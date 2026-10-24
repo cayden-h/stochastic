@@ -6,8 +6,9 @@ An amount edit replaces one line's amount with new_value (USD thousands).
 A remap edit moves one target line onto another platform line.
 A reverted edit is ignored everywhere. An edit that matches nothing is refused, never guessed.
 
-The income statement roll-up rule (a detail edit carries into the totals the way the filed statement is built):
-- line_sign(name): -1 (a cost) when the lower-cased name contains "cost", "expense", "tax", "provision", or
+The income statement roll-up rule (a detail edit carries into the totals the way the filed statement is built).
+The sign of a line is inferred from its name, not read from the filing; the fixture figures are verified by the tests.
+- line_sign(name) (inferred): -1 (a cost) when the lower-cased name contains "cost", "expense", "tax", "provision", or
   "attributable to the non-controlling"; else +1 when it contains "revenue", "sales", "income", "profit",
   "earnings", or "gain"; else -1 (no word: treated as a cost, and named under rollup_notes in the run output).
 - For an amount edit on an income statement detail line (not is_total), delta = new_value - the line's value in
@@ -25,10 +26,13 @@ A rolls_into field on the fixture lines would replace this rule later.
 
 Refusals (ValueError), so a total is never left stale and a figure is never guessed:
 - An amount edit that matches no line, or more than one line (give the section, or the line is ambiguous).
+- An amount edit on an income statement detail line when no later is_total line of that company is a net income
+  line (a name holding "net income", "net earnings", or "net loss"): the edit could not reach net income or EBITDA,
+  and would look applied with an unchanged verdict.
 - An amount edit on a detail line (not is_total) outside the income statement when that company has any is_total
   line in the same section. The balance sheet's nesting is not derivable from order alone, and the tie-out would
   hide a wrong carry, so code does not guess which total a balance sheet detail line feeds. Edits on is_total lines,
-  and on detail lines of a section with no totals, still apply.
+  and on detail lines of a balance sheet or cash flow section with no totals, still apply.
 - A remap that matches no mapping, that names an old_platform_line other than the mapping's current one (stale), onto
   a platform line the platform does not have, or onto a platform total
   (is_total) for a detail target line.
@@ -78,6 +82,15 @@ def line_sign(name: str) -> int:
     return -1
 
 
+NET_INCOME_WORDS = ("net income", "net earnings", "net loss")
+
+
+def is_net_income(name: str) -> bool:
+    """A net income line by name: the lower-cased name holds "net income", "net earnings", or "net loss"."""
+    n = _norm(name)
+    return any(w in n for w in NET_INCOME_WORDS)
+
+
 def _has_sign_word(name: str) -> bool:
     n = _norm(name)
     return any(w in n for w in COST_WORDS + REVENUE_WORDS)
@@ -119,16 +132,20 @@ def carry_amount_edits(lines: list[SourceLine], edits: Iterable[Edit] | None
         line = out[i]
         same = [j for j, o in enumerate(out) if _norm(o.company) == _norm(line.company) and o.section == line.section]
         carry: list[tuple[int, float]] = []
-        if not line.is_total and any(out[j].is_total for j in same):
-            if line.section != INCOME_STATEMENT:
+        if not line.is_total and line.section != INCOME_STATEMENT and any(out[j].is_total for j in same):
+            raise ValueError(f"amount edit {eid} on {line.line} ({line.company}, {line.section}) is refused: "
+                             f"the roll-up for that section is not defined, so code cannot recompute the totals")
+        if not line.is_total and line.section == INCOME_STATEMENT:
+            later = [j for j in same if j > i and out[j].is_total]
+            if not any(is_net_income(out[j].line) for j in later):
                 raise ValueError(f"amount edit {eid} on {line.line} ({line.company}, {line.section}) is refused: "
-                                 f"the roll-up for that section is not defined, so code cannot recompute the totals")
+                                 f"no later total line of {line.company} is a net income line, so the edit could "
+                                 f"not reach net income or EBITDA")
             delta = round(float(new_value) - _thousands(line), 6)
             sign = line_sign(line.line)
             if not _has_sign_word(line.line):
                 notes.append(f"{line.line} ({line.company}) has no revenue or cost word in its name; "
                              f"the roll-up treated it as a cost")
-            later = [j for j in same if j > i and out[j].is_total]
             if later and _norm(out[later[0]].line).startswith("total"):
                 carry.append((later[0], delta))
             carry += [(j, sign * delta) for j in later if not _norm(out[j].line).startswith("total")]

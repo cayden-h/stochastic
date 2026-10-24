@@ -325,3 +325,62 @@ def test_amount_edit_matching_two_lines_is_refused():
     out, applied = edit_tools.apply_amount_edits(lines, [edit("ed_12", company="Nu Aire", line="Other",
                                                               section="cash_flow", new_value=1.0)])
     assert [x.amount for x in out] == [1.0, 200.0] and applied == ["ed_12"]
+
+
+def test_two_edits_in_one_group_add_up(inputs):
+    p, t, m, brief = inputs
+    # G&A 6,162.806 -> 5,662.806 (-500, a cost: net income +500) and R&D 532.092 -> 632.092 (+100, a cost: net
+    # income -100). Total Operating Expense 18,433.001 - 500 + 100 = 18,033.001; Net Income 5,438.271 + 400 =
+    # 5,838.271; covenant EBITDA 28,378.845 + 500 - 100 = 28,778.845; 21,633 / 28,778.845 = 0.7517 -> 0.752.
+    edits = [edit("ed_20", company="Nu Aire", line="General and Administrative", section="income_statement",
+                  old_value=6162.806, new_value=5662.806),
+             edit("ed_21", company="Nu Aire", line="Research and Development", section="income_statement",
+                  old_value=532.092, new_value=632.092)]
+    for order in (edits, edits[::-1]):
+        lines, applied, _, _ = edit_tools.carry_amount_edits(t, order)
+        got = is_amounts(lines, "Nu Aire")
+        assert (got["Total Operating Expense"], got["Net Income"]) == (18033.001, 5838.271)
+        out = run_all(inputs, order)
+        assert out["ebitda"]["ebitda"] == 28778.845
+        assert finance.leverage(out["covenant_debt"]["debt"], out["ebitda"]["ebitda"])["leverage"] == 0.752
+        assert out["tie_out"]["ok"] is True
+
+
+def test_an_edit_to_the_non_controlling_interest_moves_only_the_attributable_line(inputs):
+    p, t, m, brief = inputs
+    # NCI 304 -> 404 (+100, a deduction: sign -1). The only later total is "Net earnings attributable to Kewaunee
+    # Scientific Corporation": 18,753 - 100 = 18,653. Net earnings (19,057, before it) and EBITDA do not move.
+    nci = edit("ed_22", company="Kewaunee", line="Net earnings attributable to the non-controlling interest",
+               section="income_statement", old_value=304, new_value=404)
+    lines, applied, rollup, _ = edit_tools.carry_amount_edits(p, [nci])
+    got = is_amounts(lines, "Kewaunee")
+    assert got["Net earnings attributable to Kewaunee Scientific Corporation"] == 18653.0
+    assert got["Net earnings"] == 19057.0
+    assert [(r["line"], r["delta"]) for r in rollup] == [
+        ("Net earnings attributable to Kewaunee Scientific Corporation", -100.0)]
+    assert finance.ebitda(p, t, brief, edits=[nci])["ebitda"] == 28378.845
+
+
+def _is_line(lid, name, amount, is_total=False):
+    return SourceLine(id=lid, deal_id="d_x", company="Nu Aire", line=name, section="income_statement", period="FY",
+                      amount=amount, unit="USD thousands", is_total=is_total, source_ref="test")
+
+
+def test_an_income_statement_edit_that_cannot_reach_net_income_is_refused():
+    # Revenue 100, Operating expenses 60, Net income 40, no line marked a total (an upload can do this). Cutting
+    # Operating expenses to 50 would leave Net income at 40 and EBITDA unchanged while the edit looks applied.
+    cut = edit("ed_23", company="Nu Aire", line="Operating expenses", section="income_statement", new_value=50.0)
+    lines = [_is_line("sl_r", "Revenue", 100.0), _is_line("sl_o", "Operating expenses", 60.0),
+             _is_line("sl_n", "Net income", 40.0)]
+    with pytest.raises(ValueError, match=r"amount edit ed_23 on Operating expenses \(Nu Aire, income_statement\) "
+                                         r"is refused: no later total line of Nu Aire is a net income line"):
+        edit_tools.carry_amount_edits(lines, [cut])
+    # with only a group total marked, the edit would stop there: also refused
+    lines = [_is_line("sl_r", "Revenue", 100.0), _is_line("sl_o", "Operating expenses", 60.0),
+             _is_line("sl_t", "Total expenses", 60.0, is_total=True), _is_line("sl_n", "Net income", 40.0)]
+    with pytest.raises(ValueError, match="ed_23 on Operating expenses"):
+        edit_tools.carry_amount_edits(lines, [cut])
+    # with Net income marked a total the edit carries: Total expenses 50, Net income 50
+    lines[-1] = _is_line("sl_n", "Net income", 40.0, is_total=True)
+    out, applied, rollup, _ = edit_tools.carry_amount_edits(lines, [cut])
+    assert [x.amount for x in out] == [100.0, 50.0, 50.0, 50.0] and applied == ["ed_23"]

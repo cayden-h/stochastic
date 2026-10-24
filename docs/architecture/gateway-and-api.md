@@ -293,7 +293,8 @@ The quotes are elided here; the gateway checks each one is an exact substring of
 
 ## Review edits in the gateway (D19)
 
-The gateway functions below are in `backend/app/gateway/gateway.py`; the routes over them are Tri's (T2, `design/review-companion.md` section 10).
+The gateway functions below are in `backend/app/gateway/gateway.py`.
+The routes over them are `POST /deals/{id}/edits`, `POST /edits/{id}/reason`, and `DELETE /edits/{id}` (routes table above; verified by `backend/tests/test_api_edits.py`).
 Every function refuses any actor but `human:controller` with 403 and a DENIED row.
 
 | Function | What it does |

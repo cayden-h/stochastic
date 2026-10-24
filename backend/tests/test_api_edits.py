@@ -18,6 +18,7 @@ os.environ["AGENT_BACKEND"] = "scripted"
 os.environ["AGENT_FALLBACK"] = "scripted"
 
 from app.api.events import next_events  # noqa: E402
+from app.api.export import AMBER  # noqa: E402
 from app.api.schemas import CaseResponse  # noqa: E402
 from app.core.models import MAPPER, PREPARER, REVIEWER  # noqa: E402
 from app.db.fixtures.kewaunee import DEAL_ID, PLATFORM, TARGET  # noqa: E402
@@ -100,16 +101,25 @@ def test_the_demo_beat_through_http(c):
     row = next(i for i, v in enumerate(ws.iter_rows(values_only=True), start=1)
                if v[0] == m["platform_line"] and v[1] == "income_statement")
     cell = ws.cell(row=row, column=4)
-    assert cell.fill.fill_type is not None and "Line was 6,162.806" in cell.comment.text
+    assert cell.fill.fill_type == "solid" and cell.fill.fgColor.rgb.endswith(AMBER)
+    assert "Line was 6,162.806" in cell.comment.text
 
 
 def test_undo_restores_the_agents_leverage(c):
+    agents = case(c)["result"]
     edit = c.post(f"/deals/{DEAL_ID}/edits", json=AMOUNT).json()["edit"]
     r = c.delete(f"/edits/{edit['id']}")
     assert r.status_code == 200
     out = r.json()
     assert out["edit"]["status"] == "reverted" and out["result"]["edit_ids"] == []
     assert (out["verdict"]["leverage"], out["verdict"]["ebitda"]) == (0.762, 28378.845)
+    # every row of the revision equals the agents' row (the run id is the recompute's own), and so do the figures
+    def rows(result):
+        return [{k: v for k, v in row.items() if k != "run_id"} for row in result["rows"]]
+    assert rows(out["result"]) == rows(agents) and len(rows(agents)) > 0
+    assert {row["run_id"] for row in out["result"]["rows"]} != {row["run_id"] for row in agents["rows"]}
+    for k in ("ebitda", "debt", "leverage", "limit", "verdict", "headroom_turns", "tie_out_ok"):
+        assert out["result"][k] == agents[k], k
     assert case(c)["verdict"]["leverage"] == 0.762
     assert c.delete(f"/edits/{edit['id']}").status_code == 409  # already reverted
     assert c.delete("/edits/e_999").status_code == 404
@@ -139,6 +149,11 @@ def test_bad_bodies_get_422_naming_the_field(c):
                                 f'"value": {bad}}}', headers={"Content-Type": "application/json"})
         assert r.status_code == 422 and "value must be a finite number" in detail(r), bad
         assert r.json()["detail"][0]["loc"] == ["body", "value"]
+        assert r.json()["detail"][0]["input"] == "non-finite"  # never echoed as a non-finite number
+    # a boolean is not a number, and a string is not a number either, even "NaN"
+    for bad in (True, "NaN", "12"):
+        r = c.post(url, json={**AMOUNT, "value": bad})
+        assert r.status_code == 422 and r.json()["detail"][0]["loc"] == ["body", "value"], bad
     r = c.post(url, json={"kind": "remap", "company": TARGET, "line": "Certificates of Deposit"})
     assert r.status_code == 422 and "platform_line is required" in detail(r)
     r = c.post(url, json={**AMOUNT, "kind": "split"})
@@ -155,9 +170,29 @@ def test_bad_bodies_get_422_naming_the_field(c):
     r = c.post(f"/edits/{edit['id']}/reason", json={"text": "   "})
     assert r.status_code == 422 and "chip or text" in detail(r)
     assert c.post(f"/edits/{edit['id']}/reason", json={"chip": 7}).status_code == 422
+    r = c.post(f"/edits/{edit['id']}/reason", json={"chip": True})
+    assert r.status_code == 422 and r.json()["detail"][0]["loc"] == ["body", "chip"]
     assert c.post("/edits/e_999/reason", json={"chip": 0}).status_code == 404
     typed = c.post(f"/edits/{edit['id']}/reason", json={"text": "Bonus accrual booked twice", "remember": False})
     assert typed.status_code == 200 and typed.json()["adjustment_id"] is None
+
+
+def test_non_finite_numbers_in_any_field_get_422_naming_the_field(c):
+    """JSON NaN anywhere in a body is a 422 that names the field (app/api/errors.py), never a 500."""
+    edit = c.post(f"/deals/{DEAL_ID}/edits", json=AMOUNT).json()["edit"]
+    raw = '{"kind": "amount", "company": "Nu Aire", "line": "General and Administrative", "value": 1.0, '
+    for url, body, loc in (
+            (f"/edits/{edit['id']}/reason", '{"chip": NaN}', ["body", "chip"]),
+            (f"/deals/{DEAL_ID}/edits", raw + '"section": NaN}', ["body", "section"]),
+            (f"/deals/{DEAL_ID}/edits", raw.replace('"amount"', "NaN") + '"section": "income_statement"}',
+             ["body", "kind"]),
+            (f"/deals/{DEAL_ID}/edits", "[NaN]", ["body"])):
+        r = c.post(url, content=body, headers={"Content-Type": "application/json"})
+        assert r.status_code == 422, (url, body, r.text)
+        first = r.json()["detail"][0]
+        assert first["loc"] == loc and first["msg"], body
+        assert "NaN" not in r.text and "Infinity" not in r.text
+    assert len(case(c)["edits"]) == 1  # nothing else was kept
 
 
 def test_a_remap_through_http_ties_out(c):
@@ -200,3 +235,6 @@ def test_the_edit_stream_event():
     gw.reason_edit(CONTROLLER, edit.id, chip=0)
     events, seen, last = next_events(store, DEAL_ID, seen, last, edits_seen=cursor)
     assert [d["edits"] for k, d in parse(events) if k == "edit"] == [[{"id": edit.id, "status": "reasoned"}]]
+    gw.revert_edit(CONTROLLER, edit.id)
+    events, seen, last = next_events(store, DEAL_ID, seen, last, edits_seen=cursor)
+    assert [d["edits"] for k, d in parse(events) if k == "edit"] == [[{"id": edit.id, "status": "reverted"}]]

@@ -96,10 +96,11 @@ These come from the review of `tri/tool/new` (findings C-1, I-1, I-4, I-6, M-1, 
 - The remap path must replace the stored mapping's `platform_line` rather than add a second `Mapping`, or `consolidate` raises "mapped twice" (I-4).
 - The simpler path is to store only the `Edit` and pass it as `edits=`, since `apply_remap_edits` already moves the line; revert is then just status "reverted".
 - C-1 roll-up rule (P4a, verified by `backend/tests/test_tools_edits.py`): an amount edit on an income statement detail line now carries into the totals by a defined rule in `backend/app/tools/edits.py`.
-- The sign of a line is -1 when its name contains "cost", "expense", "tax", "provision", or "attributable to the non-controlling", else +1 when it contains "revenue", "sales", "income", "profit", "earnings", or "gain", else -1 (named under `rollup_notes` in the run output).
+- The sign of a line is inferred from its name, not read from the filing (the fixture figures are verified by the tests): it is -1 when its name contains "cost", "expense", "tax", "provision", or "attributable to the non-controlling", else +1 when it contains "revenue", "sales", "income", "profit", "earnings", or "gain", else -1 (named under `rollup_notes` in the run output).
 - With delta = new value - old value in USD thousands, the first total after the edited line moves by +delta when its name starts with "Total" (a group total), and every later total whose name does not start with "Total" (a running total such as Net Income) moves by sign * delta.
 - No other line moves and taxes are not recomputed, so a 500 cut in Nu Aire "General and Administrative" raises covenant EBITDA by exactly 500 (28,378.845 to 28,878.845, leverage 0.749).
 - Every line the carry moved is listed under `rollup` as `{edit_id, company, line, delta}` in the consolidate, ebitda, and covenant_debt outputs.
+- An income statement detail edit is refused when no later total line of that company is a net income line (its name holds "net income", "net earnings", or "net loss"), because the edit could not reach EBITDA and would look applied.
 - A balance sheet detail edit stays refused, because its nesting is not derivable from order alone and the tie-out would hide a wrong carry.
 - A `rolls_into` field with a sign on each fixture line would replace this rule later.
 - `tie_out` lists the edits passed to it; the gateway should take `edits_applied` from the consolidate run it checks (M-1).

@@ -23,7 +23,7 @@ from app.api import certificate as cert_doc
 from app.api import export as export_doc
 from app.api.events import next_events
 from app.api.schemas import CaseResponse, DealCreated, EditBody, EditReasonBody, EditResponse, HealthResponse
-from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, State
+from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, Edit, State
 from app.db.loader import MAX_BYTES, LoaderError, parse_statement_csv
 from app.gateway.gateway import Gateway, GatewayError
 
@@ -459,7 +459,7 @@ def build_router(gw: Gateway) -> APIRouter:
                                                          value=body.value, platform_line=body.platform_line,
                                                          section=body.section)))
 
-    @r.post("/edits/{edit_id}/reason")
+    @r.post("/edits/{edit_id}/reason", response_model=Edit)
     def reason_edit(edit_id: str, body: EditReasonBody, x_actor: str = Header(default=CONTROLLER)):
         """Why the controller made the edit: a chip or a typed reason. With remember, it becomes memory."""
         return dump(guard(lambda: gw.reason_edit(x_actor, edit_id, chip=body.chip, text=body.text,

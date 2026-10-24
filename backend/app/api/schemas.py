@@ -87,12 +87,10 @@ class CaseResponse(BaseModel):
     reason_chips: dict[str, list[ReasonChip]] | None = None
 
 
-NON_FINITE = "not a finite number"
-
-
 class EditBody(BaseModel):
-    """POST /deals/{id}/edits. An amount edit gives value (USD thousands, finite); a remap gives platform_line.
-    The gateway checks the rest (the company, the line, the approval state) and audits every refusal."""
+    """POST /deals/{id}/edits. An amount edit gives value (USD thousands, a finite JSON number; a boolean or a string
+    is refused); a remap gives platform_line. The gateway checks the rest (the company, the line, the approval
+    state) and audits every refusal. A non-finite value in a 422 is written as "non-finite" (app/api/errors.py)."""
     kind: EditKind
     company: str = Field(min_length=1, max_length=200)
     line: str = Field(min_length=1, max_length=300)
@@ -100,19 +98,18 @@ class EditBody(BaseModel):
     platform_line: str | None = Field(default=None, min_length=1, max_length=300)
     section: Section | None = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def _mark_non_finite(cls, data):
-        """NaN or an infinity (JSON NaN, 1e999) is swapped for a marker before parsing: the 422 response echoes the
-        input, and a non-finite float cannot be written as JSON, so it would turn the 422 into a 500."""
-        if isinstance(data, dict) and isinstance(data.get("value"), float) and not math.isfinite(data["value"]):
-            data = {**data, "value": NON_FINITE}
-        return data
-
     @field_validator("value", mode="before")
     @classmethod
+    def _number(cls, v):
+        """Only a JSON number: lax parsing would read true as 1.0 and the string "NaN" as nan."""
+        if v is not None and (isinstance(v, bool) or not isinstance(v, (int, float))):
+            raise ValueError("value must be a JSON number (USD thousands), not a boolean or a string")
+        return v
+
+    @field_validator("value")
+    @classmethod
     def _finite(cls, v):
-        if v == NON_FINITE:
+        if v is not None and not math.isfinite(v):
             raise ValueError("value must be a finite number")
         return v
 
@@ -136,6 +133,14 @@ class EditReasonBody(BaseModel):
     chip: int | None = None
     text: str | None = None
     remember: bool = True
+
+    @field_validator("chip", mode="before")
+    @classmethod
+    def _chip_is_an_integer(cls, v):
+        """Only a JSON integer: lax parsing would read true as chip 1."""
+        if v is not None and (isinstance(v, bool) or not isinstance(v, int)):
+            raise ValueError("chip must be a JSON integer (a reason chip id)")
+        return v
 
     @model_validator(mode="after")
     def _one_reason(self) -> "EditReasonBody":

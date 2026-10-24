@@ -339,13 +339,14 @@ TOOLS = {
 
 EDIT_RULE = ("An amount edit on an income statement detail line carries into the totals: the first total after it, "
              "if its name starts with 'Total', moves by the change; every later running total (Gross Profit, "
-             "Operating profit, Income Before Income Taxes, Net Income) moves by the change times the line's sign "
-             "(-1 for a cost, expense, tax, or provision line, +1 for a revenue, sales, income, or profit line, -1 "
-             "for a name with neither, named in rollup_notes). Taxes are not recomputed. Every line the carry moved "
-             "is listed in rollup. An edit on a total line replaces that line only. An amount edit on a balance "
-             "sheet detail line is refused: its roll-up is not defined, so code cannot recompute the totals. An edit "
-             "that matches no line or several lines, or a remap onto a platform total or a line the platform does "
-             "not have, is refused.")
+             "Operating profit, Income Before Income Taxes, Net Income) moves by the change times the line's sign, "
+             "which is inferred from its name (-1 for a cost, expense, tax, or provision line, +1 for a revenue, "
+             "sales, income, or profit line, -1 for a name with neither, named in rollup_notes). Taxes are not "
+             "recomputed. An income statement detail edit with no later net income total line is refused. Every "
+             "line the carry moved is listed in rollup. An edit on a total line replaces that line only. An amount "
+             "edit on a balance sheet detail line is refused: its roll-up is not defined, so code cannot recompute "
+             "the totals. An edit that matches no line or several lines, or a remap onto a platform total or a line "
+             "the platform does not have, is refused.")
 
 TOOL_DESCRIPTIONS = {
     "consolidate": "Add the target's statement lines onto the platform's lines using the approved mappings. "
