@@ -44,8 +44,8 @@ def test_mapper_flags_the_financing_liability_and_effects_are_computed(world):
     flags = gw.open_flags(DEAL_ID)
     fin = next(f for f in flags if "Financing liability" in (f.question or ""))
     effects = {o.id: o.effect for o in fin.options}
-    assert "Over the limit" in effects["a"]  # whole line counted: 2.57x
-    assert "OK" in effects["b"]  # covenant reading: 0.77x
+    assert "Over the limit" in effects["a"]  # whole line counted: 2.61x
+    assert "OK" in effects["b"]  # covenant reading: 0.79x
     assert all(o.run_id for o in fin.options)  # every effect traces to a limit_test run
 
 
@@ -135,7 +135,7 @@ def test_numbers_without_a_run_id_are_refused(world):
     item = gw.create_item(DEAL_ID, "prepare_result")
     fake = PreparerOutput(rows=[ResultRow(line="Net sales", section="income_statement", platform=1, target=1,
                                           combined=2, run_id="run_999")],
-                          ebitda=28032.6, debt=21633.0, leverage=0.77, limit=2.5, run_ids=["run_999"])
+                          ebitda=28032.6, debt=21633.0, leverage=0.77, limit=2.5, run_ids=["run_999"])  # any numbers: the point is that no run produced them
     with pytest.raises(Invalid):
         gw.store_result(PREPARER, item.id, fake)
     assert store.audit[-1].result == "DENIED"
@@ -228,7 +228,7 @@ def test_api_flow():
 def test_units_and_limit_test():
     assert finance.to_thousands(74850302, "USD") == 74850.302
     assert finance.limit_test(2.499, 2.5)["ok"] and not finance.limit_test(2.5, 2.5)["ok"]
-    assert finance.limit_test(0.772, 2.5, ebitda_value=28032.6, debt=21633.0)["debt_capacity"] == pytest.approx(48448.5)
+    assert finance.limit_test(0.786, 2.5, ebitda_value=27518.845, debt=21633.0)["debt_capacity"] == pytest.approx(47164.113, abs=0.01)
 
 
 def test_ebitda_subtracts_interest_income(world):

@@ -9,7 +9,7 @@ Built at Cal Hacks 13.0 (Oct 23-25, 2026, San Francisco) for the Hyphenate track
 
 | | |
 | --- | --- |
-| Status | Backend runs the demo deal end to end on real filing figures (2026-10-24): mapping, flags with computed effects, consolidation with tie-out, covenant leverage 0.77x against 2.50x, maker-checker, hash-chained log, learned policies. The console is being rebuilt on the new API. |
+| Status | Backend runs the demo deal end to end on real filing figures (2026-10-24): mapping, flags with computed effects, consolidation with tie-out, covenant leverage 0.79x against 2.50x, maker-checker, hash-chained log, learned policies. The console is being rebuilt on the new API. |
 | Visibility | Private. |
 | Team | UTSA, four people. |
 | Start here | [`docs/STOCHASTIC.md`](docs/STOCHASTIC.md), the reference for features, architecture, and scope. |
@@ -116,7 +116,7 @@ Public filings give statement lines, not trial balances, so the demo maps statem
 It holds the Statesville sale-leaseback ($27,782K), the new PNC term loan and revolver ($20,563K), and the 8% seller notes ($22,540K). [verified]
 The credit agreement's Senior Funded Bank Debt excludes the capital lease on that property and subordinated debt.
 So the agent asks the controller which parts count, and each option shows the leverage it gives, computed by the tools.
-Counting the whole line gives 2.57x, over the 2.50x limit. The agreement's reading gives 0.77x. [verified: `backend/tests/test_trust_rules.py`]
+Counting the whole line gives 2.61x, over the 2.50x limit. The agreement's reading gives 0.79x. [verified: `backend/tests/test_trust_rules.py`]
 
 **The one screen** has the flag card with its options and effects, a combined table (the combined balance sheet balances at $182,456K of total assets), and one verdict line that shows combined leverage against the 2.50x limit with the room left.
 The audit log is a small link.
@@ -190,7 +190,7 @@ cp .env.example .env                                        # then add keys; AGE
 cd backend
 uv venv --python 3.12 .venv
 uv pip install -p .venv/bin/python fastapi "uvicorn[standard]" pydantic pytest httpx python-dotenv python-multipart anthropic "droid-sdk[mcp]"
-.venv/bin/python -m pytest -q                               # 17 trust-rule and math tests on the real figures
+.venv/bin/python -m pytest -q                               # 93 trust-rule and math tests on the real figures
 .venv/bin/uvicorn app.main:app --port 8000 --reload
 
 cd frontend
@@ -205,7 +205,7 @@ curl -X POST localhost:8000/deals/d_kequ_nuaire/run          # Mapper runs, stop
 curl localhost:8000/deals/d_kequ_nuaire/case                 # the whole screen, including open_flags
 curl -X POST localhost:8000/work-items/wi_002/answer -H 'content-type: application/json' -d '{"option_id":"b"}'
 curl -X POST localhost:8000/work-items/wi_003/answer -H 'content-type: application/json' -d '{"option_id":"a"}'
-curl -X POST localhost:8000/deals/d_kequ_nuaire/run          # Preparer and Reviewer run; verdict 0.77x against 2.50x
+curl -X POST localhost:8000/deals/d_kequ_nuaire/run          # Preparer and Reviewer run; verdict 0.79x against 2.50x
 curl -X POST localhost:8000/work-items/wi_006/approve        # controller approves; the gateway posts
 curl -X POST localhost:8000/dev/reset && curl -X POST localhost:8000/deals/d_kequ_nuaire/run   # second run: no flag
 ```
@@ -242,8 +242,8 @@ Every figure is from the filings or computed by the tools. [verified: `backend/t
 2. At close the pro forma adds $43,103K to the same line: the $15,000K term loan, the $5,563K revolver draw, and the $22,540K seller notes. [Ex 99.2 Note 4(h)]
 3. The credit agreement's Senior Funded Bank Debt excludes the capital lease on that property and excludes subordinated debt. [Ex 10.1]
 4. The Mapper tags the line unclear and raises a flag with three options. The gateway runs the tools for each option and writes the effect on the card.
-5. Whole line: debt $71,955K, leverage 2.57x, over the limit. Agreement's reading: debt $21,633K, leverage 0.77x, OK. Bank debt plus seller notes: 1.58x.
-6. Covenant EBITDA is $28,033K: both companies' net income plus interest, taxes, and D&A, plus the $4,177K noncash pension add-back, less $1,970K of Statesville cash rent (inferred from the 10-K obligations table).
+5. Whole line: debt $71,955K, leverage 2.61x, over the limit. Agreement's reading: debt $21,633K, leverage 0.79x, OK. Bank debt plus seller notes: 1.61x.
+6. Covenant EBITDA is $27,519K: both companies' net income plus interest, taxes, and D&A, plus the $4,177K noncash pension add-back, less $1,970K of Statesville cash rent (inferred from the 10-K obligations table).
 7. The controller picks b. The Preparer calls consolidate, ebitda, covenant_debt, and leverage. The Reviewer calls tie_out and limit_test. The controller approves and the gateway posts.
 8. Reset and run again: the Mapper applies the policy and asks nothing.
 

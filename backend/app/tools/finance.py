@@ -194,6 +194,8 @@ def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], bri
 # Borrowed money must be tagged debt, not_debt, or unclear. An 'na' on one of these names is a missed tag.
 BORROWING_WORDS = ("borrowing", "loan", "note payable", "notes payable", "debt", "credit facility", "revolver",
                    "term loan", "financing liability", "finance lease", "financing lease")
+# Names that mark an asset, reserve, or cost rather than borrowed money, so a borrowing word in them is not a missed tag.
+NOT_BORROWING_WORDS = ("receivable", "reserve", "allowance", "issuance cost")
 
 
 def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLine], brief: Brief,
@@ -203,6 +205,8 @@ def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLin
     Lines tagged `debt` count. Lines tagged `not_debt` are listed as excluded with their note.
     A line tagged `unclear` stops the calculation, unless naive=True, which counts it: that is what a
     careless reading of the balance sheet gives, and it is reported as naive.
+    The borrowing check on `na` lines is a name heuristic that fails loudly, and the fix for a false positive
+    is to tag the line `not_debt` with a note.
     """
     included = []
     excluded = []
@@ -212,7 +216,9 @@ def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLin
         if line.section != "balance_sheet":
             continue
         amt = to_thousands(line.amount, line.unit)
-        if line.covenant_tag == "na" and any(w in line.line.lower() for w in BORROWING_WORDS):
+        name = line.line.lower()
+        if (line.covenant_tag == "na" and any(w in name for w in BORROWING_WORDS)
+                and not any(w in name for w in NOT_BORROWING_WORDS)):
             raise ValueError(f"covenant tag is 'na' on a borrowing-like line: {line.line} ({line.company})")
         if line.covenant_tag == "debt":
             included.append({"line": line.line, "company": line.company, "amount": round(amt, 3)})
