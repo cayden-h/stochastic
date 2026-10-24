@@ -9,6 +9,8 @@ from __future__ import annotations
 import html
 from datetime import datetime, timezone
 
+from app.tools.edits import active
+
 
 UNIT = "USD thousands"
 DRAFT_NOTE = ("Draft. Not signed. Prepared from the approved result; an officer of the borrower signs the "
@@ -39,8 +41,50 @@ def approval_item(items, result):
                  if i.type == "approve_result" and i.payload.get("result_id") == result.id), None)
 
 
-def build_certificate(store, deal, result, items, chain_valid: bool) -> dict:
-    """The certificate as a dict. Reads the store and the tool runs; never computes a figure."""
+def deal_edits(store, deal_id: str, edits=None) -> list:
+    """The deal's active edits: the given list, else the store's edits for the deal. Reverted edits are dropped.
+
+    Edits are read by attribute (the EditLike shape in app/tools/edits.py), so any object with those fields works.
+    """
+    if edits is None:
+        found = getattr(store, "edits", None) or {}
+        found = found.values() if isinstance(found, dict) else found
+        edits = [e for e in found if getattr(e, "deal_id", None) == deal_id]
+    return active(edits)
+
+
+def edit_reason(edit) -> str:
+    """The controller's reason: the text, else the chip's label, else "chip {n}"."""
+    text = getattr(edit, "reason_text", None)
+    if text:
+        return text
+    chip = getattr(edit, "reason_chip", None)
+    if chip is None:
+        return "not given yet"
+    label = chip.get("label") if isinstance(chip, dict) else getattr(chip, "label", None)
+    if label:
+        return label
+    n = chip.get("id") if isinstance(chip, dict) else getattr(chip, "id", chip)
+    return f"chip {n}"
+
+
+def edit_values(edit) -> tuple:
+    """(agent value, final value): amounts for an amount edit, platform line names for a remap."""
+    if getattr(edit, "kind", None) == "remap":
+        return getattr(edit, "old_platform_line", None), getattr(edit, "new_platform_line", None)
+    return getattr(edit, "old_value", None), getattr(edit, "new_value", None)
+
+
+def _iso(at) -> str | None:
+    return at.isoformat() if isinstance(at, datetime) else (str(at) if at is not None else None)
+
+
+def build_certificate(store, deal, result, items, chain_valid: bool, edits=None) -> dict:
+    """The certificate as a dict. Reads the store and the tool runs; never computes a figure.
+
+    `edits` defaults to the store's active edits for the deal. The figures are the runs' own; once the gateway
+    passes edits to the tools (C2), those runs already carry the edited figures.
+    """
     brief = deal.brief
     by_tool = result.run_ids_by_tool
 
@@ -101,6 +145,13 @@ def build_certificate(store, deal, result, items, chain_valid: bool) -> dict:
     appr = approval_item(items, result)
     rows = [a for a in store.audit if a.deal_id == deal.id]
     mappings = store.deal_mappings(deal.id)
+    edit_list = []
+    for e in deal_edits(store, deal.id, edits):
+        old, new = edit_values(e)
+        edit_list.append({"id": getattr(e, "id", None), "kind": getattr(e, "kind", None),
+                          "company": getattr(e, "company", None), "line": getattr(e, "line", None),
+                          "old": old, "new": new, "reason": edit_reason(e), "actor": getattr(e, "actor", None),
+                          "at": _iso(getattr(e, "at", None)), "policy_id": getattr(e, "policy_id", None)})
 
     return {
         "header": {"deal": deal.name, "deal_id": deal.id, "platform": deal.platform, "target": deal.target,
@@ -117,6 +168,7 @@ def build_certificate(store, deal, result, items, chain_valid: bool) -> dict:
         "limit_test": limit_test,
         "tie_out": tie_out,
         "decisions": decisions,
+        "edits": edit_list,
         "approval": {"item_id": appr.id if appr else None, "state": appr.state.value if appr else None,
                      "audit": {"rows": len(rows), "chain_valid": chain_valid,
                                "denied": len([a for a in rows if a.result == "DENIED"])}},
@@ -240,6 +292,14 @@ def _sections(cert: dict) -> list[tuple[str, list[str]]]:
         lines.append(f"{x['id']} ({x['kind'] or 'flag'}, {x['state']}): {x['question']} Chosen: {x['option_id']} "
                      f"- {x['label']}. Effect: {x['effect']} [{source}]")
     out.append(("Decisions", lines or ["No flags on this deal."]))
+
+    lines = []
+    for x in cert.get("edits", []):
+        policy = f" Policy {x['policy_id']}." if x.get("policy_id") else ""
+        old, new = (fmt(x["old"]), fmt(x["new"])) if x["kind"] == "amount" else (x["old"], x["new"])
+        lines.append(f"{x['id']} ({x['kind']}): {x['line']} ({x['company']}) {old} to {new}. "
+                     f"Reason: {x['reason']}. By {x['actor']} at {x['at']}.{policy}")
+    out.append(("Edits in review", lines or ["None."]))
 
     a = cert["approval"]
     au = a["audit"]

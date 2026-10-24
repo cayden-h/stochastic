@@ -20,6 +20,7 @@ from app.agents import runner as agent_runner
 from app.agents import settings as agent_settings
 from app.agents.jobs import advance
 from app.api import certificate as cert_doc
+from app.api import export as export_doc
 from app.api.events import next_events
 from app.api.schemas import CaseResponse, DealCreated, HealthResponse
 from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, State
@@ -253,22 +254,37 @@ def build_router(gw: Gateway) -> APIRouter:
             "backend": backend_status(),
         }
 
-    @r.get("/deals/{deal_id}/certificate")
-    def certificate(deal_id: str, format: Literal["md", "html", "json"] = "md"):
-        """Draft compliance certificate from the approved, posted result. Every figure carries its run id."""
+    def need_posted(deal_id: str, what: str):
+        """The deal, its items, and its result, once the controller approved that result and it is posted; else 409.
+        The certificate and the final workbook share this gate so the two cannot drift."""
         d = need_deal(deal_id)
         items = store.deal_items(deal_id)
         result = store.latest_result(deal_id)
         approval = cert_doc.approval_item(items, result) if result else None
         if (not result or not approval or approval.payload.get("result_id") != result.id
                 or approval.state != State.POSTED or d.stage != "posted"):
-            raise HTTPException(status_code=409, detail="certificate is available after the controller approves the result")
+            raise HTTPException(status_code=409, detail=f"{what} available after the controller approves the result")
+        return d, items, result
+
+    @r.get("/deals/{deal_id}/certificate")
+    def certificate(deal_id: str, format: Literal["md", "html", "json"] = "md"):
+        """Draft compliance certificate from the approved, posted result. Every figure carries its run id."""
+        d, items, result = need_posted(deal_id, "certificate is")
         doc = cert_doc.build_certificate(store, d, result, items, chain_valid=gw.verify_chain())
         if format == "json":
             return doc
         if format == "html":
             return HTMLResponse(cert_doc.render_html(doc))
         return Response(cert_doc.render_markdown(doc), media_type="text/markdown; charset=utf-8")
+
+    @r.get("/deals/{deal_id}/export.xlsx")
+    def export_xlsx(deal_id: str):
+        """The combined books as a workbook (Combined, Edits, Audit), from the approved, posted result."""
+        d, items, result = need_posted(deal_id, "final files are")
+        wb = export_doc.build_workbook(store, d, result, items, chain_valid=gw.verify_chain())
+        name = export_doc.export_filename(d.platform, d.target)
+        return Response(export_doc.workbook_bytes(wb), media_type=export_doc.XLSX_MEDIA_TYPE,
+                        headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
     @r.get("/deals/{deal_id}/source-lines")
     def source_lines(deal_id: str, company: str | None = None):
