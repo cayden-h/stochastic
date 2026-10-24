@@ -31,7 +31,7 @@ set -a; . ../.env; set +a
 TEST_DATABASE_URL="$DATABASE_URL" DB_SCHEMA=stochastic_<you> .venv/bin/python -m pytest -q
 ```
 
-Run this before every merge that touches the store, the gateway, or the API. Expect 329 passed and 3 skipped (verified against Tiger Cloud on 2026-10-24), and about 65 seconds.
+Run this before every merge that touches the store, the gateway, or the API. Expect 330 passed and 3 skipped (verified against Tiger Cloud on 2026-10-24), and about 65 seconds.
 
 ## Status
 
