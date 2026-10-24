@@ -292,11 +292,13 @@ class Gateway:
         out = MapperOutput.model_validate(out.model_dump())  # the gateway re-validates the typed result
         target_by_id = {l.id: l for l in self._target_lines(deal)}
         flagged_ids = {lid for f in out.flags if f.kind == "mapping" for lid in f.line_ids}
+        try:  # check the whole result before writing any of it, so a refused result leaves nothing behind
+            self._check_mapping(deal, out, target_by_id)
+        except Invalid as error:
+            self._deny(error, deal.id, actor, "propose:map_lines", item.id)
         stored: list[Mapping] = []
         for p in out.mappings:
-            t = target_by_id.get(p.target_line_id)
-            if t is None:
-                raise Invalid(f"mapping names unknown target line {p.target_line_id}")
+            t = target_by_id[p.target_line_id]
             pl = self._platform_line(deal, t.section, p.platform_line)
             m = Mapping(id=self.store.next_id("m"), deal_id=deal.id, target_line_id=t.id,
                         platform_line_id=pl.id if pl else None, target_line=t.line,
@@ -306,9 +308,7 @@ class Gateway:
             self.store.mappings[m.id] = m
             stored.append(m)
         for tag in out.tags:
-            line = self.store.source_lines.get(tag.line_id)
-            if line is None or line.deal_id != deal.id:
-                raise Invalid(f"tag names unknown line {tag.line_id}")
+            line = self.store.source_lines[tag.line_id]
             line.covenant_tag = tag.tag
             line.covenant_note = tag.note or None
             line.covenant_policy_id = self._cited_policy(tag.policy_id, "covenant_tag", tag.tag)
@@ -323,12 +323,22 @@ class Gateway:
         self._log(deal.id, actor, "propose:map_lines", "ALLOWED", item.id,
                   reason=f"{_count(len(out.mappings), 'mapping')}, {_count(len(out.flags), 'flag')}")
         for flag in out.flags:
-            self._check_flag_resolves(flag)
-        for flag in out.flags:
             self._open_flag(deal, item, flag)
         self._post(item)
         deal.stage = "awaiting_flag" if self.open_flags(deal.id) else "mapped"
         return item
+
+    def _check_mapping(self, deal: Deal, out: MapperOutput, target_by_id: dict[str, SourceLine]) -> None:
+        for p in out.mappings:
+            if p.target_line_id not in target_by_id:
+                raise Invalid(f"mapping names unknown target line {p.target_line_id}: target_line_id must be the id "
+                              f"of a target line ({deal.target}), never a platform line")
+        for tag in out.tags:
+            line = self.store.source_lines.get(tag.line_id)
+            if line is None or line.deal_id != deal.id:
+                raise Invalid(f"tag names unknown line {tag.line_id}")
+        for flag in out.flags:
+            self._check_flag_resolves(flag)
 
     @staticmethod
     def _check_flag_resolves(flag: FlagProposal) -> None:

@@ -322,6 +322,7 @@ class MapperInput(BaseModel):
     brief: Brief
     policies: list[Policy] = Field(default_factory=list)  # what the Mapper learned before
     session: AgentSession | None = None
+    previous_refusal: str | None = None  # why the gateway refused the Mapper's last result, on the one retry
 
 
 class MapperOutput(BaseModel):

@@ -7,6 +7,7 @@ Home of the answer key and the scoring. Owner: Eric.
 - `fixture_check.md`: every fixture figure checked against the filings.
 - `answer_key.csv`: each Nu Aire detail line and its Kewaunee line, from Note 2 of the pro forma filing (8-K/A Ex 99.2).
 - `score_mapper.py`: runs the deal in-process and scores the Mapper's mappings against the key.
+- `mapper_trials.py`: runs the Mapper alone N times on the Anthropic backend and reports acceptance, score, flags, and cost. It spends real API credit.
 - The deal-math tests with the real figures live in `backend/tests/test_trust_rules.py` (tie-out, naive versus covenant leverage).
 
 ## The answer key is preliminary and matches in shape only
@@ -52,6 +53,13 @@ Both recorded Droid runs were scored without a key, by replaying the Mapper's re
 | `backend/recordings/haiku-5-5/` | Claude Haiku 5.5 (04:30) | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/haiku-5-5-run2/` | Claude Haiku 5.5 (evening, after the settle-every-line rule) | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/droid-console-0751/` | Droid run from the console on 2026-10-24 at 07:51 (model not stored in the recording; the backend default was Haiku 5.5) | 23 of 23 | 10 of 10 | 33 of 33 |
+| `backend/recordings/anthropic-haiku-5-5/` | Claude Haiku 5.5 on the Anthropic backend (the first Anthropic run) | 22 of 23 | 10 of 10 | 32 of 33 |
+
+The Anthropic run is the first on that backend. [verified]
+Its one disagreement: it puts Accrued Commissions in Other accrued expenses, where Note 2 puts it in Employee compensation and amounts withheld. [verified]
+It flagged three groups (the financing liability readings, five Nu Aire lines with no direct home, and interest income), passed review at 0.76x, and used 128,242 input and 23,346 output tokens, about $0.02 at $0.10 and $0.50 per million. [verified: run log, 2026-10-24]
+Two earlier attempts failed: the first two stopped at the old 16,000-token output cap, and one after the cap was raised was refused by the gateway because the Mapper named a Kewaunee line as a target line. [verified]
+Scored with `RECORDINGS_DIR=$PWD/backend/recordings/anthropic-haiku-5-5 backend/.venv/bin/python evals/score_mapper.py --backend replay`.
 
 The Sonnet run was scored with `backend/.venv/bin/python evals/score_mapper.py --backend replay`; it is the default recording since 2026-10-24. [verified]
 The Haiku run was scored straight from `backend/recordings/haiku-5-5/mapper.json`, because the gateway rejects that Mapper output (see below). [verified]
@@ -63,3 +71,29 @@ Why the Haiku run is not the default: its Mapper tagged "Short-term borrowings" 
 Since 2026-10-24 the gateway rejects any covenant flag whose option leaves a flagged line unsettled, so a Mapper output like that fails at the Mapper step and the runner falls back. [verified: `test_flag_option_that_leaves_a_line_unclear_is_refused`]
 The Sonnet recording runs through and is the default replay.
 The Mapper is scored on what it proposed before any human answer; the default flag answers changed no mappings in this run.
+
+## Mapper consistency on the Anthropic backend (2026-10-24)
+
+Each batch ran the Mapper 10 times on Claude Haiku 5.5 through the Anthropic backend with `evals/mapper_trials.py`, from a fresh store each time, recording nothing.
+Ten runs per batch is a small sample: the counts are measured, and whether they hold over many more runs is inferred.
+
+| Batch | Accepted by the gateway | Scores (of 33) | Cost |
+| --- | --- | --- | --- |
+| Before any fix (16K cap raised to 64K only) | 9 of 10 | 27, 28, 31, 32, 32, 32, 32, 33, 33 | about $0.12 |
+| Retry with the refusal reason, plus a prompt sentence on target ids | 9 of 10 | 32, 32, 32, 32, 32, 32, 33, 33, 33 | about $0.11 |
+| Strict submit tool with line id enums | 10 of 10 | 30, 31, 31, 32, 32, 32, 33, 33, 33, 33 | about $0.12 |
+| Both fixes combined, batch 1 | 10 of 10 | 30, 31, 32, 32, 32, 32, 32, 33, 33, 33 | about $0.12 |
+| Both fixes combined, batch 2 | 10 of 10 | 29, 29, 32, 32, 32, 32, 33, 33, 33, 33 | about $0.12 |
+
+[verified: trial output, 2026-10-24]
+
+What failed before the fixes: in 2 of 12 runs the Mapper gave Nu Aire's "Cash and Cash Equivalents" Kewaunee's line id `sl_001`, and in 1 run it returned `flags` as text instead of a list.
+With both fixes, no run hit either failure, and no Mapper retry was needed. [verified]
+
+The covenant flag in combined batch 2, which recorded the lines each flag asks about:
+- Every run raised one covenant flag on the Statesville sale-leaseback lines (current and long-term portion of financing liability) and the 8% seller notes, and tagged the PNC revolver and term loan as debt. [verified]
+- 5 of 10 runs also put "Short-term borrowings" ($805K) in the flag. When the controller excludes it, leverage shows 0.74x instead of 0.76x; the verdict does not change. [verified: run output; figures from `docs/devpost/flag-card.md`]
+- 1 run flagged the three lines without tagging them unclear; the gateway accepted it, and the controller's answer sets the tags. Combined batch 1 showed the same pattern in 2 runs, which did not record flag lines. [verified for batch 2; inferred for batch 1]
+
+The most common miss is "Accrued Commissions" mapped to "Other accrued expenses", where Note 2 says "Employee compensation and amounts withheld". [verified]
+A live Anthropic run now reliably reaches the financing flag and the same verdict, but the exact flag lines and the leverage shown can differ between runs, so the recorded replay stays the stage default. [inferred]
