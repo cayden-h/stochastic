@@ -14,7 +14,7 @@ A real deployment would use signed tokens.
 | Actor | Who it is |
 | --- | --- |
 | `agent:mapper`, `agent:preparer`, `agent:reviewer` | The three agents. Each has its own permission set. |
-| `agent:brief_reader` (planned, D20) | The Brief Reader. It may store a draft brief (`propose:draft_brief`) and call the read-only tools `get_section` and `get_definition`, nothing else. See `brief-reader.md`. |
+| `agent:brief_reader` (D20) | The Brief Reader. It may store a draft brief (`propose:draft_brief`) and call the read-only tools `get_section` and `get_definition`, nothing else. See `brief-reader.md`. |
 | `human:controller` | The portfolio controller. |
 | `system:gateway` | The gateway itself. It posts, opens work items, and runs what-if tool calls for flag effects. |
 
@@ -32,6 +32,7 @@ A real deployment would use signed tokens.
 | Edit the books, give an edit's reason, revert an edit (D19) | no | no | no | yes, `human:controller` only | no |
 | Approve | no | no | no | yes, not an item they prepared | no |
 | Create a deal, run the job runner | no | no | no | yes | no |
+| Amend and approve the Brief (`amend_brief`, `approve_brief`) | no | no | no | yes | no |
 | Post to the record, open work items, write the log, write policies | no | no | no | no | yes |
 
 A forbidden action returns 403 and writes a DENIED row.
@@ -51,7 +52,8 @@ A `company` policy with no company applies to nothing.
 A `platform` policy applies only to the target lines of a deal whose platform company is `Policy.platform`, and only as a mapping: it never settles a covenant tag, so it never satisfies 5a.
 5e. A result cannot be approved while any edit of the deal is `needs_reason`; the DENIED row names the edit.
 5f. Only `human:controller` edits, and only while the deal's approval item is `PROPOSED` (or `NEEDS_INFO` when an edit's recompute failed a check). The recompute runs as the system through the edit-aware tools, and its figures are read from those runs.
-6. The limit must equal the brief's limit.
+5g. On a deal whose Brief is not approved, `store_mapping` and the tools `ebitda`, `covenant_debt`, and `limit_test` are refused (409 and a DENIED row).
+6. The limit must equal the brief's limit. Every Brief, sent as JSON or drafted, has finite figures and a limit above zero.
 7. The payload matches its Pydantic model. The gateway re-validates every agent result.
 8. `consolidate` refuses to run while a flag is open.
 9. The gateway writes one audit row for each change, and the hash of each row includes the hash of the row before it.
@@ -65,7 +67,9 @@ A policy has a `scope`.
 Flag answers make `company` policies, which apply only to the company whose line they were learned on (D18).
 Remap edits (D19) make `platform` policies, which apply to every add-on of the platform named in `Policy.platform`.
 The job runner gives the Mapper only the live policies whose scope covers the deal (`Gateway.policies_for`), so a model never sees another company's answers.
-When two policies cover a line, the scripted Mapper applies the newest, so a later correction wins over an earlier answer.
+When two policies cover a line, the newest wins, so a later correction beats an earlier answer: the scripted Mapper applies it, the Mapper prompt says so, and the gateway accepts a cited policy only if it is the newest covering the line.
+Each remembered remap learns its own policy and never updates an older one, so reverting it makes the older one effective again.
+Company and platform names are compared casefolded and stripped. The rule is in `backend/app/core/policies.py`, shared by the gateway and the scripted Mapper.
 A line mapped by a platform policy cites it in its reason and carries its id in `Mapping.policy_id`, so the Learned chip shows it on the next deal.
 Each role has an `AgentSession` (backend, session id, turns, a short transcript).
 `POST /dev/reset` keeps both unless `keep_memory=false`.
@@ -309,10 +313,28 @@ The edit is recorded on top of the agents' run, never over it: the source lines 
 A remap does not write a new `Mapping`; the edit itself carries the new platform line, and the edit-aware `consolidate` applies it.
 The recompute (`Gateway._recompute`) runs as `system:gateway`: `consolidate`, `ebitda`, `covenant_debt` (not naive), `leverage`, `tie_out`, `limit_test`.
 Every run is new, and the edit-aware runs carry `edit_ids` (the live edits) in their inputs.
-Only the gateway may pass `edit_ids` to a tool, and only to `consolidate`, `ebitda`, `covenant_debt`, and `tie_out`.
+Only the gateway may pass `edit_ids` to a tool, and only to `consolidate`, `ebitda`, and `covenant_debt`.
+`tie_out` takes no edits: its rows come from the edited `consolidate` run, so applying the edits again would double count.
 If those tools do not take `edits` yet (Tri's T1), the edit is refused with 503 ("edit-aware tools not installed (T1)") and nothing is kept.
-The new result has `supersedes` (the result it replaces), `edit_ids`, a `review` read from the `tie_out` and `limit_test` runs, and `run_ids_by_tool` for all six tools.
-The new approval item is proposed by the Preparer, as before, and is `PROPOSED` when both checks pass, `NEEDS_INFO` otherwise.
+When a covenant flag gave the whole-line reading, the recompute also runs that what-if again on the edited books: `covenant_debt` naive with the flagged lines tagged debt (restored after), `ebitda` as filed, and `leverage`, each with `what_if: "whole_line"`.
+The new result has `supersedes` (the result it replaces), `edit_ids`, a `review` read from the `tie_out` and `limit_test` runs, and `run_ids_by_tool` for the six tools plus `naive_covenant_debt`, `naive_ebitda`, and `naive_leverage` when the what-if ran.
+For Tri: `_whole_line_runs` in `routes.py` still reads the whole-line runs from the covenant flag's option, so the `/case` sensitivity figures do not show edits yet. It should prefer `result.run_ids_by_tool["naive_covenant_debt"]` and `["naive_ebitda"]` when the latest result has them.
+The new approval item is proposed by `system:gateway`, because the revision is the gateway's recompute; the controller approves it, so maker-checker holds. It is `PROPOSED` when both checks pass, `NEEDS_INFO` otherwise.
+
+### The T1 contract (edit-aware tools)
+
+```python
+consolidate(platform_lines, target_lines, mappings, edits=None)
+ebitda(platform_lines, target_lines, brief, as_filed=False, edits=None)
+covenant_debt(platform_lines, target_lines, brief, naive=False, edits=None)
+tie_out(rows, tolerance=0.5)  # unchanged: no edits
+```
+
+- `edits` is a list of `Edit` models: the live edits only, in the order they were made.
+- An `amount` edit names its line by `company`, `line`, and `section`, and carries `new_value` in USD thousands. Source lines keep their filed unit (Nu Aire files whole dollars), so the tool converts with `to_thousands` before it compares or replaces.
+- An amount edit on an income statement line must move the figures that depend on it; for example (500) of G&A raises Net Income, so covenant EBITDA rises by 500.
+- A `remap` edit carries `new_platform_line`. The agents' `Mapping` is not changed, so `consolidate` must move that target line to the new platform line itself.
+- Each of the three tools returns `edits_applied: list[str]`, the ids of the edits it used. The gateway refuses the recompute (a DENIED `edit:apply` or `edit:revert` row) if the key is missing, names an edit it was not given, repeats an id, or, for `consolidate`, leaves out any live edit.
 The old approval item becomes `SUPERSEDED` (a new `State`) and stays in the log.
 
 Audit rows of an edit:
@@ -324,7 +346,6 @@ Audit rows of an edit:
 | `create:approve_result` | `system:gateway` | new approval item | After every recompute. |
 | `edit:reason` | `human:controller` | edit id | The reason is given. |
 | `policy:learn` | `system:gateway` | policy or adjustment id | A remembered reason; the reason starts with `source: edit <id>`. |
-| `policy:update` | `system:gateway` | policy id | A remembered remap on a line that already has a live platform policy. |
 | `edit:revert` | `human:controller` | edit id | The edit is undone. |
 | `policy:retire` | `system:gateway` | policy or adjustment id | Its edit was reverted. |
 
@@ -343,6 +364,38 @@ Answering `apply` calls `apply_edit` to set that line to this deal's agent value
 Answering `skip` leaves the books as the agents made them.
 Either way the adjustment goes back to `applied`, live for later deals.
 Audit rows: `ask:flag` (the Preparer) and `adjustment:propose` when it opens, `answer` and `adjustment:apply` or `adjustment:skip` when it is answered.
+
+## The Brief Reader in the gateway (D20)
+
+The functions are in `backend/app/gateway/gateway.py`; the text helpers (normalization, the hash, the section and definition indexes) are in `backend/app/core/agreement.py`.
+The routes over them are Tri's (T4): `POST /deals` with `agreement_txt` calls `create_deal_from_agreement`, the amounts route calls `amend_brief`, `POST /deals/{id}/brief/approve` calls `approve_brief`, and `/case` reads `brief_draft`.
+
+| Function | What it does |
+| --- | --- |
+| `create_deal_from_agreement(actor, deal, lines, text, source)` | Creates the deal with `brief_status` `none` and stores the `AgreementText` (kind `agreement`). If an earlier deal's approved Brief has the same agreement hash, it is reused (`brief:reuse`) and the reader is skipped. |
+| `brief_reader_input(deal_id, item_id)` | The section index, the definition index, and the sections that mention a leverage ratio; never the whole agreement. |
+| `read_agreement(actor, deal_id, name, args)` | `get_section(id)` and `get_definition(term)`, for the reader (and the system) only. Logged as `tool:get_section` and `tool:get_definition`; no `ToolRun` is stored, since they produce no figures. |
+| `store_brief(actor, item_id, out)` | The reader's draft. Refused (DENIED) unless it passes the nine checks below; then the deal's Brief is `draft`, its `brief_field` flags open, and the stage is `awaiting_brief`. |
+| `amend_brief(actor, deal_id, field, value, source_ref=None, inferred=False, note="")` | The controller sets one field by path, for example `ebitda_addbacks[0].amount` with its `source_ref` (required for an amount). A new adjustment is added by its `.name` at the next index. The open flags on that field close with answer `amended`. |
+| `approve_brief(actor, deal_id)` | The controller only, and only with no open `brief_field` flag. Applies the removals, checks the figures again, sets `brief_status` `approved`, and logs the agreement hash. The Brief is then locked: `amend_brief` and `store_brief` answer 409. |
+| `brief_draft(deal_id)` | The `BriefDraft` for `/case`: the Brief, its citations, its flag ids, `amendments_supplied` (false: base agreement only), and `removed`. |
+
+The checks on a draft (`brief-reader.md` section 6):
+1. Only `agent:brief_reader` stores a draft, on a `draft_brief` item in state NEW.
+2. Every citation names a section of the agreement, and its quote, normalized, is an exact substring of that section's text and at least four words.
+3. The limit is in its quote as written, and that quote comes from the numbered covenant section the Brief names in `limit_section` (never the preamble or an annex, so a sentence planted there cannot set the limit). A cap is in its quote after the unit conversion (4000 is "$4,000,000").
+4. Every required field has a verified quote or a reader flag: `lender`, `limit`, `limit_section`, `limit_wording`, `debt_term`, `debt_definition`, each `debt_excludes[i]`, `ebitda_definition`, and each adjustment's `.name` and `.cap`.
+5. `limit_wording` is a quote from `limit_section` and contains `debt_term`; the figures are finite and the limit is above zero (0 only while its not-found flag is open).
+6. An adjustment amount other than 0 needs `inferred=true` and a reader flag.
+7. A field whose best quote has confidence below 0.6 opens a flag (proposed by `system:gateway`); so does every adjustment amount ("Enter the amount from the books with its source, or keep 0").
+8. An empty required field needs a reader flag that says "not found in sections ...".
+9. The draft is marked base agreement only (`amendments_supplied` false), and the approval row says so.
+
+A `brief_field` flag is a `flag` work item with `payload.kind` `brief_field` and `payload.field`. Its options are `confirm` and, for a list item, `remove` (applied at approval). The runner stops on it, as on any open flag; with every flag answered it stops on "waiting on the controller to approve the Brief".
+Audit rows: `agreement:load`, `brief:reuse`, `create:draft_brief`, `tool:get_section`, `tool:get_definition`, `propose:draft_brief` (DENIED when refused, with the reason), `ask:flag`, `answer`, `brief:amend`, `approve_brief`.
+A refused draft is retried once with the reason, then made by the scripted backend under the same checks, as for the Mapper.
+The scripted reader returns the fixture Brief with the verbatim quotes in `data/brief/kewaunee_quotes.json` when the agreement's normalized hash is listed there (the full Ex 10.1 text or the test excerpt), and a low-confidence regex read otherwise.
+`closing_financing` is left empty by the reader: it comes from Ex 99.2, not the agreement, and no tool reads it.
 
 ## The stream
 
@@ -366,7 +419,9 @@ A `: keepalive` comment is sent every 15 seconds.
 
 ## Stages
 
-`new` (loaded), `awaiting_flag`, `flags_answered`, `mapped`, `awaiting_review`, `needs_attention`, `awaiting_approval`, `posted`.
+`new` (loaded), `reading_brief`, `awaiting_brief`, `brief_ready`, `awaiting_flag`, `flags_answered`, `mapped`, `awaiting_review`, `needs_attention`, `awaiting_approval`, `posted`, and `run_failed`.
+A deal from agreement text goes `reading_brief`, `awaiting_brief` (open Brief flags), `brief_ready` (all answered), then back to `new` on approval, and maps from there.
+A run that stops on an error is `run_failed`, on the sync route as well as in the background, with one `run:failed` row.
 After an edit, the stage is `awaiting_approval` or `needs_attention` again, from the recompute's checks.
 
 ## Errors

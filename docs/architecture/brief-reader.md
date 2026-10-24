@@ -1,7 +1,7 @@
 # The Brief Reader: a fourth agent that reads the credit agreement
 
 Last updated: 2026-10-24, evening.
-Status: decided (D20), not built.
+Status: decided (D20). Stage 1 is built in the gateway and the agents (2026-10-25); the routes are Tri's T4. The gateway functions are in `gateway-and-api.md`.
 Research: `research/brief-reader.md`.
 Claims are tagged [verified] when a file or a filing shows them, and [inferred] when they are our judgment.
 

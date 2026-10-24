@@ -15,9 +15,9 @@ from dataclasses import dataclass, field
 from pydantic import BaseModel
 
 from app.agents import recording
-from app.agents.backends.scripted import scripted_mapper, scripted_preparer, scripted_reviewer
+from app.agents.backends.scripted import scripted_brief_reader, scripted_mapper, scripted_preparer, scripted_reviewer
 from app.agents.roles import Role
-from app.core.models import MapperInput, PreparerInput, ReviewerInput
+from app.core.models import BriefReaderInput, MapperInput, PreparerInput, ReviewerInput
 
 # The Anthropic backend has run on a teammate's key (recordings/anthropic-haiku-5-5), but the demo laptop has no
 # key, so the default fallback is the deterministic rules. Add `anthropic` to AGENT_FALLBACK when a key is in .env.
@@ -42,6 +42,8 @@ def _scripted(role: Role, inp: BaseModel, call_tool) -> BaseModel:
         return scripted_preparer(inp, call_tool)
     if isinstance(inp, ReviewerInput):
         return scripted_reviewer(inp, call_tool)
+    if isinstance(inp, BriefReaderInput):
+        return scripted_brief_reader(inp, call_tool)
     raise TypeError(f"no scripted agent for {type(inp).__name__}")
 
 
