@@ -44,7 +44,9 @@ export function FlagCard({
   position: string;
 }) {
   const covenant = item.payload.kind === "covenant_tag";
-  const kind = covenant ? "Lender definition question" : "Mapping question";
+  // A learned adjustment the Preparer offers on a later deal (D19): apply or skip, never applied silently.
+  const adjustment = item.payload.kind === "adjustment";
+  const kind = covenant ? "Lender definition question" : adjustment ? "Learned adjustment" : "Mapping question";
   const lineIds = Array.isArray(item.payload.line_ids) ? (item.payload.line_ids as string[]) : [];
   const flagged = lines.filter((l) => lineIds.includes(l.id));
   const [heading, detail] = splitQuestion(item.question ?? "");
@@ -89,6 +91,7 @@ export function FlagCard({
                 {suggested ? <Tag>Suggested</Tag> : null}
                 {o.added_by ? <ActorChip actor={o.added_by} /> : null}
               </span>
+              {adjustment ? <span className="text-[13px] leading-[18px] text-slate">{o.effect}</span> : null}
               {o.leverage != null ? (
                 <>
                   <span className={`text-[30px] font-semibold ${ok ? "text-clear" : "text-denied"}`}>{fmtX(o.leverage)}</span>

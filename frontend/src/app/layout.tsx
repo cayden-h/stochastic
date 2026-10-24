@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { DM_Sans, IBM_Plex_Mono, Instrument_Serif, Public_Sans } from "next/font/google";
 import "./globals.css";
 import { DealProvider } from "@/lib/deal-context";
+import { EditProvider } from "@/lib/edit-context";
+import { Companion } from "@/components/companion";
 import { SourcePanel, SourceProvider } from "@/components/source";
 import { Shell } from "@/components/shell";
 
@@ -32,10 +34,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <DealProvider>
-          <SourceProvider>
-            <Shell>{children}</Shell>
-            <SourcePanel />
-          </SourceProvider>
+          <EditProvider>
+            <SourceProvider>
+              <Shell>{children}</Shell>
+              <SourcePanel />
+            </SourceProvider>
+            <Companion />
+          </EditProvider>
         </DealProvider>
       </body>
     </html>

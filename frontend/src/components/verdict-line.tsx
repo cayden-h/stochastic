@@ -1,30 +1,59 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { fmtK, fmtM, fmtX } from "@/lib/format";
 import type { Verdict as VerdictShape } from "@/lib/types";
 import { Label, Mono, Shape, Verdict } from "./ui";
+
+/** A figure that ticks from its last value to the new one (about 450 ms), so an edit's recompute is seen landing.
+ * With reduced motion it changes at once. The value itself always comes from the gateway. */
+function useTicked(value: number): number {
+  const [shown, setShown] = useState(value);
+  const from = useRef(value);
+  useEffect(() => {
+    const start = from.current;
+    from.current = value;
+    if (start === value) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const t = setTimeout(() => setShown(value), 0);
+      return () => clearTimeout(t);
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / 450);
+      setShown(start + (value - start) * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return shown;
+}
 
 /**
  * Leverage against the limit, OK or Over the limit, the room left, and the Reviewer badge.
  * Approve and Reject sit in the page header. Every figure names its tool run.
  */
 export function VerdictLine({
-  verdict, runIds, asFiled, note,
+  verdict, runIds, asFiled, note, action,
 }: {
   verdict: VerdictShape; runIds: Record<string, string>;
   /** The whole-line reading from the answered covenant flag, so the comparison stays on screen after the answer. */
   asFiled?: { leverage: number; ok: boolean; run_id: string | null } | null;
   /** One sentence on what happened, under the figure. */
   note?: ReactNode;
+  /** The verdict's own action, such as Download final files after approval. */
+  action?: ReactNode;
 }) {
   const over = verdict.verdict === "over_limit";
+  const leverage = useTicked(verdict.leverage);
   const review = verdict.review?.verdict ?? null;
   return (
     <section className={`flex w-full flex-col gap-[14px] rounded-card border bg-white p-[20px] ${over ? "border-denied" : "border-line"}`}>
       <div className="flex flex-wrap items-center gap-[12px]">
         <h2 className="text-[30px] font-semibold text-forest">
-          {fmtX(verdict.leverage)} <span className="text-[20px] font-medium text-slate">against {fmtX(verdict.limit)}</span>
+          <span aria-label={fmtX(verdict.leverage)}>{fmtX(leverage)}</span> <span className="text-[20px] font-medium text-slate">against {fmtX(verdict.limit)}</span>
         </h2>
         <Verdict kind={over ? "over_limit" : "ok"} />
         {review ? <Verdict kind={review} /> : <Verdict kind="waiting" word="Reviewer pending" />}
@@ -33,6 +62,7 @@ export function VerdictLine({
         {verdict.approval_state === "REJECTED" ? (
           <span className="flex items-center gap-[6px] text-[14px] font-semibold text-denied"><Shape kind="cross" size={12} />Rejected</span>
         ) : null}
+        {action}
       </div>
 
       {note ? <p className="-mt-[6px] text-[14px] leading-[20px] text-slate">{note}</p> : null}

@@ -89,7 +89,7 @@ function Learning() {
     ...(kase?.policies.map((p) => p.learned_from) ?? []),
   ]).size;
   const policies = kase?.policies.length ?? 0;
-  // Edits arrive with the edit API (D19); until then the case has no `edits` and the count is 0.
+  // Edits saved with a reason (D19). Until Tri's T2 adds `edits` to /case the count is 0.
   const edits = kase?.edits?.filter((e) => e.status === "reasoned").length ?? 0;
   const rows: [string, number][] = [["Human answers", answers], ["Policies", policies], ["Edits", edits]];
   return (

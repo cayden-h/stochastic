@@ -7,8 +7,11 @@ import { FlagCard, MoreFlags, WaitingVerdict } from "@/components/flag-card";
 import { Page } from "@/components/shell";
 import { Button, Card, Label, Mono, PageHeader, Shape, Tag } from "@/components/ui";
 import { VerdictLine } from "@/components/verdict-line";
+import { DownloadFinal, YourEdits } from "@/components/your-edits";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
+import { useEdits } from "@/lib/edit-context";
+import { canEdit } from "@/lib/edits";
 import { canStart, fmtX, learnedPolicies, plural } from "@/lib/format";
 import type { AuditRow, Stage } from "@/lib/types";
 
@@ -72,6 +75,7 @@ export default function CaseScreen() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
+  const editsCtx = useEdits();
 
   if (!kase) return null;
   const { deal, stage, flags, open_flags, verdict, result, mappings, source_lines, policies, audit } = kase;
@@ -95,7 +99,10 @@ export default function CaseScreen() {
   const working = !idle && !open.length && (!verdict || !verdict.review);
   const review = verdict?.review?.verdict ?? null;
   const over = verdict?.verdict === "over_limit";
-  const canApprove = verdict?.approval_state === "PROPOSED" && review === "pass" && !over;
+  // The controller's edits (D19). Approval is refused while one has no reason (check 5e).
+  const edits = editsCtx.edits;
+  const unreasoned = edits.filter((e) => e.status === "needs_reason").length;
+  const canApprove = verdict?.approval_state === "PROPOSED" && review === "pass" && !over && !unreasoned;
 
   // The lines an open flag is about, by name, so the combined books can show them in amber.
   const flaggedIds = new Set(open.flatMap((f) => (Array.isArray(f.payload.line_ids) ? (f.payload.line_ids as string[]) : [])));
@@ -109,8 +116,16 @@ export default function CaseScreen() {
     finally { setBusy(false); }
   }
 
+  const editWord = plural(edits.length, "edit");
+  const headline = verdict && edits.length
+    ? `${over ? "Over" : "Under"} the limit at ${fmtX(verdict.leverage)}. ${editWord.charAt(0).toUpperCase()}${editWord.slice(1)}.`
+    : null;
   const sub =
-    verdict?.posted ? "Posted to the record. The answer you gave is now a policy the Mapper applies next time."
+    verdict?.posted && edits.length ? "Approved with your edits. The reasons are now policies for the next add-on."
+    : verdict?.posted ? "Posted to the record. The answer you gave is now a policy the Mapper applies next time."
+    : edits.length && unreasoned && !editsCtx.asking ? `${plural(unreasoned, "edit")} ${unreasoned === 1 ? "needs" : "need"} a reason before you can approve.`
+    : edits.length && unreasoned ? `Code recomputed the books with your ${edits.length === 1 ? "edit" : "edits"}. Give a reason and approve.`
+    : edits.length ? `Code recomputed the books with your ${edits.length === 1 ? "edit" : "edits"}. The Reviewer re-ran the checks. Your approval posts it.`
     : noFlagThisTime ? `No flag this time. The Mapper applied ${earlierAnswers === 1 ? "your earlier answer" : `your ${earlierAnswers} earlier answers`} to ${plural(learnedLines, "line")} and asked nothing. Code combined the books and tested the limit again.`
     : verdict ? "Code combined the books and tested the limit. The Reviewer re-ran the checks. Your approval posts it."
     : null;
@@ -129,12 +144,25 @@ export default function CaseScreen() {
             {verdict?.approval_state === "PROPOSED" ? (
               <Button kind="link" disabled={busy} onClick={() => act(() => api.reject(verdict.approval_item!, "Rejected by the controller."))}>Reject</Button>
             ) : null}
-            <Button kind="primary" disabled={busy || !canApprove} onClick={() => act(() => api.approve(verdict!.approval_item!))}>Approve</Button>
+            <Button
+              kind="primary"
+              disabled={busy || !canApprove}
+              title={unreasoned ? "Give each edit a reason first" : undefined}
+              onClick={() => act(() => api.approve(verdict!.approval_item!))}
+            >
+              Approve
+            </Button>
           </>
         )}
       </PageHeader>
 
       {note ? <p role="alert" className="rounded-[8px] bg-denied-tint px-[12px] py-[8px] font-semibold text-denied">{note}</p> : null}
+      {editsCtx.error ? (
+        <p role="alert" className="flex items-center gap-[12px] rounded-[8px] bg-denied-tint px-[12px] py-[8px] font-semibold text-denied">
+          <span className="flex-1">The edit was not saved: {editsCtx.error}</span>
+          <Button kind="link" className="text-[13px] text-denied" onClick={editsCtx.clearError}>Dismiss</Button>
+        </p>
+      ) : null}
 
       <div className="flex w-full items-start gap-[20px]">
         <div className="flex min-w-0 flex-1 flex-col gap-[20px]">
@@ -175,14 +203,22 @@ export default function CaseScreen() {
               verdict={verdict}
               runIds={runIds}
               asFiled={asFiled}
-              note={sub ? <>{noFlagThisTime ? <><Tag tone="agent">Learned</Tag>{" "}</> : null}{sub}</> : null}
+              note={sub ? (
+                <>
+                  {headline ? <strong className="block text-[16px] font-semibold text-forest">{headline}</strong> : null}
+                  {noFlagThisTime ? <><Tag tone="agent">Learned</Tag>{" "}</> : null}{sub}
+                </>
+              ) : null}
+              action={verdict.posted ? <DownloadFinal deal={deal} /> : null}
             />
           ) : open.length ? (
             <WaitingVerdict text={open.length === 1 ? "Verdict waits on the flag." : `Verdict waits on ${open.length} flags.`} limit={deal.brief.limit} />
           ) : null}
 
+          {verdict ? <YourEdits locked={!canEdit(kase)} /> : null}
+
           {result ? (
-            <CombinedTable result={result} flagged={flaggedNames} />
+            <CombinedTable result={result} flagged={flaggedNames} kase={kase} />
           ) : !idle ? (
             <CombinedPending text={open.length ? "Code combines the books after you answer." : "Code is combining the books."} />
           ) : null}
@@ -228,8 +264,8 @@ export default function CaseScreen() {
           <CaseTile
             href="/agents"
             label="Review"
-            value={review === "pass" ? "Pass" : review === "needs_attention" ? "Needs attention" : "Waiting"}
-            sub={review === "pass" ? "The Reviewer re-ran the checks" : review === "needs_attention" ? "Read the reasons on the verdict" : open.length ? "Reviewer runs after your answer" : "Reviewer runs after the Preparer"}
+            value={editsCtx.rechecking ? "Re-checking your edit" : review === "pass" ? "Pass" : review === "needs_attention" ? "Needs attention" : "Waiting"}
+            sub={editsCtx.rechecking ? "Tie-out and the limit test run again on the edited books" : review === "pass" ? "The Reviewer re-ran the checks" : review === "needs_attention" ? "Read the reasons on the verdict" : open.length ? "Reviewer runs after your answer" : "Reviewer runs after the Preparer"}
           />
           <CaseTile
             href="/log"
