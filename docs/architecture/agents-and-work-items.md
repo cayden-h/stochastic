@@ -16,6 +16,7 @@ This file describes the code in `backend/app/agents/` as of 2026-10-24.
 | `review_result` | Job runner | Check the draft. The Reviewer handles it. |
 | `approve_result` | Gateway, after the review | The controller approves the result before it posts. It is proposed by the Preparer, so maker-checker applies. |
 | `reverse:<type>` | Gateway, on a reversal | A new item linked to the original. |
+| `draft_brief` (planned, D20) | Job runner, before `map_lines`, when the deal has an agreement and no approved brief | Draft the brief from the credit agreement. The Brief Reader handles it, and the controller approves it. See `brief-reader.md`. |
 
 ## States
 
@@ -87,6 +88,7 @@ The runner holds no state. It can run again at any time and finds the next thing
 
 - **Flag.** A line is unclear. The console shows the question, the evidence, and the options with their computed effects. The controller chooses.
 - **Approval.** The controller approves the combined result before it posts. The gateway refuses until the Reviewer verdict is pass.
+- **Brief approval (planned, D20).** Before mapping, the controller approves the brief the Brief Reader drafted, with a quote for every field. Mapping and the covenant tools are refused until then.
 
 If the Reviewer finds a tie-out error or a breach of the limit, `approve_result` opens as NEEDS_INFO with the reasons, and the controller rejects it or reverses a flag.
 

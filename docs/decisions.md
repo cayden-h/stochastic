@@ -133,6 +133,7 @@ Rejected:
 Revisit if:
 A step needs a judgment that the three agents cannot make.
 Also revisit if the job runner grows decision logic. That would be a sign it needs a model.
+Revisited in D20: a fourth role, the Brief Reader, reads the credit agreement.
 
 ## D6. Demo scope: two minutes, one simple screen
 
@@ -180,6 +181,7 @@ Rejected:
 Revisit if:
 Reading the credit agreement text turns out to be easy and reliable.
 It could become a later feature.
+Revisited in D20: the Brief Reader drafts the brief from the agreement, and the controller approves it.
 
 ## D8. Real deal: Kewaunee Scientific buys Nu Aire
 
@@ -457,3 +459,40 @@ Rejected:
 - Tauri. The stack is Node, Squeek's companion is a working Electron reference, and Chromium renders the same as the browser the console was designed in.
 
 Design: `design/review-companion.md`.
+
+## D20. A fourth agent, the Brief Reader, reads the credit agreement into the Brief
+
+Date: 2026-10-24, evening. Decided by Cayden after asking whether Stochastic works only for the one PNC agreement; the design comes from three research passes the same evening.
+
+Context: the code takes any Brief (`POST /deals` accepts one as JSON, and nothing in the math names PNC), but a person writes the Brief by hand, and only one exists. [verified: `backend/app/api/routes.py`, `backend/app/db/fixtures/kewaunee.py`]
+So Stochastic is tested on one agreement, and "what about a different lender?" has no good answer.
+This answers D5's "Revisit if" (a step needs a judgment the three agents cannot make) and replaces D7's "Rejected: reading the full credit agreement in the MVP".
+
+Decision:
+1. Add a fourth role, the Brief Reader (credit analyst). It reads the covenant section and the definitions it uses, and drafts the Brief with a verbatim quote and a section for every field.
+2. It is a separate role, not part of the Mapper. The agreement is read once per loan and the books on every deal; the agent that applies the definition of debt must not also write it; and the approved Brief is a gate before mapping starts.
+3. The model points and code decides. The gateway refuses a quote that is not an exact substring of the agreement after normalization, and a number that does not appear in its quote. The model never computes a number.
+4. The controller approves the Brief, and no agent can. Mapping and the covenant tools are refused until it is approved. The approved Brief is locked and keyed by the agreement's hash, so the next add-on under the same facility reuses it.
+5. Adjustment amounts come from the books, not the agreement. The reader gives each add-back's name and cap and flags its amount; the controller enters it with its source.
+6. Stage 1 keeps the current Brief schema. What the schema cannot express becomes a flag, not a guess. Stage 2 turns the covenant into data from a fixed menu (several covenants, step-downs, cash netting, percent caps, pro forma acquisitions, the EBITDA base as parts); the model never writes a free-form formula.
+7. A Brief JSON can still be sent instead of an agreement. The demo deal and the existing tests stay as they are.
+8. The answer key for the reader is a set of hand-written Briefs: PNC and Kewaunee, Noble Roman's, and Mayville Engineering, scored field by field.
+
+Why:
+- One approved Brief serves every add-on under the same facility, so the reader runs rarely and the Mapper runs every deal. [inferred]
+- Models find citations convincing on topic alone (37% to 61% of wrong pinpoints caught in one study), so code checks the quotes, not a model. [verified: `research/brief-reader.md` section 4.2]
+- The Citations API cannot be combined with structured output and is not on the Droid or scripted backends, so the quote check lives in the gateway, where it works on every backend. [verified: `research/brief-reader.md` section 4.4]
+- Products that read credit agreements extract terms and link to the source. Barring the model from numbers and checking every quote in code is the narrower, stricter claim we can defend. [inferred: `research/brief-reader.md` section 6]
+- Hyphenate asks "would you hire it?", and a tool that only works for one loan is a weak answer. [inferred]
+
+Rejected:
+- The Mapper reads the agreement too. It would write the rule it then applies, and it would re-read a 240K to 690K character agreement on every deal.
+- The whole agreement in one prompt. The relevant text is 8K to 30K characters, and accuracy drops mid-context. [verified: `research/brief-reader.md` sections 1 and 4.2]
+- Fuzzy quote matching. It can accept "4.50" for "4.25" or drop a "not".
+- A model-written formula that code runs.
+
+Not changed: the math in `backend/app/tools/finance.py`, and the three existing roles.
+
+Not decided: when to build stage 1. The order of work in `TASKS.md` has a feature freeze on Saturday at 8pm.
+
+Design: `architecture/brief-reader.md`. Research: `research/brief-reader.md`.

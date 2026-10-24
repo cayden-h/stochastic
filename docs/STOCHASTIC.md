@@ -1,6 +1,6 @@
 # Stochastic: reference for Claude
 
-Last updated: 2026-10-24, evening (D19: Mac desktop app, edits in review that teach the agents).
+Last updated: 2026-10-24, evening (D20: a fourth agent, the Brief Reader, decided and not built).
 Read this file first in any session about Stochastic.
 It holds the main features, the architecture, and the scope.
 If this file and a PDF or an older note disagree, this file is correct.
@@ -11,6 +11,7 @@ Stochastic merges the books of a newly acquired company into the books of the pl
 It flags the few lines that need a human, and then checks the combined result against the lender's limit.
 It is built for private equity buy-and-build firms, which keep buying add-on companies.
 Three stateful agents do the repeatable work, code does all the math, and a human controller approves.
+A fourth agent, the Brief Reader, will read the credit agreement into the brief (D20). It is decided and not built; today a person writes the brief.
 What the controller decides once, the agents keep: the next run and the next deal start with that memory.
 Every step goes in an audit log.
 
@@ -59,6 +60,7 @@ There is no after-close monitoring and no ongoing consolidation in the MVP.
 ## 4. The workflow
 
 1. **Upload.** The user adds the platform's statement file, the target's statement file, and a short brief that states the lender's limit.
+   Planned (D20): the user adds the credit agreement instead, the Brief Reader drafts the brief with a quote for every field, and the controller approves it before mapping starts. A brief already approved for the same agreement is reused.
 2. **Map.** The Mapper matches each target line to a platform line, with a confidence and a reason.
 3. **Flag.** Lines the Mapper cannot place with confidence go to the human. The human approves a mapping or changes it.
 4. **Combine and test.** The Preparer calls code tools that add the books, remove intercompany amounts, compute combined EBITDA, and compute leverage. The Reviewer checks that the totals tie and tests leverage against the limit.
@@ -83,7 +85,7 @@ The user sees one screen with a flag card, an editable combined table, and one v
 The system has four parts.
 
 - **People and files.** The console, the two data files, and the brief.
-- **Agents.** Three stateful agents and a plain job runner.
+- **Agents.** Three stateful agents and a plain job runner. A fourth, the Brief Reader, is planned (D20).
 - **The gateway.** It is the only writer. It checks permissions, enforces work-item states, runs the tools, writes the log, and writes the agents' memory.
 - **The store.** In memory for every read, written through to Postgres on Tiger Cloud when `STORE=postgres`. It holds the record, the work items, the tool runs, the audit log, the policies, and the agent sessions. The audit log is a TimescaleDB hypertable that refuses edits, and a restart loads everything back. [verified: `backend/tests/test_postgres_store.py`, run against the `stochastic` service on 2026-10-24] When the Mapper raises a covenant flag, the gateway forks the ledger on Tiger Cloud (a zero-copy fork, about 35 s) and writes every option's what-if into the fork, never into the live record; the controller's answer keeps one option in the ledger and deletes the fork with the alternatives. [verified: `backend/app/gateway/whatif.py`, live on 2026-10-24 09:00]
 
@@ -114,6 +116,17 @@ Agents never write to the store and never talk to each other.
 
 The human controller answers flags and approves the final result.
 
+Planned, not built (D20): a fourth role runs before the Mapper.
+
+| Agent | Real-team role | Gets | Returns | Keeps | Never |
+| --- | --- | --- | --- | --- | --- |
+| Brief Reader | Credit analyst | The indexed credit agreement (sections and definitions), read-only tools to fetch more, its session | A draft brief with a verbatim quote and section for every field, and flags for what it cannot place or what the schema cannot hold | The approved brief, keyed by the agreement's hash, reused by the next add-on under the same facility | Computes a number, approves its own brief, or fills a field without a quote |
+
+Why it is separate from the Mapper: the agreement is read once per loan and the books on every deal, and the agent that applies the definition of debt must not also write it.
+The gateway refuses a quote that is not in the agreement and a number that is not in its quote. The controller approves the brief, and mapping is refused until then.
+Adjustment amounts come from the books, not the agreement, so the reader flags them and the controller enters them.
+Design: `architecture/brief-reader.md`. Research: `research/brief-reader.md`.
+
 Memory, in detail. [verified: `backend/app/gateway/gateway.py`, `_learn`]
 - When the controller answers a flag, the gateway writes a `Policy`: the line name, the decision, who decided, and the flag it came from.
 - On the next run the Mapper applies the policy with confidence 0.98 and the reason "Policy p_001: human:controller decided this on wi_002", and the gateway logs `policy:apply`.
@@ -129,6 +142,8 @@ There are two, plus one that shows memory.
 - **Flag.** A line is unclear, and the human chooses how to treat it. Each option shows the leverage it gives, computed by the tools.
 - **Approval.** The controller approves the combined result before it posts. The gateway refuses until the Reviewer verdict is pass.
 - **Second run.** After a reset, the same deal runs with no flag, because the Mapper applies what the controller decided. The audit log shows `policy:apply`.
+
+Planned (D20): a third moment comes first. The controller approves the brief the Brief Reader drafted, field by field with its quotes, before mapping starts.
 
 If the Reviewer finds a tie-out error or a breach of the limit, the approval item opens as needs-attention with the reasons.
 An earlier design had six escalation points (E1 to E6). They are archived. Two are enough for this workflow.
@@ -156,6 +171,11 @@ Inputs for the demo:
 - A statement file for the platform (CSV), built from the acquirer's filings.
 - A statement file for the target (CSV), built from the target's audited statements.
 - A short brief: the lender's limit and the covenant's definition of debt and EBITDA.
+
+The brief is written by hand today, and the PNC brief is the only one. [verified: `backend/app/db/fixtures/kewaunee.py`]
+`POST /deals` accepts any brief as JSON, and nothing in the math names PNC, so another agreement with one debt-to-EBITDA covenant works if a person writes its brief. [verified: `backend/app/api/routes.py`]
+The schema does not hold step-downs, cash netting, percent-of-EBITDA caps, pro forma acquisitions, or a second covenant, and `ebitda()` always subtracts interest income, which two of four real agreements do not. [verified: `research/brief-reader.md` section 3]
+The Brief Reader (D20) and its stage 2 schema address this.
 
 Tables (a design proposal, and the first prototype keeps them in memory):
 - `deal`, `source_line`, `mapping`, `work_item`, `result`, `audit_log`.
@@ -254,12 +274,14 @@ Should (if the schedule holds):
 - The second-run memory moment on stage.
 - A downloadable draft compliance certificate.
 - The Mac desktop app (Electron), the editable review table, the companion, and Download final files (D19). The demo beat is in `design/review-companion.md` section 9.
+- The Brief Reader, stage 1 (D20): the role, the gateway's quote and number checks, brief approval before mapping, the scripted fallback, and the tests. When to build it against the 8pm freeze is open. Design: `architecture/brief-reader.md`.
 - Tiger Cloud Postgres in place of the memory store. Built on 2026-10-24 as a write-through store (`backend/app/db/postgres.py`).
 
 Cut (do not build this weekend):
 - Purchase accounting beyond a "provisional" label. The combined table is historical plus target; the pro forma adjustments are not applied.
 - Intercompany schedules and eliminations.
 - Other situations, other deals, arbitrary uploads, accounts, login, mobile.
+- The Brief Reader's stage 2: several covenants, step-downs, cash netting, percent caps, pro forma acquisitions, and the EBITDA base as data (D20).
 - Plan search, Monte Carlo, and rejection-to-policy. These belong to the earlier framing.
 - A live SEC call on stage.
 - A staged denied-action demo.
@@ -368,6 +390,7 @@ Do not lead the pitch with ingestion.
 - Does the SEC allow us to redistribute the cached filings? The fixture holds only line values and source references, not the filings.
 - Does a former-banker or controller reviewer count as the human seat?
 - Is the Statesville cash rent deduction ($1,970K, from the 10-K obligations table) the right figure for the test period? It is inferred.
+- When to build the Brief Reader's stage 1, and on which model (D20). The open points are in `architecture/brief-reader.md` section 12.
 
 ## 19. Where to find more
 
@@ -385,6 +408,7 @@ All paths are inside `docs/`.
 - `research/ma-workflow-research.md`: the three M&A users, pain, time, and existing products.
 - `research/post-close-deliverables.md`: what a PE finance team gets after an add-on closes.
 - `research/real-deal-candidates.md`: the real deal, with EDGAR links.
+- `research/brief-reader.md`: four real credit agreements, what the brief schema cannot hold, and products and benchmarks for reading agreements (D20).
 - `research/agent-framework-options.md`: Droid, ADK, Anthropic API, and others.
 - `hyphenate-workshop.md`: the workshop blueprint and the gaps.
 - `sponsors/`: Hyphenate, Tiger Data, Microsoft, Factory, Mana, and the Slack notes.

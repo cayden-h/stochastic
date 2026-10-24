@@ -114,6 +114,8 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 These are roadmap.
 None is built.
 - An upload screen and route for new deals.
+- A fourth agent, the Brief Reader, that drafts the brief from the credit agreement with a verbatim quote for every field, checked by code and approved by the controller.
+- A covenant schema for sponsor-style agreements: several covenants, step-downs, cash netting, percent-of-EBITDA caps, and pro forma acquisitions.
 - Purchase accounting with a provisional label, and intercompany eliminations.
 - A second deal, to show the policies carrying over.
 - Confidence calibration from the answer key.

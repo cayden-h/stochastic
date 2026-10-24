@@ -17,7 +17,7 @@ The product reference is `../STOCHASTIC.md`. If this folder and that file disagr
 | People and files | Two statement files and a brief, loaded by `backend/app/db/fixtures/kewaunee.py` | The input. The brief states the lender's limit and definitions. |
 | Console | Next.js, React, TypeScript, Tailwind | One screen: flag card, combined table, verdict line. A small link opens the audit log. |
 | Gateway API | Python, FastAPI | The only writer. Checks the actor, the permission, the state change, maker-checker, and the run ids. Writes the audit log and the agents' memory. |
-| Agents | Python, `run_agent(role, item)` | Three stateful agents: Mapper, Preparer, Reviewer. Four backends: anthropic, droid, scripted, replay. |
+| Agents | Python, `run_agent(role, item)` | Three stateful agents: Mapper, Preparer, Reviewer. Four backends: anthropic, droid, scripted, replay. A fourth, the Brief Reader, is planned (D20, `brief-reader.md`). |
 | Job runner | Python, plain code | Moves work items from one agent to the next. It is not a model. |
 | Code tools | Python, `backend/app/tools/finance.py` | All the math: consolidation, tie-out, EBITDA, covenant debt, leverage, limit test. No write access. |
 | Store | In memory, written through to Postgres on Tiger Cloud with `STORE=postgres` | Holds the record, the work items, the tool runs, the audit log, the policies, and the sessions. The audit log is an append-only TimescaleDB hypertable, and a restart loads everything back (`backend/app/db/postgres.py`). |
@@ -64,3 +64,4 @@ flowchart LR
 | `gateway-and-api.md` | Actors, permissions, checks, routes, the case shape, `run_agent` |
 | `data-model.md` | The tables, the audit chain, how a number traces to its source lines |
 | `repo-structure.md` | The folder map and the conventions for code |
+| `brief-reader.md` | The planned fourth agent: reading the credit agreement into the brief, the gateway's quote checks, brief approval, stages (D20) |

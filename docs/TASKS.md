@@ -53,6 +53,7 @@ Open (details in `tasks/cayden.md`):
 6. Submit the Devpost first draft by Saturday night, with the four tracks opted in (from Eric).
 7. The honest-limits card and a printed one-page summary (from Eric).
 8. Sunday 8am: wake the Tiger service and check `GET /health`.
+9. Decide when to build the Brief Reader's stage 1 (D20), given the 8pm freeze. The build list is in `architecture/brief-reader.md` sections 7 and 8. Until it is built, the pitch says a person writes the brief.
 
 ## Eric
 
