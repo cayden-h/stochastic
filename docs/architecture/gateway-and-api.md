@@ -29,6 +29,7 @@ A real deployment would use signed tokens.
 | Tool `leverage` | no | yes | yes | no | yes |
 | Tools `tie_out`, `limit_test` | no | no | yes | no | yes |
 | Answer a flag, hold, reject, reverse | no | no | no | yes | no |
+| Edit the books, give an edit's reason, revert an edit (D19) | no | no | no | yes, `human:controller` only | no |
 | Approve | no | no | no | yes, not an item they prepared | no |
 | Create a deal, run the job runner | no | no | no | yes | no |
 | Post to the record, open work items, write the log, write policies | no | no | no | no | yes |
@@ -46,6 +47,10 @@ A forbidden action returns 403 and writes a DENIED row.
 5b. A Reviewer `pass` must cite a `tie_out` run on the result's consolidate run and a `limit_test` run on its leverage run, both for this deal and both ok. The gateway reads the pass from those runs.
 5c. A covenant flag option that counts every flagged line as debt is computed as filed (reported EBITDA, `ebitda` with `as_filed`); choosing it puts the deal on the as-filed basis, so the result matches the card. Each covenant option carries `leverage`, `ok`, and `basis` from its run chain.
 5d. Policies apply only to the company whose line they were learned on; reversing a flag retires the policies it taught (`policy:retire` rows).
+A `company` policy with no company applies to nothing.
+A `platform` policy applies only to the target lines of a deal whose platform company is `Policy.platform`, and only as a mapping: it never settles a covenant tag, so it never satisfies 5a.
+5e. A result cannot be approved while any edit of the deal is `needs_reason`; the DENIED row names the edit.
+5f. Only `human:controller` edits, and only while the deal's approval item is `PROPOSED` (or `NEEDS_INFO` when an edit's recompute failed a check). The recompute runs as the system through the edit-aware tools, and its figures are read from those runs.
 6. The limit must equal the brief's limit.
 7. The payload matches its Pydantic model. The gateway re-validates every agent result.
 8. `consolidate` refuses to run while a flag is open.
@@ -58,7 +63,10 @@ When the controller answers a flag, the gateway writes a `Policy` for the Mapper
 On the next run the Mapper applies the policy instead of asking, and the gateway logs `policy:apply`.
 A policy has a `scope`.
 Flag answers make `company` policies, which apply only to the company whose line they were learned on (D18).
-Remap edits (D19, planned) make `platform` policies, which apply to every add-on of the platform named in `Policy.platform`.
+Remap edits (D19) make `platform` policies, which apply to every add-on of the platform named in `Policy.platform`.
+The job runner gives the Mapper only the live policies whose scope covers the deal (`Gateway.policies_for`), so a model never sees another company's answers.
+When two policies cover a line, the scripted Mapper applies the newest, so a later correction wins over an earlier answer.
+A line mapped by a platform policy cites it in its reason and carries its id in `Mapping.policy_id`, so the Learned chip shows it on the next deal.
 Each role has an `AgentSession` (backend, session id, turns, a short transcript).
 `POST /dev/reset` keeps both unless `keep_memory=false`.
 
@@ -175,8 +183,7 @@ One change the controller made to the combined books, recorded on top of the age
 `status` is `needs_reason`, `reasoned`, or `reverted`.
 A `reasoned` edit has `reason_chip` (0 to 2) or `reason_text`.
 An `amount` edit must have `new_value` and no platform lines; a `remap` edit must have `new_platform_line` and no values.
-Planned (C2): approval will be refused while any edit is `needs_reason`.
-The gateway does not check this yet.
+Approval is refused while any edit is `needs_reason` (check 5e).
 `policy_id` and `adjustment_id` are set by the gateway when a reasoned edit with `remember` teaches something.
 `run_ids` are the recompute runs, all new.
 
@@ -210,12 +217,13 @@ The figures above are placeholders; the demo figures come from the filing.
 What a reasoned amount edit teaches.
 The Preparer proposes it as a flag on a later deal, and it is never applied silently.
 `status` is `applied` (learned on this deal), `proposed` (offered on a later deal), or `retired` (its edit was reverted).
+`amount` is the signed change the controller made (new value minus the agents' value), not the value: an add-back is "remove 500 of cost", which carries to another deal only as a change.
 In the spec this is called `Adjustment`; the code names it `LearnedAdjustment`, because `Adjustment` is already the Brief's EBITDA add-back or deduction.
 
 ```json
 {
   "id": "a_001", "deal_id": "d_kequ_nuaire", "company": "Nu Aire", "line": "Selling, general and administrative",
-  "amount": 9312.0, "reason": "One-time acquisition cost, an allowed add-back", "edit_id": "e_001", "status": "applied",
+  "amount": -500.0, "reason": "One-time acquisition cost, an allowed add-back", "edit_id": "e_001", "status": "applied",
   "at": "2026-10-25T10:45:00Z"
 }
 ```
@@ -277,6 +285,58 @@ Existing policies read back as `company`, so the D18 rule on `not_debt` tags is 
 
 The quotes are elided here; the gateway checks each one is an exact substring of the agreement (`brief-reader.md` section 6).
 
+## Review edits in the gateway (D19)
+
+The gateway functions below are in `backend/app/gateway/gateway.py`; the routes over them are Tri's (T2, `design/review-companion.md` section 10).
+Every function refuses any actor but `human:controller` with 403 and a DENIED row.
+
+| Function | What it does |
+| --- | --- |
+| `apply_edit(actor, deal_id, kind, company, line, value=None, platform_line=None, section=None)` | `amount`: one company's value on one statement line, in USD thousands. `remap`: one target line to another platform line. Refuses subtotals, unknown lines and companies, an unchanged value, and a second live edit of the same kind on the same line (409). Records the edit as `needs_reason`, recomputes, and returns `{"edit", "result", "verdict", "approval", "reasons"}`. |
+| `reason_edit(actor, edit_id, chip=None, text=None, remember=True)` | Exactly one of `chip` (a `ReasonChip` id) or `text` (at most 500 characters). Sets `reasoned`. With `remember`, a remap writes a `platform` mapping policy (`Edit.policy_id`) and an amount edit writes a `LearnedAdjustment` with status `applied` (`Edit.adjustment_id`). |
+| `revert_edit(actor, edit_id)` | Sets `reverted` (the edit is never deleted), retires its policy (`retired_by` is the edit id) or its adjustment (`status` `retired`), and recomputes without it. Returns the same shape as `apply_edit`. |
+| `reason_chips(deal_id, kind)` | The chips, hardcoded per deal in `backend/app/agents/backends/scripted.py` (`REASON_CHIPS`). A deal with no list of its own gets the demo deal's. |
+| `policies_for(role, deal_id)` | The live policies of a role whose scope covers the deal. |
+
+The edit is recorded on top of the agents' run, never over it: the source lines and the mappings stay as the agents left them.
+A remap does not write a new `Mapping`; the edit itself carries the new platform line, and the edit-aware `consolidate` applies it.
+The recompute (`Gateway._recompute`) runs as `system:gateway`: `consolidate`, `ebitda`, `covenant_debt` (not naive), `leverage`, `tie_out`, `limit_test`.
+Every run is new, and the edit-aware runs carry `edit_ids` (the live edits) in their inputs.
+Only the gateway may pass `edit_ids` to a tool, and only to `consolidate`, `ebitda`, `covenant_debt`, and `tie_out`.
+If those tools do not take `edits` yet (Tri's T1), the edit is refused with 503 ("edit-aware tools not installed (T1)") and nothing is kept.
+The new result has `supersedes` (the result it replaces), `edit_ids`, a `review` read from the `tie_out` and `limit_test` runs, and `run_ids_by_tool` for all six tools.
+The new approval item is proposed by the Preparer, as before, and is `PROPOSED` when both checks pass, `NEEDS_INFO` otherwise.
+The old approval item becomes `SUPERSEDED` (a new `State`) and stays in the log.
+
+Audit rows of an edit:
+
+| Action | Actor | Target | When |
+| --- | --- | --- | --- |
+| `edit:apply` | `human:controller` | edit id | The edit is recorded and recomputed (DENIED when refused). |
+| `supersede` | `system:gateway` | old approval item | A recompute replaced it. |
+| `create:approve_result` | `system:gateway` | new approval item | After every recompute. |
+| `edit:reason` | `human:controller` | edit id | The reason is given. |
+| `policy:learn` | `system:gateway` | policy or adjustment id | A remembered reason; the reason starts with `source: edit <id>`. |
+| `policy:update` | `system:gateway` | policy id | A remembered remap on a line that already has a live platform policy. |
+| `edit:revert` | `human:controller` | edit id | The edit is undone. |
+| `policy:retire` | `system:gateway` | policy or adjustment id | Its edit was reverted. |
+
+### Learned adjustments on a later deal
+
+The Preparer offers each live learned adjustment that covers a line of the deal, and the gateway opens it as a flag; it is never applied silently.
+An adjustment covers a line with the same name at the same company, or at the target of a deal whose platform is `LearnedAdjustment.platform`.
+`Gateway.adjustments_for(deal_id)` lists the ones the Preparer may offer: not retired, not learned on this deal's own edits, and not already offered on this deal.
+The job runner passes them as `PreparerInput.adjustments`, and the Preparer returns `PreparerOutput.adjustment_flags` (`adjustment_id`, `line_id`, `question`).
+`store_result` refuses an offer the gateway would not make: an unknown or retired adjustment, a line it does not cover, or the same adjustment twice.
+The question states the change, for example "a change of (500) to Acme Labs's General and Administrative ... from 6,163K to 5,663K".
+The flag is a `flag` work item with `payload.kind` `adjustment`, proposed by the Preparer, with options `apply` and `skip` (default `skip`).
+While it is open, the adjustment's status is `proposed`.
+An adjustment flag does not block the Preparer, the Reviewer, or `consolidate` (`open_flags` leaves it out; `open_adjustment_flags` lists it), but approval is refused while one is open.
+Answering `apply` calls `apply_edit` to set that line to this deal's agent value plus the adjustment's `amount`, then `reason_edit` with the adjustment's reason and `remember=False`, so it shows in Your edits with `Edit.from_adjustment_id`.
+Answering `skip` leaves the books as the agents made them.
+Either way the adjustment goes back to `applied`, live for later deals.
+Audit rows: `ask:flag` (the Preparer) and `adjustment:propose` when it opens, `answer` and `adjustment:apply` or `adjustment:skip` when it is answered.
+
 ## The stream
 
 `GET /deals/{id}/stream` sends two kinds of event.
@@ -293,6 +353,7 @@ A `: keepalive` comment is sent every 15 seconds.
 ## Stages
 
 `new` (loaded), `awaiting_flag`, `flags_answered`, `mapped`, `awaiting_review`, `needs_attention`, `awaiting_approval`, `posted`.
+After an edit, the stage is `awaiting_approval` or `needs_attention` again, from the recompute's checks.
 
 ## Errors
 

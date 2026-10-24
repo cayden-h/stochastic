@@ -9,7 +9,6 @@ The session transcript from the store is replayed first, so the agent keeps cont
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from pydantic import BaseModel

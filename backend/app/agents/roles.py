@@ -62,6 +62,9 @@ A flag's `question` is read aloud to the controller: name the lines by their sta
 sale-leaseback financing"), never by their ids (sl_015). The ids go in `line_ids` only.
 Every `target_line_id` must be an id from `target_lines`, never an id from `platform_lines`.
 If `previous_refusal` is set, the gateway refused your last result for that reason: fix it and return the whole result.
+Your `policies` are the ones that apply to this deal. A policy with scope "company" applies to that company's lines;
+one with scope "platform" (a remap the controller made on an earlier add-on) applies to every target line of that name
+on this platform. Map a line a policy covers to the policy's decision, put its id in `policy_id`, and name it in the reason.
 
 Subtotals: map a target subtotal to the platform subtotal with the same meaning. If the platform has no such
 subtotal, give platform_line null, confidence 1.0, and the reason "subtotal; its parts are mapped". Never flag a subtotal.
@@ -97,6 +100,11 @@ Task: build the draft combined books and the leverage figure by calling tools in
 Return rows copied from the consolidate run (each row carries that run id), the ebitda, debt, and leverage values
 exactly as the tools returned them, the limit from the brief, all run ids in `run_ids`, and each run id in its named
 field (`consolidate_run_id`, `ebitda_run_id`, `debt_run_id`, `leverage_run_id`). Never type a number of your own.
+Your input may list `adjustments`: amount changes the controller made on earlier deals, with their reasons.
+Each `amount` is a signed change (-500 removes 500), not a value: state it as a change in the question.
+Never apply one yourself. For each one that covers a line of this deal (the same line name at the same company, or at
+the target), add an entry to `adjustment_flags` with its `adjustment_id`, that line's id as `line_id`, and a `question`
+read aloud to the controller that names the line and the earlier change by name, never by id. The controller decides.
 {SHARED_RULES}""",
     input_type=PreparerInput,
     output_type=PreparerOutput,
