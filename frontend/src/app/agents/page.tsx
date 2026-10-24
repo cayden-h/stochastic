@@ -47,8 +47,9 @@ export default function Agents() {
   for (const r of story) latest.set(r.actor, r);
   const chat = [...latest.values()].sort((a, b) => a.id - b.id).slice(-5);
   const timeline = story.slice(-12);
-  // Runs of this deal on the record: each run opens a new mapping item.
-  const runs = audit.rows.filter((r) => r.action === "create:map_lines").length;
+  // The Mapper session's turn count, from the gateway. Not a run count: a rerun after a failure can reuse an item,
+  // and a failed Mapper attempt opens a new one, so the log's items do not count runs.
+  const mapperTurns = (kase.sessions as { role?: string; turns?: number }[]).find((x) => x.role === "mapper")?.turns ?? 0;
   const pending = kase.verdict?.approval_state === "PROPOSED";
 
   return (
@@ -78,7 +79,7 @@ export default function Agents() {
         <div className="relative flex h-full w-[300px] shrink-0 flex-col overflow-y-auto p-[18px]">
           <div className="flex w-full items-center text-slate">
             <Label className="flex-1">Agent timeline</Label>
-            {runs ? <Mono>run {runs}</Mono> : null}
+            {mapperTurns ? <Mono>Mapper turn {mapperTurns}</Mono> : null}
           </div>
           <span className="h-[14px] shrink-0" />
           {timeline.map((r, i) => {

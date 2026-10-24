@@ -53,25 +53,31 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   const many = useRef<HTMLInputElement>(null);
   const one = useRef<Record<Slot, HTMLInputElement | null>>({ platform: null, target: null, brief: null });
   const dialog = useRef<HTMLDivElement>(null);
+  // The latest onClose and busy, read by the one key handler set up on mount (the parent passes an inline onClose).
+  const onCloseRef = useRef(onClose);
   const busyRef = useRef(false);
-  useEffect(() => { busyRef.current = busy; }, [busy]);
+  useEffect(() => { onCloseRef.current = onClose; busyRef.current = busy; });
 
   // Nothing closes the modal while a request is in flight.
-  const close = useCallback(() => { if (!busyRef.current) onClose(); }, [onClose]);
+  const close = useCallback(() => { if (!busyRef.current) onCloseRef.current(); }, []);
 
-  // Focus moves into the dialog on open, Tab stays inside it, and focus returns to the opener on close.
+  // Once, on open: focus moves into the dialog, Tab stays inside it, and focus returns to the opener on close.
+  // When every control is disabled (busy), the panel itself (tabIndex -1) holds focus.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    const focusable = () => [...(dialog.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]):not(.hidden)") ?? [])];
-    focusable()[0]?.focus();
+    const panel = dialog.current;
+    const focusable = () => [...(panel?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]):not(.hidden)") ?? [])];
+    (focusable()[0] ?? panel)?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { close(); return; }
       if (e.key !== "Tab") return;
       const items = focusable();
-      if (!items.length) return;
+      const active = document.activeElement;
+      if (!items.length) { e.preventDefault(); panel?.focus(); return; }
       const first = items[0], last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      if (!panel?.contains(active)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+      else if (e.shiftKey && (active === first || active === panel)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
     };
     window.addEventListener("keydown", onKey);
     return () => { window.removeEventListener("keydown", onKey); opener?.focus(); };
@@ -99,7 +105,11 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
 
   function swap() {
     created.current = null;
-    setPicked((p) => ({ ...p, platform: p.target, target: p.platform }));
+    setPicked((p) => {
+      // Only defined slots are kept, so a swap with one CSV leaves no empty key behind.
+      const next: Partial<Record<Slot, Picked>> = { brief: p.brief, platform: p.target, target: p.platform };
+      return Object.fromEntries(Object.entries(next).filter(([, v]) => v)) as Partial<Record<Slot, Picked>>;
+    });
   }
 
   const current: Record<Slot, { name: string; sub: string }> = {
@@ -111,7 +121,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   async function begin() {
     setBusy(true); setNote(null);
     try {
-      const chosen = Object.keys(picked).length;
+      const chosen = Object.values(picked).filter(Boolean).length;
       if (chosen && chosen < 3) throw new Error("Choose the platform CSV, the target CSV, and the brief, or close to keep this deal.");
       if (chosen && !created.current) {
         const p = picked.platform!.file, t = picked.target!.file;
@@ -143,7 +153,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
     <div className="no-drag fixed inset-0 z-20 flex items-center justify-center bg-[rgba(15,41,33,0.45)] p-4 pt-[34px]">
       {/* The backdrop closes on click but is not a tab stop; Close and Esc do the same from the keyboard. */}
       <div aria-hidden="true" className="absolute inset-0" onClick={close} />
-      <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="new-deal-title" className="relative flex w-full max-w-[880px] flex-col gap-[18px] rounded-[20px] bg-white p-[28px] shadow-[0px_24px_60px_0px_rgba(15,41,33,0.3)]">
+      <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="new-deal-title" className="relative flex outline-none w-full max-w-[880px] flex-col gap-[18px] rounded-[20px] bg-white p-[28px] shadow-[0px_24px_60px_0px_rgba(15,41,33,0.3)]">
         <div className="flex w-full items-center gap-[12px]">
           <h2 id="new-deal-title" className="font-serif text-[30px] text-forest">New deal</h2>
           <span className="flex-1" />

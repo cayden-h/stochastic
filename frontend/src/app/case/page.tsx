@@ -20,13 +20,15 @@ const STEPS: { role: string; item: string; working: Stage[]; done: Stage[] }[] =
 ];
 
 /** While the agents run (30 to 60 s on a live model), show who is working and for how long.
- * The clock starts at the audit row where the gateway opened the working agent's item, so a reload or a
- * remount does not reset it. Without that row it counts from when the row appeared. */
-function Progress({ stage, rows }: { stage: Stage; rows: AuditRow[] }) {
+ * The clock starts when this session saw the stage begin. On a fresh load it starts at the audit row where the
+ * gateway opened the working agent's item, unless a failed run came after that row: a rerun reuses the item and
+ * logs no new row (backend/app/agents/jobs.py), so then it counts from when the row appeared. */
+function Progress({ stage, rows, stageSince }: { stage: Stage; rows: AuditRow[]; stageSince: number }) {
   const step = STEPS.find((s) => s.working.includes(stage));
   const opened = step ? rows.findLast((r) => r.action === `create:${step.item}`)?.at : undefined;
+  const failed = rows.findLast((r) => r.action === "run:failed")?.at;
   const [shown] = useState(() => Date.now());
-  const since = opened ? new Date(opened).getTime() : shown;
+  const since = stageSince || (opened && (!failed || opened > failed) ? new Date(opened).getTime() : shown);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -66,7 +68,7 @@ function CaseTile({ href, label, value, sub, children }: { href: string; label: 
  * Run, answer the flags, read the verdict, approve. Mapping, Review and Log are tiles on the right.
  */
 export default function CaseScreen() {
-  const { kase, refresh, audit: { rows: auditRows } } = useDeal();
+  const { kase, refresh, stageSince, audit: { rows: auditRows } } = useDeal();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -166,7 +168,7 @@ export default function CaseScreen() {
           <MoreFlags items={open.filter((f) => f !== current)} onOpen={setCurrentId} />
 
           {/* While an agent works the row shows who and for how long, also beside a verdict the Reviewer is checking. */}
-          {working ? <Progress stage={stage} rows={auditRows} /> : null}
+          {working ? <Progress stage={stage} rows={auditRows} stageSince={stageSince} /> : null}
 
           {verdict ? (
             <VerdictLine

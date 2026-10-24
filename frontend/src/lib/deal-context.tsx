@@ -11,7 +11,9 @@ interface DealData {
   audit: AuditResponse;
   error: LoadError | null;
   loading: boolean;
-  /** Reads the case again. True when this read committed fresh data. */
+  /** When this session saw the current stage begin, in ms; 0 when it was already the stage on first load. */
+  stageSince: number;
+  /** Reads the case again. True when this read, or a later one, committed fresh data. */
   refresh: () => Promise<boolean>;
   /** Make another deal the current one (the Dashboard rows and a new upload). */
   select: (id: string) => Promise<boolean>;
@@ -38,29 +40,37 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
   const dealId = useRef<string | null>(null);
 
   // Reads can overlap (a stream event while a reset is in flight, or select(B) while A loads). Each read takes a
-  // number; only the latest one may commit, so a slow, stale response never overwrites a newer state.
+  // number, and a read commits only if no later-numbered read has committed already. A stale response never
+  // overwrites newer state, and a steady stream of events cannot starve updates (each finished read still commits).
   const seq = useRef(0);
+  const committed = useRef(0);
+  const [stageSeen, setStageSeen] = useState<{ deal: string; stage: string; at: number } | null>(null);
 
   const refresh = useCallback(async (): Promise<boolean> => {
     const mine = ++seq.current;
     try {
       // The list is read every time: a reset drops uploaded deals, and the current one must fall back to the demo deal.
       const list = await api.deals();
-      if (mine !== seq.current) return false;
       if (!list.some((d) => d.id === dealId.current)) dealId.current = list[0]?.id ?? null;
       const id = dealId.current;
       if (!id) throw new NoDeal();
       const [c, h, a] = await Promise.all([api.case(id), api.health(), api.audit(id)]);
-      if (mine !== seq.current || id !== dealId.current) return false;
+      if (mine < committed.current) return true;  // a later read already put newer data on screen
+      if (id !== dealId.current) return false;    // the controller switched deals meanwhile; that read will commit
+      committed.current = mine;
       setDeals(list); setCase(c); setHealth(h); setAudit(a);
+      // When this session saw the stage change, so a progress clock can start there (the backend logs no row
+      // when a rerun reuses an agent's work item).
+      setStageSeen((prev) => (prev && prev.deal === c.deal.id && prev.stage === c.stage ? prev
+        : { deal: c.deal.id, stage: c.stage, at: prev && prev.deal === c.deal.id ? Date.now() : 0 }));
       setError(null);
       return true;
     } catch (e) {
-      if (mine !== seq.current) return false;
+      if (mine < committed.current) return true;
       setError(e instanceof NoDeal ? { kind: "no_deal", message: e.message } : { kind: "unreachable", message: e instanceof Error ? e.message : "Cannot reach the gateway API" });
       return false;
     } finally {
-      if (mine === seq.current) setLoading(false);
+      setLoading(false);
     }
   }, []);
 
@@ -91,7 +101,7 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     return () => { es.close(); if (timer) clearTimeout(timer); };
   }, [id, refresh]);
 
-  return <Ctx.Provider value={{ deals, kase, health, audit, error, loading, refresh, select }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ deals, kase, health, audit, error, loading, refresh, select, stageSince: stageSeen?.at ?? 0 }}>{children}</Ctx.Provider>;
 }
 
 export function useDeal(): DealData {
