@@ -12,6 +12,8 @@ Phase 2  reset (memory kept), run with the forced refusal: the retry rewinds S1 
          Answer the flags, run the Preparer and Reviewer, and approve: the deal must post.
 Phase 3  reset (memory kept), run again with no forced refusal: the Mapper must resume S2, and the deal must post.
 Then Factory's session records: S1 holds the refused turn, S2 does not, and S2 holds the phase 3 turn.
+With STORE=postgres (use your own DB_SCHEMA, never the demo's): phase 4 stops the server, starts a new one that
+loads the record from Postgres, and checks the Mapper's saved session is still S2 and the deal is still posted.
 """
 from __future__ import annotations
 
@@ -30,8 +32,9 @@ sys.path.insert(0, str(ROOT / "backend"))
 from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(ROOT / ".env")
-os.environ.update(AGENT_BACKEND="droid", AGENT_FALLBACK="", RECORD_RUNS="0", STORE="memory",
+os.environ.update(AGENT_BACKEND="droid", AGENT_FALLBACK="", RECORD_RUNS="0",
                   DROID_MODEL="claude-haiku-5-5", DROID_MODEL_MAPPER="claude-sonnet-5-5")
+os.environ.setdefault("STORE", "memory")  # STORE=postgres DB_SCHEMA=<your own> runs it on Tiger, plus a restart phase
 os.environ.setdefault("DROID_WORKDIR", tempfile.mkdtemp(prefix="rewind-api-"))
 
 import httpx  # noqa: E402
@@ -39,7 +42,7 @@ import uvicorn  # noqa: E402
 
 from app.agents import jobs  # noqa: E402
 from app.db.fixtures.kewaunee import DEAL_ID  # noqa: E402
-from app.main import create_app  # noqa: E402
+import app.main as app_main  # noqa: E402  (importing it builds one app, which holds the store)
 
 PORT = 8765
 FORCE = {"left": 0}
@@ -71,16 +74,28 @@ def record(session_id: str | None) -> str:
     return open(paths[0], encoding="utf-8").read() if paths else ""
 
 
-def main() -> int:
-    server = uvicorn.Server(uvicorn.Config(create_app(), host="127.0.0.1", port=PORT, log_level="warning"))
-    threading.Thread(target=server.run, daemon=True).start()
-    c = httpx.Client(base_url=f"http://127.0.0.1:{PORT}", timeout=1200)
-    for _ in range(100):
+def start(port: int, app=None):
+    app = app or app_main.create_app()
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    c = httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=1200)
+    for _ in range(300):
         try:
             if c.get("/health").status_code == 200:
                 break
         except httpx.HTTPError:
             time.sleep(0.1)
+    return app, server, thread, c
+
+
+def main() -> int:
+    app, server, thread, c = start(PORT, app_main.app)
+    store_status = c.get("/health").json().get("store") or {}
+    print("store:", store_status, flush=True)
+    if os.getenv("STORE") == "postgres" and store_status.get("kind") != "postgres":
+        print("FAIL: STORE=postgres but the API is not on Postgres; not running the deal")
+        return 1
     checks: list[tuple[str, bool, str]] = []
 
     def check(name, ok, detail=""):
@@ -163,6 +178,23 @@ def main() -> int:
     check("records: S1 holds the refused turn", bad and bad in r1)
     check("records: S2 does not hold the refused turn", bad and r2 and bad not in r2)
     check("records: S2 holds the phase 3 turn", nxt.get("turn_message_id") and nxt["turn_message_id"] in r2)
+    if os.getenv("STORE") == "postgres":
+        print("phase 4: restart, load from Postgres", flush=True)
+        server.should_exit = True
+        thread.join(timeout=30)
+        app.state.gateway.store.close()  # flush the write-through queue and release the schema lock
+        app, server, thread, c = start(PORT + 1)
+        mem = c.get("/agents/memory").json()
+        saved = next((s for s in mem["sessions"] if s["role"] == "mapper"), {})
+        check("phase 4: after a restart the Mapper's saved session is still S2", saved.get("session_id") == s2,
+              str(saved.get("session_id")))
+        case = c.get(f"/deals/{DEAL_ID}/case").json()
+        check("phase 4: after a restart the deal is still posted with a valid chain",
+              case["stage"] == "posted" and case["audit"]["chain_valid"], case["stage"])
+        rows = c.get(f"/deals/{DEAL_ID}/audit").json()["rows"]
+        denied = [r for r in rows if r.get("action") == "propose:map_lines" and r.get("result") == "DENIED"]
+        print(f"  info: audit rows for this deal after the restart: {len(rows)}; "
+              f"Mapper refusals among them: {len(denied)} (a reset may start the deal's log fresh)", flush=True)
     print("served models:", sorted({str(m.get("model_served")) for m in MAPPER_CALLS}))
     print(f"S1={s1}\nS2={s2}\nrefused turn={bad}\nphase 3 turn={nxt.get('turn_message_id')}")
     failed = [name for name, ok, _ in checks if not ok]
