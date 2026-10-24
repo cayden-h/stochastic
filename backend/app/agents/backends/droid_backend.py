@@ -34,7 +34,7 @@ import re
 
 from pydantic import BaseModel
 
-from app.agents.roles import Role
+from app.agents.roles import READER_TOOL_DESCRIPTIONS, Role
 from app.agents.settings import role_model, role_reasoning
 from app.tools.finance import TOOL_DESCRIPTIONS
 
@@ -63,8 +63,15 @@ def _build_server(role: Role, call_tool):
         def limit_test(leverage_run_id: str) -> str:
             return _call(name, {"leverage_run_id": leverage_run_id})
 
+        def get_section(id: str) -> str:  # noqa: A002 - the tool's argument name
+            return _call(name, {"id": id})
+
+        def get_definition(term: str) -> str:
+            return _call(name, {"term": term})
+
         return {"consolidate": consolidate, "tie_out": tie_out, "ebitda": ebitda, "covenant_debt": covenant_debt,
-                "leverage": leverage, "limit_test": limit_test}[name]
+                "leverage": leverage, "limit_test": limit_test, "get_section": get_section,
+                "get_definition": get_definition}[name]
 
     def _call(name: str, args: dict) -> str:
         try:
@@ -74,7 +81,7 @@ def _build_server(role: Role, call_tool):
             return json.dumps({"error": str(error)})
 
     for name in role.tools:
-        droid_tools.append(tool(name, TOOL_DESCRIPTIONS[name], make(name)))
+        droid_tools.append(tool(name, {**TOOL_DESCRIPTIONS, **READER_TOOL_DESCRIPTIONS}[name], make(name)))
     return create_sdk_mcp_server(name="stochastic", tools=droid_tools), [t.name for t in droid_tools] if droid_tools else []
 
 

@@ -12,6 +12,7 @@ DEFAULT_MODEL = "claude-haiku-5-5"
 # Droid picks "high" when no effort is given, whatever the model's own default. We set it explicitly so a session is
 # never left to the CLI's or the router's choice.
 DEFAULT_REASONING_EFFORT = "medium"
+ROLE_NAMES = ("brief_reader", "mapper", "preparer", "reviewer")
 
 
 def role_model(prefix: str, role_name: str) -> str | None:
@@ -31,10 +32,10 @@ def summary() -> dict:
         "backend": os.getenv("AGENT_BACKEND", "scripted"),
         "fallback": os.getenv("AGENT_FALLBACK", "scripted"),
         "models": {
-            "anthropic": {r: role_model("ANTHROPIC_MODEL", r) for r in ("mapper", "preparer", "reviewer")},
-            "droid": {r: role_model("DROID_MODEL", r) for r in ("mapper", "preparer", "reviewer")},
+            "anthropic": {r: role_model("ANTHROPIC_MODEL", r) for r in ROLE_NAMES},
+            "droid": {r: role_model("DROID_MODEL", r) for r in ROLE_NAMES},
         },
-        "reasoning_effort": {"droid": {r: role_reasoning("DROID", r) for r in ("mapper", "preparer", "reviewer")}},
+        "reasoning_effort": {"droid": {r: role_reasoning("DROID", r) for r in ROLE_NAMES}},
         "record_runs": os.getenv("RECORD_RUNS", "1"),
         "droid_timeout_seconds": float(os.getenv("DROID_TIMEOUT", "240")),
     }
