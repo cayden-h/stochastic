@@ -17,7 +17,23 @@ The current code implements an earlier workflow and is being updated per `docs/T
 | `app/core/` | Settings, logging, and shared types. |
 | `tests/` | Tests for the trust rules and the tools. |
 
+## Tests
+
+```
+.venv/bin/python -m pytest -q
+```
+
+The normal run uses the memory store and never touches the network. The 5 tests in `tests/test_postgres_store.py` skip unless `TEST_DATABASE_URL` is set.
+To run them against Tiger Cloud, use your own schema so you do not take the demo schema's advisory lock:
+
+```
+set -a; . ../.env; set +a
+TEST_DATABASE_URL="$DATABASE_URL" DB_SCHEMA=stochastic_<you> .venv/bin/python -m pytest -q
+```
+
+Run this before every merge that touches the store, the gateway, or the API. Expect 120 passed and about 25 seconds.
+
 ## Status
 
-Surface-level prototype. The gateway enforces the trust rules and writes a hash-chained audit log. The store is in memory and seeded with illustrative data.
-The real agents come next. Postgres is optional.
+The gateway enforces the trust rules and writes a hash-chained audit log. The store is in memory by default; with `STORE=postgres` it writes through to Tiger Cloud and reloads the record on start.
+The writer is a background thread, so call the store's `flush()` (or wait for `/health` to show `pending: 0`) before you stop a process whose writes you want to keep.
