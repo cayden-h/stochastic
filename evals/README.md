@@ -40,5 +40,25 @@ backend/.venv/bin/python evals/score_mapper.py --backend scripted
 - Not scored (`none` rows), the Mapper's answers: Certificates of Deposit to Cash and cash equivalents (0.50, flagged), Noncompete Agreement, Net to Other assets (0.60), Reserve for Uncertain Tax Positions to Other non-current liabilities (0.70), Depreciation and Amortization to Depreciation (0.95).
 
 The scripted backend's synonym table was written with Note 2 at hand, so this score shows the key and the scripted Mapper agree; it is not independent evidence of model quality (inferred).
-The score that matters is a model backend (`--backend anthropic` or `--backend droid`), which has not been run against the key yet.
+The score that matters is a model backend.
+
+### Recorded model runs (2026-10-24)
+
+Both recorded Droid runs were scored without a key, by replaying the Mapper's recorded output against the key.
+
+| Recording | Model (requested) | `note2` | `note2_total` | All scored |
+| --- | --- | --- | --- | --- |
+| `backend/recordings/sonnet-5-5/` | Claude Sonnet 5.5 | 23 of 23 | 10 of 10 | 33 of 33 |
+| `backend/recordings/` (the default replay) | Claude Haiku 5.5 | 23 of 23 | 10 of 10 | 33 of 33 |
+
+The Sonnet run was scored with `RECORDINGS_DIR=$PWD/backend/recordings/sonnet-5-5 backend/.venv/bin/python evals/score_mapper.py --backend replay`. [verified]
+The Haiku run was scored straight from `backend/recordings/mapper.json`, because the replay stops before the score prints (see below). [verified]
+Droid does not confirm which model ran, so the model names are what was requested (see `docs/agents.md`). [verified]
+Both runs flag Certificates of Deposit and tag the financing liability lines unclear, as intended. [verified]
+The score covers the line-to-line mapping only, not the covenant tags. [verified]
+
+Demo risk, for Cayden: the Haiku Mapper also tags "Short-term borrowings" unclear and puts it in the financing liability flag.
+After the default flag answer, that line stays unclear, and the Preparer refuses with "covenant tag is unclear for: Short-term borrowings". [verified: replay run of `score_mapper.py`]
+The scorer answers flags the way the console does (the default option), so the replay fallback on stage would likely stop at the same step. [inferred]
+The Sonnet recording runs through.
 The Mapper is scored on what it proposed before any human answer; the default flag answers changed no mappings in this run.
