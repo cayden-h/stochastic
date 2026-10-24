@@ -1,71 +1,78 @@
 "use client";
 
 import { useState } from "react";
-import { isLearned, isLearnedTag, plural } from "@/lib/format";
+import { isLearned, isLearnedTag, pct } from "@/lib/format";
 import type { Mapping, SourceLine } from "@/lib/types";
-import { Button, Mono, Shape, Tag } from "./ui";
+import { Card, Label, Mono, Tag } from "./ui";
+
+export type MappingFilter = "all" | "unsure" | "policy";
+
+/** Unsure: in a mapping question, or below 0.80 confidence. */
+export function isUnsure(m: Mapping): boolean {
+  return m.flagged || m.confidence < 0.8;
+}
+
+const FIRST = 10;
 
 /**
- * The Mapper's line-by-line answer: each target line and the platform line it goes to.
+ * The Mapper's line-by-line answer: each target line, the platform line it goes to, and how sure it was.
  * A "Learned" chip marks a mapping or a tag the gateway tied to a learned policy: the controller decided it once.
  */
-export function Mappings({ mappings, lines }: { mappings: Mapping[]; lines: SourceLine[] }) {
-  const [open, setOpen] = useState(false);
-  const learned = mappings.filter(isLearned);
-  const learnedTags = lines.filter(isLearnedTag);
-  const flagged = mappings.filter((m) => m.flagged);
-  const low = mappings.filter((m) => m.confidence < 0.8 && !m.flagged);
+export function Mappings({ mappings, lines, filter }: { mappings: Mapping[]; lines: SourceLine[]; filter: MappingFilter }) {
+  const [all, setAll] = useState(false);
+  const rows = filter === "unsure" ? mappings.filter(isUnsure) : filter === "policy" ? mappings.filter(isLearned) : mappings;
+  const learnedTags = filter === "policy" ? lines.filter(isLearnedTag) : [];
+  const shown = all ? rows : rows.slice(0, FIRST);
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h2 className="font-serif text-[26px] leading-8 font-medium">Mapping</h2>
-        <span className="text-muted">
-          {plural(mappings.length, "target line")} mapped. {flagged.length} in a mapping question. {low.length} below 0.80 confidence.
-        </span>
-        {learned.length + learnedTags.length > 0 ? (
-          <span className="inline-flex items-center gap-2">
-            <Tag tone="agent">Learned</Tag>
-            <span className="text-muted">{plural(learned.length + learnedTags.length, "line")} settled by earlier answers</span>
-          </span>
-        ) : null}
-        <span className="flex-1" />
-        <Button kind="link" onClick={() => setOpen((v) => !v)}>{open ? "Hide" : "Show"}</Button>
-      </div>
-
-      {learnedTags.length && !open ? (
-        <div className="flex flex-col gap-1 rounded-chip border border-hairline bg-card px-4 py-2">
-          {learnedTags.map((l) => (
-            <div key={l.id} className="flex items-center gap-3">
-              <Tag tone="agent">Learned</Tag>
-              <span className="truncate">{l.line}</span>
-              <Mono>{l.covenant_tag}</Mono>
-              <Mono className="truncate">{l.covenant_note}</Mono>
-            </div>
-          ))}
+    <>
+      <Card className="flex w-full flex-col">
+        <div className="flex w-full gap-[12px] border-b border-line px-[20px] py-[12px]">
+          <Label className="min-w-0 flex-1">Target line</Label>
+          <Label className="min-w-0 flex-1">Platform line</Label>
+          <Label className="w-[130px] shrink-0">Confidence</Label>
         </div>
-      ) : null}
-
-      {open ? (
-        <div className="overflow-x-auto rounded-card border border-rule bg-card">
-          <div className="min-w-[640px]">
-          {mappings.map((m) => (
-            <div key={m.id} className="grid grid-cols-[1fr_24px_1fr_72px_140px] items-center gap-3 border-b border-hairline px-4 py-1 last:border-b-0">
-              <span className="truncate" title={m.target_line}>{m.target_line}</span>
-              <span className="text-muted"><Shape kind="square" size={10} /></span>
-              <span className={`truncate ${m.platform_line ? "" : "text-muted"}`} title={m.platform_line ?? "unmapped"}>
-                {m.platform_line ?? "Unmapped, listed"}
-              </span>
-              <Mono className="text-right">{m.confidence.toFixed(2)}</Mono>
-              <span className="flex justify-end gap-2">
+        {shown.map((m) => {
+          const unsure = isUnsure(m);
+          return (
+            <div
+              key={m.id}
+              className={`flex w-full items-center gap-[12px] border-b border-line px-[20px] py-[12px] text-[14px] last:border-b-0 ${unsure ? "bg-amber-tint" : ""}`}
+            >
+              <span className="min-w-0 flex-1 truncate font-medium text-body" title={m.target_line}>{m.target_line}</span>
+              <span
+                className={`flex min-w-0 flex-1 items-center gap-[8px] ${unsure ? "font-semibold text-escalation" : m.platform_line ? "text-forest" : "text-faint"}`}
+                title={m.reason}
+              >
+                <span className="truncate">{m.platform_line ?? (unsure ? "?" : "Total, not mapped")}</span>
                 {isLearned(m) ? <Tag tone="agent">Learned</Tag> : null}
-                {m.flagged ? <Tag>Flagged</Tag> : null}
                 {m.approved_by ? <Mono>by you</Mono> : null}
               </span>
+              <span className={`w-[130px] shrink-0 font-ui font-semibold ${unsure ? "text-escalation" : "text-clear"}`}>{pct(m.confidence)}</span>
             </div>
-          ))}
+          );
+        })}
+        {learnedTags.map((l) => (
+          <div key={l.id} className="flex w-full items-center gap-[12px] border-b border-line px-[20px] py-[12px] text-[14px] last:border-b-0">
+            <span className="min-w-0 flex-1 truncate font-medium text-body" title={l.line}>{l.line}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-[8px] text-forest" title={l.covenant_note ?? ""}>
+              <span className="truncate">{l.covenant_tag === "debt" ? "Counts as debt" : l.covenant_tag === "not_debt" ? "Not debt" : l.covenant_tag}</span>
+              <Tag tone="agent">Learned</Tag>
+            </span>
+            <Mono className="w-[130px] shrink-0">lender tag</Mono>
           </div>
-        </div>
+        ))}
+        {!shown.length && !learnedTags.length ? (
+          <p className="px-[20px] py-[14px] text-[14px] text-slate">
+            {filter === "policy" ? "No line was settled by an earlier answer yet." : filter === "unsure" ? "The Mapper was sure of every line." : "The Mapper has not run."}
+          </p>
+        ) : null}
+      </Card>
+      {rows.length > FIRST ? (
+        <p className="font-mono text-[12px] text-slate">
+          {all ? rows.length : FIRST} of {rows.length} &middot;{" "}
+          <button className="hover:text-forest hover:underline" onClick={() => setAll((v) => !v)}>{all ? "Show fewer" : "Show all"}</button>
+        </p>
       ) : null}
-    </section>
+    </>
   );
 }

@@ -1,180 +1,123 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CombinedTable } from "@/components/combined-table";
-import { FlagCard } from "@/components/flag-card";
-import { Mappings } from "@/components/mappings";
-import { Button, Mono, Shape } from "@/components/ui";
-import { VerdictLine } from "@/components/verdict-line";
+import { Page } from "@/components/shell";
+import { Button, Card, Label, PageHeader } from "@/components/ui";
+import { UploadModal } from "@/components/upload-modal";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
-import { fmtX, learnedPolicies, plural } from "@/lib/format";
-import type { Stage } from "@/lib/types";
+import { ago, fmtX, stageWords } from "@/lib/format";
+import type { Deal } from "@/lib/types";
 
-/** The three agents in order, and which stage means each one is working. */
-const STEPS: { role: string; working: string[]; done: string[] }[] = [
-  { role: "Mapper", working: ["mapping"], done: ["awaiting_flag", "mapped", "flags_answered", "preparing", "awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
-  { role: "Preparer", working: ["mapped", "flags_answered", "preparing"], done: ["awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
-  { role: "Reviewer", working: ["awaiting_review"], done: ["awaiting_approval", "needs_attention", "posted"] },
-];
+const STAGE_TONE = { you: "text-escalation", work: "text-forest", done: "text-clear", bad: "text-denied", idle: "text-slate" } as const;
 
-/** While the agents run (30 to 60 s on a live model), show who is working and for how long, from the stage.
- * Keyed by the stage, so the clock restarts when the next agent starts. */
-function Progress({ stage }: { stage: Stage }) {
-  const [since] = useState(() => Date.now());
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const seconds = Math.max(0, Math.round((now - since) / 1000));
-  return (
-    <ol className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-chip border border-hairline bg-card px-4 py-3" aria-live="polite">
-      {STEPS.map((s) => {
-        const done = s.done.includes(stage);
-        const working = !done && s.working.includes(stage);
-        return (
-          <li key={s.role} className={`flex items-center gap-2 font-semibold ${done ? "text-clear" : working ? "text-ink" : "text-muted"}`}>
-            <Shape kind={done ? "check" : "circle"} size={12} />
-            {s.role}
-            {working ? <span className="tabular-nums text-muted">working, {seconds} s</span> : null}
-          </li>
-        );
-      })}
-    </ol>
-  );
+/** The case column names the platform: "Kewaunee Scientific acquires Nu Aire" is the Kewaunee Scientific case. */
+function caseName(d: Deal): string {
+  return d.name.replace(/\s+acquires\s+.*$/i, "") || d.platform;
 }
 
-/**
- * The case: one screen from one read, GET /deals/{id}/case.
- * Run, answer the flags, read the verdict, approve. The log is a link.
- */
-export default function CaseScreen() {
-  const { kase, refresh } = useDeal();
+/** V3-1: every case with its stage, verdict, and last update. Begin runs the current deal; Upload loads a new one. */
+export default function Dashboard() {
+  const router = useRouter();
+  const { deals, kase, audit, select, refresh } = useDeal();
+  const [upload, setUpload] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);  // "just now" turns into "1 min ago" on its own
+    return () => clearInterval(t);
+  }, []);
 
   if (!kase) return null;
-  const { deal, stage, flags, open_flags, verdict, result, mappings, source_lines, policies, audit } = kase;
-  const open = flags.filter((f) => open_flags.includes(f.id));
-  const answered = flags.filter((f) => f.answer);
-  const runIds = result?.run_ids_by_tool ?? {};
-  const applied = learnedPolicies(mappings, source_lines);
-  const learned = applied.size;
-  const learnedLines = mappings.filter((m) => m.policy_id).length + source_lines.filter((l) => l.covenant_policy_id).length;
-  const earlierAnswers = new Set(policies.filter((p) => applied.has(p.id)).map((p) => p.learned_from)).size;
-  const noFlagThisTime = Boolean(verdict) && answered.length === 0 && learned > 0;
-  // The whole-line reading as filed, from the answered covenant flag: the comparison stays on screen after the answer.
-  const covenantFlag = answered.find((f) => f.payload.kind === "covenant_tag");
-  const asFiledOpt = covenantFlag?.options.find((o) => o.basis === "as_filed" && o.leverage != null);
-  const asFiled = asFiledOpt && deal.ebitda_basis !== "as_filed"
-    ? { leverage: asFiledOpt.leverage!, ok: Boolean(asFiledOpt.ok), run_id: asFiledOpt.run_id } : null;
-  const failed = stage === "run_failed";
-  const idle = stage === "new" || failed;
-  const working = !idle && !open.length && (!verdict || !verdict.review);
+  const current = kase.deal.id;
+  const stageOf = (d: Deal) => (d.id === current ? kase.stage : d.stage);
+  const open = deals.filter((d) => stageOf(d) !== "posted").length;
+  const needsYou = deals.filter((d) => stageWords(stageOf(d)).tone === "you").length;
+  const policies = kase.policies.length;
+  const lastAt = audit.rows[audit.rows.length - 1]?.at;
 
-  async function act(fn: () => Promise<unknown>) {
+  async function begin() {
     setBusy(true); setNote(null);
-    try { await fn(); await refresh(); } catch (e) { setNote(e instanceof Error ? e.message : "Action failed"); }
-    finally { setBusy(false); }
+    try {
+      if (kase!.stage === "new" || kase!.stage === "run_failed") { await api.start(current); await refresh(); }
+      router.push("/case");
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "Could not start the run");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  const headline =
-    failed ? "The run stopped before it finished."
-    : stage === "new" ? (policies.length ? "Run again. The Mapper now applies what you decided." : "Two sets of books. One lender's limit.")
-    : open.length ? `${open.length === 1 ? "One line needs" : `${open.length} lines need`} your answer.`
-    : verdict ? `${verdict.verdict === "ok" ? "Under" : "Over"} the limit at ${fmtX(verdict.leverage)}.${noFlagThisTime ? " No flag this time." : ""}`
-    : "The agents are working.";
+  async function openCase(id: string) {
+    if (id !== current) await select(id);
+    router.push("/case");
+  }
 
-  const sub =
-    failed ? "Nothing was posted. Run again to continue from where it stopped; the log has the reason."
-    : stage === "new" ? `${deal.platform} acquires ${deal.target}. The limit is ${deal.brief.debt_term} below ${fmtX(deal.brief.limit)}, ${deal.brief.limit_section} of the ${deal.brief.lender} agreement.`
-    : open.length ? "The Mapper stopped on what it must not decide alone. Each option shows its effect, computed by the tools."
-    : verdict?.posted ? "Approved and posted. The answer you gave is now a policy the Mapper applies next time."
-    : noFlagThisTime ? `The Mapper applied ${earlierAnswers === 1 ? "your earlier answer" : `your ${earlierAnswers} earlier answers`} to ${plural(learnedLines, "line")} and asked nothing. Code combined the books and tested the limit again.`
-    : verdict ? "Code combined the books and tested the limit. The Reviewer re-ran the checks. Your approval posts it."
-    : "Mapping, combining, and testing the limit. The screen updates on its own.";
+  const stats: [number, string][] = [
+    [open, open === 1 ? "Open case" : "Open cases"],
+    [needsYou, "Needs you"],
+    [policies, policies === 1 ? "Policy learned" : "Policies learned"],
+  ];
 
   return (
-    <div className="mx-auto flex max-w-[1120px] flex-col gap-6 px-4 pt-6 pb-12">
-      <header className="flex flex-col gap-2">
-        <h1 className="font-serif text-[40px] leading-[48px] font-medium">{headline}</h1>
-        <p className="text-muted">{sub}</p>
-      </header>
+    <Page>
+      <PageHeader title="Dashboard">
+        <Button onClick={() => setUpload(true)}>Upload</Button>
+        <Button kind="primary" disabled={busy} onClick={begin}>Begin</Button>
+      </PageHeader>
 
-      {note ? <p role="alert" className="rounded-chip bg-denied-tint px-4 py-3 font-semibold text-denied">{note}</p> : null}
+      {note ? <p role="alert" className="rounded-[8px] bg-denied-tint px-[12px] py-[8px] font-semibold text-denied">{note}</p> : null}
 
-      {idle ? (
-        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-          <Button kind="primary" disabled={busy} onClick={() => act(() => api.start(deal.id))}>
-            {policies.length || failed ? "Run again" : "Run the deal"}
-          </Button>
-          <span className="text-muted">
-            {plural(source_lines.filter((l) => l.company === deal.platform).length, `${deal.platform} line`)}, {plural(source_lines.filter((l) => l.company === deal.target).length, `${deal.target} line`)}, from public filings.
-          </span>
+      <div className="flex w-full gap-[16px]">
+        {stats.map(([n, label]) => (
+          <Card key={label} className="flex min-w-0 flex-1 flex-col gap-[4px] p-[18px]">
+            <span className="text-[28px] font-semibold text-forest">{n}</span>
+            <span className="text-[13px] text-slate">{label}</span>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="flex w-full flex-col">
+        <div className="flex w-full gap-[12px] border-b border-line px-[20px] py-[12px]">
+          <Label className="flex-1">Case</Label>
+          <Label className="w-[200px]">Target</Label>
+          <Label className="w-[170px]">Stage</Label>
+          <Label className="w-[150px]">Verdict</Label>
+          <Label className="w-[120px]">Updated</Label>
         </div>
-      ) : null}
+        {deals.map((d) => {
+          const on = d.id === current;
+          const stage = stageWords(stageOf(d));
+          const verdict = on ? kase.verdict : null;
+          return (
+            <button
+              key={d.id}
+              onClick={() => openCase(d.id)}
+              className={`flex w-full items-center gap-[12px] border-b border-line px-[20px] py-[14px] text-left last:border-b-0 transition-colors duration-150 ${
+                on ? "bg-mint/50 hover:bg-mint" : "hover:bg-mint-select"
+              }`}
+            >
+              <span className={`min-w-0 flex-1 truncate text-[15px] text-forest ${on ? "font-semibold" : ""}`} title={d.name}>{caseName(d)}</span>
+              <span className="w-[200px] truncate text-[14px] text-body">{d.target}</span>
+              <span className="flex h-[30px] w-[170px] items-center">
+                <span className={`font-ui text-[14px] font-semibold whitespace-nowrap ${STAGE_TONE[stage.tone]}`}>{stage.text}</span>
+              </span>
+              <span className="w-[150px] text-[14px]">
+                {verdict ? (
+                  <span className={`font-semibold ${verdict.verdict === "ok" ? "text-clear" : "text-denied"}`}>
+                    {fmtX(verdict.leverage)} {verdict.verdict === "ok" ? "OK" : "Over"}
+                  </span>
+                ) : <span className="text-faint">-</span>}
+              </span>
+              <span className="w-[120px] font-mono text-[12px] text-slate">{on && lastAt ? ago(lastAt, now) : "-"}</span>
+            </button>
+          );
+        })}
+      </Card>
 
-      {working ? <Progress key={stage} stage={stage} /> : null}
-
-      {open.map((f) => (
-        <FlagCard
-          key={f.id}
-          item={f}
-          lines={source_lines}
-          busy={busy}
-          onAnswer={(id) => act(() => api.answer(f.id, id))}
-          onHold={() => act(() => api.hold(f.id))}
-        />
-      ))}
-
-      {verdict ? (
-        <VerdictLine
-          verdict={verdict}
-          runIds={runIds}
-          asFiled={asFiled}
-          busy={busy}
-          onApprove={() => act(() => api.approve(verdict.approval_item!))}
-          onReject={() => act(() => api.reject(verdict.approval_item!, "Rejected by the controller."))}
-        />
-      ) : null}
-
-      {result ? <CombinedTable result={result} platform={deal.platform} target={deal.target} /> : null}
-
-      {mappings.length ? <Mappings mappings={mappings} lines={source_lines} /> : null}
-
-      {answered.length ? (
-        <section className="flex flex-col gap-2">
-          <span className="text-[14px] leading-5 font-semibold uppercase tracking-[0.04em] text-muted">Answered ({answered.length})</span>
-          {answered.map((f) => (
-            <div key={f.id} className="flex items-center gap-3 rounded-chip border border-hairline bg-card px-4 py-2">
-              <span className="text-clear"><Shape kind="check" /></span>
-              <span className="hidden min-w-0 flex-1 truncate sm:block" title={f.question ?? ""}>{f.question}</span>
-              {/* A model-written label can be a long sentence; it truncates instead of widening the page. */}
-              <strong className="min-w-0 flex-1 sm:max-w-[55%] sm:flex-none sm:truncate" title={f.options.find((o) => o.id === f.answer)?.label}>
-                {f.options.find((o) => o.id === f.answer)?.label}
-              </strong>
-              <Mono>{f.id}</Mono>
-            </div>
-          ))}
-        </section>
-      ) : null}
-
-      {/* One row only from lg: at tablet width the disclaimer was squeezed to a word per line and widened the page. */}
-      <footer className="flex flex-col items-start gap-4 border-t border-hairline pt-4 lg:flex-row lg:items-center">
-        <Link href="/log" className="font-semibold sm:whitespace-nowrap underline underline-offset-4 hover:text-code">
-          Log: {plural(audit.rows, "row")}, {audit.denied} denied, chain {audit.chain_valid ? "intact" : "broken"}
-        </Link>
-        <span className="hidden flex-1 lg:block" />
-        {verdict?.posted ? (
-          <Button kind="link" className="text-left sm:whitespace-nowrap" disabled={busy} onClick={() => act(() => api.reset(true))}>Run it again with what was learned</Button>
-        ) : null}
-        {stage !== "new" || policies.length ? (
-          <Button kind="link" className="text-left sm:whitespace-nowrap" disabled={busy} onClick={() => act(() => api.reset(false))}>Fresh deal, clear memory</Button>
-        ) : null}
-        <Mono>Figures from public SEC filings. Code does the math; a human approves. Not advice.</Mono>
-      </footer>
-    </div>
+      {upload ? <UploadModal onClose={() => setUpload(false)} /> : null}
+    </Page>
   );
 }

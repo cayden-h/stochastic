@@ -1,49 +1,46 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { fmtK, fmtM, fmtX } from "@/lib/format";
 import type { Verdict as VerdictShape } from "@/lib/types";
-import { Button, Mono, Shape, Verdict } from "./ui";
+import { Label, Mono, Shape, Verdict } from "./ui";
 
 /**
- * Leverage against the limit, OK or Over the limit, the room left, the Reviewer badge, and Approve.
- * Approve is live only while the approval item is PROPOSED. Every figure names its tool run.
+ * Leverage against the limit, OK or Over the limit, the room left, and the Reviewer badge.
+ * Approve and Reject sit in the page header. Every figure names its tool run.
  */
 export function VerdictLine({
-  verdict, runIds, busy, onApprove, onReject, asFiled,
+  verdict, runIds, asFiled, note,
 }: {
-  verdict: VerdictShape; runIds: Record<string, string>; busy: boolean; onApprove: () => void; onReject: () => void;
+  verdict: VerdictShape; runIds: Record<string, string>;
   /** The whole-line reading from the answered covenant flag, so the comparison stays on screen after the answer. */
   asFiled?: { leverage: number; ok: boolean; run_id: string | null } | null;
+  /** One sentence on what happened, under the figure. */
+  note?: ReactNode;
 }) {
   const over = verdict.verdict === "over_limit";
   const review = verdict.review?.verdict ?? null;
-  const canApprove = verdict.approval_state === "PROPOSED" && review === "pass" && !over;
   return (
-    <section className={`flex flex-col gap-4 rounded-card border bg-card p-6 ${over ? "border-denied" : "border-rule"}`}>
-      <div className="flex flex-wrap items-center gap-4">
-        <h2 className="font-serif text-[40px] leading-[48px] font-medium tabular-nums">
-          {fmtX(verdict.leverage)} <span className="text-muted">against {fmtX(verdict.limit)}</span>
+    <section className={`flex w-full flex-col gap-[14px] rounded-card border bg-white p-[20px] ${over ? "border-denied" : "border-line"}`}>
+      <div className="flex flex-wrap items-center gap-[12px]">
+        <h2 className="text-[30px] font-semibold text-forest">
+          {fmtX(verdict.leverage)} <span className="text-[20px] font-medium text-slate">against {fmtX(verdict.limit)}</span>
         </h2>
         <Verdict kind={over ? "over_limit" : "ok"} />
         {review ? <Verdict kind={review} /> : <Verdict kind="waiting" word="Reviewer pending" />}
-
         <span className="flex-1" />
-        {verdict.posted ? (
-          <span className="flex items-center gap-2 font-semibold text-clear"><Shape kind="check" />Approved and posted to the record.</span>
-        ) : verdict.approval_state === "PROPOSED" ? (
-          <div className="flex items-center gap-2">
-            <Button kind="link" disabled={busy} onClick={onReject}>Reject</Button>
-            <Button kind="primary" disabled={busy || !canApprove} onClick={onApprove}>Approve</Button>
-          </div>
-        ) : verdict.approval_state === "REJECTED" ? (
-          <span className="flex items-center gap-2 font-semibold text-denied"><Shape kind="cross" />Rejected.</span>
+        {/* Approved and posted shows in the page header, where Approve was. */}
+        {verdict.approval_state === "REJECTED" ? (
+          <span className="flex items-center gap-[6px] text-[14px] font-semibold text-denied"><Shape kind="cross" size={12} />Rejected</span>
         ) : null}
       </div>
 
+      {note ? <p className="-mt-[6px] text-[14px] leading-[20px] text-slate">{note}</p> : null}
+
       {asFiled ? (
-        <p className="-mt-2 text-muted">
+        <p className="-mt-[6px] text-[14px] leading-[20px] text-slate">
           Read as filed, counting the whole financing line:{" "}
-          <span className={`font-semibold tabular-nums ${asFiled.ok ? "text-ink" : "text-denied"}`}>
+          <span className={`font-semibold ${asFiled.ok ? "text-body" : "text-denied"}`}>
             {fmtX(asFiled.leverage)}, {asFiled.ok ? "under the limit" : "over the limit"}
           </span>
           . The agreement&apos;s definition gives {fmtX(verdict.leverage)}.{" "}
@@ -51,7 +48,7 @@ export function VerdictLine({
         </p>
       ) : null}
 
-      <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <dl className="grid grid-cols-4 gap-[16px] border-t border-line pt-[14px]">
         <Figure label={verdict.debt_term} value={fmtK(verdict.debt)} run={runIds.covenant_debt} />
         <Figure label="Covenant EBITDA" value={fmtK(verdict.ebitda)} run={runIds.ebitda} />
         <Figure
@@ -69,12 +66,12 @@ export function VerdictLine({
       </dl>
 
       {review === "needs_attention" && verdict.review?.reasons.length ? (
-        <ul className="flex flex-col gap-1 rounded-chip bg-escalation-tint px-4 py-3 text-escalation">
+        <ul className="flex flex-col gap-[4px] rounded-[8px] bg-escalation-tint px-[12px] py-[10px] text-[14px] text-escalation">
           {verdict.review.reasons.map((r, i) => <li key={i}>{r}</li>)}
         </ul>
       ) : null}
       {over ? (
-        <p className="text-denied">Over the limit returns the result to you as needs attention. The gateway refuses approval.</p>
+        <p className="text-[14px] text-denied">Over the limit returns the result to you as needs attention. The gateway refuses approval.</p>
       ) : null}
     </section>
   );
@@ -82,10 +79,10 @@ export function VerdictLine({
 
 function Figure({ label, value, run, sub, tone }: { label: string; value: string; run?: string; sub?: string; tone?: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      <dt className="text-[14px] leading-5 font-semibold uppercase tracking-[0.04em] text-muted">{label}</dt>
-      <dd className={`font-semibold tabular-nums ${tone ?? ""}`}>{value}</dd>
-      <dd><Mono>{[sub, run].filter(Boolean).join(" ")}</Mono></dd>
+    <div className="flex min-w-0 flex-col gap-[4px]">
+      <dt><Label>{label}</Label></dt>
+      <dd className={`text-[16px] font-semibold ${tone ?? "text-forest"}`}>{value}</dd>
+      <dd><Mono className="text-[11px]">{[sub, run].filter(Boolean).join(" ")}</Mono></dd>
     </div>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { AuditRowView } from "@/components/audit-log";
-import { Button, Shape } from "@/components/ui";
+import { AuditRowView, LOG_COLS } from "@/components/audit-log";
+import { Page } from "@/components/shell";
+import { Button, Card, Label, PageHeader, Shape } from "@/components/ui";
 import { useDeal } from "@/lib/deal-context";
 import { clock, plural } from "@/lib/format";
 
-/** Log: prove what happened. Read only, one toggle, one Verify button. */
+/** V3-5, the log: prove what happened. Read only, one toggle, one Verify button. All times are PT. */
 export default function Log() {
   const { audit, kase, refresh } = useDeal();
   const [deniedOnly, setDeniedOnly] = useState(false);
@@ -18,31 +19,39 @@ export default function Log() {
   const head = audit.rows[audit.rows.length - 1]?.hash.slice(0, 6) ?? "-";
 
   return (
-    <div className="mx-auto flex max-w-[1120px] flex-col gap-4 px-4 pt-6 pb-8">
-      <header className="flex flex-col gap-2">
-        <h1 className="font-serif text-[40px] leading-[48px] font-medium">Every action is on the record.</h1>
-        <p className="text-muted">
-          {deniedCount === 0 ? "No actions were denied." : `${deniedCount} ${deniedCount === 1 ? "action was" : "actions were"} denied.`} Each row carries the hash of the row before it. All times are PT.
-        </p>
-      </header>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className={`flex items-center gap-2 font-semibold ${audit.chain_valid ? "text-clear" : "text-denied"}`}>
-          <Shape kind={audit.chain_valid ? "check" : "cross"} size={16} />
-          {audit.chain_valid ? `Chain intact. ${plural(audit.rows.length, "row")}. Head ${head}.` : "Chain broken. A past row changed."}
-          {verified ? <span className="font-mono text-[14px] leading-5 font-normal text-muted">Verified {verified}</span> : null}
+    <Page>
+      <PageHeader title="Log">
+        <span
+          className={`flex items-center gap-[6px] text-[13px] font-semibold whitespace-nowrap ${audit.chain_valid ? "text-clear" : "text-denied"}`}
+          title="Each row carries the hash of the row before it."
+        >
+          <Shape kind={audit.chain_valid ? "check" : "cross"} size={12} />
+          {audit.chain_valid ? `Chain intact. ${plural(audit.rows.length, "row")}, head ${head}.` : "Chain broken. A past row changed."}
+          {verified ? <span className="font-mono text-[12px] font-normal text-slate">Verified {verified} PT</span> : null}
         </span>
-        <span className="flex-1" />
-        <label className="flex items-center gap-2">
-          <input type="checkbox" className="size-5 accent-ink" checked={deniedOnly} onChange={(e) => setDeniedOnly(e.target.checked)} />
-          Denied only
-        </label>
-        <Button onClick={async () => { await refresh(); setVerified(clock(new Date().toISOString())); }}>Verify chain</Button>
-      </div>
+        <button
+          aria-pressed={deniedOnly}
+          onClick={() => setDeniedOnly((v) => !v)}
+          className={`rounded-full border px-[12px] py-[6px] text-[13px] font-semibold whitespace-nowrap transition-colors duration-150 ${
+            deniedOnly ? "border-denied bg-denied text-white" : "border-line bg-white text-body hover:bg-denied-tint"
+          }`}
+        >
+          Denied only ({deniedCount})
+        </button>
+        <Button onClick={async () => { await refresh(); setVerified(clock(new Date().toISOString())); }}>Verify</Button>
+      </PageHeader>
 
-      <div className="flex flex-col gap-px overflow-hidden rounded-card border border-rule bg-hairline">
+      <Card className="flex w-full flex-col">
+        <div className="flex w-full gap-[12px] border-b border-line px-[20px] py-[12px]">
+          <Label className={`${LOG_COLS.time} shrink-0`}>Time</Label>
+          <Label className={`${LOG_COLS.actor} shrink-0`}>Agents</Label>
+          <Label className={`${LOG_COLS.verb} shrink-0`}>Verb</Label>
+          <Label className="min-w-0 flex-1">Detail</Label>
+          <Label className={`${LOG_COLS.run} shrink-0`}>Run</Label>
+        </div>
         {rows.map((r) => <AuditRowView key={r.id} row={r} items={items} />)}
-      </div>
-    </div>
+        {!rows.length ? <p className="px-[20px] py-[14px] text-[14px] text-slate">{deniedOnly ? "No actions were denied." : "No rows yet."}</p> : null}
+      </Card>
+    </Page>
   );
 }

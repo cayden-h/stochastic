@@ -3,7 +3,7 @@
 import { fmtX, lineK } from "@/lib/format";
 import type { SourceLine, WorkItem } from "@/lib/types";
 import { SourceChip } from "./source";
-import { ActorChip, Button, Mono, Shape, Tag, Verdict } from "./ui";
+import { ActorChip, Button, Mono, Shape, Tag } from "./ui";
 
 type Fork = { state: string; service_id?: string; seconds?: number; reason?: string };
 
@@ -18,11 +18,17 @@ function ForkLine({ fork }: { fork?: Fork }) {
   if (!text) return null;
   const live = fork.state === "creating" || fork.state === "ready";
   return (
-    <p className="flex items-center gap-2 text-[14px] leading-5 text-muted">
-      <span className={fork.state === "ready" ? "text-clear" : "text-muted"}><Shape kind="circle" size={10} /></span>
+    <p className="flex items-center gap-[8px] text-[13px] text-slate">
+      <span className={fork.state === "ready" ? "text-clear" : "text-slate"}><Shape kind="circle" size={10} /></span>
       <span className={live ? "" : "italic"}>{text}</span>
     </p>
   );
+}
+
+/** The question in two parts: its first sentence as the heading, the rest as the detail under it. */
+function splitQuestion(q: string): [string, string] {
+  const m = q.match(/^([\s\S]+?[?.])\s+([\s\S]*)$/);
+  return m ? [m[1], m[2]] : [q, ""];
 }
 
 /**
@@ -31,102 +37,122 @@ function ForkLine({ fork }: { fork?: Fork }) {
  * The ratio, verdict, effect text and run id come from the gateway's tool runs. Nothing here is computed.
  */
 export function FlagCard({
-  item, lines, busy, onAnswer, onHold,
+  item, lines, busy, onAnswer, onHold, position,
 }: {
   item: WorkItem; lines: SourceLine[]; busy: boolean; onAnswer: (optionId: string) => void; onHold: () => void;
+  /** "1 of 2" when several flags are open. */
+  position: string;
 }) {
   const covenant = item.payload.kind === "covenant_tag";
   const kind = covenant ? "Lender definition question" : "Mapping question";
   const lineIds = Array.isArray(item.payload.line_ids) ? (item.payload.line_ids as string[]) : [];
   const flagged = lines.filter((l) => lineIds.includes(l.id));
-  const wide = item.options.length > 2;
+  const [heading, detail] = splitQuestion(item.question ?? "");
   return (
-    <section className="flex flex-col gap-4 rounded-card border border-escalation-bar border-l-[6px] bg-card p-4 sm:p-6">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+    <section className="flex w-full flex-col gap-[14px] rounded-card border border-amber-line bg-white p-[20px]">
+      <div className="flex w-full flex-wrap items-center gap-[10px]">
         <ActorChip actor={item.proposed_by} />
-        <span className="inline-flex items-center gap-2 text-[14px] leading-5 font-semibold uppercase tracking-[0.04em] text-escalation">
-          <Shape kind="triangle" />
+        <span className="inline-flex items-center gap-[6px] text-[11px] font-semibold uppercase tracking-[0.88px] text-escalation">
+          <Shape kind="triangle" size={10} />
           {kind}
         </span>
-        <Mono>{item.id}</Mono>
         <span className="flex-1" />
         <Button kind="link" onClick={onHold} disabled={busy}>Not sure. Hold this item.</Button>
+        <Mono>{position}</Mono>
       </div>
 
       <ForkLine fork={item.payload.fork as Fork | undefined} />
 
-      <h2 className="font-serif text-[26px] leading-8 font-medium">{item.question}</h2>
+      <div className="flex flex-col gap-[6px]">
+        <h2 className="text-[22px] font-semibold text-forest">{heading}</h2>
+        {detail ? <p className="text-[14px] leading-[20px] text-slate">{detail}</p> : null}
+      </div>
 
-      <div className={`grid gap-4 ${wide ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-        {item.options.map((o) => {
+      <div className="flex w-full gap-[12px]">
+        {item.options.map((o, i) => {
           const suggested = o.id === item.default;
+          const ok = Boolean(o.ok);
           return (
             <button
               key={o.id}
               disabled={busy}
               onClick={() => onAnswer(o.id)}
-              className={`flex flex-col items-start gap-2 rounded-chip bg-card p-4 text-left transition-colors duration-150 hover:bg-paper disabled:opacity-50 ${
-                suggested ? "border-2 border-ink" : "border border-rule"
+              className={`flex min-w-0 flex-1 flex-col items-start gap-[6px] self-stretch rounded-[12px] p-[16px] text-left transition-colors duration-150 disabled:opacity-50 ${
+                suggested ? "border-2 border-clear bg-mint-select p-[15px] hover:bg-mint" : "border border-line bg-white hover:bg-mint-select"
               }`}
             >
+              <span className="flex w-full items-start gap-[6px] text-forest">
+                <span className="pt-[2px] font-mono text-[12px]">{String.fromCharCode(97 + i)}.</span>
+                <span className="min-w-0 flex-1 text-[14px] font-semibold">{o.label}</span>
+                {/* With a reading, the tag sits beside the figure so a long label keeps the card's width. */}
+                {suggested && o.leverage == null ? <Tag>Suggested</Tag> : null}
+                {o.added_by ? <ActorChip actor={o.added_by} /> : null}
+              </span>
               {o.leverage != null ? (
-                <span className="flex flex-wrap items-center gap-3">
-                  <span className={`font-serif text-[40px] leading-[48px] font-medium tabular-nums ${o.ok ? "" : "text-denied"}`}>
-                    {fmtX(o.leverage)}
+                <>
+                  <span className="flex w-full items-center gap-[8px]">
+                    <span className={`flex-1 text-[30px] font-semibold ${ok ? "text-clear" : "text-denied"}`}>{fmtX(o.leverage)}</span>
+                    {suggested ? <Tag>Suggested</Tag> : null}
                   </span>
-                  <Verdict kind={o.ok ? "ok" : "over_limit"} />
-                </span>
+                  <span className={`inline-flex items-center gap-[4px] text-[13px] font-medium ${ok ? "text-clear" : "text-denied"}`}>
+                    <Shape kind={ok ? "check" : "cross"} size={10} />
+                    {ok ? "OK" : "Over the limit"}
+                  </span>
+                </>
               ) : null}
-              {suggested || o.added_by ? (
-                <span className="flex flex-wrap gap-2">
-                  {suggested ? <Tag>Agent suggests</Tag> : null}
-                  {o.added_by ? <ActorChip actor={o.added_by} /> : null}
-                </span>
-              ) : null}
-              <span className="font-semibold">{o.label}</span>
-              <span className="text-muted">{o.effect}</span>
-              {o.run_id ? <Mono>{o.run_id}</Mono> : null}
+              <span className="text-[12px] leading-[16px] text-slate">{o.effect}</span>
+              {o.run_id ? <Mono className="text-[11px]">{o.run_id}</Mono> : null}
             </button>
           );
         })}
       </div>
 
       {flagged.length || item.evidence.length ? (
-        <details className="group rounded-chip border border-hairline bg-paper px-4 py-3" open={!covenant}>
-          <summary className="cursor-pointer font-semibold">
+        <details className="group rounded-[12px] border border-line bg-fog px-[14px] py-[10px]" open={!covenant}>
+          <summary className="cursor-pointer text-[13px] font-semibold text-forest">
             Evidence: {flagged.length ? `${flagged.length} line${flagged.length === 1 ? "" : "s"}` : ""}
             {flagged.length && item.evidence.length ? ", " : ""}
             {item.evidence.length ? `${item.evidence.length} quote${item.evidence.length === 1 ? "" : "s"} from the filings` : ""}
           </summary>
-          <div className="mt-3 flex flex-col gap-4">
-      {flagged.length ? (
-        <div className="flex flex-col gap-1 rounded-chip border border-hairline bg-card px-4 py-3">
-          {flagged.map((l) => (
-            <div key={l.id} className="flex flex-wrap items-baseline gap-x-3">
-              <span className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1" title={l.line}>{l.line}</span>
-              <Mono>{l.company}</Mono>
-              <span className="font-semibold tabular-nums">{lineK(l.amount, l.unit)}</span>
-            </div>
-          ))}
-          {flagged.find((l) => l.note) ? (
-            <p className="mt-1 text-muted">{flagged.find((l) => l.note)!.note}</p>
-          ) : null}
-        </div>
-      ) : null}
+          <div className="mt-[10px] flex flex-col gap-[12px]">
+            {flagged.length ? (
+              <div className="flex flex-col gap-[4px] rounded-[8px] border border-line bg-white px-[12px] py-[10px]">
+                {flagged.map((l) => (
+                  <div key={l.id} className="flex items-baseline gap-x-[12px]">
+                    <span className="min-w-0 flex-1 truncate text-[14px]" title={l.line}>{l.line}</span>
+                    <Mono>{l.company}</Mono>
+                    <span className="text-[14px] font-semibold text-forest">{lineK(l.amount, l.unit)}</span>
+                  </div>
+                ))}
+                {flagged.find((l) => l.note) ? (
+                  <p className="mt-[4px] text-[13px] text-slate">{flagged.find((l) => l.note)!.note}</p>
+                ) : null}
+              </div>
+            ) : null}
 
-      {item.evidence.length ? (
-        <div className="flex flex-col gap-3">
-          {item.evidence.map((e, i) => (
-            <blockquote key={i} className="flex flex-col gap-2 border-l-2 border-rule py-1 pl-4">
-              <p className="font-serif text-[20px] leading-[30px]">{`"${e.quote}"`}</p>
-              <div><SourceChip evidence={e} line={flagged[0]} /></div>
-            </blockquote>
-          ))}
-        </div>
-      ) : null}
+            {item.evidence.length ? (
+              <div className="flex flex-col gap-[10px]">
+                {item.evidence.map((e, i) => (
+                  <figure key={i} className="flex flex-col gap-[6px] border-l-2 border-amber-line py-[2px] pl-[12px]">
+                    <p className="font-serif text-[18px] text-body">{`"${e.quote}"`}</p>
+                    <div><SourceChip evidence={e} line={flagged[0]} /></div>
+                  </figure>
+                ))}
+              </div>
+            ) : null}
           </div>
         </details>
       ) : null}
     </section>
+  );
+}
+
+/** The fog card in the verdict's place while there is no verdict yet. */
+export function WaitingVerdict({ text, limit }: { text: string; limit: number }) {
+  return (
+    <div className="flex w-full items-center gap-[12px] rounded-card border border-line bg-fog p-[14px] text-[16px] font-semibold text-slate">
+      <span className="min-w-0 flex-1">{text}</span>
+      <span className="whitespace-nowrap">- of {fmtX(limit)}</span>
+    </div>
   );
 }
