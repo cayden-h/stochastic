@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from app.agents import runner as agent_runner
 from app.agents.jobs import advance
+from app.api.events import next_events
 from app.api.schemas import CaseResponse, HealthResponse
 from app.core.models import CONTROLLER, State
 from app.gateway.gateway import Gateway, GatewayError
@@ -237,12 +238,16 @@ def build_router(gw: Gateway) -> APIRouter:
         need_deal(deal_id)
 
         async def gen():
-            seen = 0
+            seen, last, tick = 0, None, 0
             while not await request.is_disconnected():
-                rows = [a for a in store.audit if a.deal_id == deal_id]
-                for row in rows[seen:]:
-                    yield f"event: audit\ndata: {json.dumps(dump(row))}\n\n"
-                seen = len(rows)
+                if deal_id not in store.deals:
+                    return
+                events, seen, last = next_events(store, deal_id, seen, last)
+                for e in events:
+                    yield e
+                tick += 1
+                if tick % 15 == 0:
+                    yield ": keepalive\n\n"
                 await asyncio.sleep(1)
 
         return StreamingResponse(gen(), media_type="text/event-stream")
