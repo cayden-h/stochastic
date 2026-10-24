@@ -170,6 +170,13 @@ Build `architecture/brief-reader.md` sections 5 to 7, in the gateway and agent f
 - `db/postgres.py`: the `agreement` kind and the new role.
 Done when: Tri's `test_brief_reader.py` passes (section 8), and a deal created from agreement text stops on the Brief, takes the controller's answers, and then maps.
 
+Status (2026-10-25, branch `cayden/brief-reader`): stage 1 is built in the gateway and the agents, and a deal created from agreement text stops on the Brief, takes the controller's answers, and then maps to 0.76x (`test_a_deal_from_agreement_text_stops_on_the_brief_then_maps_and_ends_at_0_76x`).
+Tri's T4 and Eric's E3 had not landed, so the ten section 8 behaviors are tested at gateway level in `backend/tests/test_brief_reader_gateway.py`, which Tri's `test_brief_reader.py` may replace.
+The Kewaunee quotes are in `data/brief/kewaunee_quotes.json`, extracted by Cayden's agent from the SEC copy of Ex 10.1 (each verbatim, under 15 words, with its section); Eric should check them against E3 and replace the file if his differ.
+The test agreement is `backend/tests/fixtures/kewaunee_ex101_excerpt.txt`, stitched from those quotes; the full text stays out of git.
+Droid, run once on Sonnet 5.5 over the full Ex 10.1 (10.8K characters of input): the whole script took about 51 s for two reader turns, so `DROID_TIMEOUT=75` is enough. [measured, 2026-10-25]
+Both drafts were refused: once by an extra rule (the limit's quote must repeat the debt term) that was then relaxed to "the limit is quoted from limit_section", and once for writing "THIS LOAN AGREEMENT" as "This Loan Agreement", which is correct. The run fell back to scripted, so no Droid recording was kept; `backend/recordings/brief_reader.json` waits for the next live run.
+
 ### C4. The console screens (after Josie's frames, with her review)
 
 Build the frames from Hi-fi v3 with the Figma MCP (`design/README.md` has the links), against `GET /deals/{id}/case`:

@@ -28,8 +28,8 @@ import psycopg
 from psycopg.rows import dict_row
 from pydantic import BaseModel
 
-from app.core.models import (AgentSession, AuditRow, Deal, Edit, LearnedAdjustment, Mapping, Policy, Result, SourceLine,
-                             ToolRun, WorkItem, now)
+from app.core.models import (AgentSession, AgreementText, AuditRow, Deal, Edit, LearnedAdjustment, Mapping, Policy,
+                             Result, SourceLine, ToolRun, WorkItem, now)
 from app.db.memory import MemoryStore
 
 log = logging.getLogger("stochastic.store")
@@ -50,6 +50,7 @@ KINDS: dict[str, tuple[str, type[BaseModel], bool]] = {
     "session": ("sessions", AgentSession, True),
     "edit": ("edits", Edit, False),
     "adjustment": ("adjustments", LearnedAdjustment, True),
+    "agreement": ("agreements", AgreementText, False),
 }
 
 SCHEMA_SQL = """

@@ -11,16 +11,24 @@ import hashlib
 import inspect
 import json
 import math
+import re
 import threading
 from typing import Any
 
+from app.core import agreement as agr
 from app.core.models import (
+    BRIEF_READER,
     CONTROLLER,
     MAPPER,
     PREPARER,
     REVIEWER,
     SYSTEM,
+    AgreementText,
     AuditRow,
+    Brief,
+    BriefDraft,
+    BriefReaderInput,
+    BriefReaderOutput,
     Deal,
     AgentSession,
     Edit,
@@ -55,13 +63,16 @@ BASELINE_OPTION = "count_all"  # the option id of the baseline reading the gatew
 # tie_out takes none: its rows come from the edited consolidate run, so applying the edits again would double count.
 EDIT_TOOLS = ("consolidate", "ebitda", "covenant_debt")
 T1_MISSING = "edit-aware tools not installed (T1)"
+# The tools that read the Brief's terms: refused until the controller approves the Brief (D20).
+BRIEF_TOOLS = ("ebitda", "covenant_debt", "limit_test")
 
 # Per-role permissions. Agents are named, so the Mapper cannot call the Preparer's tools.
 PERMISSIONS: dict[str, set[str]] = {
+    BRIEF_READER: {"propose:draft_brief", "tool:get_section", "tool:get_definition"},
     MAPPER: {"propose:map_lines"},
     PREPARER: {"propose:prepare_result", "tool:consolidate", "tool:ebitda", "tool:covenant_debt", "tool:leverage"},
     REVIEWER: {"propose:review_result", "tool:tie_out", "tool:limit_test", "tool:leverage"},
-    "human": {"answer", "approve", "reject", "hold", "reverse", "create_deal", "run"},
+    "human": {"answer", "approve", "reject", "hold", "reverse", "create_deal", "run", "amend_brief", "approve_brief"},
     "system": {"post", "log", "create_item", "tool:*"},
 }
 
@@ -113,6 +124,22 @@ def _count(n: int, word: str) -> str:
 
 def _fmt(x: float) -> str:
     return f"{x:,.0f}"
+
+
+def _brief_number_problem(brief: Brief, limit_may_be_missing: bool = False) -> str | None:
+    """Every figure in a Brief is finite, and the limit is above zero (moved here from routes.py, so it holds for
+    every Brief). A limit the reader did not find may be 0 while its flag is open."""
+    figures = [("limit", brief.limit)]
+    for group in ("ebitda_addbacks", "ebitda_deductions"):
+        for i, a in enumerate(getattr(brief, group)):
+            figures += [(f"{group}[{i}].amount", a.amount), (f"{group}[{i}].cap", a.cap)]
+    figures += [(f"closing_financing[{i}].amount", f.amount) for i, f in enumerate(brief.closing_financing)]
+    for path, value in figures:
+        if value is not None and not math.isfinite(value):
+            return f"{path} must be a finite number"
+    if brief.limit <= 0 and not (limit_may_be_missing and brief.limit == 0):
+        return "limit must be above zero"
+    return None
 
 
 def _signed(x: float) -> str:
@@ -227,6 +254,10 @@ class Gateway:
         self._require(actor, "create_deal", deal.id)
         if deal.id in self.store.deals:
             raise Invalid(f"deal {deal.id} exists")
+        if deal.brief is not None:
+            bad = _brief_number_problem(deal.brief)
+            if bad:
+                self._deny(Invalid(bad), deal.id, actor, "create_deal", deal.id)
         self.store.deals[deal.id] = deal
         for line in lines:
             self.store.source_lines[line.id] = line
@@ -241,7 +272,7 @@ class Gateway:
                         proposed_by=proposed_by, payload=payload or {})
         self.store.items[item.id] = item
         self._log(deal_id, SYSTEM, f"create:{type_}", "ALLOWED", item.id)
-        working = {"map_lines": "mapping", "prepare_result": "preparing"}.get(type_)
+        working = {"draft_brief": "reading_brief", "map_lines": "mapping", "prepare_result": "preparing"}.get(type_)
         if working:  # the console shows which agent is working during a 30 to 60 s model run
             self._deal(deal_id).stage = working
         return item
@@ -252,6 +283,9 @@ class Gateway:
         showing an agent working forever. The next run picks up where this one stopped."""
         deal = self._deal(deal_id)
         deal.stage = "run_failed"
+        last = next((r for r in reversed(self.store.audit) if r.deal_id == deal_id), None)
+        if last and last.action == "run:failed" and last.reason == error[:300]:
+            return  # the runner already noted this failure; the background route notes it again
         self._log(deal_id, SYSTEM, "run:failed", "ALLOWED", deal_id, reason=error[:300])
 
     # ------------------------------------------------------------------ tools
@@ -261,6 +295,9 @@ class Gateway:
         inputs = dict(inputs or {})
         self._require(actor, f"tool:{name}", deal_id)
         deal = self._deal(deal_id)
+        if name in BRIEF_TOOLS and deal.brief_status != "approved":
+            self._deny(IllegalTransition(f"{name} waits for the approved Brief (the Brief is {deal.brief_status})"),
+                       deal_id, actor, f"tool:{name}")
         fn = finance.TOOLS.get(name)
         if fn is None:
             raise NotFound(f"tool {name} not found")
@@ -402,6 +439,9 @@ class Gateway:
             self._deny(IllegalTransition(f"cannot store a mapping on {item.type} in state {item.state.value}"),
                        item.deal_id, actor, "propose:map_lines", item.id)
         deal = self._deal(item.deal_id)
+        if deal.brief_status != "approved":
+            self._deny(IllegalTransition(f"mapping waits for the approved Brief (the Brief is {deal.brief_status})"),
+                       deal.id, actor, "propose:map_lines", item.id)
         out = MapperOutput.model_validate(out.model_dump())  # the gateway re-validates the typed result
         target_by_id = {l.id: l for l in self._target_lines(deal)}
         flagged_ids = {lid for f in out.flags if f.kind == "mapping" for lid in f.line_ids}
@@ -592,6 +632,8 @@ class Gateway:
             self._deny(IllegalTransition(f"unknown option '{option_id}'"), item.deal_id, actor, "answer", item.id)
         if item.type == "flag" and item.payload.get("kind") == "adjustment":
             return self._answer_adjustment(actor, item, option_id)
+        if item.type == "flag" and item.payload.get("kind") == "brief_field":
+            return self._answer_brief_field(actor, item, option_id)
         item.answer = option_id
         if item.type == "flag":
             self._apply_flag_answer(actor, item, option_id)
@@ -1362,3 +1404,358 @@ class Gateway:
                   reason=f"flag {item.id}: {detail}")
         self._post(item)
         return item
+
+    # ------------------------------------------------------------------ the Brief Reader (D20)
+    def agreement(self, deal_id: str) -> AgreementText | None:
+        return next((a for a in self.store.agreements.values() if a.deal_id == deal_id), None)
+
+    @_writes
+    def create_deal_from_agreement(self, actor: str, deal: Deal, lines: list[SourceLine], text: str,
+                                   source: str) -> Deal:
+        """A deal whose Brief is read from the agreement text. If an earlier deal's approved Brief has the same
+        agreement hash, it is reused and the reader is skipped; an amendment is new text, so it is read again."""
+        if not text.strip():
+            raise Invalid("the agreement text is empty")
+        sha = agr.agreement_sha256(text)
+        reuse = next((self.store.deals[a.deal_id].brief for a in self.store.agreements.values()
+                      if a.sha256 == sha and a.deal_id in self.store.deals
+                      and self.store.deals[a.deal_id].brief_status == "approved"), None)
+        deal = deal.model_copy(update={"brief": reuse.model_copy(deep=True) if reuse else None,
+                                       "brief_status": "approved" if reuse else "none"})
+        self.create_deal(actor, deal, lines)
+        ag = AgreementText(id=self.store.next_id("ag"), deal_id=deal.id, text=text, sha256=sha, source=source)
+        self.store.agreements[ag.id] = ag
+        self._log(deal.id, actor, "agreement:load", "ALLOWED", ag.id,
+                  reason=f"{source}; sha256 {sha[:12]}; {len(text):,} characters")
+        if reuse:
+            self._log(deal.id, SYSTEM, "brief:reuse", "ALLOWED", deal.id,
+                      reason=f"approved Brief for agreement {sha[:12]} reused; the reader is skipped")
+        return self.store.deals[deal.id]
+
+    def brief_reader_input(self, deal_id: str, item_id: str) -> BriefReaderInput:
+        """The indexes and the leverage sections, never the whole agreement (brief-reader.md section 5)."""
+        ag = self.agreement(deal_id)
+        if ag is None:
+            raise Invalid(f"deal {deal_id} has no agreement text")
+        return BriefReaderInput(deal_id=deal_id, item_id=item_id, agreement_id=ag.id, sha256=ag.sha256,
+                                section_index=agr.section_index(ag.text),
+                                definition_index=agr.definition_index(ag.text),
+                                excerpts=agr.leverage_excerpts(ag.text), amendments_supplied=False)
+
+    @_writes
+    def read_agreement(self, actor: str, deal_id: str, name: str, args: dict[str, Any]) -> ToolRun:
+        """get_section(id) and get_definition(term): read-only, logged, and not stored as tool runs (no figures)."""
+        self._require(actor, f"tool:{name}", deal_id)
+        ag = self.agreement(deal_id)
+        if ag is None:
+            raise Invalid(f"deal {deal_id} has no agreement text")
+        if name == "get_section":
+            key = str(args.get("id", ""))
+            body = agr.section_text(ag.text, key)
+            if body is None:
+                raise Invalid(f"no section '{key}'; the sections are the keys of section_index")
+            outputs = {"id": key, "text": agr.normalize(body)[:20000]}
+        elif name == "get_definition":
+            key = str(args.get("term", ""))
+            body = agr.definition_text(ag.text, key)
+            if body is None:
+                raise Invalid(f"no definition of '{key}'; the terms are the keys of definition_index")
+            outputs = {"term": key, "text": body}
+        else:
+            raise NotFound(f"tool {name} not found")
+        self._log(deal_id, actor, f"tool:{name}", "ALLOWED", key)
+        return ToolRun(run_id=f"read:{name}", deal_id=deal_id, tool=name, actor=actor, inputs=dict(args),
+                       outputs=outputs)
+
+    # -- the nine checks (brief-reader.md section 6)
+    @staticmethod
+    def _brief_paths(brief: Brief) -> dict[str, Any]:
+        """Every required field, by path, with its value."""
+        paths: dict[str, Any] = {k: getattr(brief, k) for k in ("lender", "limit", "limit_section", "limit_wording",
+                                                                 "debt_term", "debt_definition", "ebitda_definition")}
+        for i, x in enumerate(brief.debt_excludes):
+            paths[f"debt_excludes[{i}]"] = x
+        for group in ("ebitda_addbacks", "ebitda_deductions"):
+            for i, a in enumerate(getattr(brief, group)):
+                paths[f"{group}[{i}].name"] = a.name
+                if a.cap is not None:
+                    paths[f"{group}[{i}].cap"] = a.cap
+        return paths
+
+    @staticmethod
+    def _section_id(ref: str) -> str:
+        return re.sub(r"^(section|sec\.|§)\s*", "", ref.strip(), flags=re.I)
+
+    def _check_brief(self, deal: Deal, ag: AgreementText, out: BriefReaderOutput) -> list[dict[str, Any]]:
+        """Refuse a draft that breaks a rule; return the flags to open. The model points, code decides."""
+        brief, text = out.brief, ag.text
+        index = agr.section_index(text)
+        required = self._brief_paths(brief)
+        optional = {"test_period_note", "agreement_ref"}
+        flagged = {f.field: f for f in out.flags}
+        verified: dict[str, list] = {}
+        for c in out.citations:
+            if c.field not in required and c.field not in optional:
+                raise Invalid(f"citation names unknown field '{c.field}'")
+            sid = self._section_id(c.section)
+            if sid not in index:
+                raise Invalid(f"citation for {c.field} names section '{c.section}', which is not in the agreement")
+            if not agr.quote_in(c.quote, agr.section_text(text, sid) or ""):  # check 2
+                raise Invalid(f"the quote for {c.field} is not in section {sid} of the agreement, or is under "
+                              f"{agr.MIN_QUOTE_WORDS} words: '{c.quote[:100]}'")
+            if c.field == "limit":  # check 3; and the limit is quoted from the covenant section the Brief names
+                if not agr.ratio_in(c.quote, brief.limit):
+                    raise Invalid(f"limit {brief.limit} is not in its quote: '{c.quote[:100]}'")
+                if sid == agr.PREAMBLE or not sid[0].isdigit():
+                    raise Invalid(f"the limit must be quoted from a covenant section, not '{sid}'")
+                if brief.limit_section and sid != self._section_id(brief.limit_section):
+                    raise Invalid(f"the limit is quoted from section {sid}, not from limit_section "
+                                  f"'{brief.limit_section}'")
+            if c.field.endswith(".cap") and not agr.thousands_in(c.quote, required[c.field]):
+                raise Invalid(f"{c.field} {required[c.field]} (USD thousands) is not in its quote: '{c.quote[:100]}'")
+            verified.setdefault(c.field, []).append(c)
+        for path, value in required.items():  # check 4, coverage, and check 8, missing is said
+            if path not in verified and path not in flagged:
+                raise Invalid(f"{path} has no verified quote and no flag")
+            if value in ("", None) and "not found in" not in (flagged.get(path).question if path in flagged else ""):
+                raise Invalid(f"{path} is empty: say where you looked, in a flag that says 'not found in sections ...'")
+        bad = _brief_number_problem(brief, limit_may_be_missing="limit" in flagged)  # check 5
+        if bad:
+            raise Invalid(bad)
+        if brief.limit_wording:
+            sid = self._section_id(brief.limit_section)
+            if sid not in index or not agr.quote_in(brief.limit_wording, agr.section_text(text, sid) or ""):
+                raise Invalid(f"limit_wording is not a quote from the limit section '{brief.limit_section}'")
+            if brief.debt_term.casefold() not in agr.normalize(brief.limit_wording).casefold():
+                raise Invalid(f"debt_term '{brief.debt_term}' does not appear in limit_wording")
+        for group in ("ebitda_addbacks", "ebitda_deductions"):  # check 6, amounts come from the books
+            for i, a in enumerate(getattr(brief, group)):
+                path = f"{group}[{i}].amount"
+                if a.amount != 0 and not (a.inferred and path in flagged):
+                    raise Invalid(f"{path} is {a.amount}: an amount comes from the books, so give 0 with "
+                                  f"inferred=true, or flag it")
+        flags = [dict(field=f.field, question=f.question, evidence=f.evidence, proposed=f.proposed,
+                      proposed_by=BRIEF_READER) for f in out.flags]
+        for path in required:  # check 7, confidence is a hint
+            if path in flagged:
+                continue
+            best = max(c.confidence for c in verified[path])
+            if best < 0.6:
+                c = verified[path][0]
+                flags.append(dict(field=path, question=f"The reader is not sure of {path} (confidence {best:.2f}). "
+                                  f"Is '{required[path]}' right?", evidence=[Evidence(quote=c.quote,
+                                  document_id=f"{ag.source}, {c.section}")], proposed=str(required[path]),
+                                  proposed_by=SYSTEM))
+        for group in ("ebitda_addbacks", "ebitda_deductions"):
+            for i, a in enumerate(getattr(brief, group)):
+                path = f"{group}[{i}].amount"
+                if path in flagged:
+                    continue
+                cap = f", capped at {_fmt(a.cap)}K," if a.cap is not None else ""
+                flags.append(dict(field=path, question=f"The agreement allows '{a.name}'{cap} but does not give its "
+                                  f"amount. Enter the amount from the books with its source, or keep 0.",
+                                  evidence=[], proposed=f"{a.amount:g}", proposed_by=SYSTEM))
+        return flags
+
+    def _open_brief_flag(self, deal: Deal, parent: WorkItem, f: dict[str, Any]) -> WorkItem:
+        listed = re.fullmatch(r"(debt_excludes\[\d+\])|((ebitda_addbacks|ebitda_deductions)\[\d+\])\.name", f["field"])
+        options = [Option(id="confirm", label="Keep the reader's value" if not f["field"].endswith(".amount")
+                          else "Keep it as it is (0 means not applied)",
+                          effect=f"{f['field']} stays {f['proposed']!s}." if f["proposed"] is not None
+                          else f"{f['field']} stays as drafted.")]
+        if listed:
+            options.append(Option(id="remove", label="Remove it from the Brief",
+                                  effect=f"{f['field']} is left out of the approved Brief."))
+        item = WorkItem(id=self.store.next_id("wi"), deal_id=deal.id, type="flag", state=State.NEEDS_INFO,
+                        proposed_by=f["proposed_by"], question=f["question"], evidence=f["evidence"],
+                        options=options, default="confirm",
+                        payload={"kind": "brief_field", "field": f["field"], "proposed": f["proposed"],
+                                 "parent": parent.id})
+        self.store.items[item.id] = item
+        self._log(deal.id, f["proposed_by"], "ask:flag", "ALLOWED", item.id, reason=f["question"],
+                  evidence=f["evidence"])
+        return item
+
+    def _draft_item(self, deal_id: str) -> WorkItem | None:
+        return next((i for i in reversed(self.store.deal_items(deal_id, "draft_brief"))
+                     if i.state in (State.PROPOSED, State.POSTED)), None)
+
+    def brief_draft(self, deal_id: str) -> BriefDraft | None:
+        """What /case shows as `brief_draft`: the live draft, its citations, and its flags."""
+        item = self._draft_item(deal_id)
+        return BriefDraft.model_validate(item.payload["draft"]) if item else None
+
+    def _brief_flags(self, deal_id: str, open_only: bool = True) -> list[WorkItem]:
+        return [i for i in self.store.deal_items(deal_id, "flag") if i.payload.get("kind") == "brief_field"
+                and (i.state == State.NEEDS_INFO or not open_only)]
+
+    @_writes
+    def store_brief(self, actor: str, item_id: str, out: BriefReaderOutput) -> WorkItem:
+        item = self._item(item_id)
+        self._require(actor, "propose:draft_brief", item.deal_id, item.id)  # check 1
+        if item.type != "draft_brief" or item.state != State.NEW:
+            self._deny(IllegalTransition(f"cannot store a draft Brief on {item.type} in state {item.state.value}"),
+                       item.deal_id, actor, "propose:draft_brief", item.id)
+        deal = self._deal(item.deal_id)
+        if deal.brief_status == "approved":
+            self._deny(IllegalTransition("the Brief is approved and locked"), deal.id, actor, "propose:draft_brief",
+                       item.id)
+        ag = self.agreement(deal.id)
+        if ag is None:
+            self._deny(Invalid("the deal has no agreement text"), deal.id, actor, "propose:draft_brief", item.id)
+        out = BriefReaderOutput.model_validate(out.model_dump())
+        try:
+            flags = self._check_brief(deal, ag, out)
+        except Invalid as error:
+            self._deny(error, deal.id, actor, "propose:draft_brief", item.id)
+        brief = out.brief.model_copy(update={"agreement_ref": out.brief.agreement_ref or ag.source})
+        deal.brief, deal.brief_status = brief, "draft"
+        opened = [self._open_brief_flag(deal, item, f) for f in flags]
+        draft = BriefDraft(item_id=item.id, agreement_id=ag.id, sha256=ag.sha256, brief=brief,
+                           citations=out.citations, flags=[i.id for i in opened], amendments_supplied=False)
+        item.state = State.PROPOSED
+        item.payload = {"draft": draft.model_dump(mode="json"), "note": out.note}
+        self._log(deal.id, actor, "propose:draft_brief", "ALLOWED", item.id,
+                  reason=f"{_count(len(out.citations), 'citation')}, {_count(len(opened), 'flag')}; base agreement "
+                         f"only (no amendment supplied)")
+        deal.stage = "awaiting_brief"
+        return item
+
+    def _sync_draft(self, deal: Deal, **changes) -> None:
+        item = self._draft_item(deal.id)
+        if item:
+            item.payload = {**item.payload, "draft": {**item.payload["draft"],
+                                                      "brief": deal.brief.model_dump(mode="json"), **changes}}
+
+    def _answer_brief_field(self, actor: str, item: WorkItem, option_id: str) -> WorkItem:
+        deal = self._deal(item.deal_id)
+        if deal.brief_status == "approved":
+            self._deny(IllegalTransition("the Brief is approved and locked"), deal.id, actor, "answer", item.id)
+        field = item.payload["field"]
+        if option_id == "remove":
+            draft = self.brief_draft(deal.id)
+            self._sync_draft(deal, removed=sorted({*(draft.removed if draft else []), field}))
+        item.answer = option_id
+        item.state = State.APPROVED
+        self._log(deal.id, actor, "answer", "ALLOWED", item.id, reason=f"option {option_id} on {field}")
+        self._post(item)
+        deal.stage = "awaiting_brief" if self._brief_flags(deal.id) else "brief_ready"
+        return item
+
+    _PATH = re.compile(r"^(?P<field>[a-z_]+)(?:\[(?P<i>\d+)\])?(?:\.(?P<attr>name|amount|cap))?$")
+
+    @_writes
+    def amend_brief(self, actor: str, deal_id: str, field: str, value: Any, source_ref: str | None = None,
+                    inferred: bool = False, note: str = "") -> Brief:
+        """The controller sets one field of the draft, most often an adjustment amount from the books with its
+        source. A new adjustment can be added at the next index. The open flags on that field are closed."""
+        action = "amend_brief"
+        deal = self._deal(deal_id)
+        self._require(actor, action, deal_id, deal_id)
+        if deal.brief_status == "approved":
+            self._deny(IllegalTransition("the Brief is approved and locked"), deal_id, actor, action, field)
+        if deal.brief_status != "draft" or deal.brief is None:
+            self._deny(IllegalTransition("there is no draft Brief to amend"), deal_id, actor, action, field)
+        m = self._PATH.match(field or "")
+        data = deal.brief.model_dump()
+        try:
+            if not m:
+                raise Invalid(f"unknown field '{field}'")
+            name, i, attr = m.group("field"), m.group("i"), m.group("attr")
+            if name in ("lender", "limit_section", "limit_wording", "debt_term", "debt_definition",
+                        "ebitda_definition", "test_period_note") and i is None and attr is None:
+                if not isinstance(value, str) or not value.strip() or len(value) > 2000:
+                    raise Invalid(f"{field} must be text of 1 to 2000 characters")
+                data[name] = value.strip()
+            elif name == "limit" and i is None and attr is None:
+                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                    raise Invalid("limit must be a number")
+                data["limit"] = float(value)
+            elif name == "debt_excludes" and i is not None and attr is None:
+                k = int(i)
+                if not isinstance(value, str) or not value.strip() or k > len(data[name]):
+                    raise Invalid(f"{field} must be text, at an index up to {len(data[name])}")
+                data[name][k:k + 1] = [value.strip()]
+            elif name in ("ebitda_addbacks", "ebitda_deductions") and i is not None and attr:
+                k, items = int(i), data[name]
+                if k > len(items) or (k == len(items) and attr != "name"):
+                    raise Invalid(f"{field}: add a new adjustment by its name first, at index {len(items)}")
+                if k == len(items):
+                    items.append(dict(name="", amount=0.0, cap=None, source_ref=deal.brief.agreement_ref, note="",
+                                      inferred=True))
+                if attr == "name":
+                    if not isinstance(value, str) or not value.strip():
+                        raise Invalid(f"{field} must be text")
+                    items[k]["name"] = value.strip()
+                elif attr == "cap":
+                    if value is not None and (not isinstance(value, (int, float)) or isinstance(value, bool)
+                                              or value < 0):
+                        raise Invalid(f"{field} must be a number of USD thousands, or null for no cap")
+                    items[k]["cap"] = None if value is None else float(value)
+                else:
+                    if not isinstance(value, (int, float)) or isinstance(value, bool):
+                        raise Invalid(f"{field} must be a number of USD thousands")
+                    if not (source_ref or "").strip():
+                        raise Invalid(f"{field} needs its source: the filing and the line it comes from")
+                    items[k].update(amount=float(value), source_ref=source_ref.strip(), inferred=bool(inferred),
+                                    note=note or items[k].get("note", ""))
+            else:
+                raise Invalid(f"unknown field '{field}'")
+            brief = Brief.model_validate(data)
+            bad = _brief_number_problem(brief)
+            if bad:
+                raise Invalid(bad)
+        except GatewayError as error:
+            self._deny(error, deal_id, actor, action, field)
+        except ValueError as error:
+            self._deny(Invalid(f"invalid Brief: {error}"), deal_id, actor, action, field)
+        deal.brief = brief
+        self._sync_draft(deal)
+        shown = f"{value:,.3f}" if isinstance(value, float) else str(value)
+        self._log(deal_id, actor, "brief:amend", "ALLOWED", field,
+                  reason=f"{field} = {shown[:200]}" + (f"; source: {source_ref}" if source_ref else ""))
+        for flag in self._brief_flags(deal_id):
+            if flag.payload.get("field") == field:
+                flag.answer, flag.state = "amended", State.APPROVED
+                self._log(deal_id, actor, "answer", "ALLOWED", flag.id, reason=f"amended {field}")
+                self._post(flag)
+        deal.stage = "awaiting_brief" if self._brief_flags(deal_id) else "brief_ready"
+        return brief
+
+    @_writes
+    def approve_brief(self, actor: str, deal_id: str) -> Deal:
+        """The controller approves the Brief. No agent can. It is then locked on the deal, with the agreement's hash
+        in the log, and mapping can start."""
+        action = "approve_brief"
+        deal = self._deal(deal_id)
+        self._require(actor, action, deal_id, deal_id)
+        item = self._draft_item(deal_id)
+        if deal.brief_status != "draft" or item is None:
+            self._deny(IllegalTransition(f"there is no draft Brief to approve (the Brief is {deal.brief_status})"),
+                       deal_id, actor, action, deal_id)
+        if actor == item.proposed_by:
+            self._deny(Denied("the proposer cannot approve its own draft"), deal_id, actor, action, item.id)
+        waiting = self._brief_flags(deal_id)
+        if waiting:
+            self._deny(Denied(f"flag {waiting[0].id} on {waiting[0].payload['field']} is open; answer every Brief "
+                              f"question first"), deal_id, actor, action, item.id)
+        draft = self.brief_draft(deal_id)
+        data = deal.brief.model_dump()
+        for path in sorted(draft.removed, key=lambda p: -int(re.search(r"\[(\d+)\]", p).group(1))):
+            name, k = re.match(r"(\w+)\[(\d+)\]", path).groups()
+            del data[name][int(k)]
+        brief = Brief.model_validate(data)
+        bad = _brief_number_problem(brief)
+        empty = [k for k, v in self._brief_paths(brief).items() if v in ("", None)]
+        if bad or empty:
+            self._deny(Invalid(bad or f"{', '.join(empty)} still empty"), deal_id, actor, action, item.id)
+        deal.brief, deal.brief_status = brief, "approved"
+        ag = self.agreement(deal_id)
+        self._sync_draft(deal)
+        item.state = State.APPROVED
+        self._log(deal_id, actor, action, "ALLOWED", item.id,
+                  reason=f"Brief locked: limit {brief.limit:.2f}x, {brief.debt_term}; agreement sha256 "
+                         f"{ag.sha256[:12] if ag else 'none'}; base agreement only")
+        self._post(item)
+        deal.stage = "new"
+        return deal

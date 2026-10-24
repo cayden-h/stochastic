@@ -39,7 +39,7 @@ def open_store(schema):
 def snapshot(store):
     return {attr: {k: v.model_dump(mode="json") for k, v in getattr(store, attr).items()}
             for attr in ("deals", "source_lines", "mappings", "items", "results", "tool_runs", "policies", "sessions",
-                         "edits", "adjustments")}
+                         "edits", "adjustments", "agreements")}
 
 
 def run_to_posted(gw):
@@ -121,6 +121,22 @@ def test_review_edits_survive_a_restart_and_adjustments_survive_a_reset(schema, 
     third = open_store(schema)
     assert not third.edits and set(third.adjustments) == {edit.adjustment_id}
     third.close()
+
+
+def test_an_agreement_and_its_draft_brief_survive_a_restart(schema):
+    from tests.test_brief_reader_gateway import new_deal
+    store = open_store(schema)
+    gw = Gateway(store)
+    new_deal(store, gw)
+    advance(gw, DEAL_ID, backend="scripted")
+    assert store.deals[DEAL_ID].brief_status == "draft"
+    assert store.flush() and store.status()["last_error"] is None
+    before = snapshot(store)
+    store.close()
+    again = open_store(schema)
+    assert snapshot(again) == before and len(again.agreements) == 1
+    assert Gateway(again).brief_draft(DEAL_ID).citations
+    again.close()
 
 
 def test_the_audit_log_refuses_update_and_delete(schema):

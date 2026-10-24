@@ -1,0 +1,121 @@
+{
+  "about": "Quotes from Kewaunee's PNC Loan Agreement (8-K Ex 10.1, 2024-11-01), each verbatim after brief-reader.md section 6 normalization and under 15 words, with the section that contains it. Extracted by Cayden's agent on 2026-10-25 from the SEC copy; Eric's E3 file replaces this one if it differs. The scripted Brief Reader uses them when the agreement's normalized SHA-256 is listed below.",
+  "source": "8-K Ex 10.1, PNC Loan Agreement dated 2024-11-01",
+  "url": "https://www.sec.gov/Archives/edgar/data/55529/000119312524249232/d886750dex101.htm",
+  "sha256": {
+    "ex101_full_text": "a7158ee3455edd4a0834a73fd12780c154c68c593aeb49bfd9d467973207f6ff",
+    "test_excerpt": "800d838d7e81bae76772487377ab54a19de2b11960aa56de24ee358c348fc473"
+  },
+  "citations": [
+    {
+      "field": "lender",
+      "quote": "PNC BANK, NATIONAL ASSOCIATION (the \" Bank \"), with an address at",
+      "section": "preamble",
+      "confidence": 0.95
+    },
+    {
+      "field": "limit",
+      "quote": "ratio of Senior Funded Bank Debt to EBITDA of less than 2.50 to 1.00",
+      "section": "4.8(a)",
+      "confidence": 0.95
+    },
+    {
+      "field": "limit_section",
+      "quote": "(a) Senior Funded Bank Debt to EBITDA . The Borrower will maintain",
+      "section": "4.8(a)",
+      "confidence": 0.95
+    },
+    {
+      "field": "limit_wording",
+      "quote": "ratio of Senior Funded Bank Debt to EBITDA of less than 2.50 to 1.00",
+      "section": "4.8(a)",
+      "confidence": 0.95
+    },
+    {
+      "field": "debt_term",
+      "quote": "\" Senior Funded Bank Debt \" means all secured indebtedness for borrowed money",
+      "section": "Addendum I",
+      "confidence": 0.95
+    },
+    {
+      "field": "debt_definition",
+      "quote": "means all secured indebtedness for borrowed money, including but not limited to",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "debt_excludes[0]",
+      "quote": "but excluding (i) Subordinated Debt and (ii) any capitalized lease obligations",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "debt_excludes[1]",
+      "quote": "capitalized lease obligations relating to the real property located at 2700 West Front Street",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "ebitda_definition",
+      "quote": "\" EBITDA \" means net income plus interest expense less interest income plus",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "ebitda_addbacks[0].name",
+      "quote": "noncash pension termination expense completed during the fiscal year of the Borrower",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "ebitda_addbacks[1].name",
+      "quote": "plus (without duplication) any stock-based compensation",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "ebitda_addbacks[2].name",
+      "quote": "transaction costs related to the Closing Date Acquisition, but not exceeding",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "ebitda_addbacks[2].cap",
+      "quote": "Closing Date Acquisition, but not exceeding $4,000,000 in the aggregate",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "ebitda_addbacks[3].name",
+      "quote": "integration costs relating to the Closing Date Acquisition incurred by the Borrower",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "ebitda_addbacks[3].cap",
+      "quote": "Closing Date Acquisition, but not exceeding $1,000,000 in the aggregate",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "ebitda_deductions[0].name",
+      "quote": "less cash rental expense relating to the real property located at 2700",
+      "section": "Addendum I",
+      "confidence": 0.9
+    },
+    {
+      "field": "test_period_note",
+      "quote": "measured as of the end of each fiscal quarter of the Borrower",
+      "section": "4.8(a)",
+      "confidence": 0.9
+    }
+  ],
+  "schema_gaps": [
+    {
+      "field": "covenants",
+      "quote": "a Fixed Charge Coverage Ratio of at least 1.20 to 1",
+      "section": "4.8(b)",
+      "question": "Section 4.8(b) also sets a Fixed Charge Coverage Ratio of at least 1.20 to 1. A Brief holds one leverage covenant, so this one is not tested here (stage 2). Confirm that only the leverage covenant is in scope."
+    }
+  ]
+}
