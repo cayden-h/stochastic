@@ -373,6 +373,8 @@ Do not lead the pitch with ingestion.
 
 All paths are inside `docs/`.
 
+- The UI: the `Hi-fi - v3` page in Figma (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-2). The `Technologies Used` page in the same file is for the pitch. Frame links are in `design/README.md`.
+
 - `TASKS.md`: who builds what. `tasks/` holds one file per person, with branches and owned folders.
 - `agents.md`: the agent layer in detail: roles, rules, flags, memory, backends, settings, the run log.
 - `demo-script.md`: the 2:00 plan, the 30-second demo beat by beat, the failure plan, and judge Q&A prep.

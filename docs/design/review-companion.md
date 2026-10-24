@@ -3,6 +3,7 @@
 Status: proposed design, 2026-10-24 evening. Decision D19 in `docs/decisions.md`.
 Owner: Josie (screens and Figma), Cayden (desktop shell, companion, edit endpoints), Tri (recompute and export).
 Read `design/README.md` first: every color, font, and radius here is an existing token.
+The base screens are Hi-fi v3 in Figma (`design/README.md` has the frame links). This spec adds to V3-3 Case and V3-4 Mapping.
 
 ## 1. What changes
 
@@ -30,13 +31,13 @@ The behavior is modeled on Squeek's cursor ghost (https://github.com/syedkazmi14
 
 ## 3. Screen layout
 
-The page order stays as it is in `src/app/page.tsx`: header, flag cards, verdict line, combined books, mappings, answered flags, footer.
-Two things are added:
+The screens are Hi-fi v3 (sidebar plus main area, 1440 by 900).
+Changes per frame:
 
-- **Your edits** section, directly under the verdict line, shown once there is at least one edit.
-- **Download final files** button in the verdict line, in place of the posted message, after approval.
-
-The combined table opens expanded on the first section with a change, instead of collapsed, so the edit stays in view.
+- **V3-3 Case:** the Combined books table becomes editable for amounts (section 4). The **Your edits** section sits directly under the verdict, shown once there is at least one edit. After approval, the verdict shows **Download final files**. The table opens on the section with a change, so the edit stays in view.
+- **V3-4 Mapping:** the Platform line column becomes a dropdown, and that is where remaps happen. Add an **Edited** filter next to All, Unsure, and By policy.
+- **Sidebar:** "Always learning from" gains a third counter, **Edits**, next to Human answers and Policies. It goes up when an edit is saved with a reason.
+- **V3-3 tiles:** the Review tile says "Re-checking your edit" for the second it takes after each edit.
 
 ### Header copy while editing
 
@@ -51,7 +52,7 @@ Edits are limited to what feeds the books, so the math stays in code and every n
 
 | Cell | Editable | How |
 | --- | --- | --- |
-| Line (target lines) | Yes | Click the line name. A dropdown lists the platform's lines. Picking one remaps the target line. |
+| Line (target lines) | On V3-4 Mapping | The Platform line cell is a dropdown of the platform's lines. Picking one remaps the target line. |
 | Platform amount | Yes | Click, type, Enter. |
 | Target amount | Yes | Click, type, Enter. |
 | Combined | No | Always computed. Shows the change from the agents' value. |
