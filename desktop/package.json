@@ -1,0 +1,39 @@
+{
+  "name": "stochastic-desktop",
+  "productName": "Stochastic",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mac desktop shell for the Stochastic console",
+  "main": "main.js",
+  "scripts": {
+    "desktop": "electron .",
+    "desktop:dev": "STOCHASTIC_DEV=1 electron .",
+    "build:console": "npm --prefix ../frontend run build",
+    "package": "electron-builder --mac --dir -c.extraMetadata.stochasticRoot=\"$(cd .. && pwd)\"",
+    "open": "open dist/mac-$(uname -m)/Stochastic.app"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.stochastic.desktop",
+    "productName": "Stochastic",
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "assets/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "target": [
+        "dir"
+      ],
+      "category": "public.app-category.finance",
+      "identity": null
+    }
+  }
+}
