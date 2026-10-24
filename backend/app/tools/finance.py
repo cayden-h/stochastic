@@ -37,6 +37,12 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
     Returns rows in platform order, each with platform, target, combined (USD thousands).
     """
     by_id = {line.id: line for line in target_lines}
+    seen: dict[str, Mapping] = {}
+    for m in mappings:  # one target line may land in one place only, or it would be counted twice
+        if m.target_line_id in seen and m.target_line_id in by_id:
+            t = by_id[m.target_line_id]
+            raise ValueError(f"target line {t.line} is mapped twice ({seen[m.target_line_id].id}, {m.id})")
+        seen[m.target_line_id] = m
     platform_rows: "OrderedDict[str, dict]" = OrderedDict()
     for p in platform_lines:
         k = _key(p.section, p.line)
@@ -98,15 +104,28 @@ def tie_out(rows: list[dict], tolerance: float = 0.5) -> dict:
     assets = _find(rows, "balance_sheet", ("total assets",))
     liab_eq = _find(rows, "balance_sheet", ("total liabilities and stockholders' equity",
                                              "total liabilities and stockholders’ equity",
+                                             "total liabilities and shareholders' equity",
+                                             "total liabilities and shareholders’ equity",
                                              "total liabilities and equity"))
     balance_ok = None
     balance = None
+    missing = []
+    if any(r["section"] == "balance_sheet" for r in rows):
+        # a balance sheet with no total to compare must fail, not pass by default
+        if not assets:
+            missing.append("total assets")
+        if not liab_eq:
+            missing.append("total liabilities and equity")
     if assets and liab_eq:
         balance = {"total_assets": assets["combined"], "total_liabilities_and_equity": liab_eq["combined"]}
         balance_ok = abs(assets["combined"] - liab_eq["combined"]) <= tolerance
-    ok = not bad_rows and (balance_ok is not False)
+    ok = not bad_rows and (balance_ok is not False) and not missing
     return {"ok": ok, "bad_rows": bad_rows, "balance_sheet_balances": balance_ok, "balance": balance,
-            "rows_checked": len(rows)}
+            "rows_checked": len(rows), "missing_totals": missing}
+
+
+def _matched(lines: list[SourceLine], names: tuple[str, ...], section: str) -> list[str]:
+    return [l.line for l in lines if l.section == section and l.line.strip().lower() in names]
 
 
 def _pick(lines: list[SourceLine], names: tuple[str, ...], section: str) -> float:
@@ -137,6 +156,13 @@ def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], bri
     parts = []
     base = 0.0
     for company, lines in (("platform", platform_lines), ("target", target_lines)):
+        for label, names, section in (("net income", NET_INCOME, "income_statement"),
+                                      ("depreciation and amortization", DA, "cash_flow")):
+            if not _matched(lines, names, section):  # these two must exist; a missing one would silently understate EBITDA
+                raise ValueError(f"{company}: no {label} line found (looked for: {', '.join(names)})")
+        used = (_matched(lines, NET_INCOME, "income_statement") + _matched(lines, INTEREST, "income_statement")
+                + _matched(lines, INTEREST_INCOME, "income_statement") + _matched(lines, TAXES, "income_statement")
+                + _matched(lines, DA, "cash_flow"))
         ni = _pick(lines, NET_INCOME, "income_statement")
         it = _pick(lines, INTEREST, "income_statement")
         ii = _pick(lines, INTEREST_INCOME, "income_statement")
@@ -145,7 +171,7 @@ def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], bri
         sub = ni + it - ii + tx + da
         parts.append({"company": company, "net_income": round(ni, 3), "interest_expense": round(it, 3),
                       "interest_income": round(ii, 3), "income_taxes": round(tx, 3), "depreciation_amortization": round(da, 3),
-                      "subtotal": round(sub, 3)})
+                      "subtotal": round(sub, 3), "lines_used": used})
         base += sub
     addbacks = []
     total_add = 0.0
@@ -165,6 +191,11 @@ def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], bri
             "deductions": deductions, "unit": THOUSANDS}
 
 
+# Borrowed money must be tagged debt, not_debt, or unclear. An 'na' on one of these names is a missed tag.
+BORROWING_WORDS = ("borrowing", "loan", "note payable", "notes payable", "debt", "credit facility", "revolver",
+                   "term loan", "financing liability", "finance lease", "financing lease")
+
+
 def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLine], brief: Brief,
                   naive: bool = False) -> dict:
     """The covenant's debt figure, from the covenant tags on the balance sheet lines.
@@ -181,6 +212,8 @@ def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLin
         if line.section != "balance_sheet":
             continue
         amt = to_thousands(line.amount, line.unit)
+        if line.covenant_tag == "na" and any(w in line.line.lower() for w in BORROWING_WORDS):
+            raise ValueError(f"covenant tag is 'na' on a borrowing-like line: {line.line} ({line.company})")
         if line.covenant_tag == "debt":
             included.append({"line": line.line, "company": line.company, "amount": round(amt, 3)})
             total += amt
