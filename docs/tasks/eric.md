@@ -116,6 +116,45 @@ Write the answers in this file under a "Permission spike result" heading, with t
 If the answers to 2 and 3 are yes, propose (do not build) how each request becomes an audit row through the gateway.
 If not, say so plainly, and we drop the "every tool call goes through Droid's permission system" line from the pitch.
 
+### Permission spike result
+
+Script: `scripts/droid_permission_spike.py` (run with `DROID_MODEL=claude-haiku-5-5`, droid CLI v0.249.0, `droid_sdk` 0.5.0).
+It opens a session in an empty temp folder with an in-process MCP server `spike` that has two fake tools.
+`lookup_rate` is allowed by `restrict_tools` (the same three name forms as `droid_backend.py`), and `hidden_rate` is on the server but not allowed.
+The handler prints every `PermissionRequest` and answers `proceed_once`, or `cancel` in the deny case.
+Six runs, one turn each: high, off, low, deny, hidden, resume.
+
+1. With `Autonomy.HIGH`, the handler never runs. The model called `spike___lookup_rate`, our tool function ran, and the handler was called 0 times. [verified: run on 2026-10-24]
+   So in our backend today the handler would be dead code.
+2. With `Autonomy.OFF` and with `Autonomy.LOW`, the handler runs once per call to our MCP tool, before the tool function runs. [verified: run on 2026-10-24]
+   The request holds one `McpToolAction` with `tool_name='spike___lookup_rate'`, `server_name='spike'`, `actual_tool_name='lookup_rate'`, `impact_level='high'`, and `tool_use`, which carries the tool call id and the full arguments (`{'code': 'SOFR'}`).
+   The options offered were `proceed_once`, `proceed_always`, `proceed_always_tools`, `proceed_always_server`, and `cancel`. `associated_session_ids` was empty.
+   The built-in `ToolSearch` call the model makes to load our deferred tool did not reach the handler. [verified: run on 2026-10-24]
+   Because Droid rates every MCP tool `impact_level='high'`, `Autonomy.MEDIUM` probably asks too. [inferred]
+3. When the handler denies (`cancel`), our tool function does not run, and the model sees a tool result `Error: Tool execution cancelled by user` with `is_error=True`. [verified: run on 2026-10-24]
+   The comment we passed with the deny did not appear in that tool result. [verified: run on 2026-10-24]
+   The turn does not finish with a typed result: it stops right after the cancel, and the result is `success=False` with `Structured output failed local validation`. [verified: run on 2026-10-24]
+   So a deny ends the turn. It cannot tell the model "not that, try something else". `cancel` is the only deny option offered.
+4. A tool that is NOT in `restrict_tools` is invisible to the model, and the handler never sees it. The model's `ToolSearch` for `hidden_rate` returned `Error: Tool(s) not found`, the model reported it could see only `ToolSearch` and `spike___lookup_rate`, and the handler was called 0 times. [verified: run on 2026-10-24]
+5. On a session reopened with `Session.resume(..., interactions=handlers)`, the handler still runs, and the resumed session keeps `Autonomy.OFF`. [verified: run on 2026-10-24]
+   `Session.resume` takes its own `interactions` argument, so every resume must pass the handler again.
+   If the handler is missing or raises, the SDK reports an error and answers `cancel`, so it fails closed. [verified from the SDK source, `interaction_adapter.py` lines 254-283; not run]
+
+Verdict: question 2 is yes, but question 3 is only half yes.
+A deny is seen and blocks the call, but it ends the turn without a typed result.
+Today our sessions run at `Autonomy.HIGH`, so no tool call goes through Droid's permission system.
+The pitch line "every tool call goes through Droid's permission system" is false today and should be dropped.
+`restrict_tools` is the real front door: a tool outside a role's list does not exist for that agent.
+
+If we ever want it (not proposed for this weekend), here is how it could work [inferred]:
+- Open sessions with `Autonomy.OFF` and an `on_permission` handler that calls the gateway.
+- The gateway writes one audit row per request, with the role, session id, `tool_use.id`, tool name, arguments, and decision.
+- It answers `proceed_once` only, never a `proceed_always*` option, so every call is asked.
+- A deny would end the turn, and the runner's existing fallback would handle it.
+- The tool's own gateway call would then link to that row by `tool_use.id`.
+
+Pitch line we can defend: "Each agent can only see its own tools (Droid `restrict_tools`), and every call goes through our gateway, which writes the audit log." [verified: runs on 2026-10-24]
+
 ### Not in scope
 
 - Forking Droid sessions per what-if option, and `QuestionHandler`. We decided not to build these for now.

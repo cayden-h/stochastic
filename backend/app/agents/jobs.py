@@ -18,10 +18,22 @@ def _call_tool(gw: Gateway, actor: str, deal_id: str):
     return call
 
 
-def _run(gw: Gateway, role: Role, inp, deal_id: str, item_id: str, backend: str | None):
+def _run(gw: Gateway, role: Role, inp, deal_id: str, item_id: str, backend: str | None,
+         rewind_to: str | None = None):
     """Run a role with its saved session, so a backend that can resume (Droid) continues the same conversation."""
     return run_agent(role, inp, _call_tool(gw, role.actor, deal_id), session=gw.store.sessions.get(role.name),
-                     backend=backend)
+                     backend=backend, rewind_to=rewind_to)
+
+
+def _refused_turn(gw: Gateway, role: Role, run) -> str | None:
+    """The message id that started a refused turn, when that turn was added to the role's saved session.
+    The retry rewinds the session to before it, so the refused answer never becomes the agent's memory.
+    A turn that ran in a new session needs no rewind: `_remember` was not called, so that session is not kept."""
+    ok = next((a for a in reversed(run.attempts) if a.get("ok")), {})
+    saved = gw.store.sessions.get(role.name)
+    if ok.get("resumed") and saved and ok.get("session_id") == saved.session_id:
+        return ok.get("turn_message_id")
+    return None
 
 
 def _remember(gw: Gateway, role: Role, run, item_id: str, summary: str) -> None:
@@ -56,8 +68,16 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
                 gw.store_mapping(MAPPER_ROLE.actor, item.id, run.output)
             except Invalid as error:  # the gateway logged the refusal; one retry with the reason, then fail as before
                 log.append(f"mapper result refused on {run.backend}: {error.message}")
+                # The agent forgets its refused answer (rewind) but still learns why it was refused (previous_refusal).
+                rewind_to = _refused_turn(gw, MAPPER_ROLE, run)
                 inp = inp.model_copy(update={"previous_refusal": error.message})
-                run = _run(gw, MAPPER_ROLE, inp, deal_id, item.id, backend)
+                run = _run(gw, MAPPER_ROLE, inp, deal_id, item.id, backend, rewind_to=rewind_to)
+                ok = next((a for a in reversed(run.attempts) if a.get("ok")), {})
+                if ok.get("rewound"):
+                    log.append(f"mapper session rewound before the retry: {ok.get('rewound_from_session')} "
+                               f"-> {ok.get('session_id')}")
+                elif rewind_to:
+                    log.append(f"mapper session not rewound: {ok.get('rewind_error') or 'the retry ran on ' + run.backend}")
                 gw.store_mapping(MAPPER_ROLE.actor, item.id, run.output)
             _remember(gw, MAPPER_ROLE, run, item.id,
                       f"mapped {len(run.output.mappings)} lines, {len(run.output.flags)} flags")
