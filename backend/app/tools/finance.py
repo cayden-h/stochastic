@@ -11,7 +11,7 @@ import math
 from collections import OrderedDict
 
 from app.core.models import Brief, Mapping, SourceLine
-from app.tools.edits import active, apply_amount_edits, apply_remap_edits
+from app.tools.edits import active, apply_remap_edits, carry_amount_edits
 
 THOUSANDS = "USD thousands"
 
@@ -33,11 +33,12 @@ def _key(section: str, line: str) -> str:
 
 
 def _with_amount_edits(platform_lines: list[SourceLine], target_lines: list[SourceLine],
-                       edits) -> tuple[list[SourceLine], list[SourceLine], list[str]]:
-    """Apply the active amount edits across both companies' lines. Copies only; the inputs are never changed."""
-    edited, applied = apply_amount_edits(list(platform_lines) + list(target_lines), edits)
+                       edits) -> tuple[list[SourceLine], list[SourceLine], list[str], dict]:
+    """Apply the active amount edits across both companies' lines, carried by the income statement roll-up rule.
+    Copies only; the inputs are never changed. The last item is {rollup, rollup_notes} for the run output."""
+    edited, applied, rollup, notes = carry_amount_edits(list(platform_lines) + list(target_lines), edits)
     n = len(platform_lines)
-    return edited[:n], edited[n:], applied
+    return edited[:n], edited[n:], applied, {"rollup": rollup, "rollup_notes": notes}
 
 
 def _in_edit_order(edits, applied: set[str]) -> list[str]:
@@ -54,7 +55,7 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
     A remapped target line lands on the platform line's own section when the platform has a line of that name.
     Returns rows in platform order, each with platform, target, combined (USD thousands), and edits_applied.
     """
-    platform_lines, target_lines, amount_ids = _with_amount_edits(platform_lines, target_lines, edits)
+    platform_lines, target_lines, amount_ids, carried = _with_amount_edits(platform_lines, target_lines, edits)
     given = {id(m) for m in mappings}
     mappings, remap_ids = apply_remap_edits(mappings, target_lines, platform_lines, edits)
     remapped = {m.target_line_id for m in mappings if id(m) not in given}  # the copies a remap made
@@ -115,7 +116,7 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
         r["combined"] = round(r["platform"] + r["target"], 3)
         rows.append(r)
     return {"rows": rows, "unmapped_target_lines": unmapped, "skipped_target_totals": skipped_totals,
-            "unit": THOUSANDS, "edits_applied": _in_edit_order(edits, set(amount_ids) | set(remap_ids))}
+            "unit": THOUSANDS, "edits_applied": _in_edit_order(edits, set(amount_ids) | set(remap_ids)), **carried}
 
 
 def _find(rows: list[dict], section: str, names: tuple[str, ...]) -> dict | None:
@@ -186,7 +187,7 @@ def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], bri
     Expense lines are stored as positive amounts; a tax benefit is stored as a negative amount.
     The deal's active amount edits are applied to the lines first; edits_applied lists them.
     """
-    platform_lines, target_lines, edit_ids = _with_amount_edits(platform_lines, target_lines, edits)
+    platform_lines, target_lines, edit_ids, carried = _with_amount_edits(platform_lines, target_lines, edits)
     parts = []
     base = 0.0
     for company, lines in (("platform", platform_lines), ("target", target_lines)):
@@ -223,7 +224,7 @@ def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], bri
     return {"ebitda": round(value, 3), "base": round(base, 3), "addbacks_total": round(total_add, 3),
             "deductions_total": round(total_ded, 3), "parts": parts, "addbacks": addbacks,
             "deductions": deductions, "basis": "as_filed" if as_filed else "covenant", "unit": THOUSANDS,
-            "edits_applied": edit_ids}
+            "edits_applied": edit_ids, **carried}
 
 
 # Borrowed money must be tagged debt, not_debt, or unclear. An 'na' on one of these names is a missed tag.
@@ -244,7 +245,7 @@ def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLin
     is to tag the line `not_debt` with a note.
     The deal's active amount edits are applied to the lines first; edits_applied lists them.
     """
-    platform_lines, target_lines, edit_ids = _with_amount_edits(platform_lines, target_lines, edits)
+    platform_lines, target_lines, edit_ids, carried = _with_amount_edits(platform_lines, target_lines, edits)
     included = []
     excluded = []
     unclear = []
@@ -273,7 +274,7 @@ def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLin
     if unclear and not naive:
         raise ValueError(f"covenant tag is unclear for: {', '.join(unclear)}")
     return {"debt": round(total, 3), "term": brief.debt_term, "included": included, "excluded": excluded,
-            "naive": naive, "unit": THOUSANDS, "edits_applied": edit_ids}
+            "naive": naive, "unit": THOUSANDS, "edits_applied": edit_ids, **carried}
 
 
 def leverage(debt: float, ebitda_value: float) -> dict:
@@ -336,10 +337,15 @@ TOOLS = {
     "limit_test": limit_test,
 }
 
-EDIT_RULE = ("An amount edit on a detail line is refused when that company has a total in the same section: the "
-             "roll-up for that section is not defined, so code cannot recompute the totals. Edits on total lines "
-             "apply. An edit that matches no line or several lines, or a remap onto a platform total or a line "
-             "the platform does not have, is refused.")
+EDIT_RULE = ("An amount edit on an income statement detail line carries into the totals: the first total after it, "
+             "if its name starts with 'Total', moves by the change; every later running total (Gross Profit, "
+             "Operating profit, Income Before Income Taxes, Net Income) moves by the change times the line's sign "
+             "(-1 for a cost, expense, tax, or provision line, +1 for a revenue, sales, income, or profit line, -1 "
+             "for a name with neither, named in rollup_notes). Taxes are not recomputed. Every line the carry moved "
+             "is listed in rollup. An edit on a total line replaces that line only. An amount edit on a balance "
+             "sheet detail line is refused: its roll-up is not defined, so code cannot recompute the totals. An edit "
+             "that matches no line or several lines, or a remap onto a platform total or a line the platform does "
+             "not have, is refused.")
 
 TOOL_DESCRIPTIONS = {
     "consolidate": "Add the target's statement lines onto the platform's lines using the approved mappings. "

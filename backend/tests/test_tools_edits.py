@@ -194,25 +194,116 @@ def test_amount_edit_section_is_optional_and_case_is_ignored(inputs):
 ROLLUP = "the roll-up for that section is not defined, so code cannot recompute the totals"
 
 
-def test_amount_edit_on_a_detail_line_under_totals_is_refused(inputs):
+def is_amounts(lines, company):
+    return {x.line: round(finance.to_thousands(x.amount, x.unit), 3) for x in lines
+            if x.company == company and x.section == "income_statement"}
+
+
+def test_line_sign_on_the_fixture_income_statements():
+    plus = ("Net sales", "Other income, net", "Net Revenues", "Interest Income - Net", "Other Income")
+    minus = ("Cost of products sold", "Operating expenses", "Pension expense", "Interest expense",
+             "Income tax (benefit) expense", "Net earnings attributable to the non-controlling interest",
+             "Cost of Revenues", "Selling Expense", "General and Administrative", "Research and Development",
+             "Provision for Income Taxes")
+    assert [edit_tools.line_sign(n) for n in plus] == [1] * len(plus)
+    assert [edit_tools.line_sign(n) for n in minus] == [-1] * len(minus)
+
+
+def test_a_cost_cut_on_nu_aire_general_and_administrative_carries_to_net_income(inputs):
     p, t, m, brief = inputs
-    # General and Administrative: 6,162,806 dollars = 6,162.806; +1,000 would not reach Total Operating Expense
-    # or Net Income, so EBITDA would not move. Refused until a roll-up map exists.
+    # 6,162,806 dollars = 6,162.806; cut 500 to 5,662.806 (delta -500). Total Operating Expense is the first
+    # total after it and starts with "Total": 18,433.001 - 500 = 17,933.001. The running totals move by
+    # -1 * -500 = +500: Income from Operations 5,248.610 -> 5,748.610, Income Before Income Taxes
+    # 5,952.220 -> 6,452.220, Net Income 5,438.271 -> 5,938.271. Gross Profit (before) and Total Other Income
+    # (a group total after a running total) do not move.
     ga = edit("ed_8", company="Nu Aire", line="General and Administrative", section="income_statement",
-              old_value=6162.806, new_value=7162.806)
-    msg = r"amount edit ed_8 on General and Administrative \(Nu Aire, income_statement\) is refused: " + ROLLUP
-    for call in (lambda: finance.ebitda(p, t, brief, edits=[ga]),
-                 lambda: finance.covenant_debt(p, t, brief, edits=[ga]),
-                 lambda: finance.consolidate(p, t, m, edits=[ga])):
-        with pytest.raises(ValueError, match=msg):
-            call()
+              old_value=6162.806, new_value=5662.806)
+    lines, applied, rollup, notes = edit_tools.carry_amount_edits(t, [ga])
+    got = is_amounts(lines, "Nu Aire")
+    assert (got["General and Administrative"], got["Total Operating Expense"], got["Income from Operations"],
+            got["Income Before Income Taxes"], got["Net Income"]) == (5662.806, 17933.001, 5748.61, 6452.22, 5938.271)
+    assert (got["Gross Profit"], got["Total Other Income"]) == (23681.611, 703.61)
+    assert rollup == [{"edit_id": "ed_8", "company": "Nu Aire", "line": n, "delta": d} for n, d in (
+        ("Total Operating Expense", -500.0), ("Income from Operations", 500.0),
+        ("Income Before Income Taxes", 500.0), ("Net Income", 500.0))]
+    assert applied == ["ed_8"]
+    assert notes == ["General and Administrative (Nu Aire) has no revenue or cost word in its name; "
+                     "the roll-up treated it as a cost"]
+    out = run_all(inputs, [ga])
+    # covenant EBITDA 28,378.845 + 500 = 28,878.845; 21,633 / 28,878.845 = 0.74909 -> 0.749
+    assert out["ebitda"]["ebitda"] == 28878.845 and out["ebitda"]["rollup"] == rollup
+    assert out["ebitda"]["rollup_notes"] == notes
+    assert finance.leverage(out["covenant_debt"]["debt"], out["ebitda"]["ebitda"])["leverage"] == 0.749
+    assert out["consolidate"]["rollup"] == rollup and out["covenant_debt"]["debt"] == 21633.0
+    net = rows_by_line(out["consolidate"])[("income_statement", "Net earnings")]
+    assert (net["target"], net["combined"]) == (5938.271, 24995.271)  # 19,057 + 5,938.271
+    assert out["tie_out"]["ok"] is True
+    # the input lines were not changed
+    assert next(x for x in t if x.line == "Total Operating Expense").amount == 18433001.0
+
+
+def test_a_cost_rise_on_kewaunee_operating_expenses_carries_to_every_running_total(inputs):
+    p, t, m, brief = inputs
+    # 33,770 + 1,000. The first total after it is Operating profit, a running total, so no group total moves.
+    # Running totals move by -1 * 1,000: Operating profit 18,281 -> 17,281, Profit before income taxes
+    # 13,119 -> 12,119, Net earnings 19,057 -> 18,057, Net earnings attributable to Kewaunee 18,753 -> 17,753.
+    ox = edit("ed_13", company="Kewaunee", line="Operating expenses", section="income_statement",
+              old_value=33770, new_value=34770)
+    lines, applied, rollup, notes = edit_tools.carry_amount_edits(p, [ox])
+    got = is_amounts(lines, "Kewaunee")
+    assert (got["Operating profit"], got["Profit before income taxes"], got["Net earnings"],
+            got["Net earnings attributable to Kewaunee Scientific Corporation"], got["Gross profit"]) == (
+        17281.0, 12119.0, 18057.0, 17753.0, 52051.0)
+    assert [r["line"] for r in rollup] == ["Operating profit", "Profit before income taxes", "Net earnings",
+                                           "Net earnings attributable to Kewaunee Scientific Corporation"]
+    assert {r["delta"] for r in rollup} == {-1000.0} and notes == []
+    # covenant EBITDA 28,378.845 - 1,000 = 27,378.845
+    assert finance.ebitda(p, t, brief, edits=[ox])["ebitda"] == 27378.845
+
+
+def test_more_interest_income_at_nu_aire_leaves_covenant_ebitda_unchanged(inputs):
+    p, t, m, brief = inputs
+    # 513.770 + 100 = 613.770. Total Other Income 703.610 + 100 = 803.610; Income Before Income Taxes
+    # 6,052.220; Net Income 5,538.271. The EBITDA build subtracts interest income, so net income +100 and
+    # interest income +100 cancel: covenant EBITDA stays 28,378.845.
+    ii = edit("ed_14", company="Nu Aire", line="Interest Income - Net", section="income_statement",
+              old_value=513.77, new_value=613.77)
+    lines, applied, rollup, notes = edit_tools.carry_amount_edits(t, [ii])
+    got = is_amounts(lines, "Nu Aire")
+    assert (got["Total Other Income"], got["Income Before Income Taxes"], got["Net Income"]) == (
+        803.61, 6052.22, 5538.271)
+    assert (got["Income from Operations"], got["Total Operating Expense"]) == (5248.61, 18433.001)
+    assert [(r["line"], r["delta"]) for r in rollup] == [("Total Other Income", 100.0),
+                                                         ("Income Before Income Taxes", 100.0), ("Net Income", 100.0)]
+    out = finance.ebitda(p, t, brief, edits=[ii])
+    assert out["ebitda"] == 28378.845
+    assert (out["parts"][1]["net_income"], out["parts"][1]["interest_income"]) == (5538.271, 613.77)
+
+
+def test_reverting_the_carried_edits_restores_every_figure(inputs):
+    plain = run_all(inputs)
+    edits = [edit("ed_8", status="reverted", company="Nu Aire", line="General and Administrative",
+                  section="income_statement", old_value=6162.806, new_value=5662.806),
+             edit("ed_13", status="reverted", company="Kewaunee", line="Operating expenses",
+                  section="income_statement", old_value=33770, new_value=34770)]
+    out = run_all(inputs, edits)
+    for name in plain:
+        assert out[name] == plain[name]
+    assert out["ebitda"]["ebitda"] == 28378.845 and out["consolidate"]["rollup"] == []
+
+
+def test_amount_edit_on_a_balance_sheet_detail_line_is_refused(inputs):
+    p, t, m, brief = inputs
     # Cash and Cash Equivalents: 13,455.974 + 500 would not reach Total Assets, and the tie-out would still pass.
     cash = edit("ed_9", company="Nu Aire", line="Cash and Cash Equivalents", section="balance_sheet",
                 old_value=13455.974, new_value=13955.974)
-    with pytest.raises(ValueError, match=r"amount edit ed_9 on Cash and Cash Equivalents .*" + ROLLUP):
+    with pytest.raises(ValueError, match=r"amount edit ed_9 on Cash and Cash Equivalents \(Nu Aire, balance_sheet\) "
+                                         r"is refused: " + ROLLUP):
         finance.consolidate(p, t, m, edits=[cash])
     with pytest.raises(ValueError, match="ed_9"):
         finance.covenant_debt(p, t, brief, edits=[cash])
+    with pytest.raises(ValueError, match="ed_9"):
+        finance.ebitda(p, t, brief, edits=[cash])
 
 
 def _synthetic(lid, section, amount):

@@ -6,12 +6,29 @@ An amount edit replaces one line's amount with new_value (USD thousands).
 A remap edit moves one target line onto another platform line.
 A reverted edit is ignored everywhere. An edit that matches nothing is refused, never guessed.
 
+The income statement roll-up rule (a detail edit carries into the totals the way the filed statement is built):
+- line_sign(name): -1 (a cost) when the lower-cased name contains "cost", "expense", "tax", "provision", or
+  "attributable to the non-controlling"; else +1 when it contains "revenue", "sales", "income", "profit",
+  "earnings", or "gain"; else -1 (no word: treated as a cost, and named under rollup_notes in the run output).
+- For an amount edit on an income statement detail line (not is_total), delta = new_value - the line's value in
+  USD thousands. In statement order (the order of that company's lines as given):
+  1. If the first is_total line after the edited line starts with "total" (a group total such as
+     "Total Operating Expense"), it moves by +delta (a group total has the nature of its lines).
+  2. Every later is_total line whose name does not start with "total" (a running total: Gross Profit,
+     Operating profit, Income Before Income Taxes, Net Income, ...) moves by line_sign(edited line) * delta.
+  3. No other line moves. Taxes are not recomputed: the edit flows to net income before tax, which the covenant
+     EBITDA build adds back, so a 500 cut in a cost raises covenant EBITDA by exactly 500.
+  4. Group totals after a running total, and totals before the edited line, do not move.
+- Every line the carry moved is reported as {edit_id, company, line, delta} under rollup.
+- An amount edit on an is_total line replaces that line only.
+A rolls_into field on the fixture lines would replace this rule later.
+
 Refusals (ValueError), so a total is never left stale and a figure is never guessed:
 - An amount edit that matches no line, or more than one line (give the section, or the line is ambiguous).
-- An amount edit on a detail line (not is_total) when that company has any is_total line in the same section.
-  The statements store totals as filed lines, and no roll-up map says which detail lines feed which total, so code
-  cannot recompute the totals (or the net income line EBITDA starts from) after a detail edit. Edits on is_total
-  lines, and on detail lines of a section with no totals, still apply. This holds until the team adds a roll-up map.
+- An amount edit on a detail line (not is_total) outside the income statement when that company has any is_total
+  line in the same section. The balance sheet's nesting is not derivable from order alone, and the tie-out would
+  hide a wrong carry, so code does not guess which total a balance sheet detail line feeds. Edits on is_total lines,
+  and on detail lines of a section with no totals, still apply.
 - A remap that matches no mapping, that names an old_platform_line other than the mapping's current one (stale), onto
   a platform line the platform does not have, or onto a platform total
   (is_total) for a detail target line.
@@ -46,15 +63,45 @@ def _line_matches(line: SourceLine, edit: Edit) -> bool:
             and (not section or line.section == section))
 
 
-def apply_amount_edits(lines: list[SourceLine], edits: Iterable[Edit] | None) -> tuple[list[SourceLine], list[str]]:
-    """Copies of the lines with each active amount edit's new_value as the amount, in USD thousands.
+COST_WORDS = ("cost", "expense", "tax", "provision", "attributable to the non-controlling")
+REVENUE_WORDS = ("revenue", "sales", "income", "profit", "earnings", "gain")
+INCOME_STATEMENT = "income_statement"
 
-    Returns the new lines and the applied edit ids in edit order. The input lines are never changed.
-    Raises ValueError for an edit that matches no line or several lines, and for an edit on a detail line in a
-    section where the company has totals (see the module docstring).
+
+def line_sign(name: str) -> int:
+    """+1 for a revenue or profit line, -1 for a cost. A name with neither kind of word counts as a cost."""
+    n = _norm(name)
+    if any(w in n for w in COST_WORDS):
+        return -1
+    if any(w in n for w in REVENUE_WORDS):
+        return 1
+    return -1
+
+
+def _has_sign_word(name: str) -> bool:
+    n = _norm(name)
+    return any(w in n for w in COST_WORDS + REVENUE_WORDS)
+
+
+def _thousands(line: SourceLine) -> float:
+    from app.tools.finance import to_thousands  # finance imports this module; import at call time
+    return to_thousands(line.amount, line.unit)
+
+
+def carry_amount_edits(lines: list[SourceLine], edits: Iterable[Edit] | None
+                       ) -> tuple[list[SourceLine], list[str], list[dict], list[str]]:
+    """Copies of the lines with each active amount edit applied and carried by the income statement roll-up rule.
+
+    Returns (lines, applied edit ids in edit order, rollup, rollup_notes). rollup lists every line the carry moved
+    as {edit_id, company, line, delta} in USD thousands; rollup_notes names each edited line whose sign was taken
+    as a cost because its name has no revenue or cost word. The input lines are never changed.
+    Raises ValueError for an edit that matches no line or several lines, and for a detail edit outside the income
+    statement in a section where the company has totals (see the module docstring).
     """
     out = list(lines)
     applied: list[str] = []
+    rollup: list[dict] = []
+    notes: list[str] = []
     for edit in _of_kind(edits, "amount"):
         eid = getattr(edit, "id", "?")
         new_value = getattr(edit, "new_value", None)
@@ -70,12 +117,33 @@ def apply_amount_edits(lines: list[SourceLine], edits: Iterable[Edit] | None) ->
                              f"or the line is ambiguous")
         i = hits[0]
         line = out[i]
-        if not line.is_total and any(o.is_total and _norm(o.company) == _norm(line.company)
-                                     and o.section == line.section for o in out):
-            raise ValueError(f"amount edit {eid} on {line.line} ({line.company}, {line.section}) is refused: "
-                             f"the roll-up for that section is not defined, so code cannot recompute the totals")
+        same = [j for j, o in enumerate(out) if _norm(o.company) == _norm(line.company) and o.section == line.section]
+        carry: list[tuple[int, float]] = []
+        if not line.is_total and any(out[j].is_total for j in same):
+            if line.section != INCOME_STATEMENT:
+                raise ValueError(f"amount edit {eid} on {line.line} ({line.company}, {line.section}) is refused: "
+                                 f"the roll-up for that section is not defined, so code cannot recompute the totals")
+            delta = round(float(new_value) - _thousands(line), 6)
+            sign = line_sign(line.line)
+            if not _has_sign_word(line.line):
+                notes.append(f"{line.line} ({line.company}) has no revenue or cost word in its name; "
+                             f"the roll-up treated it as a cost")
+            later = [j for j in same if j > i and out[j].is_total]
+            if later and _norm(out[later[0]].line).startswith("total"):
+                carry.append((later[0], delta))
+            carry += [(j, sign * delta) for j in later if not _norm(out[j].line).startswith("total")]
         out[i] = line.model_copy(update={"amount": float(new_value), "unit": THOUSANDS})
+        for j, d in carry:
+            out[j] = out[j].model_copy(update={"amount": round(_thousands(out[j]) + d, 6), "unit": THOUSANDS})
+            rollup.append({"edit_id": edit.id, "company": out[j].company, "line": out[j].line,
+                           "delta": round(d, 3)})
         applied.append(edit.id)
+    return out, applied, rollup, notes
+
+
+def apply_amount_edits(lines: list[SourceLine], edits: Iterable[Edit] | None) -> tuple[list[SourceLine], list[str]]:
+    """carry_amount_edits without the roll-up report: the new lines and the applied edit ids in edit order."""
+    out, applied, _, _ = carry_amount_edits(lines, edits)
     return out, applied
 
 
