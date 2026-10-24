@@ -1,8 +1,29 @@
 "use client";
 
+import { lineK } from "@/lib/format";
 import type { SourceLine, WorkItem } from "@/lib/types";
 import { SourceChip } from "./source";
 import { ActorChip, Button, Mono, Shape, Tag } from "./ui";
+
+type Fork = { state: string; service_id?: string; seconds?: number; reason?: string };
+
+/** Where this flag's what-ifs live: a Tiger fork of the ledger, made by the gateway (app/gateway/whatif.py). */
+function ForkLine({ fork }: { fork?: Fork }) {
+  if (!fork) return null;
+  const text =
+    fork.state === "creating" ? "Forking the ledger on Tiger Cloud to hold these what-ifs. About 35 s."
+    : fork.state === "ready" ? `What-ifs held in Tiger fork ${fork.service_id}, outside the live ledger. Ready in ${fork.seconds} s.`
+    : fork.state === "failed" || fork.state === "skipped" ? `What-ifs computed here; no fork (${fork.reason}).`
+    : null;
+  if (!text) return null;
+  const live = fork.state === "creating" || fork.state === "ready";
+  return (
+    <p className="flex items-center gap-2 text-[14px] leading-5 text-muted">
+      <span className={fork.state === "ready" ? "text-clear" : "text-muted"}><Shape kind="circle" size={10} /></span>
+      <span className={live ? "" : "italic"}>{text}</span>
+    </p>
+  );
+}
 
 /**
  * One flag: the question, the filing evidence, and the options with their computed effects.
@@ -30,6 +51,8 @@ export function FlagCard({
         <Button kind="link" onClick={onHold} disabled={busy}>Not sure. Hold this item.</Button>
       </div>
 
+      <ForkLine fork={item.payload.fork as Fork | undefined} />
+
       <h2 className="font-serif text-[26px] leading-8 font-medium">{item.question}</h2>
 
       {flagged.length ? (
@@ -38,8 +61,7 @@ export function FlagCard({
             <div key={l.id} className="flex flex-wrap items-baseline gap-x-3">
               <span className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1" title={l.line}>{l.line}</span>
               <Mono>{l.company}</Mono>
-              <span className="font-semibold tabular-nums">{Math.round(l.amount).toLocaleString("en-US")}</span>
-              <Mono>{l.unit}</Mono>
+              <span className="font-semibold tabular-nums">{lineK(l.amount, l.unit)}</span>
             </div>
           ))}
           {flagged.find((l) => l.note) ? (
@@ -71,7 +93,9 @@ export function FlagCard({
                 suggested ? "border-2 border-ink" : "border border-rule"
               }`}
             >
-              {suggested ? <Tag>Agent suggests</Tag> : <span className="h-7" />}
+              {suggested ? <Tag>Agent suggests</Tag>
+                : o.added_by ? <ActorChip actor={o.added_by} />
+                : <span className="h-7" />}
               <span className="font-semibold">{o.label}</span>
               <span className="text-muted">{o.effect}</span>
               {o.run_id ? <Mono>{o.run_id}</Mono> : null}

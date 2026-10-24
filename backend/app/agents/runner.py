@@ -1,8 +1,9 @@
 """run_agent(role, item): one function, several backends, one typed result.
 
 AGENT_BACKEND picks the backend: anthropic, droid, scripted, or replay. If the chosen backend fails, the runner
-falls back along AGENT_FALLBACK (default "anthropic,scripted") and says which backend produced the result, so the
-pitch can be honest about it. Successful model runs are recorded for replay when RECORD_RUNS=1 (the default).
+falls back along AGENT_FALLBACK (default "scripted") and says which backend produced the result, so the
+pitch can be honest about it. Successful model runs are recorded to recordings/latest/ when RECORD_RUNS=1 (the default),
+so a live run never replaces the pinned replay; `scripts/record_run.py` (RECORD_RUNS=force) writes the pinned one.
 Agents are stateful: the runner loads the role's session from the gateway, passes it in, and updates it after.
 """
 from __future__ import annotations
@@ -17,6 +18,10 @@ from app.agents import recording
 from app.agents.backends.scripted import scripted_mapper, scripted_preparer, scripted_reviewer
 from app.agents.roles import Role
 from app.core.models import MapperInput, PreparerInput, ReviewerInput
+
+# No Anthropic key is on the team, so the default fallback is the deterministic rules. Add `anthropic` back in
+# AGENT_FALLBACK when a key is in .env.
+DEFAULT_FALLBACK = "scripted"
 
 LAST_RUNS: list[dict] = []  # what the console shows as "backend status"
 TOTALS: dict[str, float] = {"runs": 0, "factory_credits": 0.0, "input_tokens": 0, "output_tokens": 0}  # this process
@@ -68,7 +73,7 @@ def _attempt(backend: str, role: Role, inp: BaseModel, call_tool, session) -> tu
 def run_agent(role: Role, inp: BaseModel, call_tool, session=None, backend: str | None = None) -> AgentRun:
     """Run one role on one work item. Returns the typed output and the backend that produced it."""
     chosen = backend or os.getenv("AGENT_BACKEND", "scripted")
-    chain = [chosen] + [b for b in os.getenv("AGENT_FALLBACK", "anthropic,scripted").split(",") if b and b != chosen]
+    chain = [chosen] + [b for b in os.getenv("AGENT_FALLBACK", DEFAULT_FALLBACK).split(",") if b and b != chosen]
     attempts: list[dict] = []
     start = time.time()
     for b in chain:
@@ -80,7 +85,7 @@ def run_agent(role: Role, inp: BaseModel, call_tool, session=None, backend: str 
             rec = os.getenv("RECORD_RUNS", "1")
             if (b in ("anthropic", "droid") and rec == "1") or (rec == "force" and b != "replay"):
                 try:
-                    recording.record(role.name, inp, out, b)
+                    recording.record(role.name, inp, out, b, latest=rec != "force")
                 except OSError:
                     pass
             run = AgentRun(output=out, backend=b, attempts=attempts, seconds=round(time.time() - start, 2))

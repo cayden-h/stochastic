@@ -8,6 +8,7 @@ import asyncio
 import json
 import math
 import os
+import threading
 
 from typing import Literal
 
@@ -154,7 +155,7 @@ def build_router(gw: Gateway) -> APIRouter:
     def backend_status() -> dict:
         return {
             "configured": os.getenv("AGENT_BACKEND", "scripted"),
-            "fallback": os.getenv("AGENT_FALLBACK", "anthropic,scripted"),
+            "fallback": os.getenv("AGENT_FALLBACK", "scripted"),
             "anthropic_key": bool(os.getenv("ANTHROPIC_API_KEY")),
             "factory_key": bool(os.getenv("FACTORY_API_KEY")),
             "last_runs": agent_runner.LAST_RUNS[-6:],
@@ -162,19 +163,42 @@ def build_router(gw: Gateway) -> APIRouter:
             "settings": agent_settings.summary(),
         }
 
-    def run_in_background(deal_id: str, backend: str | None, tasks: BackgroundTasks):
+    # One job per deal at a time. Answering the last flag starts the job runner, so a Run click at the same moment
+    # would start a second Preparer; the gateway would deny its result, but the click should get a clear 409 instead.
+    running: set[str] = set()
+    running_lock = threading.Lock()
+
+    def claim(deal_id: str) -> bool:
+        with running_lock:
+            if deal_id in running:
+                return False
+            running.add(deal_id)
+            return True
+
+    def release(deal_id: str) -> None:
+        with running_lock:
+            running.discard(deal_id)
+
+    def run_in_background(deal_id: str, backend: str | None, tasks: BackgroundTasks) -> bool:
+        if not claim(deal_id):
+            return False
         tasks.add_task(_safe_advance, deal_id, backend)
+        return True
 
     def _safe_advance(deal_id: str, backend: str | None):
         try:
             advance(gw, deal_id, backend=backend)
         except Exception as error:  # keep the server up; the audit log and LAST_RUNS hold the trace
             agent_runner.LAST_RUNS.append({"role": "runner", "backend": backend, "error": str(error)[:300]})
+        finally:
+            release(deal_id)
 
     # ------------------------------------------------------------------ reads
     @r.get("/health", response_model=HealthResponse)
     def health():
-        return {"ok": True, "chain_valid": gw.verify_chain(), "backend": backend_status(), "store": store.status()}
+        forks = gw.forks.status() if gw.forks else {"enabled": False}
+        return {"ok": True, "chain_valid": gw.verify_chain(), "backend": backend_status(),
+                "store": {**store.status(), "forks": forks}}
 
     @r.get("/deals")
     def deals():
@@ -353,13 +377,18 @@ def build_router(gw: Gateway) -> APIRouter:
         if not gw._allowed(x_actor, "run"):
             raise HTTPException(status_code=403, detail=f"{x_actor} may not run")
         if body.sync:
+            if not claim(deal_id):
+                raise HTTPException(status_code=409, detail="a run is already in progress for this deal")
             try:
                 return {"ok": True, "log": advance(gw, deal_id, backend=body.backend), "stage": store.deals[deal_id].stage}
             except GatewayError as error:
                 raise HTTPException(status_code=error.status, detail=error.message)
             except Exception as error:
                 raise HTTPException(status_code=500, detail=str(error)[:300])
-        run_in_background(deal_id, body.backend, tasks)
+            finally:
+                release(deal_id)
+        if not run_in_background(deal_id, body.backend, tasks):
+            raise HTTPException(status_code=409, detail="a run is already in progress for this deal")
         return {"ok": True, "log": ["started"], "stage": store.deals[deal_id].stage}
 
     @r.post("/work-items/{item_id}/answer")

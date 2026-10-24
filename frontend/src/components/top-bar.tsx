@@ -58,7 +58,7 @@ export function TopBar() {
     <header className="border-b border-hairline bg-card">
       <div className="mx-auto flex max-w-[1120px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-4">
         <span className="font-serif text-[26px] leading-8 font-medium">Stochastic</span>
-        <span className="hidden text-muted md:inline">{kase?.deal.name ?? ""}</span>
+        <span className="hidden text-muted xl:inline">{kase?.deal.name ?? ""}</span>
         <span className="flex-1" />
         <nav className="flex items-center gap-6">
           {TABS.map((t) => {

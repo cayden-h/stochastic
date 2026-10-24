@@ -57,6 +57,7 @@ class Option(BaseModel):
     label: str
     effect: str  # computed by a tool run, never written by a model
     run_id: str | None = None
+    added_by: str | None = None  # "system:gateway" for the baseline reading the gateway adds; None when the Mapper wrote it
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +135,7 @@ class SourceLine(BaseModel):
     note: str | None = None  # what the filing says about the line, such as the 10-Q note on a sale-leaseback
     covenant_tag: CovenantTag = "na"
     covenant_note: str | None = None
+    covenant_policy_id: str | None = None  # set by the gateway when a learned policy decided the tag
 
 
 class Mapping(BaseModel):
@@ -147,6 +149,7 @@ class Mapping(BaseModel):
     reason: str
     flagged: bool = False
     approved_by: str | None = None
+    policy_id: str | None = None  # set by the gateway when a learned policy decided it; the console's Learned chip
 
 
 class ResultRow(BaseModel):
@@ -319,6 +322,7 @@ class MapperInput(BaseModel):
     brief: Brief
     policies: list[Policy] = Field(default_factory=list)  # what the Mapper learned before
     session: AgentSession | None = None
+    previous_refusal: str | None = None  # why the gateway refused the Mapper's last result, on the one retry
 
 
 class MapperOutput(BaseModel):

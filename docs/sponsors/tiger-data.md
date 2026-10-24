@@ -15,7 +15,9 @@ The store is built on Tiger Cloud: service `stochastic`, PostgreSQL 18.6 with Ti
 - The audit log is a TimescaleDB hypertable on `at`, and a trigger refuses UPDATE and DELETE on it.
 - A reset starts a new ledger instead of deleting, so every earlier run stays queryable.
 - The Tiger CLI (0.26.0) is installed and lists the service; the Tiger MCP is installed for Claude Code.
-- Not built: forks that hold the two answers to the flag. That is the strongest remaining fit with what Tiger Data pushes, if there is time.
+- Built 2026-10-24 09:00: forks that hold a covenant flag's what-ifs (`../../backend/app/gateway/whatif.py`, `../../backend/app/db/forks.py`). The gateway forks the ledger when the flag opens, writes each option's tags and computed figures into a `what_if` table in the fork, and deletes the fork when the controller answers; the live ledger keeps only the chosen option. Live: fork ready in 33 s with 3 what-ifs, deleted 1 s after the answer, three FORK rows in the audit log. Settings: `FORKS=tiger`, `TIGER_SERVICE_ID`. [verified]
+- History of the spike, 2026-10-24 08:40: `tiger service fork p4a7k2ox3x --no-set-default` failed at once with "You have reached your free service limit. Delete a service or create a paid service instead." The free plan allows two services, and the account holds `stochastic` and `larp-city` (a paused HackRice database). So a fork needs either `larp-city` deleted (Cayden's call) or a paid plan, and then one fork per option would also hit the same two-service limit. Cayden chose to delete `larp-city` (backed up first to `HackRice/backups/larp-city-2026-10-24.dump`, 15 MB). A fork then took 33 to 35 s. With the main service running there is room for one fork at a time, so a second covenant flag while one fork is open gets no fork and says so. [verified]
+- What the demo also shows: the restart moment (`../demo-script.md` section 5), the append-only hypertable, and the ledgers kept across resets.
 
 ### Which old notes still apply
 

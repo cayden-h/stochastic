@@ -343,7 +343,7 @@ Eric's check of the figures against the filings finds a different depreciation, 
 Date: 2026-10-24.
 
 Decision:
-`run_agent` tries `AGENT_BACKEND` and falls back along `AGENT_FALLBACK` (default `anthropic,scripted`). The `replay` backend plays recorded outputs; the Preparer and Reviewer re-run their tools on replay so the run ids are real. Every result carries `backend`. [verified: `backend/app/agents/runner.py`]
+`run_agent` tries `AGENT_BACKEND` and falls back along `AGENT_FALLBACK` (default `anthropic,scripted` until 2026-10-24 08:00, `scripted` since, because no Anthropic key exists). The `replay` backend plays recorded outputs; the Preparer and Reviewer re-run their tools on replay so the run ids are real. Every result carries `backend`. [verified: `backend/app/agents/runner.py`]
 
 Why:
 The pitch must be honest about which runs went through Droid, and the demo must survive any backend failing.
@@ -383,3 +383,30 @@ They are not decided yet.
 5. Does the Python Droid SDK qualify for "Building with the Droid SDK" when the tools call our own gateway?
 6. Does the SEC allow us to redistribute the cached filings?
 7. Does a former-banker or controller reviewer count as the human seat?
+
+## D16. The gateway owns the moment and the memory mark; Sonnet runs the demo Mapper
+
+Date: 2026-10-24, 08:30. Decided by Cayden's agent during the live end-to-end tests, under Cayden's goal to finish his task list.
+
+Context: live Droid runs on Haiku 5.5 showed three things the scripted runs hid. One run offered three readings of the financing liability, all under the limit, so the 2.54x moment did not appear. The model's mapping reasons read "Controller policy maps ...", so the console's Learned chip (which looked for "Policy" at the start of the reason) never showed. A second run with memory raised a new flag on lines the first run had not asked about.
+
+Decision:
+1. Every covenant flag shows the count-everything reading. When the Mapper does not offer it, the gateway adds it, computed by the same tools and labelled as the gateway's. The controller always sees what the exclusions are worth, and the trust story is unchanged: the gateway adds an option, it never removes or edits one.
+2. The gateway marks a learned line from the policy record (`policy_id`), and only when the cited policy decided the same thing. No model wording decides what the console calls learned.
+3. The demo Mapper runs on Sonnet 5.5 (`DROID_MODEL_MAPPER`); the Preparer and Reviewer stay on Haiku 5.5. Sonnet held both moments in two trials of two; Haiku in one of two and zero of one.
+4. The default fallback is `scripted`. Anthropic returns to the chain only with a key.
+
+Evidence: `agents.md` section 9, rows 08:06 to 08:33; tests `test_covenant_flag_always_shows_the_count_everything_reading`, `test_learned_lines_are_marked_by_the_gateway_not_by_the_model_wording`, `test_second_run_while_one_is_in_progress_is_refused`.
+
+## D17. A covenant flag's what-ifs live in a Tiger fork
+
+Date: 2026-10-24, 09:00. Cayden chose to delete the paused `larp-city` service (backed up first) to free the free plan's second service slot.
+
+Decision: when the Mapper raises a covenant flag, the gateway forks the ledger on Tiger Cloud in the background and writes each option's what-if (tags, effect, tool outputs, run id) into a `what_if` table in the fork. The live record never holds a hypothetical. The controller's answer keeps one option in the ledger, and the gateway deletes the fork with the alternatives, which frees the slot. Each step is a gateway write: `fork:create`, `fork:ready`, `fork:delete` (or `fork:failed`, `fork:skip`) in the hash-chained log, and the fork state on the flag.
+
+Why: a plain Postgres store does not stand out for Tiger Data, and forks are what Tiger Data pushes (`sponsors/tiger-data.md`). The fit is honest: a what-if is exactly a copy of the ledger that may be thrown away.
+
+Limits: a fork takes 33 to 35 s, so it never blocks the flag; the options and effects are computed in process as before. The free plan allows one fork beside the main service, so a second covenant flag while a fork is open gets none and says so. A fork left by a crash is deleted on the next start (`FORK_PREFIX`).
+
+Evidence: `backend/tests/test_whatif_forks.py` (lifecycle, answer before ready, failure, one slot, cleanup, and an opt-in round trip against Tiger that passed on 2026-10-24); the live browser run at 08:53 in `agents.md` section 9.
+

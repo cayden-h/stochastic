@@ -1,18 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { isLearned, plural } from "@/lib/format";
+import { isLearned, isLearnedTag, plural } from "@/lib/format";
 import type { Mapping, SourceLine } from "@/lib/types";
 import { Button, Mono, Shape, Tag } from "./ui";
 
 /**
  * The Mapper's line-by-line answer: each target line and the platform line it goes to.
- * A "Learned" chip marks a mapping or a tag whose reason starts with "Policy": the controller decided it once.
+ * A "Learned" chip marks a mapping or a tag the gateway tied to a learned policy: the controller decided it once.
  */
 export function Mappings({ mappings, lines }: { mappings: Mapping[]; lines: SourceLine[] }) {
   const [open, setOpen] = useState(false);
   const learned = mappings.filter(isLearned);
-  const learnedTags = lines.filter((l) => (l.covenant_note ?? "").startsWith("Policy"));
+  const learnedTags = lines.filter(isLearnedTag);
   const flagged = mappings.filter((m) => m.flagged);
   const low = mappings.filter((m) => m.confidence < 0.8 && !m.flagged);
   return (

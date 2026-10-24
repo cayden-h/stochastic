@@ -4,7 +4,7 @@ export type Stage = "new" | "awaiting_flag" | "mapped" | "flags_answered" | "awa
 export type Backend = "scripted" | "anthropic" | "droid" | "replay" | string;
 
 export interface Evidence { quote: string; page: number | null; document_id: string | null }
-export interface Option { id: string; label: string; effect: string; run_id: string | null }
+export interface Option { id: string; label: string; effect: string; run_id: string | null; added_by?: string | null }
 
 export interface Brief {
   lender: string; agreement_ref: string; limit: number; limit_section: string; limit_wording: string;
@@ -17,11 +17,13 @@ export interface SourceLine {
   id: string; company: string; line: string; section: "balance_sheet" | "income_statement" | "cash_flow";
   period: string; amount: number; unit: string; source_ref: string; is_total: boolean; note: string | null;
   covenant_tag: "debt" | "not_debt" | "unclear" | "na"; covenant_note: string | null;
+  covenant_policy_id?: string | null;
 }
 
 export interface Mapping {
   id: string; target_line_id: string; platform_line_id: string | null; target_line: string; platform_line: string | null;
   confidence: number; reason: string; flagged: boolean; approved_by: string | null;
+  policy_id?: string | null;
 }
 
 export interface WorkItem {

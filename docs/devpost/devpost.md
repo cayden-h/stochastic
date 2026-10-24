@@ -77,6 +77,8 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 - Every action, allowed or denied, goes in an audit log, and each row is chained to the one before it by hash. [verified: `test_tampering_breaks_the_chain`, `test_agents_cannot_approve_and_denial_is_logged`]
 - One function, `run_agent(role, item)`, runs the same role on four backends: Factory Droid, the Anthropic API, scripted rules, and replay of a recorded run. It falls back along a set order, and every result names the backend that produced it. [verified: `backend/app/agents/runner.py`]
 - Droid runs each agent in an empty directory with only our gateway tools allowed (`restrict_tools`) and a typed output. [verified: `docs/agents.md`, section 7]
+- The store is Postgres on Tiger Cloud: every gateway write goes through to it, the audit log is a TimescaleDB hypertable that refuses UPDATE and DELETE, and a restart loads the record, the log, and the agents' memory back. [verified: `backend/tests/test_postgres_store.py`]
+- Each covenant flag's what-ifs go to a zero-copy fork of the ledger on Tiger Cloud, made in about 35 s, so the live record never holds a hypothetical. The controller's answer keeps one option and deletes the fork. [verified: `backend/tests/test_whatif_forks.py`, live run 2026-10-24]
 - Backend: Python 3.12, FastAPI, Pydantic, Uvicorn, pytest. [verified: `backend/pyproject.toml`]
 - Console: Next.js 16, React 19, TypeScript, Tailwind CSS 4. [verified: `frontend/package.json`]
 - Design: the Figma file "Stochastic - Reviewer Console" holds a `Tokens` variable collection, seven text styles, five components, and four screen frames. [verified: `docs/design/README.md`]
@@ -93,7 +95,7 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 
 ## Accomplishments that we're proud of
 
-- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 115 tests pass]
+- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 125 tests pass, plus 5 against Tiger Cloud]
 - The flag is real. It comes from a real line in a real filing, and the answer moves the leverage verdict. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 - The whole deal ran through Factory Droid with our gateway tools, once with Claude Sonnet 5.5 and once with Claude Haiku 5.5 requested, and both passed review at 0.77x as computed then; the Sonnet recording replays at 0.76x today, after the EBITDA definition items were applied. [verified: `docs/agents.md`, run log]
 - After a reset, the same deal runs with no flag, because the Mapper applies the controller's policy, and the log shows `policy:apply`. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
@@ -111,7 +113,6 @@ None is built.
 - Purchase accounting with a provisional label, and intercompany eliminations.
 - A second deal, to show the policies carrying over.
 - Confidence calibration from the answer key.
-- A Postgres store in place of the in-memory store.
 - Checking the NetSuite, Sage Intacct, Microsoft Dynamics 365, Epicor, and Infor layouts against real exports.
 - Live connectors that pull the trial balance from those systems instead of a file export.
 - Other corporate-finance situations.
@@ -134,6 +135,7 @@ Real:
 - The flag and the leverage effect of each answer are computed by the tools, not written by a model. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 - Agent memory is real: it is policies the gateway wrote from the controller's answers. It is not a change to model weights. [verified: `backend/app/gateway/gateway.py`, `_learn`]
 - The store is real: with `STORE=postgres`, every gateway write reaches Postgres on Tiger Cloud, and a restart loads the record, the log, and the memory back. If Tiger Cloud is unreachable, the API runs in memory and the console says so. [verified: `backend/tests/test_postgres_store.py`, `backend/tests/test_store_fallback.py`]
+- The what-if forks are real: each covenant flag's options are written into a zero-copy fork of the ledger on Tiger Cloud, never into the live record, and the controller's answer deletes the fork. On the free plan there is room for one fork at a time; if a fork fails, the flag works the same and says so. [verified: `backend/tests/test_whatif_forks.py`, live run 2026-10-24 09:00]
 
 Not real, or not claimed:
 - The statement lines come from public filings, not from the companies' internal books.
@@ -168,13 +170,13 @@ Claim nothing unconfirmed.
 - Factory: the agents ran through the Droid SDK on 2026-10-24, with Sonnet 5.5 and Haiku 5.5 requested. [verified: `docs/agents.md`, run log]
   Say "built with the Droid SDK" only about `droid` runs.
 - Figma: the console's design system and screen frames are in the Figma file. [verified: `docs/design/README.md`]
-- Tiger Data: the record, the audit log, and the agents' memory are stored in Postgres on Tiger Cloud, and the audit log is a TimescaleDB hypertable that refuses edits. [verified: `backend/tests/test_postgres_store.py`]
+- Tiger Data: the record, the audit log, and the agents' memory are stored in Postgres on Tiger Cloud, and the audit log is a TimescaleDB hypertable that refuses edits. Each covenant flag's what-ifs live in a zero-copy fork of the ledger, made in about 35 s and deleted by the answer. [verified: `backend/tests/test_postgres_store.py`, `backend/tests/test_whatif_forks.py`]
   Say how the shipped screen was built from it only once Josie confirms.
 
 ## Open before submission
 
 - Done 2026-10-24: the one-screen console (flag card, verdict line, combined table, mapping, log link) is built against `GET /deals/{id}/case` and shows the backend badge from `GET /health`. [verified: `frontend/README.md`]
 - Josie: what was done in Figma and through the Figma MCP (`use_figma`), and is there a frame for the new one-screen console? `docs/decisions.md` D11 says the design system was built through `use_figma`, but `docs/design/README.md` does not say so.
-- Cayden, on the day: which backend produced the run in the video and at the table (droid, anthropic, scripted, or replay). Write it into the list above.
+- Cayden, on the day: which backend produced the run in the video and at the table. Planned: `droid`, with the Mapper on Claude Sonnet 5.5 and the Preparer and Reviewer on Claude Haiku 5.5 (`agents.md` section 9, 08:30). Confirm it from the badge, then write it into the list above.
 - Done 2026-10-24: the EBITDA items are decided (stock compensation and the $4,019K pension figure applied, transaction costs kept at zero), and every leverage figure in this file, `flag-card.md`, and `brief.md` was updated.
 - Anyone, with a Cal Hacks organizer: can one project enter several sponsor tracks?

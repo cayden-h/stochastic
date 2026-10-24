@@ -91,9 +91,9 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 {
   "deal": { "id": "d_kequ_nuaire", "name": "Kewaunee Scientific acquires Nu Aire", "platform": "Kewaunee", "target": "Nu Aire", "stage": "awaiting_flag", "brief": { "limit": 2.5, "debt_term": "Senior Funded Bank Debt", "...": "..." } },
   "stage": "awaiting_flag",
-  "source_lines": [ { "id": "sl_001", "company": "Kewaunee", "line": "Cash and cash equivalents", "section": "balance_sheet", "period": "2024-10-31", "amount": 25963, "unit": "USD thousands", "source_ref": "10-Q ...", "is_total": false, "note": null, "covenant_tag": "na", "covenant_note": null } ],
-  "mappings": [ { "id": "m_001", "target_line": "Net Revenues", "platform_line": "Net sales", "confidence": 0.95, "reason": "...", "flagged": false, "approved_by": null } ],
-  "flags": [ { "id": "wi_002", "type": "flag", "state": "NEEDS_INFO", "question": "...", "evidence": [ { "quote": "...", "document_id": "8-K Ex 10.1, Section 4.8(a)" } ], "options": [ { "id": "a", "label": "Whole line counts (70,885K)", "effect": "Senior Funded Bank Debt 71,955K. Leverage 2.54x against 2.50x. Over the limit.", "run_id": "run_004" } ], "default": "b", "answer": null } ],
+  "source_lines": [ { "id": "sl_001", "company": "Kewaunee", "line": "Cash and cash equivalents", "section": "balance_sheet", "period": "2024-10-31", "amount": 25963, "unit": "USD thousands", "source_ref": "10-Q ...", "is_total": false, "note": null, "covenant_tag": "na", "covenant_note": null, "covenant_policy_id": null } ],
+  "mappings": [ { "id": "m_001", "target_line": "Net Revenues", "platform_line": "Net sales", "confidence": 0.95, "reason": "...", "flagged": false, "approved_by": null, "policy_id": null } ],
+  "flags": [ { "id": "wi_002", "type": "flag", "state": "NEEDS_INFO", "question": "...", "evidence": [ { "quote": "...", "document_id": "8-K Ex 10.1, Section 4.8(a)" } ], "options": [ { "id": "a", "label": "Whole line counts (70,885K)", "effect": "Senior Funded Bank Debt 71,955K. Leverage 2.54x against 2.50x. Over the limit.", "run_id": "run_004", "added_by": null } ], "default": "b", "answer": null } ],
   "open_flags": ["wi_002", "wi_003"],
   "result": null,
   "verdict": null,
@@ -101,7 +101,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
   "policies": [ "..." ],
   "sessions": [ "..." ],
   "audit": { "rows": 12, "chain_valid": true, "denied": 0 },
-  "backend": { "configured": "scripted", "fallback": "anthropic,scripted", "anthropic_key": false, "factory_key": true, "last_runs": [ "..." ] }
+  "backend": { "configured": "scripted", "fallback": "scripted", "anthropic_key": false, "factory_key": true, "last_runs": [ "..." ] }
 }
 ```
 
@@ -160,7 +160,11 @@ A `: keepalive` comment is sent every 15 seconds.
 
 - 403: the actor may not do this. The gateway also writes a DENIED row.
 - 404: the deal, item, or run does not exist.
-- 409: the state change is not legal.
+- 409: the state change is not legal, or `POST /deals/{id}/run` while a run of that deal is in progress (answering the last flag starts one).
+
+Fields the gateway sets, never a model:
+- `Option.added_by` is `system:gateway` on the baseline reading the gateway adds to a covenant flag (every flagged line counted as debt) when the Mapper did not offer it; `null` on the Mapper's options.
+- `Mapping.policy_id` and `SourceLine.covenant_policy_id` name the learned policy that decided the line, and are set only when the cited policy exists and decided the same thing. The console's Learned chip reads them.
 - 422: the payload is not valid, such as a number with no run id, or a tool called while a flag is open.
 
 ## run_agent(role, item)
@@ -174,6 +178,6 @@ One function runs every agent (`backend/app/agents/runner.py`).
 | Deterministic rules, no model | `scripted` | Last fallback and reference answer |
 | Recorded outputs from `backend/recordings/` (the Preparer and Reviewer re-run their tools) | `replay` | No-network fallback |
 
-The runner tries `AGENT_BACKEND`, then each backend in `AGENT_FALLBACK` (default `anthropic,scripted`), and reports which one produced the result.
+The runner tries `AGENT_BACKEND`, then each backend in `AGENT_FALLBACK` (default `scripted`), and reports which one produced the result.
 `result.backend` and `GET /health` show it.
 Say "built with the Factory Droid SDK" only about runs that went through `droid`.

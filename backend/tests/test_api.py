@@ -408,3 +408,30 @@ def test_sensitivity_failure_does_not_fail_case(monkeypatch):
     again = c.get(f"/deals/{DEAL_ID}/case")
     assert again.status_code == 200 and "naive_debt" not in again.json()["verdict"]
     assert len(c.get(f"/deals/{DEAL_ID}/audit").json()["rows"]) == rows
+
+
+def test_second_run_while_one_is_in_progress_is_refused(monkeypatch):
+    """Answering the last flag starts the job runner; a Run click at the same moment must get 409, not a second Preparer."""
+    import threading
+
+    from app.api import routes
+
+    started, finish = threading.Event(), threading.Event()
+
+    def slow_advance(gw, deal_id, backend=None):
+        started.set()
+        finish.wait(5)
+        return ["slow"]
+
+    monkeypatch.setattr(routes, "advance", slow_advance)
+    c = TestClient(create_app())
+    first = {}
+    t = threading.Thread(target=lambda: first.setdefault("r", c.post(f"/deals/{DEAL_ID}/run")))
+    t.start()
+    assert started.wait(5)
+    second = c.post(f"/deals/{DEAL_ID}/run")
+    finish.set()
+    t.join(5)
+    assert second.status_code == 409 and "in progress" in second.json()["detail"]
+    assert first["r"].status_code == 200
+    assert c.post(f"/deals/{DEAL_ID}/run").status_code == 200  # released after the first run ends

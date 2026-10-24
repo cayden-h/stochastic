@@ -21,4 +21,4 @@ def test_an_unreachable_database_falls_back_to_memory(monkeypatch):
 
 def test_the_default_store_is_memory():
     health = TestClient(main.create_app()).get("/health").json()
-    assert health["store"] == {"kind": "memory", "fallback_reason": None}
+    assert health["store"] == {"kind": "memory", "fallback_reason": None, "forks": {"enabled": False}}

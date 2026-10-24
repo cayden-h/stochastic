@@ -65,6 +65,14 @@ Rules:
 - The presenter does not read numbers aloud unless they are final. See section 4.
 - Do not stage a denied action. Show a DENIED row only if a judge asks to see the log. [verified: `STOCHASTIC.md`, section 9]
 
+Measured on live Droid on 2026-10-24 08:30 (Mapper Sonnet 5.5, Preparer and Reviewer Haiku 5.5, `STORE=postgres`) [verified: `agents.md` section 9]:
+- Run to the flag card: 47 to 49 s. Too long for beat 2, so run the deal to the flag before each judge arrives (reset with memory cleared, press Run, wait for the card).
+- Last answer to a live Approve button: 36 to 38 s (Preparer about 28 s, Reviewer about 9 s). Answer the flag early and talk over this wait: the gateway, the tools, the run ids.
+- Second run after a reset with memory kept: 58 s to approval, no flag. Show it at the table only if a judge has the time, or point to the Learned chips.
+- If the timing does not fit, use `AGENT_BACKEND=replay` for the pitch and say so: the recorded Droid run's text, with every tool run live.
+
+The beats below are the original plan; Cayden times the real version with a stopwatch (`tasks/cayden.md` task 5).
+
 | Beat | Time | On-screen state | Presenter says | Hardcoded or real |
 | --- | --- | --- | --- | --- |
 | 1. Start | 1:30 - 1:35 | Console is open on the deal. Two files and the brief are loaded. The table is empty. The verdict line says "Waiting". | "Two statement files and a short brief with the lender's limit." | The files and brief are real data from filings. The load is real. |
@@ -152,7 +160,7 @@ Notes:
 The naive reading stays over 2.50x as long as covenant EBITDA stays below $28,782K. Our figure is $28,379K, with every add-back the agreement names and the filings quantify. An add-back above $403K that we have not found, or $403K less cash rent than we inferred, would move the naive reading under the limit; the covenant reading would still be far under. The $698K of expected transaction costs in Ex 99.2 Note 5(b) is the known candidate, kept at zero because it falls after the period. Know this before a judge asks.
 
 ## 5. Failure plan
-The agent layer has one function, `run_agent(role, item)`, with four backends. `AGENT_BACKEND` picks one and `AGENT_FALLBACK` (default `anthropic,scripted`) lists the fallbacks. [verified: `backend/app/agents/runner.py`]
+The agent layer has one function, `run_agent(role, item)`, with four backends. `AGENT_BACKEND` picks one and `AGENT_FALLBACK` (default `scripted`; no Anthropic key exists) lists the fallbacks. [verified: `backend/app/agents/runner.py`]
 The gateway, math tools, and log are plain code and do not depend on any backend.
 
 Rehearsed on 2026-10-24, 04:50 [verified]: the API was started with the `droid` CLI missing from PATH. `POST /deals/{id}/run` returned `mapper ran on scripted`, and `GET /health` showed the attempts: droid failed ("Droid executable was not found"), anthropic failed ("ANTHROPIC_API_KEY is not set"), scripted ran. The screen kept working and the backend badge said scripted.
@@ -160,12 +168,22 @@ Also found: Droid accepts an unknown model id without an error, so a wrong `DROI
 
 | Failure | Sign | What the system does | What to say |
 | --- | --- | --- | --- |
-| Droid fails | The run takes more than the timeout, or `GET /health` shows a failed droid attempt | Falls to `anthropic` (if a key is set), then `scripted`. Same screen, same gateway. | "The Droid run dropped. This one ran on the fallback. Same roles, same gateway, same math." |
-| Anthropic fails | API error, timeout, no key | Falls to `scripted` | "Switching the backend." |
-| Both model backends fail | Both attempts failed in `GET /health` | `scripted` runs: deterministic rules, no model, no network | "Both model backends are down, so the agents ran on the scripted rules. The gateway, the math, and the log are the same." |
-| You want no live model call at all | Before the demo | Set `AGENT_BACKEND=replay`: recorded outputs from the Haiku 5.5 run, with the tools re-run | "This is the recorded run from this morning. The tool calls are live." |
+| Droid fails | The run takes more than the timeout, or `GET /health` shows a failed droid attempt | Falls to `scripted`. Same screen, same gateway. The badge says scripted. | "The Droid run dropped. This one ran on the fallback. Same roles, same gateway, same math." |
+| You want no live model call at all | Before the demo | Set `AGENT_BACKEND=replay`: recorded outputs from the Sonnet 5.5 Droid run (`backend/recordings/`), with the tools re-run | "This is the recorded run from this morning. The tool calls are live." |
 | Console fails | Blank page or API error | Reload once. Then show the API: `GET /deals/{id}/case` in a browser tab is readable. | "Let me show the raw case." |
-| Wi-Fi fails | No network | `scripted` or `replay` need none. The demo makes no live SEC calls. | None needed. |
+| Wi-Fi fails | No network | `scripted` or `replay` need none. The demo makes no live SEC calls. The store keeps working in memory and queues its writes to Tiger until the network is back (`GET /health` `store.pending`). | None needed. |
+| Tiger Cloud unreachable at start | The badge says "In memory" and "Tiger unreachable" | The API runs in memory; nothing is lost from the screen | "The database is down, so this run is in memory. The log and the chain are the same." |
+| A Run click while a run is going | 409 "a run is already in progress" | Nothing; the running job finishes | None needed. |
+| The Tiger fork fails or is slow | The flag card says "no fork (...)" or still "Forking ..." | The options and effects are computed in process as always; answer when ready | "The fork is still coming up; the figures are already computed." |
+
+### The restart moment (Tiger), rehearsed 2026-10-24 08:09 [verified]
+
+1. Run the deal, answer the flags, and approve, with `STORE=postgres` (the badge says Tiger Cloud).
+2. Stop the API and start it again (`Ctrl-C`, then `backend/.venv/bin/uvicorn app.main:app --port 8000`; with `--reload`, saving any backend file restarts it).
+3. Reload the console. The verdict, the combined table, the answered flags, the log (55 rows, chain intact, the one real DENIED row), the 11 policies, and the three Droid sessions are all back, loaded from Tiger.
+4. Words: "The process just restarted. Nothing was in its memory. Everything on screen came back from Postgres on Tiger Cloud, and the log still checks."
+
+Checked on 2026-10-24 08:09: every top-level field of `GET /deals/{id}/case` was identical before and after the restart, and the restarted process had no runs of its own.
 
 Rules for failure:
 - Never hide a failure. Say it in one short line and move on. The backend badge on screen already says what ran.
