@@ -10,7 +10,7 @@ It is built for private equity buy-and-build firms.
 Three stateful agents (Mapper, Preparer, Reviewer) do the repeatable work, code does the math, and a human controller approves.
 What the controller decides once becomes a policy the agents apply next time.
 The demo deal is Kewaunee Scientific buying Nu Aire.
-It is built for the Hyphenate track at Cal Hacks 13.0 (Oct 23-25, 2026).
+It is built for the Hyphenate track at Cal Hacks 13.0 (Oct 23-25, 2026), and also targets Factory, Figma, and Tiger Data (`docs/STOCHASTIC.md` section 15).
 
 ## Read first
 

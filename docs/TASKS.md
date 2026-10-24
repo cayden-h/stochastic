@@ -1,6 +1,6 @@
 # Tasks: who builds what
 
-Last updated: 2026-10-24, 02:30.
+Last updated: 2026-10-24, 08:15.
 The product and scope are in `STOCHASTIC.md`. This file only splits the work.
 Josie owns UI and UX only. She gets no other task.
 Swap tasks freely and tell the team when you do.
@@ -11,7 +11,9 @@ The backend runs the whole deal end to end on the scripted backend: mapping, two
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded. Not yet run live: the Anthropic backend (no key in `.env`).
 Done 2026-10-24 and merged to `main`: the Note 2 answer key and Mapper score (Eric), the Devpost text (Eric), the recorded model runs (Sonnet 5.5 is the default replay), the tool guardrails, typed case, stage events, and CSV upload (Tri).
 Done 2026-10-24, evening: the console on `GET /deals/{id}/case` (flag card, verdict line, combined table, mapping, log, backend badge, second-run moment), and the EBITDA items (stock compensation and the $4,019K pension figure applied, transaction costs kept at zero).
-Not yet done: the Anthropic run, the rehearsals, the demo video.
+Done 2026-10-24, 08:00 (commit 08b2629): the Tiger Cloud store (`STORE=postgres`), with the audit log as an append-only TimescaleDB hypertable and a reload on start. Tiger Data is a target track (D15).
+Not yet done: Tiger forks, the compliance certificate, the sensitivity figures, the timeline route, the Anthropic run or its removal, the rehearsals, the Devpost submission, the demo video.
+Each person's open list, in order, is in their task file in `tasks/`. The lists below are the summary.
 
 ## The four seats
 
@@ -38,14 +40,27 @@ Done at 03:30: the `droid` CLI, the probe (Claude models are on our key), and a 
 
 Done at 05:10: Haiku 5.5 as the default model with per-role overrides, the failure switch rehearsed, the pitch words written, the Haiku run recorded. See `tasks/cayden.md` and `agents.md`.
 
-Open:
-1. Put an Anthropic key in `.env` and record a model run: `scripts/record_run.py --backend anthropic`. Commit the recordings.
-2. Rehearse the 2:00 with a stopwatch on the console, and write the credit total from `GET /health` into the run log in `agents.md`.
-3. Ask a Hyphenate mentor whether PE add-on integration counts as a corner of a finance team, and whether a learned policy counts as the "improves with every correction" signal.
+Done at 08:00: the Tiger Cloud store and Tiger Data as a target.
+
+Open (details in `tasks/cayden.md`):
+1. Run the demo on `STORE=postgres` and rehearse the restart moment (the case, the log, and the policy come back).
+2. Tiger forks, one per flag option: spike the fork time first, build only if it is fast enough, drop it by 8pm if not.
+3. The Anthropic backend: record a run with a key, or remove it from the fallback chain.
+4. Rehearse the 2:00 with a stopwatch, with the forced failure, and log the credit total.
+5. Ask the Hyphenate, Factory, and Tiger mentors the questions in `tasks/cayden.md`.
+6. Sunday 8am: wake the Tiger service and check `GET /health`.
 
 ## Eric
 
-All six done 2026-10-24, merged in PR #2. Figures were refreshed to the post-interest-income values the same day.
+Tasks 1 to 6 done 2026-10-24, merged in PR #2. Figures were refreshed to the post-interest-income values the same day.
+
+Open (details in `tasks/eric.md`):
+7. Submit the Devpost first draft on devpost.com by Saturday night, with the four tracks opted in.
+8. The compliance certificate wording from Ex 10.1, for Tri's route.
+9. Check the rent and transaction-cost inputs again.
+10. The honest-limits card and a printed one-page summary.
+
+Done:
 
 1. Check every figure in `backend/app/db/fixtures/kewaunee.py` against the filings. The links are in the file header and in `research/real-deal-candidates.md`. Flag any difference to Cayden; the tools recompute from the fixture.
 2. Export the two input files as CSVs in `data/` (git-ignored) with the fixture's columns, and write the loader script in `scripts/` so the fixture can read CSVs later.
@@ -56,7 +71,15 @@ All six done 2026-10-24, merged in PR #2. Figures were refreshed to the post-int
 
 ## Tri
 
-Tasks 1 to 5 done 2026-10-24, merged in PR #1. Task 6 waits on the team.
+Tasks 1 to 5 done 2026-10-24, merged in PR #1.
+
+Open (details in `tasks/tri.md`):
+7. Run the Tiger store tests (`TEST_DATABASE_URL`) on every merge.
+8. `GET /deals/{id}/certificate`: the draft compliance certificate, refused until approved.
+9. Sensitivity on the verdict: the add-back and the rent figure that flip the whole-line reading.
+10. `GET /deals/{id}/timeline` on the hypertable, and the store's average write time on `GET /health`.
+
+Done, plus the video:
 
 1. Review `backend/app/tools/finance.py` and own it. Check the EBITDA build (net income plus interest, taxes, D&A; add-backs; rent deduction) against Ex 10.1's definition. Add any add-back the agreement names that we left at zero, with its source. Done 2026-10-24. Reviewed against Ex 10.1; covenant EBITDA now subtracts interest income as Addendum I requires.
 2. Add tests: a test per tool with hand-computed expected values from the fixture, a test that `consolidate` refuses an unapproved flagged mapping, and a test for `limit_test` at exactly 2.50x. Done 2026-10-24. Per-tool tests with hand-computed values, the unapproved-flag refusal, and `limit_test` at exactly 2.50x.
@@ -76,6 +99,7 @@ Inputs for the design:
 - A small "learned" chip on a mapping or a tag whose reason starts with "Policy", and a second-run moment: after `POST /dev/reset`, Run again shows no flag.
 - The backend badge from `GET /health` ("scripted", "anthropic", "droid", "replay").
 - The design rules are in `design/README.md`, and the Figma file is linked there. The Figma track needs the frame on screen in the pitch.
+- Coming from the backend today (each owner tells Josie when it lands): a Download certificate button (Tri), a fork id and state on each flag option (Cayden), the store badge from `GET /health` (`memory` or `postgres`), and the sensitivity line on the verdict (Tri).
 
 ## Everyone
 
@@ -90,13 +114,13 @@ Inputs for the design:
 | Hyphenate | Cayden (demo), Eric (Devpost and the real-versus-simulated list) | The real deal runs end to end with the flag on the console. The video opens with the flag moment. The second run shows memory. |
 | Factory | Cayden | Done: all three agents ran on Droid with Claude Sonnet 5.5, recorded. Keep it working through the rehearsals. |
 | Figma | Josie (design) | The console frame exists in Figma and the console follows it. Figma is on screen in the pitch. |
-| Tiger Data | Cayden | Done: the store writes through to Postgres on Tiger Cloud, with the audit log as a TimescaleDB hypertable. Run the demo with `STORE=postgres` and show the tables once in the pitch. |
+| Tiger Data | Cayden (store, forks), Tri (timeline, write time) | Done: the store writes through to Postgres on Tiger Cloud, with the audit log as a TimescaleDB hypertable. Still to do: run the demo with `STORE=postgres`, show the restart and the tables once in the pitch, and add forks if the spike allows. Opt in on Devpost. |
 
 ## Order of work
 
-1. **Saturday morning.** Josie: the console on `/case`. Eric: figure check and CSVs. Tri: tool review and tests. Cayden: Droid CLI, probe, first Droid run.
-2. **Saturday afternoon.** Console reads real data and the flag card works. Answer key scored. Anthropic run recorded. `POST /deals` with uploads if time allows.
-3. **Saturday night.** Recorded model run committed. Full rehearsals with the failure switch. Devpost draft. Freeze new features.
+1. **Saturday morning (done).** Console on `/case`, figure check and CSVs, tool review and tests, Droid runs, the Tiger store.
+2. **Saturday until 6pm.** Josie: the UI. Cayden: `STORE=postgres`, the restart moment, the fork spike, then forks. Tri: Tiger tests, certificate, sensitivity, timeline. Eric: certificate wording, input checks, the one-page summary. Mentor questions asked.
+3. **Saturday night.** Feature freeze at 8pm. Devpost draft submitted. Full rehearsals with the failure switch and the restart. Demo video.
 4. **Sunday morning.** Fix only blockers. Submit before 9am. Practice the 2 minutes once more before judging at 10:30am.
 
 ## Risks to watch
@@ -105,3 +129,5 @@ Inputs for the design:
 - The EBITDA definition items moved EBITDA to 28,379 and leverage to 0.76x on 2026-10-24; the pitch words, the Devpost, and the tests use the new figures. The whole-line reading is 2.54x with $403K of EBITDA to spare. The $698K of expected transaction costs stays at zero; applying it would put the whole-line reading under the limit (`evals/fixture_check.md`).
 - The Droid subprocess can fail live. The switch, the fallback chain, and the recording are the answer. Rehearse it.
 - The console is on the new API as of 2026-10-24. Rehearse the 2:00 on it with the stopwatch.
+- The Tiger service is on the free shared tier and can pause when idle. If it cannot be reached, the API starts in memory and `/health` says why; wake it before judging.
+- A Droid run from the console overwrites `backend/recordings/*.json`. Check `git status` before committing, and move a new run into its own folder instead of replacing the default replay.

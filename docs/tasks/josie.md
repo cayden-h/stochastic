@@ -15,4 +15,5 @@ Inputs for the design (2026-10-24):
 - The verdict line: `verdict.leverage` against `verdict.limit`, `verdict.verdict` as OK or Over the limit, `verdict.headroom_turns`, the Reviewer badge from `verdict.review.verdict`, and the backend badge from `verdict.backend`.
 - Memory: a small "learned" chip on a mapping or a tag whose reason starts with "Policy". After a reset, Run again shows no flag; that is a moment worth one visible state.
 - The audit log link: `GET /deals/{id}/audit`, with `chain_valid`, and DENIED rows in red if any.
+- Coming from the backend on 2026-10-24 (each owner tells you when it lands): a Download certificate button for `GET /deals/{id}/certificate` (Tri), a fork id and state on each flag option (Cayden), the store badge from `GET /health` `store.kind` (`memory` or `postgres`), and a sensitivity line on the verdict (Tri).
 - The design rules are in `design/README.md`. The Figma file is https://www.figma.com/design/KDbPUruO6f5oPLyzyLgUZh. The Figma track needs the frame on screen in the pitch.

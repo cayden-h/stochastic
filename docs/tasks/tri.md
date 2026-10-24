@@ -1,15 +1,21 @@
 # Tri: math tools, tests, API
 
-Branch: `tri/tools`.
-Folders: `backend/app/tools/`, `backend/app/api/`, `backend/app/db/`, `backend/tests/`.
+Branch: `tri/tools`. Pull `main` into it first; it is behind.
+Folders: `backend/app/tools/`, `backend/app/api/`, `backend/app/db/` (except `postgres.py`, which Cayden owns), `backend/tests/`.
 
-Cayden wrote first versions of `tools/finance.py`, `api/routes.py`, `db/fixtures/kewaunee.py`, and `tests/test_trust_rules.py` on 2026-10-24 so the pipeline could run. They are yours now.
+## Done (2026-10-24, merged in PR #1)
 
-1. Review `finance.py` against Ex 10.1's definitions. EBITDA is net income plus interest, taxes, D&A, plus the brief's add-backs, less the rent deduction. Add any add-back the agreement names that we left at zero, with its source and amount, or write down why it stays zero.
-2. The computed figures today: EBITDA $28,379K, covenant debt $21,633K, leverage 0.76x; whole-line debt $71,955K, 2.54x. Reproduce them by hand once and keep the hand calculation in `tests/`.
-3. Add tests: one per tool with expected values from the fixture; `consolidate` refuses an unapproved flagged mapping; `limit_test` at exactly 2.50x fails ("less than").
-4. Add `debt_capacity` (room for the next deal, already in the `limit_test` output) to the verdict in `GET /deals/{id}/case`.
-5. Make `POST /deals` accept two CSV uploads and a brief, using Eric's loader, so a judge can try an unseen input.
-6. Make the SSE stream emit stage changes as well as audit rows.
-7. Keep the trust-rule tests green on every merge.
-8. Cut the demo video if the team agrees on one. Hyphenate wants a video that opens with the moment.
+1. `finance.py` reviewed against Ex 10.1; covenant EBITDA subtracts interest income as Addendum I requires.
+2. Per-tool tests with hand-computed values, the unapproved-flag refusal in `consolidate`, and `limit_test` at exactly 2.50x.
+3. `debt_capacity` and `debt_capacity_run_id` on the verdict in `GET /deals/{id}/case`.
+4. `POST /deals` takes two CSVs and a brief; a 422 names the file, row, and column.
+5. `GET /deals/{id}/stream` sends `stage` events as well as audit rows.
+
+## Open, in order
+
+1. **Run the Tiger tests on every merge.** The 5 tests in `tests/test_postgres_store.py` skip unless `TEST_DATABASE_URL` is set, so the normal run never touches the real database. Set it to the Tiger URL with your own `DB_SCHEMA` (for example `stochastic_tri`) so you do not take the demo schema's lock. Add the command to `backend/README.md` and to the merge rule in `docs/tasks/README.md`. About 20 minutes.
+2. **Compliance certificate route** (the strongest "would you hire it" proof). `GET /deals/{id}/certificate` returns the draft certificate the controller would send PNC: the test period, covenant EBITDA with its build, Senior Funded Bank Debt with its parts, the ratio against 2.50x under Section 4.8(a), the verdict, the controller's flag answers, and the run id behind every number. Refuse it (409) until the result is approved. Return Markdown, and HTML if it is cheap; no PDF library. Eric supplies the wording and sections (his task 2). Tests: refused before approval, and every figure equals its tool run. Tell Josie the route so she can add a Download button. About 2 hours.
+3. **Sensitivity in `limit_test`.** Add the EBITDA add-back that would bring the whole-line reading under 2.50x (about $403K today), and the rent deduction at which it would cross. Put both on the verdict as `naive_flip_addback` and `naive_flip_rent`, each with its run id. This covers our weakest input, the inferred $1,970K rent. Test it by hand like the other tools. About 1 hour.
+4. **Timeline route on the hypertable** (for "performance-driven" in the Tiger prize). `GET /deals/{id}/timeline` returns audit rows counted per actor and per stage in time buckets (`time_bucket` on `audit_log.at`) when the store is Postgres, and the same shape computed in memory otherwise. Also add the store's average write time (queue to commit) to `GET /health`, so we can quote one measured number. About 1 hour.
+5. **Keep the tests green** on every merge, including the Tiger tests from task 1.
+6. **Cut the demo video** if the team agrees on one. Hyphenate wants a video that opens with the flag moment. Record it after Josie's UI lands; a draft on the current console is fine before that.

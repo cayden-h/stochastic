@@ -1,15 +1,27 @@
 # Eric: data and facts
 
-Branch: `eric/data`.
-Folders: `data/`, `scripts/`, `evals/`.
+Branch: `eric/data`. Pull `main` into it first; it is behind.
+Folders: `data/`, `scripts/`, `evals/`, and the Devpost text in `docs/devpost/`.
 
-The filings are already read and the figures are loaded in `backend/app/db/fixtures/kewaunee.py` (Cayden, 2026-10-24). Your job is to check them, make them yours, and build the proof around them.
+## Done (2026-10-24, merged in PR #2)
 
-1. Check every figure in the fixture against the filings. The sources are in the file header. Flag any difference to Cayden.
-2. Export the platform file (Kewaunee) and the target file (Nu Aire) as CSVs in `data/` (git-ignored), with the fixture's columns: company, line, section, period, amount, unit, source_ref, is_total.
-3. Write `scripts/load_lines.py` that reads those CSVs into `SourceLine` rows, so the fixture and `POST /deals` can use it.
-4. Build the answer key from Note 2 of Ex 99.2 in `evals/answer_key.csv`: each Nu Aire line and its Kewaunee line. Mark it preliminary, shape only.
-5. Score the Mapper: run `POST /deals/d_kequ_nuaire/run`, read `GET /deals/d_kequ_nuaire/mappings`, count agreements with the key, and write the score, the date, and the backend into `evals/README.md`.
-6. Write the flag card facts: the "Financing liability" line, its three parts ($27,782K sale-leaseback, $20,563K PNC term loan and revolver, $22,540K seller notes), and the agreement's two exclusions, with quotes under 15 words and the exhibit and section.
-7. Write the brief as prose for the Devpost and the slide.
-8. Draft the Devpost text and the real-versus-simulated list by Saturday night. The honest-limits list is in `demo-script.md` section 6.
+1. Every fixture figure checked against the filings (`evals/fixture_check.md`).
+2. The two input files exported as CSVs in `data/`, and the loader in `scripts/`.
+3. The Note 2 answer key in `evals/`, and the Mapper scored against it.
+4. The flag card facts (`docs/devpost/flag-card.md`).
+5. The brief as prose (`docs/devpost/brief.md`).
+6. The Devpost text and the real-versus-simulated list (`docs/devpost/devpost.md`).
+
+## Open, in order
+
+1. **Submit the Devpost first draft on devpost.com by Saturday night.** The organizers ask for a draft Saturday night and allow edits until 10am Sunday.
+   - Add all four teammates, and opt in to Hyphenate, Factory, Figma, and Tiger Data (the MLH opt-in field).
+   - Fill in which backend produced the shown run (`devpost.md`, the line that asks Cayden).
+   - Replace the line about placeholder mockups once Josie's design is in.
+2. **Wording for the compliance certificate** (Tri builds the route, his task 2). Find what Ex 10.1 says the compliance certificate must contain, and the test period and delivery deadline. Write the sections and the fixed wording into `docs/devpost/certificate.md`, with the exhibit and section for each and quotes under 15 words. About 1 hour.
+3. **Check the two inferred inputs again.** The pitch rests on them.
+   - The Statesville cash rent ($1,970K): is the 10-K obligations-table figure right for the test period? Write the source, or a better figure, into `evals/fixture_check.md`.
+   - Transaction costs ($698K expected, kept at zero): does the 8-K/A or Ex 10.1 say whether they count in the test period? Applying them would put the whole-line reading under 2.50x, so the answer matters.
+   - Give any change to Tri; the tools recompute, and Cayden updates the pitch words.
+4. **The honest-limits card and a one-page summary**, printable, for the table: what is real, what is inferred, what is cut (purchase accounting, the five-month fiscal year gap), and the four tracks. Base it on `demo-script.md` section 6 and the real-versus-simulated list.
+5. **Answer three judge questions without notes** on the filings, Note 2, and the brief (`demo-script.md` section 8).

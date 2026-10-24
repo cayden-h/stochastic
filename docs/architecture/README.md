@@ -20,7 +20,7 @@ The product reference is `../STOCHASTIC.md`. If this folder and that file disagr
 | Agents | Python, `run_agent(role, item)` | Three stateful agents: Mapper, Preparer, Reviewer. Four backends: anthropic, droid, scripted, replay. |
 | Job runner | Python, plain code | Moves work items from one agent to the next. It is not a model. |
 | Code tools | Python, `backend/app/tools/finance.py` | All the math: consolidation, tie-out, EBITDA, covenant debt, leverage, limit test. No write access. |
-| Store | In memory | Holds the record, the work items, the tool runs, the audit log, the policies, and the sessions. Postgres is a later swap. |
+| Store | In memory, written through to Postgres on Tiger Cloud with `STORE=postgres` | Holds the record, the work items, the tool runs, the audit log, the policies, and the sessions. The audit log is an append-only TimescaleDB hypertable, and a restart loads everything back (`backend/app/db/postgres.py`). |
 
 ## System diagram
 
