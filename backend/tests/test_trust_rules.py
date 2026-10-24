@@ -290,3 +290,35 @@ def test_source_lines_carry_filing_notes(world):
     store, _ = world
     fin = next(l for l in store.lines(DEAL_ID) if l.line == "Long-term portion of financing liability")
     assert fin.note and "2700 West Front Street" in fin.note
+
+
+def test_flag_option_that_leaves_a_line_unclear_is_refused(world):
+    # A covenant flag exists to settle its lines. The Haiku 5.5 run of 2026-10-24 offered a default that kept
+    # "Short-term borrowings" unclear, and the Preparer then refused after the controller answered.
+    from app.core.models import FlagOption, FlagProposal, MapperOutput
+    from app.gateway.gateway import Invalid
+    store, gw = world
+    deal = store.deals[DEAL_ID]
+    stb = next(l for l in store.lines(DEAL_ID, deal.platform) if l.line == "Short-term borrowings")
+    fin = next(l for l in store.lines(DEAL_ID, deal.platform) if l.line == "Long-term portion of financing liability")
+    item = gw.create_item(DEAL_ID, "map_lines")
+    out = MapperOutput(mappings=[], tags=[], flags=[FlagProposal(
+        kind="covenant_tag", line_ids=[stb.id, fin.id], question="Which count?", default="a",
+        options=[FlagOption(id="a", label="agreement", tags={stb.id: "unclear", fin.id: "not_debt"}),
+                 FlagOption(id="b", label="all", tags={stb.id: "debt", fin.id: "debt"})])])
+    with pytest.raises(Invalid, match="leaves 1 flagged line"):
+        gw.store_mapping(MAPPER, item.id, out)
+    assert not gw.open_flags(DEAL_ID)  # nothing half-opened
+
+
+def test_flag_effect_text_matches_the_verdict_rounding(world):
+    # 71,955 / 27,518.8 = 2.6148: the card must say 2.61x, the same as the verdict line, not 2.62x.
+    store, gw = world
+    advance(gw, DEAL_ID)
+    fin = next(f for f in gw.open_flags(DEAL_ID) if "Financing liability" in (f.question or ""))
+    effects = {o.id: o.effect for o in fin.options}
+    assert "Leverage 2.61x" in effects["a"]
+    assert "Leverage 1.61x" in effects["c"]  # 44,173 / 27,518.8 = 1.6052
+    from app.core.models import FlagOption, FlagProposal
+    for o in fin.options:
+        assert "unclear" not in gw.store.items[fin.id].payload["option_actions"][o.id]["tags"].values()

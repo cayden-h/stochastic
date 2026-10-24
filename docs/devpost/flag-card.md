@@ -56,23 +56,23 @@ Exclusion 2, the Statesville lease:
 ## The three options and their effect
 
 Senior Funded Bank Debt below includes $1,070K that is not on the flagged line and counts in every option: $805K of short-term borrowings at the international subsidiaries and $265K of finance leases for vehicles and IT equipment. [verified: fixture and 10-Q, Notes F and H]
-Covenant EBITDA in every option is $28,033K, today's figure. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
+Covenant EBITDA in every option is $27,519K, today's figure, with interest income subtracted. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
 The gateway computes each effect with the tools.
 No model writes these numbers. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 
 | Option | What counts from the line | Senior Funded Bank Debt | Leverage | Verdict |
 | --- | --- | --- | --- | --- |
-| a. Whole line | All $70,885K | $71,955K | 2.57x | Over the 2.50x limit |
-| b. PNC only (the agreement's reading, the default) | $20,563K | $21,633K | 0.77x | OK, 1.73x of room, about $48M of debt capacity |
-| c. PNC plus the seller notes | $43,103K | $44,173K | 1.58x | OK |
+| a. Whole line | All $70,885K | $71,955K | 2.61x | Over the 2.50x limit |
+| b. PNC only (the agreement's reading, the default) | $20,563K | $21,633K | 0.79x | OK, 1.71x of room, about $47M of debt capacity |
+| c. PNC plus the seller notes | $43,103K | $44,173K | 1.61x | OK |
 
 Why b is the default: it applies both exclusions as written. [inferred: our reading of Ex 10.1; not checked by a practitioner]
 Why a matters: it is what a reader gets who counts the balance sheet line as it stands.
 It is the naive figure. [verified: `covenant_debt` with `naive=True`]
-The gap between a and b is 1.80x on the same books. [verified: arithmetic]
+The gap between a and b is 1.82x on the same books. [verified: arithmetic]
 
 The table above is the flag the scripted backend raises. [verified: scripted run of the fixture]
-The recorded Droid runs raised the same flag, but neither offered option c:
+The recorded Droid runs raised the same flag, but neither offered option c. Their figures below were computed before interest income was subtracted, so each is about 0.02x to 0.04x higher today:
 - Sonnet 5.5, 2026-10-24, 03:30: 0.77x (the agreement), 1.76x, and 2.57x (all counted). [verified: `docs/agents.md`, run log]
   The 1.76x matches PNC plus the Statesville lease, without the seller notes. [inferred: arithmetic]
 - Haiku 5.5, 2026-10-24, 04:30: 0.77x (the agreement), 0.74x (short-term borrowings also excluded), and 2.57x (all counted). [verified: `docs/agents.md`, run log]
@@ -87,7 +87,7 @@ The debt figures in options a, b, and c do not change with the open items below.
 Covenant EBITDA can change, and with it the leverage in every option.
 
 Open with Cayden and Tri, from `evals/fixture_check.md`:
-1. Nu Aire interest income ($514K) is not subtracted, though the definition says "less interest income". [verified: Ex 10.1, definitions]
+1. Done 2026-10-24: Nu Aire interest income ($514K) is now subtracted, as the definition says "less interest income". [verified: `test_ebitda_subtracts_interest_income`]
 2. Kewaunee's stock-based compensation ($1,018K) is not added back, though the definition adds "any stock-based compensation". [verified: Ex 10.1, definitions; 10-K, stock plan note]
 3. The pension add-back is the whole $4,177K, while the 10-K names $4,019K as the termination expense. [verified: 10-K, MD&A]
 
@@ -95,13 +95,13 @@ New item found while writing this card:
 4. Transaction costs are applied as $0, but Ex 99.2 Note 5(b) lists $698K of "Expected transaction expenses", item (i). [verified: Ex 99.2, Note 5(b)]
    The agreement adds back transaction costs "not exceeding $4,000,000 in the aggregate". [verified: Ex 10.1, definitions, EBITDA]
    Item (i) describes costs incurred after 2024-10-31, so whether they fall in the tested period is a judgment. [inferred]
-   Adding $698K alone gives EBITDA $28,731K and option a at 2.504x, still over by a hair. [verified: arithmetic]
+   Adding $698K alone gives EBITDA $28,217K and option a at 2.55x, still over. [verified: arithmetic]
 5. The definition takes Nu Aire EBITDA "for the four quarter period commencing on November 1, 2023". The fixture uses Nu Aire's year to 2024-09-30, one month off. [verified: Ex 10.1, definitions; inferred that the gap is small]
 
 The thin margin:
-- Option a stays over the limit only while covenant EBITDA is below $28,782K. Today's figure is $28,033K, so the margin is $749K. [verified: arithmetic]
-- With items 1 to 3 applied, option a is 2.54x, with about $400K to spare. [inferred: depends on the readings in `evals/fixture_check.md`]
-- Applying the stock compensation alone, or adding the $698K to the other add-backs, would put option a under 2.50x. The verdict would then no longer change with the controller's answer. [verified: arithmetic]
+- Option a stays over the limit only while covenant EBITDA is below $28,782K. Today's figure is $27,519K, so the margin is $1,263K. [verified: arithmetic]
+- With items 2 and 3 applied as well, option a is 2.54x, with about $400K to spare. [inferred: depends on the readings in `evals/fixture_check.md`]
+- Stock compensation alone leaves option a over the limit at 2.52x. Stock compensation plus the $698K (EBITDA $29,235K) puts it under at 2.46x, and the verdict would then no longer change with the controller's answer. [verified: arithmetic]
 - Options b and c stay far under the limit in every case above. [verified: arithmetic]
 
 So the card and the pitch must not present today's leverage figures as final.

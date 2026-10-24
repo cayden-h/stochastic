@@ -46,7 +46,7 @@ Two kinds:
 - `covenant_tag`: lines whose treatment under the covenant is the controller's call. The prompt says exclusions are never decided by the model: a line that one of the brief's exclusions may apply to, or a family of lines that holds more than one instrument, must be tagged `unclear` and put into one flag with two or three readings, the agreement's reading as the default.
 - `mapping`: a target line with no honest platform home.
 
-For every option the gateway runs the tools as a what-if (`covenant_debt` naive, `ebitda`, `leverage`, `limit_test`) and writes the effect on the option with a run id. The card never says "goes up"; it says "Senior Funded Bank Debt 71,955K. Leverage 2.62x against 2.50x. Over the limit." [verified]
+For every option the gateway runs the tools as a what-if (`covenant_debt` naive, `ebitda`, `leverage`, `limit_test`) and writes the effect on the option with a run id. The card never says "goes up"; it says "Senior Funded Bank Debt 71,955K. Leverage 2.61x against 2.50x. Over the limit." [verified]
 
 On the demo deal the intended result is one covenant flag with three readings and one small mapping flag (certificates of deposit). The scripted backend produces that every time. [verified] Model backends are judged against it in section 9.
 
@@ -106,7 +106,7 @@ Reading a run:
 - `result.backend` says which backend produced the shown result.
 - `GET /deals/{id}/runs` lists every tool run; `GET /runs/{run_id}` shows one run's inputs and outputs. Every number on screen names one.
 - The audit log shows `propose:map_lines`, `ask:flag`, `tool:<name>`, `answer`, `policy:learn`, `policy:apply`, `session:turn`, `approve`, `post`, and any `DENIED` row with the reason.
-- `backend/recordings/<role>.json` holds the last recorded output per role and the backend that made it. `backend/recordings/sonnet-5-5/` keeps the Sonnet 5.5 run of 2026-10-24, 03:30.
+- `backend/recordings/<role>.json` is the default replay: the Sonnet 5.5 run of 2026-10-24, 03:30 (a copy stays in `backend/recordings/sonnet-5-5/`). `backend/recordings/haiku-5-5/` keeps the Haiku 5.5 run of 04:30, which the gateway now rejects at the Mapper step because its default option left "Short-term borrowings" unclear. Replay a specific run with `RECORDINGS_DIR=$PWD/backend/recordings/<name>`.
 
 Failure switch, rehearsed on 2026-10-24, 04:50 [verified]: the API was started with the `droid` CLI missing from PATH. The run returned `mapper ran on scripted`; `GET /health` listed the attempts: droid failed ("Droid executable was not found"), anthropic failed ("ANTHROPIC_API_KEY is not set"), scripted ran. The same chain runs if the droid process dies mid-run or the timeout fires.
 
@@ -127,12 +127,15 @@ Haiku 5.5 is the default for that reason. A full deal on Haiku 5.5 is three Droi
 | 2026-10-24 03:20 | droid, claude-sonnet-5-5, first prompt | decided the exclusions itself; 6 small flags (subtotals, short-term borrowings) | ran through MCP, pass | 0.77x OK |
 | 2026-10-24 03:30 | droid, claude-sonnet-5-5, prompt with "exclusions are the controller's call" | 1 covenant flag with 3 readings (0.77x, 1.76x, 2.57x), 1 mapping flag | ran, pass | 0.77x OK, recorded in `recordings/sonnet-5-5/` |
 | 2026-10-24 04:00 | droid, claude-haiku-5-5, before line notes | 1 covenant flag but the default reading counted the financing liability as debt (did not know it was Statesville); 2 bundled mapping flags using line ids | Preparer ran; Reviewer returned needs-attention over an unnamed leverage run id | 1.76x, review needs-attention |
-| 2026-10-24 04:30 | droid, claude-haiku-5-5, with line notes, named run ids, and the tightened prompts | 1 covenant flag with 3 readings (agreement 0.77x, short-term borrowings excluded 0.74x, all counted 2.57x over), 2 mapping flags of three lines each, by name | ran, pass, with reasons citing the run ids | 0.77x OK, recorded in `recordings/` |
+| 2026-10-24 04:30 | droid, claude-haiku-5-5, with line notes, named run ids, and the tightened prompts | 1 covenant flag with 3 readings (agreement 0.77x, short-term borrowings excluded 0.74x, all counted 2.57x over), 2 mapping flags of three lines each, by name | ran, pass, with reasons citing the run ids | 0.77x OK, recorded in `recordings/haiku-5-5/`; no longer the default replay, see section 7 |
+
+Figures in the log are as computed at the time. Since Tri's interest-income fix on 2026-10-24, the same recordings replay at 0.79x covenant and 2.61x whole-line.
 
 Lessons written into the code after these runs:
 - The filing's note on a line is data the Mapper needs; it is now on every `SourceLine.note`.
 - Multi-line mapping flags are allowed and resolved by name or id.
 - The Preparer names its run ids, and the Reviewer is told to use them and to return needs-attention only on a failed check.
+- Every option of a covenant flag must settle every flagged line as debt or not_debt. The gateway rejects a proposal that leaves one unclear, and the Mapper prompt says so.
 
 ## 10. Honest limits of the agent layer
 

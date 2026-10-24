@@ -36,21 +36,23 @@ Three items differ from the fixture.
 
 ## Effect on leverage
 
-Covenant EBITDA in the fixture is $28,033K. The option debt figures are unchanged.
+Covenant EBITDA today is $27,519K, with interest income subtracted (item 1, done 2026-10-24). The option debt figures are unchanged.
 
 | Case | EBITDA | a. Whole line | b. PNC only | c. PNC plus seller notes |
 | --- | --- | --- | --- | --- |
-| Fixture today | $28,033K | 2.57x | 0.77x | 1.58x |
-| All three changes | $28,379K | 2.54x | 0.76x | 1.56x |
-| Stock compensation only | $29,051K | 2.48x | 0.74x | 1.52x |
-| Interest income and pension only | $27,361K | 2.63x | 0.79x | 1.61x |
+| Before the interest income fix | $28,033K | 2.57x | 0.77x | 1.58x |
+| Today (interest income subtracted) | $27,519K | 2.61x | 0.79x | 1.61x |
+| Today plus stock compensation and pension (all three) | $28,379K | 2.54x | 0.76x | 1.56x |
+| Today plus stock compensation | $28,537K | 2.52x | 0.76x | 1.55x |
+| Today plus stock compensation and $698K transaction costs | $29,235K | 2.46x | 0.74x | 1.51x |
+| Today plus pension | $27,361K | 2.63x | 0.79x | 1.61x |
 
 Option a stays over the 2.50x limit only while covenant EBITDA is below $28,782K. [verified: arithmetic]
 With all three changes, option a is still over the limit, with about $400K of EBITDA to spare. [inferred: depends on the readings above]
-Adding the stock compensation without the other two changes would put option a under the limit, and the verdict would no longer change with the controller's answer. [verified: arithmetic]
+Stock compensation alone leaves option a over the limit at 2.52x. Stock compensation plus the $698K of transaction costs would put it under, and the verdict would no longer change with the controller's answer. [verified: arithmetic]
 
 ## Asks
 
-- Cayden and Tri: decide whether to apply all three changes together. Applying only the stock compensation breaks the moment.
-- Tri: the EBITDA tool in `backend/app/tools/finance.py` adds interest expense but has no step that subtracts interest income.
+- Cayden and Tri: decide the stock compensation add-back, the pension figure, and the $698K of transaction costs. Stock compensation plus the transaction costs breaks the moment.
+- Done 2026-10-24: the EBITDA tool subtracts interest income (`test_ebitda_subtracts_interest_income`).
 - Everyone: the moment now rests on a thinner margin. Say the inferred inputs out loud, as `demo-script.md` already plans.

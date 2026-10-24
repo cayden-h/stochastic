@@ -237,7 +237,7 @@ Must (the demo does not work without these). Status on 2026-10-24, 02:30:
 4. The gateway with work-item states, maker-checker, run-id checks, the audit log, and agent memory. Done.
 5. The Preparer and the Reviewer, with real tool calls. Done on the scripted backend.
 6. The console screen: flag card, combined table, verdict line, built from the Figma frame. Josie, in progress, against `GET /deals/{id}/case`.
-7. A recorded run and a backend switch, so the demo survives a failure. Done (`backend/recordings/`, `AGENT_BACKEND=replay`). The recording is from the scripted backend until a model run is recorded.
+7. A recorded run and a backend switch, so the demo survives a failure. Done (`backend/recordings/`, `AGENT_BACKEND=replay`). The default recording is the Sonnet 5.5 Droid run of 2026-10-24.
 8. Track proofs: at least one agent runs with `AGENT_BACKEND=droid` (Factory): done, all three ran. The Figma file on screen in the pitch (Figma): open.
 
 Should (if the schedule holds):

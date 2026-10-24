@@ -42,9 +42,9 @@ def test_the_demo_run_beat_by_beat():
     fin = next(f for f in body["flags"] if "Financing liability" in f["question"])
     effects = {o["id"]: o["effect"] for o in fin["options"]}
     assert fin["default"] == "b"
-    assert effects["a"] == "Senior Funded Bank Debt 71,955K. Leverage 2.62x against 2.50x. Over the limit."
+    assert effects["a"] == "Senior Funded Bank Debt 71,955K. Leverage 2.61x against 2.50x. Over the limit."
     assert effects["b"] == "Senior Funded Bank Debt 21,633K. Leverage 0.79x against 2.50x. OK."
-    assert effects["c"] == "Senior Funded Bank Debt 44,173K. Leverage 1.60x against 2.50x. OK."
+    assert effects["c"] == "Senior Funded Bank Debt 44,173K. Leverage 1.61x against 2.50x. OK."
     assert all(o["run_id"] for o in fin["options"])  # every effect traces to a limit_test run
     for o in fin["options"]:
         assert c.get(f"/runs/{o['run_id']}").json()["tool"] == "limit_test"

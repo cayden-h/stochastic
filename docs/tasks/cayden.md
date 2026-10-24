@@ -16,7 +16,7 @@ Done at 03:30: the `droid` CLI is installed, the probe shows Claude models on ou
 Done at 05:10 (the three areas, each documented before the next):
 1. Agents and settings: Haiku 5.5 is the default on both backends with per-role overrides, filing notes are on the lines, mapping flags cover several lines, run ids are named, usage and credits are captured per run. Haiku 5.5 on Droid produces the intended moment and is the current recording. `docs/agents.md` is the reference.
 2. The application: the gateway API serves `GET /deals/{id}/case` with the new fields and `GET /health` with per-role models, attempts, and credit totals; the failure switch was rehearsed (droid missing, anthropic no key, scripted ran). `docs/architecture/gateway-and-api.md` matches the code.
-3. The demo run: pitch words with the computed figures are in `demo-script.md` section 1, the verified failure plan in section 5, the Haiku 5.5 run recorded in `backend/recordings/`, the Sonnet 5.5 run kept in `recordings/sonnet-5-5/`.
+3. The demo run: pitch words with the computed figures are in `demo-script.md` section 1, the verified failure plan in section 5, the Sonnet 5.5 run is the default replay in `backend/recordings/`, the Haiku 5.5 run kept in `recordings/haiku-5-5/` (moved 2026-10-24, because its default option left a line unclear).
 
 Open, needs a human:
 1. An Anthropic key in `.env`, then `backend/.venv/bin/python scripts/record_run.py --backend anthropic`.

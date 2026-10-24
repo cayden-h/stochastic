@@ -7,9 +7,10 @@ Swap tasks freely and tell the team when you do.
 
 ## State of the build
 
-The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.79x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 103 tests pass. [verified: `backend/tests/test_trust_rules.py`]
+The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.79x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 105 tests pass. [verified: `backend/tests/`]
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded. Not yet run live: the Anthropic backend (no key in `.env`).
-Not yet done: the console on the new API, the Note 2 answer key, the Devpost text, the recorded model run, the rehearsals.
+Done 2026-10-24 and merged to `main`: the Note 2 answer key and Mapper score (Eric), the Devpost text (Eric), the recorded model runs (Sonnet 5.5 is the default replay), the tool guardrails, typed case, stage events, and CSV upload (Tri).
+Not yet done: the console on the new API, the Anthropic run, the rehearsals, the two open EBITDA items (stock compensation, pension).
 
 ## The four seats
 
@@ -43,6 +44,8 @@ Open:
 
 ## Eric
 
+All six done 2026-10-24, merged in PR #2. Figures were refreshed to the post-interest-income values the same day.
+
 1. Check every figure in `backend/app/db/fixtures/kewaunee.py` against the filings. The links are in the file header and in `research/real-deal-candidates.md`. Flag any difference to Cayden; the tools recompute from the fixture.
 2. Export the two input files as CSVs in `data/` (git-ignored) with the fixture's columns, and write the loader script in `scripts/` so the fixture can read CSVs later.
 3. Build the answer key from Note 2 of Ex 99.2 in `evals/`: each Nu Aire line and its Kewaunee line. Score the Mapper's output from `GET /deals/{id}/mappings` against it, and write the score down with the date and the backend.
@@ -51,6 +54,8 @@ Open:
 6. Write the Devpost text and the real-versus-simulated list by Saturday night. Include: statement lines are real, account detail is not claimed, the rent and transaction-cost inputs are inferred, which backend produced the shown run, and that agent memory is policies written by the gateway.
 
 ## Tri
+
+Tasks 1 to 5 done 2026-10-24, merged in PR #1. Task 6 waits on the team.
 
 1. Review `backend/app/tools/finance.py` and own it. Check the EBITDA build (net income plus interest, taxes, D&A; add-backs; rent deduction) against Ex 10.1's definition. Add any add-back the agreement names that we left at zero, with its source. Done 2026-10-24. Reviewed against Ex 10.1; covenant EBITDA now subtracts interest income as Addendum I requires.
 2. Add tests: a test per tool with hand-computed expected values from the fixture, a test that `consolidate` refuses an unapproved flagged mapping, and a test for `limit_test` at exactly 2.50x. Done 2026-10-24. Per-tool tests with hand-computed values, the unapproved-flag refusal, and `limit_test` at exactly 2.50x.
@@ -95,6 +100,6 @@ Inputs for the design:
 ## Risks to watch
 
 - The naive-versus-covenant gap rests on the inferred rent deduction and zero transaction costs. If Tri or Eric change them, re-read the flag effects before the pitch. The code recomputes; the words must follow.
-- The interest-income subtraction moved EBITDA to 27,519 and leverage to 0.79x; the pitch words and the Devpost must use the new figures.
+- The interest-income subtraction moved EBITDA to 27,519 and leverage to 0.79x; the pitch words and the Devpost were updated 2026-10-24. The stock compensation add-back and the pension figure are still open; applying stock compensation plus the $698K transaction costs would put the whole-line reading under the limit (`evals/fixture_check.md`).
 - The Droid subprocess can fail live. The switch, the fallback chain, and the recording are the answer. Rehearse it.
 - The console is the only part not yet on the new API. Everything else waits on it for the live demo.

@@ -289,10 +289,25 @@ class Gateway:
         self._log(deal.id, actor, "propose:map_lines", "ALLOWED", item.id,
                   reason=f"{len(out.mappings)} mappings, {len(out.flags)} flags")
         for flag in out.flags:
+            self._check_flag_resolves(flag)
+        for flag in out.flags:
             self._open_flag(deal, item, flag)
         self._post(item)
         deal.stage = "awaiting_flag" if self.open_flags(deal.id) else "mapped"
         return item
+
+    @staticmethod
+    def _check_flag_resolves(flag: FlagProposal) -> None:
+        """A covenant flag exists to settle its lines. Every option must give each flagged line a settled tag
+        (debt or not_debt); an option that leaves a line unclear would block the Preparer after the answer.
+        The Haiku 5.5 run of 2026-10-24 did this on "Short-term borrowings", and its replay stopped at the Preparer."""
+        if flag.kind != "covenant_tag":
+            return
+        for opt in flag.options:
+            unsettled = [lid for lid in flag.line_ids if opt.tags.get(lid) not in ("debt", "not_debt")]
+            if unsettled:
+                raise Invalid(f"flag option '{opt.id}' leaves {len(unsettled)} flagged line(s) unsettled "
+                              f"({', '.join(unsettled)}): every option must tag each flagged line debt or not_debt")
 
     def _open_flag(self, deal: Deal, parent: WorkItem, flag: FlagProposal) -> WorkItem:
         """Turn a flag proposal into a NEEDS_INFO work item. The effect of each option is computed by tools."""
@@ -324,7 +339,10 @@ class Gateway:
                 lev = self.run_tool(SYSTEM, deal.id, "leverage", {"debt_run_id": debt.run_id, "ebitda_run_id": eb.run_id})
                 test = self.run_tool(SYSTEM, deal.id, "limit_test", {"leverage_run_id": lev.run_id})
                 verdict = "OK" if test.outputs["ok"] else "Over the limit"
-                effect = (f"{deal.brief.debt_term} {_fmt(debt.outputs['debt'])}K. Leverage {lev.outputs['leverage']:.2f}x "
+                # Format from the unrounded ratio: the tool rounds to 3 places, and rounding that again to 2
+                # showed 2.6148 as 2.62x while the verdict line said 2.61x.
+                ratio = lev.outputs["debt"] / lev.outputs["ebitda"]
+                effect = (f"{deal.brief.debt_term} {_fmt(debt.outputs['debt'])}K. Leverage {ratio:.2f}x "
                           f"against {deal.brief.limit:.2f}x. {verdict}.")
                 return effect, test.run_id
             if flag.kind == "mapping":

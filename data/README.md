@@ -10,6 +10,8 @@ Rules:
 
 ## CSV columns for POST /deals
 
+The API parses uploads with `backend/app/db/loader.py`. The export from `scripts/load_lines.py export` is in this format, with two extra columns (`company`, `note`) that the API ignores; `scripts/load_lines.py` is for exporting the fixture, checking the round-trip, and reading accounting-system exports, not for the API.
+
 Upload one UTF-8 CSV per company, each with a header row, at most 2,000 data rows and 2 MB.
 `line` is the statement line name, 1 to 200 characters.
 `section` is one of `income_statement`, `balance_sheet`, or `cash_flow`.

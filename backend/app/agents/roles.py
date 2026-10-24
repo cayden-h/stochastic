@@ -69,6 +69,8 @@ or subordinated notes). Exclusions are the controller's call, not yours. Do not 
 Put every "unclear" line into ONE covenant_tag flag (not one flag per line) that explains the readings, cites the
 agreement wording and exclusions from the brief as evidence, and offers two or three options; each option gives the
 tag for every unclear line id under that reading, and the default is the agreement's own reading.
+Every option must settle every flagged line as "debt" or "not_debt". An option may not leave a line "unclear":
+the gateway rejects the whole proposal, because the controller's answer would not let the Preparer run.
 The gateway computes the leverage effect of each option. Aim for one covenant flag and at most two mapping flags.
 {SHARED_RULES}""",
     input_type=MapperInput,
