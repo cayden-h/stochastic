@@ -78,7 +78,7 @@ def test_after_approval_all_formats(client):
     assert cert["leverage"]["leverage"] == pytest.approx(0.762, abs=0.0005)
     assert cert["limit_test"]["debt_capacity"] == pytest.approx(49314.113, abs=0.001)
     assert cert["limit_test"]["verdict"] == "ok" and cert["limit_test"]["limit"] == 2.5
-    assert "naive_flip_addback" not in cert["limit_test"]  # task 9 not in yet; omitted when the run lacks it
+    assert "naive_flip_addback" not in cert["limit_test"]  # the Reviewer's run carries no sensitivity; that is a separate gateway run on /case
     assert cert["tie_out"]["ok"] is True and cert["tie_out"]["run_id"]
     assert len(cert["decisions"]) == 2 and all(d["state"] == "POSTED" and d["option_id"] for d in cert["decisions"])
     fin = next(d for d in cert["decisions"] if "Financing liability" in d["question"])

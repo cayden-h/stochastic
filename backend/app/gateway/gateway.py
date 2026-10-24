@@ -255,7 +255,20 @@ class Gateway:
                     lev, eb, debt = lrun["leverage"], lrun.get("ebitda"), lrun.get("debt")
                 if lev is None:
                     raise ValueError("limit_test needs leverage, by value or by run id")
-                outputs = fn(float(lev), deal.brief.limit, ebitda_value=eb, debt=debt)
+                naive = rent = None  # sensitivity: the whole-line debt and the rent deduction, read from runs
+                if inputs.get("naive_debt_run_id"):
+                    nrun = self._run(deal_id, inputs["naive_debt_run_id"])
+                    if nrun.tool != "covenant_debt":
+                        raise ValueError("naive_debt_run_id must name a covenant_debt run")
+                    naive = nrun.outputs["debt"]
+                if inputs.get("ebitda_run_id"):
+                    erun = self._run(deal_id, inputs["ebitda_run_id"])
+                    if erun.tool != "ebitda":
+                        raise ValueError("ebitda_run_id must name an ebitda run")
+                    rents = [d["amount"] for d in erun.outputs["deductions"] if "rent" in d["name"].lower()]
+                    rent = sum(rents) if rents else None
+                outputs = fn(float(lev), deal.brief.limit, ebitda_value=eb, debt=debt, naive_debt=naive,
+                             rent_deduction=rent)
             else:
                 raise ValueError(f"no argument binding for {name}")
         except ValueError as error:

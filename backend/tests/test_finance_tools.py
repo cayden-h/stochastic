@@ -217,3 +217,45 @@ def test_limit_test():
     assert at["ok"] is True and at["headroom_turns"] == 0.0
     cap = finance.limit_test(2.0, 2.5, ebitda_value=60, debt=120)
     assert cap["debt_capacity"] == 30.0  # 2.5 * 60 - 120
+
+
+def test_limit_test_sensitivity_on_fixture_figures():
+    # Whole-line debt 71,955 over covenant EBITDA 28,378.845 = 2.5355, rounds to 2.536: over 2.50.
+    # Flip add-back: 71,955 / 2.5 = 28,782; 28,782 - 28,378.845 = 403.155 more EBITDA reaches the limit.
+    # Flip rent: the 1,970 rent deduction would have to fall to 1,970 - 403.155 = 1,566.845.
+    out = finance.limit_test(0.762, 2.5, ebitda_value=28378.845, debt=21633.0, naive_debt=71955.0,
+                             rent_deduction=1970.0)
+    assert out["naive_debt"] == 71955.0
+    assert out["naive_leverage"] == 2.536
+    assert out["naive_ok"] is False
+    assert out["naive_flip_addback"] == pytest.approx(403.155, abs=1e-9)
+    assert out["naive_flip_rent"] == pytest.approx(1566.845, abs=1e-9)
+    assert out["ok"] is True and out["debt_capacity"] == pytest.approx(49314.113, abs=0.001)  # unchanged keys
+
+
+def test_limit_test_sensitivity_already_passing():
+    # 120 / 60 = 2.0 passes 2.5; flip add-back 120 / 2.5 - 60 = 48 - 60 = -12 (negative: already passes).
+    out = finance.limit_test(2.0, 2.5, ebitda_value=60, debt=120, naive_debt=120, rent_deduction=5)
+    assert out["naive_leverage"] == 2.0 and out["naive_ok"] is True
+    assert out["naive_flip_addback"] == -12.0
+    assert out["naive_flip_rent"] == 17.0  # 5 - (-12)
+
+
+def test_limit_test_sensitivity_without_rent_or_naive():
+    # 150 / 50 = 3.0 fails 2.5; flip add-back 150 / 2.5 - 50 = 60 - 50 = 10. No rent: no rent flip.
+    out = finance.limit_test(1.0, 2.5, ebitda_value=50, debt=50, naive_debt=150)
+    assert out["naive_leverage"] == 3.0 and out["naive_ok"] is False
+    assert out["naive_flip_addback"] == 10.0
+    assert "naive_flip_rent" not in out
+    plain = finance.limit_test(1.0, 2.5, ebitda_value=50, debt=50, rent_deduction=5)
+    assert not any(k.startswith("naive") for k in plain)
+
+
+def test_limit_test_rejects_non_finite():
+    for bad in (float("nan"), float("inf")):
+        with pytest.raises(ValueError, match="finite"):
+            finance.limit_test(1.0, 2.5, ebitda_value=50, debt=50, naive_debt=bad)
+        with pytest.raises(ValueError, match="finite"):
+            finance.limit_test(1.0, 2.5, ebitda_value=50, debt=50, naive_debt=150, rent_deduction=bad)
+        with pytest.raises(ValueError, match="finite"):
+            finance.limit_test(bad, 2.5)

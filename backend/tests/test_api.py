@@ -288,3 +288,28 @@ def test_upload_rejects_non_finite_brief_figures(path, value):
     assert r.status_code == 422, r.text
     assert f"brief: {path} must be finite" in r.json()["detail"]
     assert c.get("/deals").status_code == 200
+
+
+def test_verdict_sensitivity_from_limit_test_run():
+    # Whole-line debt 71,955 (flag option a) / 28,378.845 = 2.536. Flip add-back 71,955 / 2.5 - 28,378.845 = 403.155.
+    # Flip rent 1,970 - 403.155 = 1,566.845.
+    c = TestClient(create_app())
+    body = full_run(c)
+    CaseResponse.model_validate(body)
+    v = body["verdict"]
+    assert v["naive_debt"] == pytest.approx(71955.0, abs=0.001)
+    assert v["naive_leverage"] == pytest.approx(2.536, abs=0.0005)
+    assert v["naive_flip_addback"] == pytest.approx(403.155, abs=0.001)
+    assert v["naive_flip_rent"] == pytest.approx(1566.845, abs=0.001)
+    run = c.get(f"/runs/{v['sensitivity_run_id']}").json()
+    assert run["tool"] == "limit_test" and run["inputs"]["sensitivity"] is True
+    assert run["inputs"]["leverage_run_id"] == body["result"]["run_ids_by_tool"]["leverage"]
+    assert run["outputs"]["naive_flip_addback"] == v["naive_flip_addback"]
+    debt_run = c.get(f"/runs/{run['inputs']['naive_debt_run_id']}").json()
+    assert debt_run["tool"] == "covenant_debt" and debt_run["outputs"]["debt"] == v["naive_debt"]
+    assert v["debt_capacity_run_id"] != v["sensitivity_run_id"]  # the Reviewer's run is untouched
+    # A second read reuses the run.
+    before = len(c.get(f"/deals/{DEAL_ID}/runs").json())
+    again = c.get(f"/deals/{DEAL_ID}/case").json()["verdict"]
+    assert again["sensitivity_run_id"] == v["sensitivity_run_id"]
+    assert len(c.get(f"/deals/{DEAL_ID}/runs").json()) == before

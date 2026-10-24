@@ -21,7 +21,7 @@ from app.agents.jobs import advance
 from app.api import certificate as cert_doc
 from app.api.events import next_events
 from app.api.schemas import CaseResponse, DealCreated, HealthResponse
-from app.core.models import CONTROLLER, Brief, Deal, State
+from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, State
 from app.db.loader import MAX_BYTES, LoaderError, parse_statement_csv
 from app.gateway.gateway import Gateway, GatewayError
 
@@ -53,6 +53,57 @@ def _debt_capacity(store, result) -> tuple[float | None, str | None]:
         if value is not None:
             return value, t.run_id
     return None, None
+
+
+SENSITIVITY_KEYS = ("naive_debt", "naive_leverage", "naive_flip_addback", "naive_flip_rent")
+
+
+def _whole_line_debt_run(store, deal_id: str) -> str | None:
+    """The covenant_debt run behind the covenant flag option that counts every flagged line as debt.
+
+    After the controller answers, the flagged lines carry their settled tags, so a fresh naive covenant_debt run
+    no longer gives the whole-line figure. The option's what-if run, made by the gateway when the flag opened, does.
+    The chain is option limit_test run -> its leverage run -> its covenant_debt run. Run ids only, no numbers."""
+    for item in reversed(store.deal_items(deal_id)):
+        if item.type != "flag" or item.payload.get("kind") != "covenant_tag":
+            continue
+        actions = item.payload.get("option_actions", {})
+        for opt in item.options:
+            tags = actions.get(opt.id, {}).get("tags", {})
+            if not opt.run_id or not tags or any(t != "debt" for t in tags.values()):
+                continue
+            test = store.tool_runs.get(opt.run_id)
+            lev = store.tool_runs.get(test.inputs.get("leverage_run_id", "")) if test else None
+            debt = store.tool_runs.get(lev.inputs.get("debt_run_id", "")) if lev else None
+            if debt and debt.tool == "covenant_debt":
+                return debt.run_id
+    return None
+
+
+def _sensitivity(gw: Gateway, deal: Deal, result) -> dict | None:
+    """How far the whole-line reading of debt is from the limit, from a limit_test run made by the gateway.
+
+    Only for a result the Reviewer passed. A run already made for this result's leverage run is reused, so
+    reading /case twice does not add runs."""
+    if not result or not result.review or result.review.verdict != "pass":
+        return None
+    lev_id = result.run_ids_by_tool.get("leverage")
+    if not lev_id:
+        return None
+    with gw.lock:  # find-or-create in one step, so two reads cannot both create a run
+        run = next((t for t in reversed(list(gw.store.tool_runs.values()))
+                    if t.deal_id == deal.id and t.tool == "limit_test" and t.inputs.get("sensitivity") is True
+                    and t.inputs.get("leverage_run_id") == lev_id), None)
+        if run is None:
+            naive_id = _whole_line_debt_run(gw.store, deal.id)
+            if naive_id is None:  # no covenant flag: the naive reading counts any unclear line as debt
+                naive_id = gw.run_tool(SYSTEM, deal.id, "covenant_debt", {"naive": True, "sensitivity": True}).run_id
+            run = gw.run_tool(SYSTEM, deal.id, "limit_test",
+                              {"leverage_run_id": lev_id, "naive_debt_run_id": naive_id,
+                               "ebitda_run_id": result.run_ids_by_tool.get("ebitda"), "sensitivity": True})
+    out = {k: run.outputs.get(k) for k in SENSITIVITY_KEYS}
+    out["sensitivity_run_id"] = run.run_id
+    return out
 
 
 def first_non_finite(brief: Brief) -> str | None:
@@ -137,6 +188,7 @@ def build_router(gw: Gateway) -> APIRouter:
                        "approval_item": approval.id if approval else None,
                        "approval_state": approval.state.value if approval else None,
                        "posted": d.stage == "posted"}
+            verdict.update(guard(lambda: _sensitivity(gw, d, result)) or {})
         return {
             "deal": dump(d),
             "stage": d.stage,

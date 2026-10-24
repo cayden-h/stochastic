@@ -109,15 +109,22 @@ After the Preparer and the Reviewer run, `verdict` is filled:
 ```json
 {
   "leverage": 0.762, "limit": 2.5, "verdict": "ok", "headroom_turns": 1.738,
-  "ebitda": 27518.845, "debt": 21633.0, "debt_term": "Senior Funded Bank Debt",
+  "ebitda": 28378.845, "debt": 21633.0, "debt_term": "Senior Funded Bank Debt",
   "review": { "verdict": "pass", "reasons": [], "run_ids": ["run_017", "run_018"] },
   "tie_out_ok": true, "backend": "scripted",
   "debt_capacity": 49314.113, "debt_capacity_run_id": "run_018",
+  "naive_debt": 71955.0, "naive_leverage": 2.536, "naive_flip_addback": 403.155, "naive_flip_rent": 1566.845,
+  "sensitivity_run_id": "run_019",
   "approval_item": "wi_006", "approval_state": "PROPOSED", "posted": false
 }
 ```
 
 `debt_capacity` (a float, or null before the Reviewer runs) is the room for the next deal in USD thousands, and `debt_capacity_run_id` is the Reviewer's `limit_test` run (or null).
+The sensitivity keys (`naive_debt`, `naive_leverage`, `naive_flip_addback`, `naive_flip_rent`, `sensitivity_run_id`) are present only after the Reviewer passes the result, and are null or absent before.
+They come from a separate `limit_test` run the gateway makes as `system:gateway` with `"sensitivity": true` in its inputs, on the first `/case` read after the pass; later reads reuse it.
+`naive_debt` is the whole-line reading of debt, read from the covenant flag option that counts every flagged line as debt (option a on the demo deal).
+`naive_flip_addback` is the EBITDA add-back at which that reading reaches the limit (debt / limit - EBITDA): positive means that much more EBITDA is needed, zero or negative means it already passes.
+`naive_flip_rent` is the rent deduction at which that reading reaches the limit (rent deduction - `naive_flip_addback`), or null when the brief has no rent deduction.
 `result.run_ids_by_tool` maps `consolidate`, `ebitda`, `covenant_debt`, and `leverage` to their run ids, so the console can link each figure to `GET /runs/{run_id}`.
 `source_lines[].note` is what the filing says about a line (for example the 10-Q note that the financing liability is the Statesville sale-leaseback). Show it on the flag card's evidence.
 A mapping flag may cover several target lines; its options then carry `mappings` (target line id to platform line) in `payload.option_actions`, and the option `effect` text lists each line.

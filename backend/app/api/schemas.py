@@ -35,6 +35,13 @@ class Verdict(BaseModel):
     debt_term: str
     debt_capacity: float | None = None  # read from the Reviewer's limit_test run, never computed in the route
     debt_capacity_run_id: str | None = None
+    # Sensitivity, from a limit_test run the gateway makes for a passed result: the whole-line reading of debt,
+    # its ratio, and the EBITDA add-back and rent deduction at which it reaches the limit. Never computed in the route.
+    naive_debt: float | None = None
+    naive_leverage: float | None = None
+    naive_flip_addback: float | None = None
+    naive_flip_rent: float | None = None
+    sensitivity_run_id: str | None = None
     review: Review | None = None
     tie_out_ok: bool | None = None
     backend: str
