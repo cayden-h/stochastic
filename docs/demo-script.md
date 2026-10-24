@@ -133,7 +133,7 @@ A second, smaller flag asks where Nu Aire's Certificates of Deposit ($991K) belo
 | Answer | Verdict line | Presenter says | Reviewer badge |
 | --- | --- | --- | --- |
 | b (the agreement's reading) | OK. 0.79x against 2.50x. Room 1.71x. | "Under the limit, with the covenant's own definition of debt. Room for the next deal." | pass |
-| a (whole line) | Over the limit. 2.61x against 2.50x. | "Over the limit. The item comes back as needs-attention and cannot be approved." | needs_attention |
+| a (whole line) | Over the limit. 2.62x against 2.50x. | "Over the limit. The item comes back as needs-attention and cannot be approved." | needs_attention |
 
 Notes:
 - Over the limit returns the item to the human as needs-attention, and the gateway refuses approval. [verified: `test_result_cannot_be_approved_before_review_passes`]
