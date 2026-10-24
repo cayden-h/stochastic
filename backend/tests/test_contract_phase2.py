@@ -94,3 +94,23 @@ def test_brief_reader_types_build_and_serialize():
     with pytest.raises(ValidationError):
         BriefCitation(field="limit", quote="q", section="s", confidence=1.5)
     assert Deal.model_validate({**_fixture_deal().model_dump(), "brief": None, "brief_status": "none"}).brief is None
+
+
+@pytest.mark.parametrize("fields", [
+    {"kind": "amount"},  # no new_value
+    {"kind": "amount", "new_value": 9312.0, "new_platform_line": "Net sales"},
+    {"kind": "amount", "new_value": 9312.0, "old_platform_line": "Net sales"},
+    {"kind": "remap"},  # no new_platform_line
+    {"kind": "remap", "new_platform_line": "Net sales", "old_value": 1.0},
+    {"kind": "remap", "new_platform_line": "Net sales", "new_value": 1.0},
+])
+def test_edit_fields_must_match_its_kind(fields):
+    with pytest.raises(ValidationError):
+        Edit(id="e_1", deal_id=DEAL_ID, company="Nu Aire", line="Net revenues", section="income_statement", **fields)
+
+
+def test_edit_kind_allows_its_own_fields():
+    assert Edit(id="e_1", deal_id=DEAL_ID, kind="amount", company="Nu Aire", line="Net revenues",
+                section="income_statement", new_value=1.0).old_value is None
+    assert Edit(id="e_2", deal_id=DEAL_ID, kind="remap", company="Nu Aire", line="Net revenues",
+                section="income_statement", new_platform_line="Net sales").old_platform_line is None

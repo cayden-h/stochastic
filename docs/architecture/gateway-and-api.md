@@ -118,6 +118,14 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 
 `edits`, `adjustments`, and `brief_draft` are the phase 2 additions (planned, shapes in the next section).
 They are empty lists and null on the demo deal until an edit is made or a deal is created from agreement text.
+They are not on `CaseResponse` yet.
+Tri adds them to `CaseResponse` in `backend/app/api/schemas.py` (T2 and T4), with `Field` imported from pydantic:
+
+```python
+edits: list[Edit] = Field(default_factory=list)
+adjustments: list[LearnedAdjustment] = Field(default_factory=list)
+brief_draft: BriefDraft | None = None
+```
 
 After the Preparer and the Reviewer run, `verdict` is filled:
 
@@ -163,7 +171,8 @@ Amounts are in USD thousands.
 One change the controller made to the combined books, recorded on top of the agents' run.
 `kind` is `amount` (uses `old_value` and `new_value`) or `remap` (uses `old_platform_line` and `new_platform_line`).
 `status` is `needs_reason`, `reasoned`, or `reverted`.
-Approval is refused while any edit is `needs_reason`.
+Planned (C2): approval will be refused while any edit is `needs_reason`.
+The gateway does not check this yet.
 `policy_id` and `adjustment_id` are set by the gateway when a reasoned edit with `remember` teaches something.
 `run_ids` are the recompute runs, all new.
 

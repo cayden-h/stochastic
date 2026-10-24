@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 def now() -> datetime:
@@ -286,6 +286,21 @@ class Edit(BaseModel):
     actor: str = CONTROLLER
     at: datetime = Field(default_factory=now)
     run_ids: list[str] = Field(default_factory=list)  # the recompute runs, all new run ids
+
+    @model_validator(mode="after")
+    def _fields_match_kind(self) -> Edit:
+        """An amount edit carries values only, and a remap carries platform lines only."""
+        if self.kind == "amount":
+            if self.new_value is None:
+                raise ValueError("an amount edit needs new_value")
+            if self.old_platform_line is not None or self.new_platform_line is not None:
+                raise ValueError("an amount edit must not set old_platform_line or new_platform_line")
+        else:
+            if self.new_platform_line is None:
+                raise ValueError("a remap edit needs new_platform_line")
+            if self.old_value is not None or self.new_value is not None:
+                raise ValueError("a remap edit must not set old_value or new_value")
+        return self
 
 
 class LearnedAdjustment(BaseModel):
