@@ -201,6 +201,31 @@ Build the frames from Hi-fi v3 with the Figma MCP (`design/README.md` has the li
 - Download final files calls `window.stochastic.saveFiles(...)` when Eric's preload is there, and a normal browser download when it is not.
 Done when: each screen matches its frame at 1440 by 900 (Josie signs off), and the demo beat runs in the app.
 
+Part 2 (the editable review) built 2026-10-24 night in `cayden/phase2-console`, against Tri's T2 shapes.
+T2 is not on `origin` yet, so it was tested through a local dev shim over the real gateway (not committed).
+- V3-3: the platform and target amounts in Combined books are editable, with the section 4 cell states, the change under the Combined cell, and a tooltip with who, when, the reason, and the policy or adjustment id.
+- An edit names one source line, and a combined row can gather several target lines (Operating expenses holds Selling, G&A, and R&D), so such a row opens to show its target lines, and those are edited.
+- Your edits sits under the verdict (check or waiting dot, line, old and new, reason, id, Undo; a click scrolls to the cell and flashes it), the header copy follows section 3, and the Review tile says "Re-checking your edit".
+- V3-4: the Platform line is a dropdown that sends a remap, with an Edited filter; a remap edit is shown over the Mapper's record.
+- Download final files appears after approval: `window.stochastic.saveFiles` when Eric's preload is there, else a browser download of `export.xlsx` (Tri's T3) and the certificate.
+- Adjustment flags (`payload.kind` `adjustment`) show as "Learned adjustment" with each option's effect. `State` has `SUPERSEDED`.
+Waiting on: T2 (the routes and `edits` on `/case`), T1 (edit-aware tools; until then the gateway answers 503), T3 (the workbook), E1 (the preload), and Josie's sign-off.
+
+The Brief card (D20) built 2026-10-24 night in the same branch, after merging C3 from `main`.
+Josie has no frame for it, and the Figma Components page has nothing named Brief, so it follows the v3 flag card and tokens.
+- The upload's third slot takes a Brief (`.json`) or the credit agreement (`.txt`, sent as `agreement_txt`).
+- The Case shows the reader's draft before mapping: each field with its quote and section, the open `brief_field` questions (confirm or remove), the adjustment amounts with their source (`POST /deals/{id}/brief/amounts`, one field per call: `field`, `value`, `source_ref`), and "Approve the Brief and map" (`POST /deals/{id}/brief/approve`, then the run).
+- `deal.brief` may be null at stage `new`; the stages `reading_brief`, `awaiting_brief`, and `brief_ready` have words on the Dashboard, a "Brief Reader reading the agreement, N s" progress row, and the Brief Reader is the fourth agent on the Agents page.
+- Tested headless through the dev shim over the real gateway: the full Ex 10.1 text, then the Brief card (one scope question, three amounts from the 10-K with their source, two kept at 0), approve, map, the two flags, 0.76x, the edit beat, approve, and download.
+Waiting on: T4 (the routes; the amounts body above is my assumption, so Tri should match it or tell me), and Josie's frame.
+
+Review fixes, 2026-10-24 night:
+- Adjustment flags: Apply waits for a PROPOSED approval item, approval waits for them, and they do not hold the progress row or the "no flag this time" note.
+- Until T2 puts `edits` on `/case`, the console keeps the edits the gateway returned, so an edit left for Later stays; `/case` wins by id. Chips come from `/case` `reason_chips`, else the last edit's response, else the demo list.
+- A reset (the deal's first audit row changes) closes the bubble and drops the session's edits and leverage moves.
+- A Brief question on a field path can be answered with a corrected value through the same amend route; the flag's `payload.unverified_evidence` shows as "Reader's words".
+- One unit conversion (`toK` in `frontend/src/lib/format.ts`, with millions as in `finance.to_thousands`).
+
 ### C5. The companion (about 2 hours, after C4)
 
 A React layer in `frontend/src/components/companion.tsx`, from `review-companion.md` sections 5 and 6:
@@ -208,3 +233,8 @@ A React layer in `frontend/src/components/companion.tsx`, from `review-companion
 - Glide to the edited cell, the bubble with chips (keys 1 to 3, Enter, Esc), Later and Save, the learned note, and the waiting dot.
 - Port the follow physics from Squeek's `halo.js` (https://github.com/syedkazmi14/squeek), restyled to our tokens.
 Done when: the demo beat takes 10 seconds or less and looks right on the demo laptop.
+
+Built 2026-10-24 night in `cayden/phase2-console`: `frontend/src/components/companion.tsx`, with the follow physics ported from Squeek's `halo.js` and credited in the file.
+The bubble follows Josie's Reason popover (Figma 545:408) for looks and section 5 for behavior.
+The demo beat runs headless through the shim in about 3 seconds, from opening the income statement to approved, with Download in the browser.
+Waiting on: the run on the demo laptop, and T1 and T2 for the real routes.

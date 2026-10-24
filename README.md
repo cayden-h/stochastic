@@ -200,7 +200,7 @@ uv pip install -p .venv/bin/python fastapi "uvicorn[standard]" pydantic pytest h
 
 cd frontend
 npm install
-npm run dev                                                 # http://localhost:3000
+npm run dev                                                 # http://localhost:3000 (Dashboard; the Case is /case)
 ```
 
 Run the deal without the console:

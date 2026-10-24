@@ -184,7 +184,7 @@ Claim nothing unconfirmed.
 
 - `images/tiger-ledger-runs.png`: `ledger_runs` in the Tiger Cloud SQL Editor. With agent memory cleared, the Mapper asks 2 questions. With memory kept, it asks none and applies 6 policies.
 - `images/tiger-bm25.png`: one BM25 search over the record in the Tiger Cloud SQL Editor.
-- `images/console-tiger-badge.png`: the console after a posted run, with the TIGER CLOUD badge in the top bar.
+- `images/console-tiger-badge.png`: the console after a posted run, with the TIGER CLOUD badge in the top bar (a capture from before Hi-fi v3; the store now shows in the sidebar's model card).
 - `images/console-log-forks.png`: the log, with the three FORK rows of one covenant flag and the policies learned from the answer.
 
 All four are from 2026-10-24, ledger 23. [verified]

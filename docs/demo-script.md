@@ -16,7 +16,7 @@ Order: the problem, then what Stochastic does, then the proof. Do not lead with 
 | 0:00 - 0:25 | Problem | The judge feels the gate: the next deal waits on the books. | Title slide or the empty console. No demo yet. |
 | 0:25 - 0:55 | What Stochastic does | Five steps in plain words: map, flag, combine, test, approve. | A simple flow slide, or the console at rest. |
 | 0:55 - 1:30 | Proof and honesty | A real public deal. Stateful agents that learn from the controller. Math is code. Say what is simulated. | The real-versus-simulated list. |
-| 1:30 - 2:00 | Live demo | One flag, one approval, one verdict line. | The one console screen. |
+| 1:30 - 2:00 | Live demo | One flag, one approval, one verdict line. | The console: Dashboard, then the Case page (`/case`). |
 
 Who speaks: one presenter talks. A second person drives the keyboard. The rest of the team stands back. [inferred]
 
@@ -62,7 +62,7 @@ If a judge gives a second minute, the memory moment: reset, run again, no flag, 
 ## 2. The 30-second live demo, beat by beat
 
 Rules:
-- The console shows one screen: the flag card, a small combined table of about ten rows, and one verdict line. The audit log is a small link. [verified: `STOCHASTIC.md`, section 12]
+- The console opens on the Dashboard (`/`); the demo runs on the Case page (`/case`): the flag card, the verdict line, and the combined books, with Mapping, Review, and Log tiles on the right. [verified: `frontend/README.md`]
 - The presenter does not read numbers aloud unless they are final. See section 4.
 - Do not stage a denied action. Show a DENIED row only if a judge asks to see the log. [verified: `STOCHASTIC.md`, section 9]
 
@@ -71,22 +71,22 @@ Measured on live Droid on 2026-10-24 08:30 (Mapper Sonnet 5.5, Preparer and Revi
 - Last answer to a live Approve button: 36 to 38 s (Preparer about 28 s, Reviewer about 9 s). Answer the flag early and talk over this wait: the gateway, the tools, the run ids.
 - Second run after a reset with memory kept: 58 s to approval, no flag. Show it at the table only if a judge has the time, or point to the Learned chips.
 - If the timing does not fit, use `AGENT_BACKEND=replay` for the pitch and say so: the recorded Sonnet 5.5 Droid run's text, with every tool run live. The pinned replay is a first run, so it raises the covenant flag. [verified: `test_demo_reset.py`]
-- Between judges, reset with memory cleared: the console's "Fresh deal, clear memory", or `curl -X POST 'localhost:8000/dev/reset?keep_memory=false'`. The plain reset keeps memory, and the next judge would see no flag. The reset is refused while a run is going (409) and frees the fork slot.
+- Between judges, reset with memory cleared: the console's "Fresh deal (clear memory)" on the Case page, or `curl -X POST 'localhost:8000/dev/reset?keep_memory=false'`. The plain reset keeps memory, and the next judge would see no flag. The reset is refused while a run is going (409) and frees the fork slot.
 - The console shows a progress row while the agents work: which agent, and for how many seconds.
 
 The beats below are the original plan; Cayden times the real version with a stopwatch (`tasks/cayden.md` task 5).
 
 | Beat | Time | On-screen state | Presenter says | Hardcoded or real |
 | --- | --- | --- | --- | --- |
-| 1. Start | 1:30 - 1:35 | Console is open on the deal. Two files and the brief are loaded. The table is empty. The verdict line says "Waiting". | "Two statement files and a short brief with the lender's limit." | The files and brief are real data from filings. The load is real. |
-| 2. Run | 1:35 - 1:42 | Press Run. A progress row shows the Mapper working, with its seconds. | "The Mapper matches each Nu Aire line to a Kewaunee line." | The mapping call goes through `run_agent` on the backend the badge names (live Droid on stage). The confidences come from the typed output. |
+| 1. Start | 1:30 - 1:35 | Console is open on the Dashboard. The Kewaunee Scientific case reads "Not started". Upload shows the two statement files and the brief already loaded. | "Two statement files and a short brief with the lender's limit." | The files and brief are real data from filings. The load is real. |
+| 2. Run | 1:35 - 1:42 | Press Begin. The Case page opens, and a progress row shows the Mapper working, with its seconds. | "The Mapper matches each Nu Aire line to a Kewaunee line." | The mapping call goes through `run_agent` on the backend the sidebar's model card names (live Droid on stage). The confidences come from the typed output. |
 | 3. Flag | 1:42 - 1:50 | The "Lender definition question" card appears for "Financing liability". Each option shows its ratio in large type with Over the limit or OK; the filing evidence is folded under the options. | "It stopped on the line it must not decide alone. Financing liability holds a sale-leaseback, the new bank debt, and seller notes. Which parts are covenant debt?" | The question and options are the Mapper's. Each ratio and effect comes from a gateway tool run. The flag work item and its state NEEDS_INFO are real gateway state. |
 | 4. Answer | 1:50 - 1:55 | The controller clicks Approve on one option, or Change. | "The controller decides. Not the model." | The answer call is real. The gateway logs it. |
 | 5. Combine and test | 1:55 - 2:00 | The verdict line shows 0.76x against 2.50x with OK and Reviewer pass, and under it "read as filed, counting the whole financing line: 2.84x, over the limit". | "Code adds the books and tests the lender's limit. That is the verdict." | The Preparer's tool calls, the math, the tie-out, and the limit test run for real. The gateway checks that every figure is the Preparer's own run and reads the Reviewer's pass from its checks. |
-| 6. Close | after 2:00 if asked | The presenter clicks the audit log link. | "Every step is here, and each row is chained to the one before." | Real. The chain check is real. |
+| 6. Close | after 2:00 if asked | The presenter clicks the Log tile on the Case page (or Log in the sidebar). | "Every step is here, and each row is chained to the one before." | Real. The chain check is real. |
 
 What runs for real: the gateway (state changes, maker-checker, permissions), the math tools (consolidation, EBITDA, leverage, limit test), the tie-out check, and the audit log with its hash chain. [verified: `STOCHASTIC.md`, section 2]
-What the model writes: the mappings, the flag question, and the option labels, on the backend the badge names.
+What the model writes: the mappings, the flag question, and the option labels, on the backend the model card names.
 What is a fallback: the scripted rules, used when the model run fails or the gateway refuses its result twice. See section 5.
 
 ### Who clicks what
@@ -183,18 +183,18 @@ Also found: Droid accepts an unknown model id without an error, so a wrong `DROI
 
 | Failure | Sign | What the system does | What to say |
 | --- | --- | --- | --- |
-| Droid fails | The run takes more than the timeout, or `GET /health` shows a failed droid attempt | Falls to `scripted`. Same screen, same gateway. The badge says "Agents: scripted rules, no model". | "The Droid run dropped. This one ran on the fallback. Same roles, same gateway, same math." |
+| Droid fails | The run takes more than the timeout, or `GET /health` shows a failed droid attempt | Falls to `scripted`. Same screen, same gateway. The sidebar's model card says "Scripted rules, no model". | "The Droid run dropped. This one ran on the fallback. Same roles, same gateway, same math." |
 | A background run stops on an error | The headline says "The run stopped before it finished" | Nothing is posted. Run again continues where it stopped; the log has the reason. | "That run stopped; running it again." |
 | You want no live model call at all | Before the demo | Set `AGENT_BACKEND=replay`: recorded outputs from the Sonnet 5.5 Droid run (`backend/recordings/`), with the tools re-run | "This is the recorded run from this morning. The tool calls are live." |
 | Console fails | Blank page or API error | Reload once. Then show the API: `GET /deals/{id}/case` in a browser tab is readable. | "Let me show the raw case." |
 | Wi-Fi fails | No network | `scripted` or `replay` need none. The demo makes no live SEC calls. The store keeps working in memory and queues its writes to Tiger until the network is back (`GET /health` `store.pending`). | None needed. |
-| Tiger Cloud unreachable at start | The badge says "In memory" and "Tiger unreachable" | The API runs in memory; nothing is lost from the screen | "The database is down, so this run is in memory. The log and the chain are the same." |
+| Tiger Cloud unreachable at start | The sidebar's model card says "Tiger unreachable" (in memory) | The API runs in memory; nothing is lost from the screen | "The database is down, so this run is in memory. The log and the chain are the same." |
 | A Run click while a run is going | 409 "a run is already in progress" | Nothing; the running job finishes | None needed. |
 | The Tiger fork fails or is slow | The flag card says "no fork (...)" or still "Forking ..." | The options and effects are computed in process as always; answer when ready | "The fork is still coming up; the figures are already computed." |
 
 ### The restart moment (Tiger), rehearsed 2026-10-24 08:09 [verified]
 
-1. Run the deal, answer the flags, and approve, with `STORE=postgres` (the badge says Tiger Cloud).
+1. Run the deal, answer the flags, and approve, with `STORE=postgres` (the model card says Tiger Cloud).
 2. Stop the API and start it again (`Ctrl-C`, then `backend/.venv/bin/uvicorn app.main:app --port 8000`; with `--reload`, saving any backend file restarts it).
 3. Reload the console. The verdict, the combined table, the answered flags, the log (55 rows, chain intact, the one real DENIED row), the 11 policies, and the three Droid sessions are all back, loaded from Tiger.
 4. Words: "The process just restarted. Nothing was in its memory. Everything on screen came back from Postgres on Tiger Cloud, and the log still checks."
@@ -239,7 +239,7 @@ Live on 2026-10-24: 23 ledgers, 12 posted runs, mean 98 s, p50 84 s, p95 465 s. 
 The Tiger MCP can run the same queries from Claude Code. [verified: 2026-10-24]
 
 Rules for failure:
-- Never hide a failure. Say it in one short line and move on. The backend badge on screen already says what ran.
+- Never hide a failure. Say it in one short line and move on. The model card in the sidebar already says what ran.
 - Say "built with the Factory Droid SDK" only about runs that went through the `droid` backend. [verified: `architecture/gateway-and-api.md`]
 - The time limit still applies. If the demo has eaten 30 seconds, stop and take questions.
 
@@ -250,7 +250,7 @@ The presenter must say this in the proof part, in these words or close to them:
 A few things are not real, so you know what you are looking at.
 The statement lines come from public filings, not from the companies' internal books.
 Account-level detail is not public, so we do not claim it.
-The agent text comes from the backend the badge names: live Claude through Droid, or our scripted fallback if that fails. The gateway, the math, and the audit log are real.
+The agent text comes from the backend the model card names: live Claude through Droid, or our scripted fallback if that fails. The gateway, the math, and the audit log are real.
 The two companies have different fiscal years, April and September, so the combined income statement adds two different years and does not match the filed pro forma.
 Two inputs are our estimates: the Statesville rent we deduct, and transaction costs, which we set to zero.
 And the filing says its own reclassification table, Note 2, is preliminary.
@@ -259,7 +259,7 @@ And the filing says its own reclassification table, Note 2, is preliminary.
 Checklist. All seven must appear:
 1. Statement lines from public filings.
 2. Account-level detail is not claimed.
-3. Which backend wrote the agent text: the badge says it.
+3. Which backend wrote the agent text: the model card says it.
 4. Fiscal-year mismatch: Kewaunee April 30, Nu Aire September 30.
 5. The combined table is historical plus target, not the filed pro forma; no purchase accounting.
 6. The rent deduction and zero transaction costs are inferred.
@@ -282,7 +282,7 @@ Before the first rehearsal:
 Each rehearsal:
 - [ ] Time the 2:00 with a stopwatch. Target 1:55.
 - [ ] Run the demo from a cold start (fresh `POST /dev/reset?keep_memory=false`, fresh browser tab).
-- [ ] Run once with `droid`, once with `replay`, once with `scripted`. Check the backend badge each time.
+- [ ] Run once with `droid`, once with `replay`, once with `scripted`. Check the model card each time.
 - [ ] Force one failure on purpose and switch backends live.
 - [ ] Say the honest-limits statement every time.
 - [ ] Check the screen at projector size and at the table-side laptop size. Text must be readable from two meters.
@@ -310,8 +310,8 @@ Answers are short and honest. If we do not know, say so.
 | 6a | How is this different from Hebbia, Chronograph, Datarails, or Numeric? | Those tools either read the credit agreement or combine the books. Stochastic does both in one gated workflow: every number carries a tool run id, the agent stops when a line's covenant treatment is ambiguous, and the controller's answer becomes a policy. [inferred] |
 | 6 | Why not Excel plus a consolidation tool? | Consolidation tools add books after the mapping is done. The mapping is the slow, error-prone part, and it needs a human for the unclear lines. We also test the covenant with its own definitions and log who decided what. Excel has no maker-checker. [inferred] |
 | 7 | What does the model do and what does code do? | The model proposes mappings with a confidence and a reason, decides which lines it must not decide alone, and writes the flag question and the readings. Code does all the math and computes the effect of each reading. The gateway refuses a number no tool run produced. [verified: `STOCHASTIC.md`, section 11; `test_model_made_number_is_refused_even_with_real_run_ids`] |
-| 8 | What is simulated? | Nothing on the agent path is hardcoded: on stage the agents run live on Claude through Droid, and the badge says if the scripted fallback ran instead. Account-level detail is not public, so we do not claim it. The gateway, the math, and the audit log are real. |
-| 9 | What if the live model fails or says something wrong? | `run_agent` has four backends (droid, anthropic, replay, scripted). A failed run falls back to scripted rules, and the badge says so. A wrong result is refused by the gateway: a model cannot exclude a line itself, cite another run's number, or pass a review without the checks. |
+| 8 | What is simulated? | Nothing on the agent path is hardcoded: on stage the agents run live on Claude through Droid, and the model card says if the scripted fallback ran instead. Account-level detail is not public, so we do not claim it. The gateway, the math, and the audit log are real. |
+| 9 | What if the live model fails or says something wrong? | `run_agent` has four backends (droid, anthropic, replay, scripted). A failed run falls back to scripted rules, and the model card says so. A wrong result is refused by the gateway: a model cannot exclude a line itself, cite another run's number, or pass a review without the checks. |
 | 10 | What stops the agent from approving its own work? | The gateway. The preparer of an item cannot approve it, and no agent has the approve permission. A forbidden action is denied and logged. |
 | 11 | How do you know the mapping is right? | We check it against Note 2 in the filing, as an answer key for shape, not to the dollar. Note 2 is preliminary, and the fiscal years differ. Unsure lines become flags. Precision comes before recall. |
 | 12 | What does the audit log hold, and can it be edited? | Every action, allowed or denied, with actor, target, reason, and evidence. Each row stores the hash of the row before it, so a change in the past breaks the chain. On Tiger the audit log is a hypertable that refuses UPDATE and DELETE. [verified: `test_the_audit_log_refuses_update_and_delete`] |
@@ -325,7 +325,7 @@ Answers are short and honest. If we do not know, say so.
 | 18 | Is this advice? | No. It produces a mapped, combined set of books and a limit check that a human approves. |
 | 19 | Who is the user? | A portfolio controller or a PE associate who owns the integration, right after an add-on closes. [inferred: no practitioner has checked this] |
 | 20 | How long does it take today without this? | One vendor playbook says about 12 weeks for a full integration (self-reported, Aleph). The compliance certificate is due 45 to 60 days after quarter end in the samples we found. We do not claim a speedup we have not measured. |
-| 21 | Where do the Factory and Droid parts fit? | Each agent runs as a Droid session with only our gateway tools allowed, an empty working directory, and a typed result. On stage the Mapper is Claude Sonnet 5.5 and the Preparer and Reviewer are Claude Haiku 5.5, through Droid; the pinned replay is the Sonnet 5.5 run. We say "built with the Droid SDK" only about runs that went through it; the backend badge shows it. [verified: `agents.md`, run log] |
+| 21 | Where do the Factory and Droid parts fit? | Each agent runs as a Droid session with only our gateway tools allowed, an empty working directory, and a typed result. On stage the Mapper is Claude Sonnet 5.5 and the Preparer and Reviewer are Claude Haiku 5.5, through Droid; the pinned replay is the Sonnet 5.5 run. We say "built with the Droid SDK" only about runs that went through it; the sidebar's model card shows it. [verified: `agents.md`, run log] |
 | 22 | Did you use real company data? | We used public SEC filings. We did not use any private or internal data. The demo makes no live SEC calls. |
 
 ## 9. Table-side checklist: judging Sunday 10:30am to 12:30pm
@@ -339,7 +339,7 @@ Before 10:30am:
 - [ ] `.env` is loaded. No keys are visible on screen.
 - [ ] The honest-limits list is on a card or a slide, in case a judge asks.
 - [ ] Charger, hotspot, and a printed one-page summary are at the table.
-- [ ] Browser tabs: the console, the audit log, the filing links (Ex 99.1, 99.2, 10.1). Close everything else.
+- [ ] Browser tabs: the console at `localhost:3000/case`, the Log page (`localhost:3000/log`), the filing links (Ex 99.1, 99.2, 10.1). Close everything else.
 
 Roles at the table:
 - [ ] Presenter: gives the 2:00 and takes the first question.
@@ -351,7 +351,7 @@ Roles at the table:
 - [ ] Each judge gets a name written down, with their questions and any follow-up they ask for.
 
 During judging:
-- [ ] Reset the demo state before every new judge with memory cleared ("Fresh deal, clear memory", or `POST /dev/reset?keep_memory=false`), and check that the screen is clean.
+- [ ] Reset the demo state before every new judge with memory cleared ("Fresh deal (clear memory)" on the Case page, or `POST /dev/reset?keep_memory=false`), and check that the screen is clean.
 - [ ] Open with the problem, not the demo. The demo is the last 30 seconds.
 - [ ] Say the honest-limits statement every time, before a judge asks.
 - [ ] Offer the audit log if a judge asks "can it be tampered with". Show `chain_valid`.
