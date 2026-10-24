@@ -1,0 +1,16 @@
+{
+  "role": "reviewer",
+  "backend": "droid",
+  "input_key": "48788e6aff45",
+  "output": {
+    "verdict": "pass",
+    "reasons": [
+      "tie_out (consolidate_run_id run_013) returned ok=true: all 54 rows checked, no bad rows, no missing totals, and the combined balance sheet balances at 182456.181.",
+      "limit_test (leverage_run_id run_016) returned ok=true: leverage 0.762 is below the 2.5 limit, with 1.738 turns of headroom."
+    ],
+    "run_ids": [
+      "run_017",
+      "run_018"
+    ]
+  }
+}
