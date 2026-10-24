@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stochastic - 03 Agents and Data</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .grid6 { position: absolute; inset: 22px 24px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr; gap: 18px 20px; }
+  .ag { background: #fff; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); overflow: hidden; display: flex; flex-direction: column; }
+  .ag header { background: var(--agent); border-bottom: 3px solid var(--ink); padding: 9px 14px; display: flex; align-items: center; justify-content: space-between; }
+  .ag header h3 { font-size: 19px; font-weight: 800; }
+  .ag header .badges span { display: inline-block; background: var(--esc); color: #fff; border: 2px solid #fff; border-radius: 6px; font-size: 11px; font-weight: 800; padding: 1px 6px; margin-left: 4px; }
+  .ag .job { padding: 10px 14px 6px; font-size: 15.5px; font-weight: 600; color: #1f2937; }
+  .ag dl { padding: 4px 14px 10px; display: grid; grid-template-columns: 66px 1fr; gap: 9px 8px; font-size: 14.8px; line-height: 1.38; }
+  .ag dt { font-weight: 800; font-size: 11.5px; letter-spacing: .06em; color: var(--muted); padding-top: 2px; }
+  .ag dt.never { color: var(--esc); }
+  .ag dd { color: #1f2937; }
+  .ag.mgr header { background: var(--ink); color: #fff; }
+  .ag.mgr header h3 { color: #fff; }
+  /* page 2 */
+  svg.arrows { position: absolute; left: 0; top: 0; width: 1520px; height: 700px; pointer-events: none; }
+  .pill { position: absolute; width: 190px; height: 64px; border: 3px solid var(--ink); border-radius: 32px; box-shadow: 4px 4px 0 var(--ink); display: flex; align-items: center; justify-content: center; font-family: 'Press Start 2P', monospace; font-size: 13px; background: var(--data); }
+  .pill.g { background: var(--human); color: #fff; }
+  .pill.r { background: var(--esc); color: #fff; }
+  .pill.y { background: var(--agent); }
+  .lbl { position: absolute; background: #fff; border: 2px solid var(--ink); border-radius: 8px; font-size: 12px; font-weight: 800; padding: 2px 7px; white-space: nowrap; }
+  .panel { position: absolute; background: #fff; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); padding: 16px 18px; }
+  .panel h2 { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: 13px; margin-bottom: 12px; line-height: 1.4; }
+  .panel ol { list-style: none; counter-reset: r; display: flex; flex-direction: column; gap: 9px; }
+  .panel ol li { counter-increment: r; font-size: 14.5px; line-height: 1.38; padding-left: 34px; position: relative; }
+  .panel ol li::before { content: counter(r); position: absolute; left: 0; top: -1px; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: #fff; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+  table.t { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table.t th, table.t td { border: 2.5px solid var(--ink); padding: 6px 10px; text-align: left; }
+  table.t th { background: var(--ink); color: #fff; font-size: 12px; letter-spacing: .06em; }
+  /* page 3 */
+  .groups { position: absolute; left: 24px; right: 24px; top: 24px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+  .grp { border: 3px solid var(--ink); border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); background: var(--data); padding: 12px 12px 14px; }
+  .grp h2 { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: 12px; margin-bottom: 4px; }
+  .grp .why { font-size: 13.5px; color: var(--muted); margin-bottom: 10px; line-height: 1.3; min-height: 34px; }
+  .tb { background: #fff; border: 2.5px solid var(--ink); border-radius: 9px; padding: 7px 9px; margin-bottom: 9px; }
+  .tb b { display: block; font-size: 15.5px; font-weight: 800; font-family: 'Inter', monospace; }
+  .tb span { display: block; font-size: 13.6px; color: var(--muted); line-height: 1.3; margin-top: 2px; }
+  .trace { position: absolute; left: 24px; right: 24px; top: 408px; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); background: #fff; padding: 14px 18px 18px; }
+  .trace h2 { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: 13px; margin-bottom: 12px; }
+  .trow { display: flex; align-items: stretch; }
+  .tstep { flex: 1; border: 3px solid var(--ink); border-radius: 11px; padding: 10px 12px; background: var(--data); font-size: 14.2px; line-height: 1.35; }
+  .tstep b { display: block; font-size: 15.5px; margin-bottom: 3px; }
+  .tstep.a { background: var(--agent); } .tstep.c { background: var(--code); color: #fff; }
+  .tar { width: 26px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; }
+  .two { position: absolute; left: 24px; right: 24px; top: 566px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .call { border: 3px dashed var(--ink); border-radius: 12px; padding: 10px 14px; font-size: 14.2px; line-height: 1.42; background: var(--agent-soft); }
+  .call b { font-weight: 800; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: AGENTS -->
+<section class="page">
+  <div class="head">
+    <div class="kicker">STOCHASTIC &middot; 03 AGENTS AND DATA &middot; PAGE 1 OF 3</div>
+    <h1>THE SIX AGENTS</h1>
+    <p class="sub">Each agent has one job, a clear input and output, a point where it asks the human, and one thing it never does</p>
+  </div>
+  <div class="canvas">
+    <div class="grid6">
+
+      <div class="ag mgr">
+        <header><h3>Deal manager</h3><span class="badges"><span>decides who asks</span></span></header>
+        <div class="job">Runs the deal. The master agent.</div>
+        <dl>
+          <dt>GETS</dt><dd>The one-line brief and every event.</dd>
+          <dt>MAKES</dt><dd>Situation type (1 of 8), playbook, task list, stale marks.</dd>
+          <dt>ASKS</dt><dd>When two results disagree, or a task cannot finish.</dd>
+          <dt class="never">NEVER</dt><dd>Does the math, or writes a record directly.</dd>
+        </dl>
+      </div>
+
+      <div class="ag">
+        <header><h3>Intake agent</h3><span class="badges"><span>E1</span><span>E2</span></span></header>
+        <div class="job">Reads the documents.</div>
+        <dl>
+          <dt>GETS</dt><dd>Uploaded or cached documents.</dd>
+          <dt>MAKES</dt><dd>A fact table: value, page, quote. A list of missing documents.</dd>
+          <dt>ASKS</dt><dd>E1 for a missing document. E2 to confirm the facts the plan relies on.</dd>
+          <dt class="never">NEVER</dt><dd>Guesses a missing number.</dd>
+        </dl>
+      </div>
+
+      <div class="ag">
+        <header><h3>Clause reader</h3><span class="badges"><span>E3</span></span></header>
+        <div class="job">Finds the limits in the loan agreement.</div>
+        <dl>
+          <dt>GETS</dt><dd>The agreement text and the fact table.</dd>
+          <dt>MAKES</dt><dd>Constraints: clause, exact quote, plain meaning, confidence, defined terms.</dd>
+          <dt>ASKS</dt><dd>E3 when a quote or a defined term is unclear.</dd>
+          <dt class="never">NEVER</dt><dd>Keeps a quote that the validator cannot find in the document.</dd>
+        </dl>
+      </div>
+
+      <div class="ag">
+        <header><h3>Structuring agent</h3><span class="badges"><span>E4</span></span></header>
+        <div class="job">Designs the financing mixes.</div>
+        <dl>
+          <dt>GETS</dt><dd>Constraints, target amount, and the objective weights of the situation profile.</dd>
+          <dt>MAKES</dt><dd>Candidate mixes of senior, junior, and preferred. A shortlist. A blocked-plan record with the clause and a consent route.</dd>
+          <dt>ASKS</dt><dd>E4 when a clause blocks the plan.</dd>
+          <dt class="never">NEVER</dt><dd>Invents terms or computes numbers itself. It calls the math tools.</dd>
+        </dl>
+      </div>
+
+      <div class="ag">
+        <header><h3>Risk agent</h3><span class="badges"><span>E5</span></span></header>
+        <div class="job">Tests each plan under many futures.</div>
+        <dl>
+          <dt>GETS</dt><dd>The shortlist and labeled assumptions (rates, growth, volatility).</dd>
+          <dt>MAKES</dt><dd>Monte Carlo results with a run id: odds of a covenant breach, a blocked dividend, a loss.</dd>
+          <dt>ASKS</dt><dd>E5 when an event flips the best plan.</dd>
+          <dt class="never">NEVER</dt><dd>Reports a number without a seed and a run id.</dd>
+        </dl>
+      </div>
+
+      <div class="ag">
+        <header><h3>Memo and approvals agent</h3><span class="badges"><span>E6</span></span></header>
+        <div class="job">Writes it up and learns from a "no".</div>
+        <dl>
+          <dt>GETS</dt><dd>All results, with their citations and run ids.</dd>
+          <dt>MAKES</dt><dd>The recommendation, the side-by-side table, and a policy proposal after a rejection.</dd>
+          <dt>ASKS</dt><dd>E6 for the final decision.</dd>
+          <dt class="never">NEVER</dt><dd>Approves its own work or its own policy.</dd>
+        </dl>
+      </div>
+
+    </div>
+  </div>
+  <div class="legend"><span><i class="a"></i>AI agent</span><span><i class="c"></i>Code (no AI)</span><span><i class="h"></i>Human reviewer</span><span><i class="e"></i>Escalation point</span></div>
+</section>
+
+<!-- PAGE 2: STATES AND RULES -->
+<section class="page">
+  <div class="head">
+    <div class="kicker">STOCHASTIC &middot; 03 AGENTS AND DATA &middot; PAGE 2 OF 3</div>
+    <h1>HOW A TASK MOVES</h1>
+    <p class="sub">Agents never chat. They pass typed work items. Each item moves through a fixed set of states</p>
+  </div>
+  <div class="canvas">
+    <div class="pill" style="left:50px; top:120px;">NEW</div>
+    <div class="pill y" style="left:290px; top:120px;">PROPOSED</div>
+    <div class="pill g" style="left:530px; top:120px;">APPROVED</div>
+    <div class="pill" style="left:770px; top:120px; background:var(--code); color:#fff;">POSTED</div>
+    <div class="pill" style="left:290px; top:300px; background:#fff;">NEEDS_INFO</div>
+    <div class="pill" style="left:530px; top:300px; background:#fff;">REJECTED</div>
+    <div class="pill" style="left:770px; top:300px; background:#fff;">REVERSED</div>
+    
+
+    <svg class="arrows" viewBox="0 0 1520 700">
+      <defs>
+        <marker id="aN" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0b0f1a"/></marker>
+        <marker id="aR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e5173f"/></marker>
+      </defs>
+      <g stroke="#0b0f1a" stroke-width="3.5" fill="none">
+        <path d="M242 152 H286" marker-end="url(#aN)"/>
+        <path d="M482 152 H526" marker-end="url(#aN)"/>
+        <path d="M722 152 H766" marker-end="url(#aN)"/>
+        <path d="M360 188 V296" marker-start="url(#aN)" marker-end="url(#aN)"/>
+        <path d="M440 190 L580 296" marker-end="url(#aN)"/>
+        <path d="M865 188 V296" marker-end="url(#aN)"/>
+      </g>
+    </svg>
+
+    <div class="lbl" style="left:244px; top:96px;">agent proposes</div>
+    <div class="lbl" style="left:462px; top:96px;">human approves</div>
+    <div class="lbl" style="left:700px; top:96px;">gateway posts</div>
+    <div class="lbl" style="left:374px; top:228px;">ask / answer</div>
+    <div class="lbl" style="left:520px; top:226px;">human says no</div>
+    <div class="lbl" style="left:772px; top:228px;">reverse and repost</div>
+    
+
+    <div class="panel" style="left:50px; top:300px; width:200px; padding:12px 14px;">
+      <h2 style="font-size:11px; margin-bottom:8px">HOW TO READ</h2>
+      <p style="font-size:13px; line-height:1.4">A box is a state. An arrow is a move. The label says who may make it.</p>
+    </div>
+
+    <div class="panel" style="left:1000px; top:24px; width:496px;">
+      <h2>WHO CAN DO WHAT</h2>
+      <table class="t">
+        <tr><th>WHO</th><th>MAY</th></tr>
+        <tr><td><b>AI agent</b></td><td>create, propose, ask a question, call its tools</td></tr>
+        <tr><td><b>Human reviewer</b></td><td>answer, approve, reject, override a profile</td></tr>
+        <tr><td><b>Gateway (code)</b></td><td>post to the record, write the log</td></tr>
+      </table>
+    </div>
+    <div class="panel" style="left:1000px; top:236px; width:496px; height:440px;">
+      <h2>SIX RULES THE GATEWAY ENFORCES</h2>
+      <ol>
+        <li>Only the gateway posts to the record.</li>
+        <li>The proposer of an item cannot approve it.</li>
+        <li>An agent can call only the tools it was given.</li>
+        <li>Every number carries a run id from the math code.</li>
+        <li>A reversal is a new item linked to the original. Nothing is deleted.</li>
+        <li>Every action and every denied attempt goes in the log. Each log row is chained to the one before.</li>
+      </ol>
+    </div>
+    <div class="panel" style="left:50px; top:480px; width:910px; background:#ffe8ec; padding:14px 18px;"><h2 style="color:#b0102f">DENIED: THE ACTION IS NOT APPLIED</h2><p style="font-size:15px; line-height:1.45">Any forbidden action is refused and written to the log. Examples: an agent approves its own item, calls a tool it was not given, or posts a number with no run id. A denied attempt is evidence, so it is kept.</p></div>
+    <div class="panel" style="left:50px; top:612px; width:910px; padding:12px 18px;">
+      <p style="font-size:14px; line-height:1.45"><b>Why this matters:</b> the Hyphenate workshop calls this the system of work. Records hold the truth. The system of work holds the tasks, the decisions, the questions, and the log.</p>
+    </div>
+  </div>
+  <div class="legend"><span><i class="a"></i>Agent step</span><span><i class="h"></i>Human step</span><span><i class="c"></i>Code step</span><span><i class="e"></i>Denied</span></div>
+</section>
+
+<!-- PAGE 3: DATA -->
+<section class="page">
+  <div class="head">
+    <div class="kicker">STOCHASTIC &middot; 03 AGENTS AND DATA &middot; PAGE 3 OF 3</div>
+    <h1>WHAT THE DATABASE HOLDS</h1>
+    <p class="sub">Exact facts live in tables. Vectors only help find the right passage. The proposed table names may change in the build</p>
+  </div>
+  <div class="canvas">
+    <div class="groups">
+      <div class="grp"><h2>SOURCE</h2><div class="why">What came in.</div>
+        <div class="tb"><b>document</b><span>File, type, hash of the file</span></div>
+        <div class="tb"><b>document_chunk</b><span>Text passage plus a vector, so search can find it</span></div></div>
+      <div class="grp"><h2>KNOWLEDGE</h2><div class="why">What we learned from it.</div>
+        <div class="tb"><b>fact</b><span>Value, page, exact quote</span></div>
+        <div class="tb"><b>clause</b><span>Quote, plain meaning, confidence, defined terms</span></div></div>
+      <div class="grp"><h2>WORK</h2><div class="why">What the agents are doing.</div>
+        <div class="tb"><b>work_item</b><span>Type, state, owner, links</span></div>
+        <div class="tb"><b>plan</b><span>Instruments and sizes</span></div>
+        <div class="tb"><b>simulation_run</b><span>Seed, run id, results</span></div></div>
+      <div class="grp"><h2>LEARNING</h2><div class="why">What the humans taught it.</div>
+        <div class="tb"><b>decision</b><span>Approve or reject, with a reason</span></div>
+        <div class="tb"><b>precedent</b><span>A past deal pattern</span></div>
+        <div class="tb"><b>policy</b><span>Rule, evidence, status</span></div></div>
+      <div class="grp"><h2>PROOF</h2><div class="why">What happened, in order.</div>
+        <div class="tb"><b>audit_log</b><span>Who, what, the change, and the hash of the row before. Only appended.</span></div>
+        <div class="tb" style="background:var(--agent-soft)"><b>forks</b><span>Copies of the database to compare plans. Tiger Cloud makes them fast.</span></div></div>
+    </div>
+
+    <div class="trace">
+      <h2>HOW ONE FACT TRAVELS (every claim in the memo traces back to the page)</h2>
+      <div class="trow">
+        <div class="tstep"><b>Document</b>Credit agreement, page 94</div><div class="tar">&gt;</div>
+        <div class="tstep a"><b>Fact or clause</b>Intake or clause reader saves the exact quote</div><div class="tar">&gt;</div>
+        <div class="tstep c"><b>Quote check</b>Code confirms the quote is on that page</div><div class="tar">&gt;</div>
+        <div class="tstep c"><b>Plan and run</b>Math uses the fact. The run gets an id</div><div class="tar">&gt;</div>
+        <div class="tstep a"><b>Memo</b>Each claim links to the run id and the quote</div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="call"><b>Vectors find, tables decide.</b> Search can help find the paragraph about a debt basket. The number used in a plan always comes from a saved fact with a page and a quote, never from a search guess.</div>
+      <div class="call"><b>Forks for what-if plans.</b> Each candidate plan can run in its own copy of the database. The reviewer compares them. Approving one merges it. This is the honest fit for the Tiger Data prize (to confirm free-tier limits at the booth).</div>
+    </div>
+  </div>
+  <div class="legend"><span><i class="a"></i>AI agent writes</span><span><i class="c"></i>Code checks</span><span><i class="d"></i>Data</span></div>
+</section>
+
+</body>
+</html>

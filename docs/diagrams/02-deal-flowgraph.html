@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stochastic - 02 Deal Flowgraph</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  svg.arrows { position: absolute; left: 0; top: 0; width: 1520px; height: 700px; pointer-events: none; }
+  .lbl { position: absolute; background: #fff; border: 2px solid var(--ink); border-radius: 8px; font-weight: 800; white-space: nowrap; }
+  .loops { position: absolute; inset: 22px 24px; display: grid; grid-template-rows: 1fr 1fr 1fr; gap: 16px; }
+  .loop { display: grid; grid-template-columns: 210px 1fr; gap: 16px; align-items: stretch; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); padding: 12px 14px; background: #fff; }
+  .lt { display: flex; flex-direction: column; justify-content: center; }
+  .lt .big { font-family: 'Press Start 2P', monospace; font-size: 30px; color: var(--esc); }
+  .lt h2 { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: 12px; line-height: 1.5; margin-top: 8px; }
+  .lt p { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+  .row { display: flex; align-items: stretch; gap: 0; }
+  .st { flex: 1; border: 3px solid var(--ink); border-radius: 11px; padding: 8px 10px; box-shadow: 3px 3px 0 var(--ink); position: relative; }
+  .st b { display: block; font-size: 15px; font-weight: 800; line-height: 1.15; }
+  .st span { display: block; font-size: 13.6px; line-height: 1.33; margin-top: 5px; }
+  .st span.tg { display: inline-block; margin-top: 0; }
+  .st.a { background: var(--agent); } .st.a span { color: #3b3200; }
+  .st.c { background: var(--code); color: #fff; } .st.c span { color: #d5dcf0; }
+  .st.h { background: var(--human); color: #fff; } .st.h span { color: #e4f7ef; }
+  .st.d { background: var(--data); } .st.d span { color: #33415c; }
+  .st.q { background: #fff; border-style: dashed; border-width: 3px; }
+  .st.q span { color: var(--muted); }
+  .tg { display: inline-block; background: var(--esc); color: #fff; border: 2px solid #fff; border-radius: 6px; font-size: 10.5px; font-weight: 800; padding: 1px 6px; margin-bottom: 4px; }
+  .ar { width: 26px; flex: none; display: flex; align-items: center; justify-content: center; }
+  .ar svg { width: 22px; height: 22px; }
+  .note { font-size: 12.5px; font-weight: 700; color: var(--esc); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: SWIMLANE -->
+<section class="page">
+  <div class="head">
+    <div class="kicker">STOCHASTIC &middot; 02 DEAL FLOWGRAPH &middot; PAGE 1 OF 2</div>
+    <h1>ONE DEAL, START TO FINISH</h1>
+    <p class="sub">Read left to right. Red dashed arrows are the points where an agent stops and asks the human.</p>
+  </div>
+  <div class="canvas">
+    <div style="position:absolute;left:0;top:44px;width:1520px;height:196px;background:var(--human-soft);border-top:2px solid #0b0f1a;"></div>
+    <div style="position:absolute;left:14px;top:114px;width:96px;font-family:'Press Start 2P',monospace;font-size:11px;line-height:1.5;">HUMAN<br>REVIEWER</div>
+    <div style="position:absolute;left:0;top:240px;width:1520px;height:196px;background:var(--agent-soft);border-top:2px solid #0b0f1a;"></div>
+    <div style="position:absolute;left:14px;top:310px;width:96px;font-family:'Press Start 2P',monospace;font-size:11px;line-height:1.5;">AI<br>AGENTS</div>
+    <div style="position:absolute;left:0;top:436px;width:1520px;height:196px;background:var(--code-soft);border-top:2px solid #0b0f1a;border-bottom:2px solid #0b0f1a;"></div>
+    <div style="position:absolute;left:14px;top:506px;width:96px;font-family:'Press Start 2P',monospace;font-size:11px;line-height:1.5;">CODE<br>(NO AI)</div>
+    <div style="position:absolute;left:137px;top:8px;width:170px;height:28px;border:2.5px solid #0b0f1a;border-radius:8px;background:#fff;font-weight:800;font-size:12.5px;letter-spacing:.05em;display:flex;align-items:center;justify-content:center;">1 START</div>
+    <div style="position:absolute;left:333px;top:8px;width:170px;height:28px;border:2.5px solid #0b0f1a;border-radius:8px;background:#fff;font-weight:800;font-size:12.5px;letter-spacing:.05em;display:flex;align-items:center;justify-content:center;">2 READ</div>
+    <div style="position:absolute;left:529px;top:8px;width:170px;height:28px;border:2.5px solid #0b0f1a;border-radius:8px;background:#fff;font-weight:800;font-size:12.5px;letter-spacing:.05em;display:flex;align-items:center;justify-content:center;">3 FIND LIMITS</div>
+    <div style="position:absolute;left:725px;top:8px;width:170px;height:28px;border:2.5px solid #0b0f1a;border-radius:8px;background:#fff;font-weight:800;font-size:12.5px;letter-spacing:.05em;display:flex;align-items:center;justify-content:center;">4 DESIGN</div>
+    <div style="position:absolute;left:921px;top:8px;width:170px;height:28px;border:2.5px solid #0b0f1a;border-radius:8px;background:#fff;font-weight:800;font-size:12.5px;letter-spacing:.05em;display:flex;align-items:center;justify-content:center;">5 TEST</div>
+    <div style="position:absolute;left:1117px;top:8px;width:170px;height:28px;border:2.5px solid #0b0f1a;border-radius:8px;background:#fff;font-weight:800;font-size:12.5px;letter-spacing:.05em;display:flex;align-items:center;justify-content:center;">6 DECIDE</div>
+    <div style="position:absolute;left:1313px;top:8px;width:170px;height:28px;border:2.5px solid #0b0f1a;border-radius:8px;background:#fff;font-weight:800;font-size:12.5px;letter-spacing:.05em;display:flex;align-items:center;justify-content:center;">7 CLOSE</div>
+    <div class="n human" style="left:143px;top:78px;width:158px;height:128px;"><h3>Upload + brief</h3><p>Documents plus one line: amount, purpose, limits.</p></div>
+    <div class="n human" style="left:339px;top:78px;width:158px;height:128px;"><div><span class="badge">E1</span><span class="badge">E2</span></div><h3>Missing docs? Facts?</h3><p>Add missing documents. Fix wrong facts.</p></div>
+    <div class="n human" style="left:535px;top:78px;width:158px;height:128px;"><div><span class="badge">E3</span></div><h3>Unclear clause?</h3><p>Answers when a clause or term is unclear.</p></div>
+    <div class="n human" style="left:731px;top:78px;width:158px;height:128px;"><div><span class="badge">E4</span></div><h3>Plan blocked</h3><p>Sees the clause, the redesign, and the consent route.</p></div>
+    <div class="n human" style="left:927px;top:78px;width:158px;height:128px;"><div><span class="badge">E5</span></div><h3>Best plan flips?</h3><p>Reviews what changed after an event.</p></div>
+    <div class="n human" style="left:1123px;top:78px;width:158px;height:128px;"><div><span class="badge">E6</span></div><h3>Final call</h3><p>Approve, reject (next page), or ask for changes.</p></div>
+    <div class="n human" style="left:1319px;top:102px;width:158px;height:80px;border-radius:40px;text-align:center;"><h3 style="margin-top:8px">Approved</h3><p>The reviewer signs off.</p></div>
+    <div class="n agent" style="left:143px;top:274px;width:158px;height:128px;"><h3>Deal manager</h3><p>Names the situation, picks a playbook, makes the tasks.</p></div>
+    <div class="n agent" style="left:339px;top:274px;width:158px;height:128px;"><h3>Intake agent</h3><p>Turns documents into facts with page and quote.</p></div>
+    <div class="n agent" style="left:535px;top:274px;width:158px;height:128px;"><h3>Clause reader</h3><p>Finds baskets, covenants, definitions. Exact quotes.</p></div>
+    <div class="n agent" style="left:731px;top:274px;width:158px;height:128px;"><h3>Structuring agent</h3><p>Proposes senior, junior, and preferred mixes.</p></div>
+    <div class="n agent" style="left:927px;top:274px;width:158px;height:128px;"><h3>Risk agent</h3><p>Chooses scenarios and explains the results.</p></div>
+    <div class="n agent" style="left:1123px;top:274px;width:158px;height:128px;"><h3>Memo agent</h3><p>Writes the recommendation and side-by-side table.</p></div>
+    <div class="n code" style="left:143px;top:470px;width:158px;height:128px;"><h3>Gateway</h3><p>Creates the deal. Logs every action.</p></div>
+    <div class="n code" style="left:339px;top:470px;width:158px;height:128px;"><h3>Fact store</h3><p>Saves facts and citations in Postgres.</p></div>
+    <div class="n code" style="left:535px;top:470px;width:158px;height:128px;"><h3>Quote check</h3><p>Rejects a quote that is not in the document.</p></div>
+    <div class="n code" style="left:731px;top:470px;width:158px;height:128px;"><h3>Deal math</h3><p>Computes leverage and cost. Keeps the best trade-offs.</p></div>
+    <div class="n code" style="left:927px;top:470px;width:158px;height:128px;"><h3>Monte Carlo</h3><p>Seeded run on the shortlist. Returns a run id.</p></div>
+    <div class="n code" style="left:1123px;top:470px;width:158px;height:128px;"><h3>Gateway checks</h3><p>Proposer cannot approve. Every number has a run id.</p></div>
+    <div class="n code" style="left:1319px;top:470px;width:158px;height:128px;border-color:#0a7d5c;border-width:4px;"><h3>POSTED</h3><p>Written to the record. Audit log closed.</p></div>
+    <svg class="arrows" viewBox="0 0 1520 700"><defs><marker id="aN" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0b0f1a"/></marker><marker id="aR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e5173f"/></marker><marker id="aG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0a7d5c"/></marker></defs><path d="M303 338 L336 338" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-end="url(#aN)"/><path d="M499 338 L532 338" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-end="url(#aN)"/><path d="M695 338 L728 338" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-end="url(#aN)"/><path d="M891 338 L924 338" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-end="url(#aN)"/><path d="M1087 338 L1120 338" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-end="url(#aN)"/><path d="M222 208 L222 271" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-end="url(#aN)"/><path d="M418 209 L418 270" stroke="#e5173f" stroke-width="3.5" fill="none" stroke-dasharray="7 5" marker-start="url(#aR)" marker-end="url(#aR)"/><path d="M614 209 L614 270" stroke="#e5173f" stroke-width="3.5" fill="none" stroke-dasharray="7 5" marker-start="url(#aR)" marker-end="url(#aR)"/><path d="M810 209 L810 270" stroke="#e5173f" stroke-width="3.5" fill="none" stroke-dasharray="7 5" marker-start="url(#aR)" marker-end="url(#aR)"/><path d="M1006 209 L1006 270" stroke="#e5173f" stroke-width="3.5" fill="none" stroke-dasharray="7 5" marker-start="url(#aR)" marker-end="url(#aR)"/><path d="M1202 209 L1202 270" stroke="#e5173f" stroke-width="3.5" fill="none" stroke-dasharray="7 5" marker-start="url(#aR)" marker-end="url(#aR)"/><path d="M222 404 L222 467" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-end="url(#aN)"/><path d="M418 405 L418 466" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-start="url(#aN)" marker-end="url(#aN)"/><path d="M614 405 L614 466" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-start="url(#aN)" marker-end="url(#aN)"/><path d="M810 405 L810 466" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-start="url(#aN)" marker-end="url(#aN)"/><path d="M1006 405 L1006 466" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-start="url(#aN)" marker-end="url(#aN)"/><path d="M1202 405 L1202 466" stroke="#0b0f1a" stroke-width="3.5" fill="none" marker-start="url(#aN)" marker-end="url(#aN)"/><path d="M1283 142 L1316 142" stroke="#0a7d5c" stroke-width="3.5" fill="none" marker-end="url(#aG)"/><path d="M1283 534 L1316 534" stroke="#0a7d5c" stroke-width="3.5" fill="none" marker-end="url(#aG)"/><path d="M1398 184 L1398 467" stroke="#0a7d5c" stroke-width="3.5" fill="none" marker-end="url(#aG)"/></svg>
+    <div class="lbl" style="left:1267px;top:102px;font-size:11.5px;padding:2px 6px;">approve</div><div class="lbl" style="left:1406px;top:326px;font-size:11.5px;padding:2px 6px;">record it</div>
+    <div style="position:absolute;left:24px;top:642px;width:1472px;height:48px;background:#101a3a;color:#fff;border:3px solid #0b0f1a;border-radius:12px;display:flex;align-items:center;gap:14px;padding:0 16px;font-size:14px;font-weight:600;"><b style="font-family:'Press Start 2P',monospace;font-size:11px;color:#ffd23f;font-weight:400;white-space:nowrap;flex:none;">ANY TIME</b><span>An event can arrive: a rate move, a lender change, or a late document. The deal manager marks the affected results <b>stale</b> and re-runs only those steps. If the best plan changes, <b style="color:#ffd23f">E5</b> asks the reviewer.</span></div>
+  </div>
+  <div class="legend"><span><i class="a"></i>AI agent</span><span><i class="c"></i>Code (no AI)</span><span><i class="h"></i>Human reviewer</span><span><i class="e"></i>Escalation point (E1 to E6)</span></div>
+</section>
+
+<!-- PAGE 2: THE THREE LOOPS -->
+<section class="page">
+  <div class="head">
+    <div class="kicker">STOCHASTIC &middot; 02 DEAL FLOWGRAPH &middot; PAGE 2 OF 2</div>
+    <h1>WHEN THINGS CHANGE</h1>
+    <p class="sub">Three loops that run inside the deal: an event, a blocked plan, and a rejection</p>
+  </div>
+  <div class="canvas">
+    <div class="loops">
+
+      <div class="loop">
+        <div class="lt"><div class="big">A</div><h2>AN EVENT ARRIVES</h2><p>The deal does not restart. Only the stale parts run again.</p></div>
+        <div class="row">
+          <div class="st d"><b>Event</b><span>Rate move, lender change, or a late document.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st c"><b>Gateway logs it</b><span>The event becomes a work item with a time stamp.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st a"><b>Deal manager</b><span>Marks every affected result stale.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st c"><b>Re-run</b><span>Only stale steps run again: deal math, Monte Carlo.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st q"><b>Did the best plan change?</b><span>If no, the memo updates and the deal goes on.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#e5173f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st h"><span class="tg">E5</span><b>Reviewer</b><span>Sees what changed and why before anything moves on.</span></div>
+        </div>
+      </div>
+
+      <div class="loop">
+        <div class="lt"><div class="big">B</div><h2>A CLAUSE BLOCKS THE PLAN</h2><p>This is the demo moment. The block is a logged action, not a sentence in a report.</p></div>
+        <div class="row">
+          <div class="st a"><b>Structuring agent</b><span>Proposes the best plan it found.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st c"><b>Deal math</b><span>Checks the plan against each limit. One clause fails.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st c"><b>Gateway</b><span>Logs a DENIED transition. It cites the exact clause quote.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st a"><b>Redesign and price</b><span>New plan inside the limit, plus the cost of asking the lender for consent.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#e5173f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st h"><span class="tg">E4</span><b>Reviewer</b><span>Sees both routes with the evidence, then chooses.</span></div>
+        </div>
+      </div>
+
+      <div class="loop">
+        <div class="lt"><div class="big">C</div><h2>A REJECTION BECOMES A POLICY</h2><p>The system gets better from a "no". It needs a few seeded past decisions for evidence.</p></div>
+        <div class="row">
+          <div class="st h"><span class="tg">E6</span><b>Reviewer rejects</b><span>Gives a reason in plain words.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st a"><b>Memo agent</b><span>Searches past decisions for the same pattern.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st a"><b>Proposes a policy</b><span>A general rule, with the evidence behind it.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st c"><b>Backtest</b><span>Runs the rule on past deals to see what it would change.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#e5173f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st h"><b>Senior approves</b><span>A human approves the policy. The agent that wrote it cannot.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st d"><b>Policy saved</b><span>The next deal starts with this rule.</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <div class="legend"><span><i class="a"></i>AI agent</span><span><i class="c"></i>Code (no AI)</span><span><i class="h"></i>Human reviewer</span><span><i class="e"></i>Escalation point</span><span><i class="d"></i>Data</span></div>
+</section>
+
+</body>
+</html>

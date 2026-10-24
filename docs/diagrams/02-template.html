@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stochastic - 02 Deal Flowgraph</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  svg.arrows { position: absolute; left: 0; top: 0; width: 1520px; height: 700px; pointer-events: none; }
+  .lbl { position: absolute; background: #fff; border: 2px solid var(--ink); border-radius: 8px; font-weight: 800; white-space: nowrap; }
+  .loops { position: absolute; inset: 22px 24px; display: grid; grid-template-rows: 1fr 1fr 1fr; gap: 16px; }
+  .loop { display: grid; grid-template-columns: 210px 1fr; gap: 16px; align-items: stretch; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); padding: 12px 14px; background: #fff; }
+  .lt { display: flex; flex-direction: column; justify-content: center; }
+  .lt .big { font-family: 'Press Start 2P', monospace; font-size: 30px; color: var(--esc); }
+  .lt h2 { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: 12px; line-height: 1.5; margin-top: 8px; }
+  .lt p { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+  .row { display: flex; align-items: stretch; gap: 0; }
+  .st { flex: 1; border: 3px solid var(--ink); border-radius: 11px; padding: 8px 10px; box-shadow: 3px 3px 0 var(--ink); position: relative; }
+  .st b { display: block; font-size: 15px; font-weight: 800; line-height: 1.15; }
+  .st span { display: block; font-size: 13.6px; line-height: 1.33; margin-top: 5px; }
+  .st span.tg { display: inline-block; margin-top: 0; }
+  .st.a { background: var(--agent); } .st.a span { color: #3b3200; }
+  .st.c { background: var(--code); color: #fff; } .st.c span { color: #d5dcf0; }
+  .st.h { background: var(--human); color: #fff; } .st.h span { color: #e4f7ef; }
+  .st.d { background: var(--data); } .st.d span { color: #33415c; }
+  .st.q { background: #fff; border-style: dashed; border-width: 3px; }
+  .st.q span { color: var(--muted); }
+  .tg { display: inline-block; background: var(--esc); color: #fff; border: 2px solid #fff; border-radius: 6px; font-size: 10.5px; font-weight: 800; padding: 1px 6px; margin-bottom: 4px; }
+  .ar { width: 26px; flex: none; display: flex; align-items: center; justify-content: center; }
+  .ar svg { width: 22px; height: 22px; }
+  .note { font-size: 12.5px; font-weight: 700; color: var(--esc); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: SWIMLANE -->
+<section class="page">
+  <div class="head">
+    <div class="kicker">STOCHASTIC &middot; 02 DEAL FLOWGRAPH &middot; PAGE 1 OF 2</div>
+    <h1>ONE DEAL, START TO FINISH</h1>
+    <p class="sub">Read left to right. Red dashed arrows are the points where an agent stops and asks the human.</p>
+  </div>
+  <div class="canvas">
+    <!--SWIMLANE-->
+  </div>
+  <div class="legend"><span><i class="a"></i>AI agent</span><span><i class="c"></i>Code (no AI)</span><span><i class="h"></i>Human reviewer</span><span><i class="e"></i>Escalation point (E1 to E6)</span></div>
+</section>
+
+<!-- PAGE 2: THE THREE LOOPS -->
+<section class="page">
+  <div class="head">
+    <div class="kicker">STOCHASTIC &middot; 02 DEAL FLOWGRAPH &middot; PAGE 2 OF 2</div>
+    <h1>WHEN THINGS CHANGE</h1>
+    <p class="sub">Three loops that run inside the deal: an event, a blocked plan, and a rejection</p>
+  </div>
+  <div class="canvas">
+    <div class="loops">
+
+      <div class="loop">
+        <div class="lt"><div class="big">A</div><h2>AN EVENT ARRIVES</h2><p>The deal does not restart. Only the stale parts run again.</p></div>
+        <div class="row">
+          <div class="st d"><b>Event</b><span>Rate move, lender change, or a late document.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st c"><b>Gateway logs it</b><span>The event becomes a work item with a time stamp.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st a"><b>Deal manager</b><span>Marks every affected result stale.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st c"><b>Re-run</b><span>Only stale steps run again: deal math, Monte Carlo.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st q"><b>Did the best plan change?</b><span>If no, the memo updates and the deal goes on.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#e5173f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st h"><span class="tg">E5</span><b>Reviewer</b><span>Sees what changed and why before anything moves on.</span></div>
+        </div>
+      </div>
+
+      <div class="loop">
+        <div class="lt"><div class="big">B</div><h2>A CLAUSE BLOCKS THE PLAN</h2><p>This is the demo moment. The block is a logged action, not a sentence in a report.</p></div>
+        <div class="row">
+          <div class="st a"><b>Structuring agent</b><span>Proposes the best plan it found.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st c"><b>Deal math</b><span>Checks the plan against each limit. One clause fails.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st c"><b>Gateway</b><span>Logs a DENIED transition. It cites the exact clause quote.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st a"><b>Redesign and price</b><span>New plan inside the limit, plus the cost of asking the lender for consent.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#e5173f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st h"><span class="tg">E4</span><b>Reviewer</b><span>Sees both routes with the evidence, then chooses.</span></div>
+        </div>
+      </div>
+
+      <div class="loop">
+        <div class="lt"><div class="big">C</div><h2>A REJECTION BECOMES A POLICY</h2><p>The system gets better from a "no". It needs a few seeded past decisions for evidence.</p></div>
+        <div class="row">
+          <div class="st h"><span class="tg">E6</span><b>Reviewer rejects</b><span>Gives a reason in plain words.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st a"><b>Memo agent</b><span>Searches past decisions for the same pattern.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st a"><b>Proposes a policy</b><span>A general rule, with the evidence behind it.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st c"><b>Backtest</b><span>Runs the rule on past deals to see what it would change.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#e5173f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st h"><b>Senior approves</b><span>A human approves the policy. The agent that wrote it cannot.</span></div>
+          <div class="ar"><svg viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="#0b0f1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="st d"><b>Policy saved</b><span>The next deal starts with this rule.</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <div class="legend"><span><i class="a"></i>AI agent</span><span><i class="c"></i>Code (no AI)</span><span><i class="h"></i>Human reviewer</span><span><i class="e"></i>Escalation point</span><span><i class="d"></i>Data</span></div>
+</section>
+
+</body>
+</html>

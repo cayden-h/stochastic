@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stochastic - Workflow and Tech Stack</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap');
+  @page { size: 1600px 900px; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #1f5eff;
+    --bg-dot: rgba(255,255,255,0.14);
+    --card: #ffffff;
+    --ink: #0b0f1a;
+    --muted: #4a5568;
+    --shadow: #0f46d1;
+    --accent: #ffd23f;
+    --warn: #ff4d6d;
+    --ok: #12b886;
+    --soft: #eaf0ff;
+  }
+  html, body { background: var(--bg); }
+  body { font-family: 'Inter', -apple-system, 'Helvetica Neue', Arial, sans-serif; color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page {
+    width: 1600px; height: 900px; padding: 44px 64px 40px; position: relative; overflow: hidden;
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--bg-dot) 1.6px, transparent 1.6px);
+    background-size: 26px 26px;
+    page-break-after: always; break-after: page;
+  }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+  h1 { font-family: 'Press Start 2P', 'Courier New', monospace; color: #fff; font-size: 54px; text-align: center; letter-spacing: 2px; line-height: 1.15; text-shadow: 5px 5px 0 var(--shadow); }
+  .sub { text-align: center; color: #dbe6ff; font-size: 19px; margin-top: 12px; font-weight: 600; }
+  .card { background: var(--card); border-radius: 18px; box-shadow: 9px 9px 0 var(--shadow); padding: 22px 26px; }
+  .card h2 { font-family: 'Press Start 2P', 'Courier New', monospace; font-size: 22px; text-align: center; margin-bottom: 16px; letter-spacing: 1px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; }
+  .chip { border: 2.5px solid var(--ink); border-radius: 10px; padding: 7px 13px; font-weight: 800; font-size: 17px; background: #fff; box-shadow: 3px 3px 0 var(--ink); }
+  .chip.y { background: var(--accent); }
+  .chip.b { background: var(--soft); }
+  .chip.g { background: #d3f9e8; }
+  .note { font-size: 14.5px; color: var(--muted); margin-top: 11px; line-height: 1.4; text-align: center; }
+  .grid { display: grid; gap: 30px; margin-top: 30px; }
+
+  /* page 1 */
+  .p1 { grid-template-columns: 1fr 1fr 1.05fr; grid-template-rows: auto auto auto; gap: 24px 30px; margin-top: 22px; }
+  .p1 .card { padding: 16px 22px; }
+  .p1 .card h2 { margin-bottom: 11px; font-size: 20px; }
+  .p1 .chip { font-size: 15.5px; padding: 5px 11px; }
+  .p1 .note { margin-top: 9px; font-size: 14px; }
+  .p1 .span2 { grid-column: span 2; }
+  .tag { display: inline-block; font-size: 12.5px; font-weight: 800; padding: 3px 9px; border-radius: 7px; margin: 2px 3px; border: 2px solid var(--ink); }
+  .tag.main { background: var(--accent); }
+  .tag.maybe { background: #d3f9e8; }
+  .tag.no { background: #f1f3f5; color: #667085; border-color: #98a2b3; }
+  .trk { margin: 9px 0; font-size: 15.5px; line-height: 1.35; }
+  .trk b { font-weight: 800; }
+  .legend { font-size: 13.5px; color: #dbe6ff; text-align: center; margin-top: 18px; }
+
+  /* page 2 */
+  .flow { display: grid; grid-template-columns: 270px 1fr 280px; gap: 26px; margin-top: 24px; align-items: stretch; }
+  .strip { margin-top: 24px; background: var(--ink); color: #fff; border: 3px solid #fff; border-radius: 14px; padding: 13px 20px; box-shadow: 6px 6px 0 var(--shadow); display: flex; gap: 16px; align-items: center; justify-content: center; flex-wrap: wrap; font-size: 15.5px; }
+  .strip b { font-family: 'Press Start 2P', monospace; font-size: 13px; color: var(--accent); }
+  .strip span.t { border: 2px solid #fff; border-radius: 8px; padding: 4px 10px; font-weight: 700; font-size: 14.5px; }
+  .four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-top: 30px; }
+  .four .card { padding: 16px 20px; }
+  .four h3 { font-family: 'Press Start 2P', 'Courier New', monospace; font-size: 14px; margin-bottom: 10px; line-height: 1.4; }
+  .four p { font-size: 14.5px; line-height: 1.4; color: var(--muted); }
+  .col { display: flex; flex-direction: column; gap: 18px; justify-content: center; }
+  .box { background: #fff; border: 3px solid var(--ink); border-radius: 14px; padding: 12px 15px; box-shadow: 6px 6px 0 var(--shadow); }
+  .box h3 { font-size: 18px; font-weight: 800; }
+  .box p { font-size: 14.5px; color: var(--muted); margin-top: 3px; line-height: 1.35; }
+  .box.y { background: var(--accent); }
+  .box.y p { color: #3b3200; }
+  .box.dark { background: var(--ink); color: #fff; border-color: #fff; box-shadow: 6px 6px 0 var(--shadow); }
+  .box.dark p { color: #cbd5e1; }
+  .mid { display: flex; flex-direction: column; gap: 14px; }
+  .arrow { text-align: center; font-family: 'Press Start 2P', monospace; color: #fff; font-size: 22px; line-height: 1; }
+  .agents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .agents .box { padding: 11px 12px; }
+  .agents .box h3 { font-size: 16.5px; }
+  .agents .box p { font-size: 13px; }
+  .esc { display: inline-block; font-family: 'Press Start 2P', monospace; font-size: 10px; background: var(--warn); color: #fff; padding: 5px 7px; border-radius: 6px; margin-top: 8px; margin-right: 4px; }
+  .bus { background: rgba(255,255,255,0.18); border: 2.5px dashed #fff; border-radius: 12px; color: #fff; font-weight: 800; text-align: center; padding: 10px; font-size: 16px; }
+  .events { color: #fff; font-weight: 700; font-size: 14.5px; text-align: center; line-height: 1.4; }
+
+  /* page 3 */
+  .p3 { grid-template-columns: 1.15fr 1fr; }
+  .elist { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+  .elist li { display: grid; grid-template-columns: 62px 1fr; gap: 12px; align-items: start; font-size: 16.5px; line-height: 1.35; }
+  .elist .esc { margin: 0; text-align: center; }
+  .elist b { font-weight: 800; }
+  .pl { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .pl li { font-size: 16.5px; line-height: 1.38; padding-left: 26px; position: relative; }
+  .pl li::before { content: ''; position: absolute; left: 0; top: 5px; width: 13px; height: 13px; background: var(--accent); border: 2.5px solid var(--ink); border-radius: 3px; }
+  .foot { position: absolute; left: 64px; right: 64px; bottom: 22px; color: #dbe6ff; font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: TECH STACK -->
+<section class="page">
+  <h1>TECH STACK</h1>
+  <p class="sub">Stochastic: an AI special-situations financing team (proposed stack, not final)</p>
+
+  <div class="grid p1">
+    <div class="card">
+      <h2>FRONTEND</h2>
+      <div class="chips">
+        <span class="chip b">Next.js</span><span class="chip b">React</span><span class="chip b">TypeScript</span><span class="chip b">Tailwind</span>
+      </div>
+      <p class="note">Reviewer console: deal board, escalation cards, side-by-side plan table, audit log viewer.</p>
+    </div>
+
+    <div class="card">
+      <h2>BACKEND</h2>
+      <div class="chips">
+        <span class="chip y">Python</span><span class="chip y">FastAPI</span><span class="chip y">NumPy</span><span class="chip y">OR-Tools (optional)</span>
+      </div>
+      <p class="note">Workflow engine (state machine and gateway), deterministic deal math, seeded Monte Carlo, quote and number validator.</p>
+    </div>
+
+    <div class="card" style="grid-row: span 3;">
+      <h2>TRACKS</h2>
+      <div class="trk"><span class="tag main">MAIN</span> <b>Hyphenate</b> - autonomous finance system, $8K / $5K / $3K plus interviews.</div>
+      <div class="trk"><span class="tag maybe">REAL FIT</span> <b>Tiger Data</b> (MLH) - Postgres forks hold alternative structures.</div>
+      <div class="trk"><span class="tag maybe">CHEAP</span> <b>Vultr</b> (MLH) - host the backend and API.</div>
+      <div class="trk"><span class="tag maybe">CHEAP</span> <b>Gemini API</b> (MLH) - only if a real step uses it.</div>
+      <div class="trk"><span class="tag maybe">CHEAP</span> <b>GoDaddy Registry</b> (MLH) - register after kickoff.</div>
+      <div class="trk"><span class="tag maybe">ASK</span> <b>Microsoft</b> - finance named, rules on required products unknown.</div>
+      <div class="trk"><span class="tag no">THIN</span> <b>CRS</b> - consumer credit data, weak fit.</div>
+      <div class="trk"><span class="tag no">SKIP</span> Bright Data (bans mocked data), Apify, Coinbase, Fetch.ai, Creao, Convex, Spacetime.</div>
+      <p class="note" style="text-align:left">Anthropic gives hackers $50 in API credits. We claim no Anthropic prize.</p>
+    </div>
+
+    <div class="card">
+      <h2>DATA</h2>
+      <div class="chips">
+        <span class="chip g">Postgres on Tiger Cloud</span><span class="chip g">pgvector / pgvectorscale</span><span class="chip g">Zero-copy forks</span>
+      </div>
+      <p class="note">Exact facts in tables (deals, clauses, decisions, policies). Vectors only find text. Audit log is append-only and hash-chained.</p>
+    </div>
+
+    <div class="card">
+      <h2>MODELS</h2>
+      <div class="chips">
+        <span class="chip y">Claude (Anthropic API)</span><span class="chip b">Gemini (optional)</span>
+      </div>
+      <p class="note">Models read, reason, and write memos. They never produce deal numbers. Code does the math.</p>
+    </div>
+
+    <div class="card span2">
+      <h2>PUBLIC DATA AND HOSTING</h2>
+      <div class="chips">
+        <span class="chip">SEC EDGAR</span><span class="chip">NY Fed SOFR</span><span class="chip">FRED</span><span class="chip">Census</span><span class="chip">Damodaran</span><span class="chip y">Vultr</span>
+      </div>
+      <p class="note">Agreements and financials come from EDGAR, cached before the demo (no SEC calls on stage). Rate and volatility inputs are labeled assumptions.</p>
+    </div>
+  </div>
+  <p class="foot">Logos left out on purpose (text chips only). Prize rules are unconfirmed until the Live Site and booths confirm them. MLH prizes need an opt-in on Devpost.</p>
+</section>
+
+<!-- PAGE 2: WORKFLOW -->
+<section class="page">
+  <h1>WORKFLOW</h1>
+  <p class="sub">One master agent, four specialists, one gateway, and a human who is asked at the moment it matters</p>
+
+  <div class="flow">
+    <div class="col">
+      <div class="box dark"><h3>1. INPUT</h3><p>Deal documents (credit agreement, amendments, financials, term sheets) plus a one-line brief: amount, purpose, timeline, hard limits.</p></div>
+      <div class="events">EVENTS ARRIVE DURING THE DEAL<br>rate move - lender changes terms - late document - reviewer feedback</div>
+    </div>
+
+    <div class="mid">
+      <div class="box y" style="text-align:center"><h3>DEAL MANAGER (MASTER AGENT)</h3><p style="color:#3b3200">Classifies the situation (8 types), picks a playbook, creates tasks, marks stale results when an event lands, decides when to ask the human.</p></div>
+      <div class="arrow">v</div>
+      <div class="agents">
+        <div class="box"><h3>Intake</h3><p>Sorts and parses documents. Builds a fact table with a citation for each fact. Lists missing documents.</p><span class="esc">E1</span><span class="esc">E2</span></div>
+        <div class="box"><h3>Clause reader</h3><p>Finds baskets, covenants, and definitions. Builds the constraint set with exact quotes and confidence.</p><span class="esc">E3</span></div>
+        <div class="box"><h3>Structuring</h3><p>Builds mixes of senior, junior, and preferred under the constraints. Keeps the best trade-offs.</p><span class="esc">E4</span></div>
+        <div class="box"><h3>Risk</h3><p>Runs seeded Monte Carlo on the shortlist. Reports breach, dividend, and loss odds.</p><span class="esc">E5</span></div>
+      </div>
+      <div class="arrow">v</div>
+      <div class="bus">TASKS AND RESULTS ARE TYPED WORK ITEMS IN POSTGRES. AGENTS DO NOT CHAT WITH EACH OTHER.</div>
+      <div class="arrow">v</div>
+      <div class="box" style="text-align:center"><h3>MEMO AND APPROVALS AGENT</h3><p>Writes the recommendation and the side-by-side table. Turns a rejection into a proposed policy with evidence.</p><span class="esc">E6</span></div>
+    </div>
+
+    <div class="col">
+      <div class="box dark"><h3>GATEWAY (CODE)</h3><p>The only writer. Checks permissions, blocks self-approval, logs every action and every denied attempt.</p></div>
+      <div class="box y"><h3>HUMAN REVIEWER</h3><p>A senior person who has done this work. Confirms key facts, answers questions, approves, rejects, or asks for changes.</p></div>
+      <div class="box"><h3>MEMORY</h3><p>Past deals, decisions, and approved policies feed the next deal.</p></div>
+    </div>
+  </div>
+  <div class="strip"><b>POSTGRES ON TIGER CLOUD</b><span class="t">work_item</span><span class="t">fact + citation</span><span class="t">document_chunk (pgvector)</span><span class="t">precedent</span><span class="t">policy</span><span class="t">audit_log (hash-chained)</span><span class="t">forks for what-if plans</span></div>
+  <p class="foot">E1 to E6 mark where an agent can stop and ask the human. See the next page. The workflow follows the Hyphenate workshop blueprint (NEEDS_INFO, APPROVED, POSTED states).</p>
+</section>
+
+<!-- PAGE 3: ESCALATION AND PROOF -->
+<section class="page">
+  <h1>ASK EARLY. PROVE IT.</h1>
+  <p class="sub">The human is asked when the agent is unsure, not only at the end</p>
+
+  <div class="grid p3">
+    <div class="card">
+      <h2>WHEN AN AGENT ASKS</h2>
+      <ul class="elist">
+        <li><span class="esc">E1</span><span><b>Missing document.</b> The existing agreement or an amendment is not in the upload. The agent requests it and pauses that part.</span></li>
+        <li><span class="esc">E2</span><span><b>Facts to rely on.</b> One screen of the facts that drive the plan. The reviewer confirms or corrects them.</span></li>
+        <li><span class="esc">E3</span><span><b>Low-confidence clause.</b> The quote is unclear or a defined term cannot be resolved. The agent asks and does not guess.</span></li>
+        <li><span class="esc">E4</span><span><b>Plan is blocked.</b> A clause stops the first plan. The agent shows the redesign, the consent or waiver route, and the price of the clause.</span></li>
+        <li><span class="esc">E5</span><span><b>Recommendation flips.</b> A rate move or lender change changes the best plan. The reviewer sees what changed and why.</span></li>
+        <li><span class="esc">E6</span><span><b>Final approval.</b> The reviewer approves, rejects, or asks for changes. A rejection becomes a proposed policy.</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>PROOF FOR JUDGES</h2>
+      <ul class="pl">
+        <li><b>Real deal, answer key.</b> Replay a real public deal (Organogenesis, Nov 2024) from the documents that existed before it. Compare with what actually happened.</li>
+        <li><b>Catch-rate score.</b> Planted and real clauses with recall, precision, and silent-error counts.</li>
+        <li><b>Deterministic math.</b> 14 closed-form tests for the simulator. No number reaches a memo without a run id.</li>
+        <li><b>Limits in code.</b> The proposing agent cannot approve its own plan. Only the gateway posts.</li>
+        <li><b>Adversarial tests.</b> Self-approval, a forged amendment, a prompt injected inside the loan agreement, a swapped plan after approval, a poisoned policy.</li>
+        <li><b>Honest framing.</b> A reconstruction from public filings, not the lenders' internal views.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="four">
+    <div class="card"><h3>REAL ENOUGH?</h3><p>Real filings, real clauses, and an answer key from what actually happened.</p></div>
+    <div class="card"><h3>WOULD YOU HIRE IT?</h3><p>It asks early, limits are enforced in code, and every step is in the audit log.</p></div>
+    <div class="card"><h3>SOMETHING NEW?</h3><p>Planning the consent or waiver route when a clause blocks a plan. Our research found no product for it, which is not proof that none exists.</p></div>
+    <div class="card"><h3>THE MOMENT</h3><p>The agent catches the clause that blocks the plan, re-plans, and defends the new plan with evidence.</p></div>
+  </div>
+  <p class="foot">Design proposal. No practitioner has checked the assumptions yet, including whether redeemable preferred counts as debt under a given agreement.</p>
+</section>
+
+</body>
+</html>

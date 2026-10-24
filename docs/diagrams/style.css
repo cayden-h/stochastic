@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600;700;800&display=swap');
+@page { size: 1600px 900px; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #1f5eff;
+  --dot: rgba(255,255,255,0.14);
+  --ink: #0b0f1a;
+  --muted: #475467;
+  --shadow: #0f46d1;
+  --agent: #ffd23f;
+  --agent-soft: #fff6d1;
+  --code: #101a3a;
+  --code-soft: #e6eaf6;
+  --human: #0a7d5c;
+  --human-soft: #dcf5ea;
+  --esc: #e5173f;
+  --data: #eaf0ff;
+}
+html, body { background: var(--bg); }
+body { font-family: 'Inter', -apple-system, 'Helvetica Neue', Arial, sans-serif; color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.page {
+  width: 1600px; height: 900px; position: relative; overflow: hidden;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--dot) 1.6px, transparent 1.6px);
+  background-size: 26px 26px;
+  break-after: page; page-break-after: always;
+}
+.page:last-child { break-after: auto; page-break-after: auto; }
+.head { position: absolute; left: 40px; top: 24px; right: 40px; }
+.kicker { font-weight: 800; font-size: 13px; letter-spacing: .14em; color: #cfe0ff; }
+h1 { font-family: 'Press Start 2P', 'Courier New', monospace; color: #fff; font-size: 32px; line-height: 1.2; text-shadow: 4px 4px 0 var(--shadow); margin-top: 8px; font-weight: 400; }
+.sub { color: #e3ecff; font-size: 17px; font-weight: 600; margin-top: 8px; }
+.canvas { position: absolute; left: 40px; top: 128px; width: 1520px; height: 700px; background: #fff; border-radius: 20px; box-shadow: 10px 10px 0 var(--shadow); overflow: hidden; }
+.legend { position: absolute; left: 40px; right: 40px; bottom: 20px; display: flex; gap: 24px; align-items: center; justify-content: center; color: #e3ecff; font-size: 13.5px; font-weight: 700; }
+.legend i { display: inline-block; width: 15px; height: 15px; border-radius: 4px; border: 2px solid var(--ink); margin-right: 7px; vertical-align: -3px; }
+.legend i.a { background: var(--agent); }
+.legend i.c { background: var(--code); }
+.legend i.h { background: var(--human); }
+.legend i.e { background: var(--esc); }
+.legend i.d { background: var(--data); }
+
+/* node boxes (absolute inside a canvas) */
+.n { position: absolute; border: 3px solid var(--ink); border-radius: 12px; padding: 9px 11px; box-shadow: 4px 4px 0 var(--ink); background: #fff; }
+.n h3 { font-size: 14.5px; font-weight: 800; line-height: 1.15; }
+.n p { font-size: 12.6px; font-weight: 500; line-height: 1.3; margin-top: 5px; color: var(--muted); }
+.n.agent { background: var(--agent); }
+.n.agent p { color: #3b3200; }
+.n.code { background: var(--code); color: #fff; }
+.n.code p { color: #d5dcf0; }
+.n.human { background: var(--human); color: #fff; }
+.n.human p { color: #e4f7ef; }
+.n.data { background: var(--data); }
+.n.data p { color: #33415c; }
+.badge { display: inline-block; background: var(--esc); color: #fff; font-weight: 800; font-size: 11px; letter-spacing: .04em; border-radius: 6px; padding: 2px 7px; margin: 0 4px 5px 0; border: 2px solid #fff; }
+.badge.plain { background: #fff; color: var(--ink); border-color: var(--ink); }
+
+/* generic flow cards (relative layout) */
+.card { background: #fff; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); padding: 16px 18px; }
+.card h2 { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: 14px; line-height: 1.35; margin-bottom: 11px; }
+.card p, .card li { font-size: 15px; line-height: 1.42; color: #1f2937; }
+.card ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.card li { padding-left: 22px; position: relative; }
+.card li::before { content: ''; position: absolute; left: 0; top: 5px; width: 11px; height: 11px; background: var(--agent); border: 2.5px solid var(--ink); border-radius: 3px; }
+.tag { display: inline-block; font-weight: 800; font-size: 11.5px; letter-spacing: .05em; padding: 2px 8px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; margin-right: 5px; }
+.tag.a { background: var(--agent); }
+.tag.c { background: var(--code); color: #fff; }
+.tag.h { background: var(--human); color: #fff; }
+.tag.e { background: var(--esc); color: #fff; border-color: #fff; }
+.tag.d { background: var(--data); }

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stochastic - 01 Big Picture</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .p1 { position: absolute; inset: 26px; display: grid; grid-template-rows: auto auto 1fr; gap: 20px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .two .card { background: var(--agent-soft); }
+  .two .card p { font-size: 16.5px; line-height: 1.5; }
+  .steps { display: flex; align-items: stretch; gap: 0; }
+  .step { flex: 1; background: #fff; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); padding: 12px 14px 12px; position: relative; }
+  .step .num { position: absolute; top: -15px; left: 12px; width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: #fff; font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; border: 3px solid #fff; }
+  .step h3 { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: 13px; margin: 6px 0 8px; }
+  .step p { font-size: 14.5px; line-height: 1.4; color: #1f2937; min-height: 62px; }
+  .step .tag { margin-top: 8px; }
+  .link { width: 34px; display: flex; align-items: center; justify-content: center; }
+  .link svg { width: 30px; height: 30px; }
+  .three .card li { font-size: 16.5px; line-height: 1.5; }
+  .three .card ul { gap: 12px; }
+  .three { display: grid; grid-template-columns: 1fr 1fr 1.15fr; gap: 24px; }
+  .rules li::before { background: var(--esc); }
+  .rules b { font-weight: 800; }
+  .demo { margin-top: 12px; font-size: 14.5px; background: var(--data); border: 2.5px dashed var(--ink); border-radius: 10px; padding: 8px 12px; line-height: 1.4; }
+  /* page 2 diagram */
+  .zone { position: absolute; border-radius: 16px; border: 3px dashed var(--ink); }
+  .zone .zl { position: absolute; top: -13px; left: 18px; background: #fff; padding: 0 8px; font-family: 'Press Start 2P', monospace; font-size: 12px; }
+  .lbl { position: absolute; background: #fff; border: 2px solid var(--ink); border-radius: 8px; font-size: 12.5px; font-weight: 800; padding: 3px 8px; white-space: nowrap; }
+  svg.arrows { position: absolute; left: 0; top: 0; width: 1520px; height: 700px; pointer-events: none; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 2.5px solid var(--ink); border-radius: 9px; background: #fff; padding: 4px 10px; font-weight: 800; font-size: 13.5px; }
+  .prof { position: absolute; left: 24px; right: 24px; top: 20px; display: flex; align-items: center; gap: 10px; background: var(--agent-soft); border: 3px solid var(--ink); border-radius: 13px; padding: 10px 16px; }
+  .prof .pt { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: 12px; margin-right: 6px; }
+  .prof .pc { border: 2.5px solid var(--ink); border-radius: 9px; background: #fff; padding: 4px 11px; font-weight: 800; font-size: 14px; }
+  .prof .pn { margin-left: auto; font-size: 14px; font-weight: 600; color: var(--muted); }
+  table.sit { position: absolute; left: 24px; right: 24px; top: 92px; width: 1472px; border-collapse: collapse; font-size: 15.5px; }
+  table.sit th { background: var(--ink); color: #fff; font-size: 12px; letter-spacing: .06em; text-align: left; padding: 8px 12px; border: 2.5px solid var(--ink); }
+  table.sit td { border: 2.5px solid var(--ink); padding: 13px 14px; line-height: 1.32; }
+  table.sit tr:nth-child(odd) td { background: #f6f8ff; }
+  table.sit td:first-child { font-size: 16.5px; width: 230px; }
+  .fine { position: absolute; left: 24px; right: 24px; bottom: 14px; font-size: 13px; color: var(--muted); line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: WHAT IT DOES -->
+<section class="page">
+  <div class="head">
+    <div class="kicker">STOCHASTIC &middot; 01 BIG PICTURE &middot; PAGE 1 OF 3</div>
+    <h1>WHAT IT DOES</h1>
+    <p class="sub">One platform for any special situation: AI agents that read, structure, test, and ask a human</p>
+  </div>
+  <div class="canvas">
+    <div class="p1">
+      <div class="two">
+        <div class="card">
+          <h2>THE PROBLEM</h2>
+          <p>A company hits a special situation: it needs new money, plans a merger, is in trouble, wants to refinance, or is changing hands. Each one needs the same hard work. Read the agreements, find the limits, design options, test the risk, and get a senior person to approve. Today this work is slow and manual.</p>
+        </div>
+        <div class="card">
+          <h2>WHAT STOCHASTIC IS</h2>
+          <p>Stochastic is one platform for all of them. A situation profile tells the same team of agents what to look for, what to weigh, and when to ask. It works one deal from the first document to the final approval and asks a human whenever it is unsure. Code does all the deal math, so the numbers can be checked.</p>
+        </div>
+      </div>
+
+      <div class="steps">
+        <div class="step"><div class="num">1</div><h3>READ</h3><p>Turn the uploaded documents into facts. Each fact keeps its page and quote.</p><span class="tag a">INTAKE AGENT</span></div>
+        <div class="link"><svg viewBox="0 0 30 30"><path d="M4 15h20M17 8l8 7-8 7" fill="none" stroke="#0b0f1a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="step"><div class="num">2</div><h3>FIND LIMITS</h3><p>Find the clauses that limit new debt, dividends, and sales. Quote them exactly.</p><span class="tag a">CLAUSE READER</span></div>
+        <div class="link"><svg viewBox="0 0 30 30"><path d="M4 15h20M17 8l8 7-8 7" fill="none" stroke="#0b0f1a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="step"><div class="num">3</div><h3>DESIGN</h3><p>Build options inside the limits, such as mixes of senior debt, junior debt, and preferred equity.</p><span class="tag a">STRUCTURING</span></div>
+        <div class="link"><svg viewBox="0 0 30 30"><path d="M4 15h20M17 8l8 7-8 7" fill="none" stroke="#0b0f1a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="step"><div class="num">4</div><h3>TEST RISK</h3><p>Run thousands of seeded scenarios. Report the odds of a breach or a loss.</p><span class="tag a">RISK AGENT</span></div>
+        <div class="link"><svg viewBox="0 0 30 30"><path d="M4 15h20M17 8l8 7-8 7" fill="none" stroke="#0b0f1a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="step"><div class="num">5</div><h3>GET APPROVAL</h3><p>Write the recommendation. A senior human approves, rejects, or asks for changes.</p><span class="tag a">MEMO AGENT</span><span class="tag h">HUMAN</span></div>
+      </div>
+
+      <div class="three">
+        <div class="card">
+          <h2>YOU GIVE IT</h2>
+          <ul>
+            <li>The loan agreement and its amendments</li>
+            <li>Financial statements</li>
+            <li>A term sheet or an offer</li>
+            <li>One line: amount, purpose, hard limits</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h2>YOU GET BACK</h2>
+          <ul>
+            <li>Ranked plans in one side-by-side table</li>
+            <li>A memo where each claim cites a page and quote</li>
+            <li>The clause that blocks a plan, and the route to consent</li>
+            <li>An audit log of every step and every denied action</li>
+          </ul>
+        </div>
+        <div class="card rules">
+          <h2>THREE RULES THAT BUILD TRUST</h2>
+          <ul>
+            <li><b>Code does the math.</b> Models read and write. They never produce a number.</li>
+            <li><b>Only the gateway writes.</b> An agent cannot change a record or approve its own work.</li>
+            <li><b>Unsure means ask.</b> The agent stops and asks the human reviewer.</li>
+          </ul>
+          <div class="demo"><b>Proof:</b> we run the platform live on one real public deal. The same engine takes a different profile for each situation (next pages).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="legend"><span><i class="a"></i>AI agent</span><span><i class="c"></i>Code (no AI)</span><span><i class="h"></i>Human reviewer</span><span><i class="e"></i>Escalation point</span><span><i class="d"></i>Data</span></div>
+</section>
+
+<!-- PAGE 2: ARCHITECTURE -->
+<section class="page">
+  <div class="head">
+    <div class="kicker">STOCHASTIC &middot; 01 BIG PICTURE &middot; PAGE 2 OF 3</div>
+    <h1>ARCHITECTURE</h1>
+    <p class="sub">Four parts: people, AI agents with their tools, one gateway, one database</p>
+  </div>
+  <div class="canvas">
+    <!-- zones -->
+    <div class="zone" style="left:392px; top:30px; width:700px; height:372px; background:var(--agent-soft);"><span class="zl">AI AGENTS</span></div>
+    <div class="zone" style="left:1170px; top:30px; width:330px; height:372px; background:var(--code-soft);"><span class="zl">TOOLS (CODE, READ-ONLY)</span></div>
+
+    <!-- left column -->
+    <div class="n data" style="left:30px; top:44px; width:320px; height:96px;"><h3>Deal documents</h3><p>Uploaded files, or filings cached from SEC EDGAR before the demo.</p></div>
+    <div class="n human" style="left:30px; top:176px; width:320px; height:212px;"><h3>Reviewer console</h3><p>Where the senior human works.</p>
+      <p>Deal board, escalation cards E1 to E6, side-by-side plan table, audit log viewer.</p>
+      <p><span class="badge">E1</span><span class="badge">E2</span><span class="badge">E3</span><span class="badge">E4</span><span class="badge">E5</span><span class="badge">E6</span></p></div>
+
+    <!-- agents -->
+    <div class="n agent" style="left:560px; top:56px; width:386px; height:78px;"><h3>Deal manager (master agent)</h3><p>Names the situation, loads its profile, makes tasks, marks stale results, decides when to ask.</p></div>
+    <div class="n agent" style="left:412px; top:168px; width:220px; height:92px;"><h3>Intake agent</h3><p>Documents to facts with citations.</p></div>
+    <div class="n agent" style="left:650px; top:168px; width:220px; height:92px;"><h3>Clause reader</h3><p>Limits, with exact quotes.</p></div>
+    <div class="n agent" style="left:888px; top:168px; width:210px; height:92px;"><h3>Structuring agent</h3><p>Debt and equity mixes.</p></div>
+    <div class="n agent" style="left:530px; top:284px; width:220px; height:92px;"><h3>Risk agent</h3><p>Chooses scenarios, explains results.</p></div>
+    <div class="n agent" style="left:768px; top:284px; width:250px; height:92px;"><h3>Memo and approvals agent</h3><p>Recommendation, and policy after a rejection.</p></div>
+
+    <!-- tools -->
+    <div class="n code" style="left:1186px; top:48px; width:298px; height:56px; padding:7px 11px;"><h3>Deal math</h3><p style="margin-top:2px">Leverage, cost, dilution</p></div>
+    <div class="n code" style="left:1186px; top:120px; width:298px; height:56px; padding:7px 11px;"><h3>Search and trade-off filter</h3><p style="margin-top:2px">Enumerate mixes, keep the best</p></div>
+    <div class="n code" style="left:1186px; top:192px; width:298px; height:56px; padding:7px 11px;"><h3>Monte Carlo (seeded)</h3><p style="margin-top:2px">Returns a run id for every result</p></div>
+    <div class="n code" style="left:1186px; top:264px; width:298px; height:56px; padding:7px 11px;"><h3>Quote validator</h3><p style="margin-top:2px">Is the quote really in the document?</p></div>
+    <div class="n code" style="left:1186px; top:336px; width:298px; height:56px; padding:7px 11px;"><h3>Cached public data</h3><p style="margin-top:2px">EDGAR filings, SOFR, FRED</p></div>
+
+    <!-- gateway -->
+    <div class="n code" style="left:30px; top:462px; width:1460px; height:78px;"><h3>GATEWAY (the only writer)</h3><p>Checks who may do what. Enforces the work-item states. Blocks self-approval. Logs every action and every denied attempt. Agents propose, the gateway decides.</p></div>
+
+    <!-- database -->
+    <div class="n data" style="left:30px; top:600px; width:1460px; height:84px;"><h3>POSTGRES on Tiger Cloud (the memory and the record)</h3>
+      <div class="chips" style="margin-top:7px"><span class="chip">work items</span><span class="chip">facts + citations</span><span class="chip">clauses</span><span class="chip">plans</span><span class="chip">simulation runs</span><span class="chip">past decisions</span><span class="chip">policies</span><span class="chip">audit log (hash-chained)</span><span class="chip">document vectors (pgvector)</span><span class="chip">forks for what-if plans</span></div></div>
+
+    <svg class="arrows" viewBox="0 0 1520 700">
+      <defs>
+        <marker id="aN" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0b0f1a"/></marker>
+      </defs>
+      <g stroke="#0b0f1a" stroke-width="3.5" fill="none">
+        <!-- documents to agents -->
+        <path d="M352 92 H388" marker-end="url(#aN)"/>
+        <!-- console to gateway -->
+        <path d="M190 390 V458" marker-start="url(#aN)" marker-end="url(#aN)"/>
+        <!-- agents to gateway -->
+        <path d="M753 404 V458" marker-start="url(#aN)" marker-end="url(#aN)"/>
+        <!-- agents to tools -->
+        <path d="M1096 216 H1166" marker-start="url(#aN)" marker-end="url(#aN)"/>
+        <!-- gateway to db -->
+        <path d="M753 542 V596" marker-start="url(#aN)" marker-end="url(#aN)"/>
+      </g>
+    </svg>
+    <div class="lbl" style="left:204px; top:414px;">approve, reject, answer</div>
+    <div class="lbl" style="left:768px; top:414px;">propose work items, ask, read</div>
+    <div class="lbl" style="left:768px; top:556px;">only the gateway writes</div>
+    <div class="lbl" style="left:1131px; top:176px; transform:translateX(-50%);">call tools</div>
+  </div>
+  <div class="legend"><span><i class="a"></i>AI agent</span><span><i class="c"></i>Code (no AI)</span><span><i class="h"></i>Human reviewer</span><span><i class="e"></i>Escalation point</span><span><i class="d"></i>Data</span></div>
+</section>
+
+<!-- PAGE 3: ONE PLATFORM -->
+<section class="page">
+  <div class="head">
+    <div class="kicker">STOCHASTIC &middot; 01 BIG PICTURE &middot; PAGE 3 OF 3</div>
+    <h1>ONE PLATFORM, EIGHT SITUATIONS</h1>
+    <p class="sub">One engine serves all eight situations. The profile changes what the agents look for, weigh, and ask. The demo runs one</p>
+  </div>
+  <div class="canvas">
+    <div class="prof">
+      <b class="pt">A PROFILE SETS</b>
+      <span class="pc">Scope</span><span class="pc">Information needed</span><span class="pc">Instruments allowed</span><span class="pc">What to weigh</span><span class="pc">When to ask</span>
+      <span class="pn">The deal manager picks the profile. The reviewer can override it.</span>
+    </div>
+    <table class="sit">
+      <tr><th>SITUATION</th><th>THE GOAL</th><th>LIMITS CHECKED FIRST</th><th>HEADLINE MEASURES</th><th>THE DEMO</th></tr>
+      <tr><td><b>Raising money</b></td><td>New capital at the lowest cost and dilution</td><td>Debt baskets, restricted payments, liens</td><td>Cost, ownership given up, covenant headroom</td><td><span class="tag h">LIVE IN THE DEMO</span></td></tr>
+      <tr><td><b>Company in trouble</b></td><td>Buy time and avoid default</td><td>Covenant breach, cross-default, waiver terms</td><td>Cash runway, odds of default, recovery</td><td><span class="tag a">IN THE PLATFORM</span></td></tr>
+      <tr><td><b>Refinancing</b></td><td>Replace existing debt on better terms</td><td>Prepayment premiums, call protection, maturity</td><td>Savings after fees, maturity wall</td><td><span class="tag a">IN THE PLATFORM</span></td></tr>
+      <tr><td><b>Mergers and acquisitions</b></td><td>Fund or structure a deal</td><td>Acquisition baskets, lender consent</td><td>Leverage after the deal, funding certainty</td><td><span class="tag a">IN THE PLATFORM</span></td></tr>
+      <tr><td><b>Selling part of a company</b></td><td>Raise cash from an asset sale</td><td>Asset-sale limits, required prepayment, lien release</td><td>Net proceeds, leverage after the sale</td><td><span class="tag a">IN THE PLATFORM</span></td></tr>
+      <tr><td><b>Borrowing against assets</b></td><td>Secured loan on receivables or equipment</td><td>Lien limits, borrowing base, advance rates</td><td>Availability, cost</td><td><span class="tag a">IN THE PLATFORM</span></td></tr>
+      <tr><td><b>Ownership changes</b></td><td>Buyout, recap, or new owners</td><td>Change of control, consent rights</td><td>Control shift, leverage</td><td><span class="tag a">IN THE PLATFORM</span></td></tr>
+      <tr><td><b>Bankruptcy</b></td><td>Spot it early and hand it to experts</td><td>Default triggers, filing risk signs</td><td>Not modeled</td><td><span class="tag e">HAND TO A HUMAN</span></td></tr>
+    </table>
+    <p class="fine">The platform is designed for all eight situations. The weekend demo runs one (raising money). Default settings are inferred from public sources. No practitioner has checked them, so the reviewer can change every one. Bankruptcy handling is proposed, not confirmed.</p>
+  </div>
+  <div class="legend"><span><i class="h"></i>Live in the demo</span><span><i class="a"></i>In the platform design</span><span><i class="e"></i>Hand off to a human</span></div>
+</section>
+
+</body>
+</html>
