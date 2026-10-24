@@ -156,8 +156,10 @@ The model points, code decides:
   ebitda_deductions[0].name, ...), `quote` is copied character for character from the text, at least four words and at
   most about fourteen, and `section` is the key of section_index whose text contains the quote (definitions are in
   their annex, for example "Addendum I"). The gateway refuses a quote that is not in that section.
-- `limit_wording` must itself be a quote from the covenant section, it must contain `debt_term`, and the limit's quote
-  must show the number as written ("2.50").
+- Quotes are exact: keep the text's own capitals ("THIS LOAN AGREEMENT", not "This Loan Agreement"), punctuation,
+  and spacing.
+- `limit_wording` must itself be a quote from the covenant section and contain `debt_term`. The limit's quote must show
+  the number as written ("2.50") and come from the section named in `limit_section`.
 - A cap is in USD thousands: "$4,000,000" is 4000, and the cap's quote must show "$4,000,000". That is the only
   conversion you may make. You never compute a number.
 - The agreement names the add-backs but not their amounts: give every adjustment amount 0 with inferred=true. The

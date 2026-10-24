@@ -1503,13 +1503,14 @@ class Gateway:
             if not agr.quote_in(c.quote, agr.section_text(text, sid) or ""):  # check 2
                 raise Invalid(f"the quote for {c.field} is not in section {sid} of the agreement, or is under "
                               f"{agr.MIN_QUOTE_WORDS} words: '{c.quote[:100]}'")
-            if c.field == "limit":  # check 3, and the limit's quote names the covenant's own debt term
+            if c.field == "limit":  # check 3; and the limit is quoted from the covenant section the Brief names
                 if not agr.ratio_in(c.quote, brief.limit):
                     raise Invalid(f"limit {brief.limit} is not in its quote: '{c.quote[:100]}'")
-                if brief.debt_term and brief.debt_term.casefold() not in agr.normalize(c.quote).casefold():
-                    raise Invalid(f"the limit's quote does not name the debt term '{brief.debt_term}'")
-                if sid in (agr.PREAMBLE,) or not sid[0].isdigit():
+                if sid == agr.PREAMBLE or not sid[0].isdigit():
                     raise Invalid(f"the limit must be quoted from a covenant section, not '{sid}'")
+                if brief.limit_section and sid != self._section_id(brief.limit_section):
+                    raise Invalid(f"the limit is quoted from section {sid}, not from limit_section "
+                                  f"'{brief.limit_section}'")
             if c.field.endswith(".cap") and not agr.thousands_in(c.quote, required[c.field]):
                 raise Invalid(f"{c.field} {required[c.field]} (USD thousands) is not in its quote: '{c.quote[:100]}'")
             verified.setdefault(c.field, []).append(c)

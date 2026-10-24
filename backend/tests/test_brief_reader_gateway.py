@@ -122,10 +122,17 @@ def test_a_limit_not_in_its_quote_is_refused(world):
     bad = out.model_copy(update={"brief": out.brief.model_copy(update={"limit": 3.0})})
     with pytest.raises(Invalid, match="limit 3.0 is not in its quote"):
         gw.store_brief(BRIEF_READER, item.id, bad)
+    elsewhere = with_citation(out, "limit", section="4.8")  # the quote is in 4.8 too, but the Brief names 4.8(a)
+    with pytest.raises(Invalid, match="not from limit_section"):
+        gw.store_brief(BRIEF_READER, item.id, elsewhere)
+    # The limit's quote need not repeat the debt term (the live Sonnet 5.5 draft of 2026-10-25 was refused for it).
+    plain = with_citation(out, "limit", quote="to EBITDA of less than 2.50 to 1.00")
     cap = out.model_copy(update={"brief": out.brief.model_copy(update={"ebitda_addbacks": [
         a.model_copy(update={"cap": 400.0}) if a.cap == 4000.0 else a for a in out.brief.ebitda_addbacks]})})
     with pytest.raises(Invalid, match=r"cap 400.0 \(USD thousands\) is not in its quote"):
         gw.store_brief(BRIEF_READER, item.id, cap)
+    gw.store_brief(BRIEF_READER, item.id, plain)
+    assert store.deals[DEAL_ID].brief_status == "draft"
 
 
 # ---- 3. coverage --------------------------------------------------------------------------------------------
