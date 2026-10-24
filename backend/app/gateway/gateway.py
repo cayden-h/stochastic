@@ -252,6 +252,9 @@ class Gateway:
         showing an agent working forever. The next run picks up where this one stopped."""
         deal = self._deal(deal_id)
         deal.stage = "run_failed"
+        last = next((r for r in reversed(self.store.audit) if r.deal_id == deal_id), None)
+        if last and last.action == "run:failed" and last.reason == error[:300]:
+            return  # the runner already noted this failure; the background route notes it again
         self._log(deal_id, SYSTEM, "run:failed", "ALLOWED", deal_id, reason=error[:300])
 
     # ------------------------------------------------------------------ tools

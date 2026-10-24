@@ -77,7 +77,19 @@ def _remember(gw: Gateway, role: Role, run, item_id: str, summary: str) -> None:
 
 
 def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: int = 6) -> list[str]:
-    """Do every step that needs no human until the deal waits on a human or is posted. Returns what happened."""
+    """Do every step that needs no human until the deal waits on a human or is posted. Returns what happened.
+
+    A run that stops on an error marks the deal `run_failed` with a `run:failed` row before the error goes up, so
+    the console offers Run again on the sync route too, not only after a background run."""
+    try:
+        return _advance(gw, deal_id, backend, max_steps)
+    except Exception as error:
+        if deal_id in gw.store.deals:  # the deal may have been reset meanwhile
+            gw.note_run_failed(deal_id, f"{type(error).__name__}: {error}")
+        raise
+
+
+def _advance(gw: Gateway, deal_id: str, backend: str | None, max_steps: int) -> list[str]:
     log: list[str] = []
     store = gw.store
     for _ in range(max_steps):
