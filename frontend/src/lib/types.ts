@@ -69,7 +69,11 @@ export interface Case {
   deal: Deal; stage: Stage; source_lines: SourceLine[]; mappings: Mapping[]; flags: WorkItem[]; open_flags: string[];
   result: Result | null; verdict: Verdict | null; work_items: WorkItem[]; policies: Policy[]; sessions: unknown[];
   audit: { rows: number; chain_valid: boolean; denied: number }; backend: BackendStatus;
+  /** The controller's edits (D19). Absent until the edit API ships; the sidebar counts the reasoned ones. */
+  edits?: Edit[];
 }
+
+export interface Edit { id: string; status: "pending" | "reasoned" | string; [key: string]: unknown }
 
 export interface StoreStatus {
   kind: "memory" | "postgres"; fallback_reason: string | null;

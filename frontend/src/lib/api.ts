@@ -24,6 +24,16 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   return res.json();
 }
 
+/** Load a new deal from two statement CSVs and a brief (JSON). POST /deals is multipart, so it skips post(). */
+async function createDeal(form: FormData): Promise<{ deal_id: string; stage: string; lines: { platform: number; target: number } }> {
+  const res = await fetch(`${API_URL}/deals`, { method: "POST", headers: { "X-Actor": ACTOR }, body: form });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(typeof detail.detail === "string" ? detail.detail : res.statusText);
+  }
+  return res.json();
+}
+
 /** One read for the screen, three writes. Everything else is a link to the record. */
 export const api = {
   deals: () => get<Deal[]>("/deals"),
@@ -36,6 +46,7 @@ export const api = {
   hold: (itemId: string) => post<WorkItem>(`/work-items/${itemId}/hold`),
   approve: (itemId: string) => post<WorkItem>(`/work-items/${itemId}/approve`),
   reject: (itemId: string, reason: string) => post<WorkItem>(`/work-items/${itemId}/reject`, { reason }),
+  createDeal,
   /** keepMemory=false clears the learned policies and sessions, so the next judge sees the flag again. */
   reset: (keepMemory = true) => post<{ ok: boolean }>(`/dev/reset?keep_memory=${keepMemory}`),
 };

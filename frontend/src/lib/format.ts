@@ -29,9 +29,39 @@ export function fmtM(v: number): string {
   return `$${(v / 1000).toFixed(1)}M`;
 }
 
-/** A leverage ratio, two places, formatted from the unrounded value like the gateway does. */
+/** A leverage ratio, two places, formatted from the unrounded value like the gateway does. v3 writes the times sign. */
 export function fmtX(v: number): string {
-  return `${v.toFixed(2)}x`;
+  return `${v.toFixed(2)}\u00d7`;
+}
+
+/** A confidence as a whole percent: 0.42 is 42%. */
+export function pct(v: number): string {
+  return `${Math.round(v * 100)}%`;
+}
+
+/** How long ago, in words a controller reads at a glance. Past a day it falls back to the PT clock. */
+export function ago(iso: string, now = Date.now()): string {
+  const s = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  return clock(iso);
+}
+
+/** The stage in the controller's words, and whether it waits on them. */
+export function stageWords(stage: string): { text: string; tone: "you" | "work" | "done" | "bad" | "idle" } {
+  switch (stage) {
+    case "new": return { text: "Not started", tone: "idle" };
+    case "mapping": return { text: "Mapping", tone: "work" };
+    case "awaiting_flag": return { text: "Mapping \u00b7 needs you", tone: "you" };
+    case "mapped": case "flags_answered": case "preparing": return { text: "Preparing", tone: "work" };
+    case "awaiting_review": return { text: "Reviewing", tone: "work" };
+    case "awaiting_approval": return { text: "Approval \u00b7 needs you", tone: "you" };
+    case "needs_attention": return { text: "Needs attention", tone: "bad" };
+    case "posted": return { text: "Posted", tone: "done" };
+    case "run_failed": return { text: "Run stopped", tone: "bad" };
+    default: return { text: titleCase(stage), tone: "work" };
+  }
 }
 
 export function plural(n: number, word: string): string {
