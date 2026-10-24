@@ -203,6 +203,44 @@ def test_controller_answer_becomes_a_policy_and_the_mapper_applies_it(world):
     assert store.sessions["mapper"].turns >= 1
 
 
+def test_learned_lines_are_marked_by_the_gateway_not_by_the_model_wording(world, monkeypatch):
+    """A model writes its own reason ("Controller policy maps ..."), so the Learned mark must come from the policy
+    record. A cited policy counts only when it exists and decided the same thing."""
+    from app.agents.backends import scripted
+
+    store, gw = world
+    advance(gw, DEAL_ID)
+    for flag in gw.open_flags(DEAL_ID):  # the answers given in the live run: nearest existing lines for the strays
+        ids = [o.id for o in flag.options]
+        gw.answer(CONTROLLER, flag.id, "nearest_existing" if "nearest_existing" in ids else flag.default or ids[0])
+    store.reset_deals(keep_memory=True)
+    seed(store, gw)
+    real = scripted.scripted_mapper
+
+    cited = {}
+
+    def model_like(inp):
+        out = real(inp)
+        for m in out.mappings:
+            m.reason = "Controller policy maps this line."  # the wording Droid produced on 2026-10-24
+        pol = next(p for p in store.policies.values() if p.kind == "mapping")
+        bogus = next(m for m in out.mappings if m.policy_id is None
+                     and (m.platform_line or "").lower() != pol.decision.lower())
+        bogus.policy_id = pol.id  # cites a real policy that decided something else
+        cited["line"] = bogus.target_line_id
+        return out
+
+    monkeypatch.setattr(scripted, "scripted_mapper", model_like)
+    monkeypatch.setattr("app.agents.runner.scripted_mapper", model_like)
+    advance(gw, DEAL_ID)
+    maps = store.deal_mappings(DEAL_ID)
+    learned = [m for m in maps if m.policy_id]
+    assert learned and all(store.policies[m.policy_id].decision.lower() == m.platform_line.lower() for m in learned)
+    assert next(m for m in maps if m.target_line_id == cited["line"]).policy_id is None
+    tagged = [l for l in store.lines(DEAL_ID, "Kewaunee") if l.covenant_policy_id]
+    assert tagged and all(store.policies[l.covenant_policy_id].decision == l.covenant_tag for l in tagged)
+
+
 # ---- API -----------------------------------------------------------------------------------------------------
 
 def test_api_flow():
@@ -322,3 +360,28 @@ def test_flag_effect_text_matches_the_verdict_rounding(world):
     from app.core.models import FlagOption, FlagProposal
     for o in fin.options:
         assert "unclear" not in gw.store.items[fin.id].payload["option_actions"][o.id]["tags"].values()
+
+
+def test_covenant_flag_always_shows_the_count_everything_reading(world):
+    """The 08:30 Haiku run offered three readings, all under the limit. The gateway adds the baseline, computed by
+    the same tools, so the controller always sees what the exclusions are worth."""
+    from app.core.models import FlagOption, FlagProposal
+
+    store, gw = world
+    advance(gw, DEAL_ID)
+    deal = store.deals[DEAL_ID]
+    parent = next(i for i in store.items.values() if i.type == "map_lines")
+    fin = [l.id for l in store.lines(DEAL_ID, "Kewaunee") if "financing liability" in l.line.lower()]
+    only_exclusions = FlagProposal(kind="covenant_tag", line_ids=fin, question="Which reading?", default="count_all",
+                                   options=[FlagOption(id="count_all", label="agreement reading (model's own id)",
+                                                       tags={lid: "not_debt" for lid in fin})])
+    item = gw._open_flag(deal, parent, only_exclusions)
+    ids = [o.id for o in item.options]
+    assert ids == ["count_all", "count_all_gateway"]
+    base = item.options[-1]
+    assert base.added_by == "system:gateway" and item.options[0].added_by is None
+    assert "Over the limit" in base.effect and store.tool_runs[base.run_id].tool == "limit_test"
+    assert item.payload["option_actions"]["count_all_gateway"]["tags"] == {lid: "debt" for lid in fin}
+
+    has_it = only_exclusions.model_copy(update={"options": [FlagOption(id="x", label="all", tags={l: "debt" for l in fin})]})
+    assert [o.id for o in gw._open_flag(deal, parent, has_it).options] == ["x"]

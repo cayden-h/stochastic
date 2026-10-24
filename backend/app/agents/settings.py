@@ -29,7 +29,7 @@ def summary() -> dict:
     """What the console shows under backend status."""
     return {
         "backend": os.getenv("AGENT_BACKEND", "scripted"),
-        "fallback": os.getenv("AGENT_FALLBACK", "anthropic,scripted"),
+        "fallback": os.getenv("AGENT_FALLBACK", "scripted"),
         "models": {
             "anthropic": {r: role_model("ANTHROPIC_MODEL", r) for r in ("mapper", "preparer", "reviewer")},
             "droid": {r: role_model("DROID_MODEL", r) for r in ("mapper", "preparer", "reviewer")},

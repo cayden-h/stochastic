@@ -9,7 +9,7 @@ import { Button, Mono, Shape } from "@/components/ui";
 import { VerdictLine } from "@/components/verdict-line";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
-import { fmtX, isLearned, plural } from "@/lib/format";
+import { fmtX, isLearned, isLearnedTag, plural } from "@/lib/format";
 
 /**
  * The case: one screen from one read, GET /deals/{id}/case.
@@ -25,7 +25,7 @@ export default function CaseScreen() {
   const open = flags.filter((f) => open_flags.includes(f.id));
   const answered = flags.filter((f) => f.answer);
   const runIds = result?.run_ids_by_tool ?? {};
-  const learned = mappings.filter(isLearned).length + source_lines.filter((l) => (l.covenant_note ?? "").startsWith("Policy")).length;
+  const learned = mappings.filter(isLearned).length + source_lines.filter(isLearnedTag).length;
   const noFlagThisTime = Boolean(verdict) && answered.length === 0 && learned > 0;
 
   async function act(fn: () => Promise<unknown>) {
@@ -100,18 +100,22 @@ export default function CaseScreen() {
             <div key={f.id} className="flex items-center gap-3 rounded-chip border border-hairline bg-card px-4 py-2">
               <span className="text-clear"><Shape kind="check" /></span>
               <span className="hidden min-w-0 flex-1 truncate sm:block" title={f.question ?? ""}>{f.question}</span>
-              <strong className="min-w-0 flex-1 sm:flex-none sm:whitespace-nowrap">{f.options.find((o) => o.id === f.answer)?.label}</strong>
+              {/* A model-written label can be a long sentence; it truncates instead of widening the page. */}
+              <strong className="min-w-0 flex-1 sm:max-w-[55%] sm:flex-none sm:truncate" title={f.options.find((o) => o.id === f.answer)?.label}>
+                {f.options.find((o) => o.id === f.answer)?.label}
+              </strong>
               <Mono>{f.id}</Mono>
             </div>
           ))}
         </section>
       ) : null}
 
-      <footer className="flex flex-col items-start gap-4 border-t border-hairline pt-4 sm:flex-row sm:items-center">
+      {/* One row only from lg: at tablet width the disclaimer was squeezed to a word per line and widened the page. */}
+      <footer className="flex flex-col items-start gap-4 border-t border-hairline pt-4 lg:flex-row lg:items-center">
         <Link href="/log" className="font-semibold sm:whitespace-nowrap underline underline-offset-4 hover:text-code">
           Log: {plural(audit.rows, "row")}, {audit.denied} denied, chain {audit.chain_valid ? "intact" : "broken"}
         </Link>
-        <span className="flex-1" />
+        <span className="hidden flex-1 lg:block" />
         {verdict?.posted ? (
           <Button kind="link" className="text-left sm:whitespace-nowrap" disabled={busy} onClick={() => act(() => api.reset())}>Reset the deal, keep what was learned</Button>
         ) : null}

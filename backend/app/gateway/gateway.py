@@ -22,6 +22,7 @@ from app.core.models import (
     Deal,
     AgentSession,
     Evidence,
+    FlagOption,
     FlagProposal,
     Mapping,
     MapperOutput,
@@ -42,6 +43,7 @@ from app.db.memory import MemoryStore
 from app.tools import finance
 
 GENESIS = "0" * 64
+BASELINE_OPTION = "count_all"  # the option id of the baseline reading the gateway adds to a covenant flag
 
 # Per-role permissions. Agents are named, so the Mapper cannot call the Preparer's tools.
 PERMISSIONS: dict[str, set[str]] = {
@@ -87,6 +89,10 @@ def parse_actor(actor: str) -> tuple[str, str]:
 def _hash(row: dict, prev_hash: str) -> str:
     body = json.dumps({**row, "prev_hash": prev_hash}, sort_keys=True, default=str)
     return hashlib.sha256(body.encode()).hexdigest()
+
+
+def _count(n: int, word: str) -> str:
+    return f"{n} {word}" + ("" if n == 1 else "s")
 
 
 def _fmt(x: float) -> str:
@@ -285,6 +291,7 @@ class Gateway:
         out = MapperOutput.model_validate(out.model_dump())  # the gateway re-validates the typed result
         target_by_id = {l.id: l for l in self._target_lines(deal)}
         flagged_ids = {lid for f in out.flags if f.kind == "mapping" for lid in f.line_ids}
+        stored: list[Mapping] = []
         for p in out.mappings:
             t = target_by_id.get(p.target_line_id)
             if t is None:
@@ -294,23 +301,26 @@ class Gateway:
                         platform_line_id=pl.id if pl else None, target_line=t.line,
                         platform_line=pl.line if pl else p.platform_line, confidence=p.confidence,
                         reason=p.reason, flagged=t.id in flagged_ids)
+            m.policy_id = self._cited_policy(p.policy_id, "mapping", m.platform_line)
             self.store.mappings[m.id] = m
+            stored.append(m)
         for tag in out.tags:
             line = self.store.source_lines.get(tag.line_id)
             if line is None or line.deal_id != deal.id:
                 raise Invalid(f"tag names unknown line {tag.line_id}")
             line.covenant_tag = tag.tag
             line.covenant_note = tag.note or None
-            if tag.policy_id:
-                self.note_policy_applied(tag.policy_id, deal.id, line.line)
-        for p in out.mappings:
-            if p.policy_id:
-                self.note_policy_applied(p.policy_id, deal.id, target_by_id[p.target_line_id].line)
+            line.covenant_policy_id = self._cited_policy(tag.policy_id, "covenant_tag", tag.tag)
+            if line.covenant_policy_id:
+                self.note_policy_applied(line.covenant_policy_id, deal.id, line.line)
+        for m in stored:
+            if m.policy_id:
+                self.note_policy_applied(m.policy_id, deal.id, m.target_line)
         item.state = State.PROPOSED
         item.payload = {"mappings": len(out.mappings), "tags": len(out.tags), "flags": len(out.flags),
                         "note": out.note}
         self._log(deal.id, actor, "propose:map_lines", "ALLOWED", item.id,
-                  reason=f"{len(out.mappings)} mappings, {len(out.flags)} flags")
+                  reason=f"{_count(len(out.mappings), 'mapping')}, {_count(len(out.flags), 'flag')}")
         for flag in out.flags:
             self._check_flag_resolves(flag)
         for flag in out.flags:
@@ -334,10 +344,14 @@ class Gateway:
 
     def _open_flag(self, deal: Deal, parent: WorkItem, flag: FlagProposal) -> WorkItem:
         """Turn a flag proposal into a NEEDS_INFO work item. The effect of each option is computed by tools."""
+        with_baseline = self._with_baseline(flag)
+        baseline_added = len(with_baseline.options) > len(flag.options)
+        flag = with_baseline
         options: list[Option] = []
         for opt in flag.options:
             effect, run_id = self._flag_effect(deal, flag, opt)
-            options.append(Option(id=opt.id, label=opt.label, effect=effect, run_id=run_id))
+            options.append(Option(id=opt.id, label=opt.label, effect=effect, run_id=run_id,
+                                  added_by=SYSTEM if opt is flag.options[-1] and baseline_added else None))
         item = WorkItem(id=self.store.next_id("wi"), deal_id=deal.id, type="flag", state=State.NEEDS_INFO,
                         proposed_by=MAPPER, question=flag.question, evidence=flag.evidence, options=options,
                         default=flag.default,
@@ -346,6 +360,22 @@ class Gateway:
         self.store.items[item.id] = item
         self._log(deal.id, MAPPER, "ask:flag", "ALLOWED", item.id, reason=flag.question, evidence=flag.evidence)
         return item
+
+    @staticmethod
+    def _with_baseline(flag: FlagProposal) -> FlagProposal:
+        """A covenant flag always shows the reading that counts every flagged line as debt, computed like the others.
+        The Mapper's options vary from run to run (the 08:30 Haiku run on 2026-10-24 offered three readings, all
+        under the limit), so the gateway adds the baseline when no option has it: the controller always sees what
+        the exclusions are worth."""
+        if flag.kind != "covenant_tag" or not flag.line_ids:
+            return flag
+        if any(all(o.tags.get(lid) == "debt" for lid in flag.line_ids) for o in flag.options):
+            return flag
+        ids = {o.id for o in flag.options}
+        baseline = FlagOption(id=next(i for i in (BASELINE_OPTION, f"{BASELINE_OPTION}_gateway") if i not in ids),
+                              tags={lid: "debt" for lid in flag.line_ids},
+                              label="Count every flagged line as debt, with no exclusions (the gateway's baseline)")
+        return flag.model_copy(update={"options": [*flag.options, baseline]})
 
     def _flag_effect(self, deal: Deal, flag: FlagProposal, opt) -> tuple[str, str | None]:
         """What-if for one option, run by the system through the same tools. Tags are restored afterwards."""
@@ -467,6 +497,14 @@ class Gateway:
         self.store.policies[policy.id] = policy
         self._log(item.deal_id, SYSTEM, "policy:learn", "ALLOWED", policy.id, reason=f"{key} -> {decision}")
         return policy
+
+    def _cited_policy(self, policy_id: str | None, kind: str, decision: str | None) -> str | None:
+        """A policy id an agent cites counts only if that policy exists, is of this kind, and decided the same thing.
+        The model's own wording never marks a line as learned; the gateway does, from the policy record."""
+        p = self.store.policies.get(policy_id) if policy_id else None
+        if not p or p.kind != kind or (decision or "").strip().lower() != p.decision.strip().lower():
+            return None
+        return p.id
 
     @_writes
     def note_policy_applied(self, policy_id: str, deal_id: str, line: str) -> None:

@@ -1,5 +1,6 @@
 "use client";
 
+import { lineK } from "@/lib/format";
 import type { SourceLine, WorkItem } from "@/lib/types";
 import { SourceChip } from "./source";
 import { ActorChip, Button, Mono, Shape, Tag } from "./ui";
@@ -38,8 +39,7 @@ export function FlagCard({
             <div key={l.id} className="flex flex-wrap items-baseline gap-x-3">
               <span className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1" title={l.line}>{l.line}</span>
               <Mono>{l.company}</Mono>
-              <span className="font-semibold tabular-nums">{Math.round(l.amount).toLocaleString("en-US")}</span>
-              <Mono>{l.unit}</Mono>
+              <span className="font-semibold tabular-nums">{lineK(l.amount, l.unit)}</span>
             </div>
           ))}
           {flagged.find((l) => l.note) ? (
@@ -71,7 +71,9 @@ export function FlagCard({
                 suggested ? "border-2 border-ink" : "border border-rule"
               }`}
             >
-              {suggested ? <Tag>Agent suggests</Tag> : <span className="h-7" />}
+              {suggested ? <Tag>Agent suggests</Tag>
+                : o.added_by ? <ActorChip actor={o.added_by} />
+                : <span className="h-7" />}
               <span className="font-semibold">{o.label}</span>
               <span className="text-muted">{o.effect}</span>
               {o.run_id ? <Mono>{o.run_id}</Mono> : null}

@@ -1,4 +1,4 @@
-import type { AuditRow, Mapping, WorkItem } from "./types";
+import type { AuditRow, Mapping, SourceLine, WorkItem } from "./types";
 
 export function clock(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-GB", { timeZone: "America/Los_Angeles", hour12: false });
@@ -18,6 +18,12 @@ export function fmtK(v: number): string {
   return `${Math.round(v).toLocaleString("en-US")}K`;
 }
 
+/** A source line's amount in USD thousands, whatever unit the filing used (Nu Aire files in dollars). */
+export function lineK(amount: number, unit: string): string {
+  const dollars = ["usd", "dollars", "usd dollars", "$"].includes(unit.trim().toLowerCase());
+  return fmtK(dollars ? amount / 1000 : amount);
+}
+
 /** USD thousands shown in millions for one headline figure: $49M. */
 export function fmtM(v: number): string {
   return `$${Math.round(v / 1000)}M`;
@@ -32,8 +38,13 @@ export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
+/** The gateway sets `policy_id` from the policy record; a model's own wording varies, so the reason is only a fallback. */
 export function isLearned(m: Mapping): boolean {
-  return m.reason.startsWith("Policy");
+  return Boolean(m.policy_id) || m.reason.startsWith("Policy");
+}
+
+export function isLearnedTag(l: SourceLine): boolean {
+  return Boolean(l.covenant_policy_id) || (l.covenant_note ?? "").startsWith("Policy");
 }
 
 const VERBS: Record<string, string> = {

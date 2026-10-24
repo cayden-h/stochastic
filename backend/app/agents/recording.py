@@ -2,6 +2,8 @@
 
 A recording is the typed output of one role for one work-item input, with the backend that produced it.
 Recordings live in backend/recordings/ and are committed, so the demo survives with no network.
+The pinned recording (backend/recordings/<role>.json) is what replay reads. Live runs write to recordings/latest/,
+so a run from the console never replaces it; promote a run by copying it up after scoring it.
 """
 from __future__ import annotations
 
@@ -20,9 +22,10 @@ def input_key(role_name: str, inp: BaseModel) -> str:
     return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:12]
 
 
-def record(role_name: str, inp: BaseModel, out: BaseModel, backend: str) -> Path:
-    RECORDINGS.mkdir(parents=True, exist_ok=True)
-    path = RECORDINGS / f"{role_name}.json"
+def record(role_name: str, inp: BaseModel, out: BaseModel, backend: str, latest: bool = False) -> Path:
+    folder = RECORDINGS / "latest" if latest else RECORDINGS
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{role_name}.json"
     data = {"role": role_name, "backend": backend, "input_key": input_key(role_name, inp),
             "output": out.model_dump(mode="json")}
     path.write_text(json.dumps(data, indent=2, default=str))
