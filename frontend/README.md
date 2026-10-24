@@ -9,7 +9,7 @@ The design notes are in `docs/design/README.md`.
 | Route | Screen | One job |
 | --- | --- | --- |
 | `/` | Dashboard (V3-1) | See every case with its stage, verdict, and last update; Begin runs the deal |
-| (modal) | New deal (V3-2) | Load two statement CSVs and a brief JSON (`POST /deals`), then run |
+| (modal) | New deal (V3-2) | Load two statement CSVs and a Brief JSON or the credit agreement as text (`POST /deals`), then run |
 | `/case` | Case (V3-3) | Run the deal, answer the flags, read the verdict, edit the books, approve, download |
 | `/mapping` | Mapping (V3-4) | Where each target line went and how sure the Mapper was: All, Unsure, By policy, Edited; remap a line |
 | `/agents` | Agents (V3-6) | The agents' conversation and timeline, from the audit log |
@@ -21,6 +21,7 @@ The design notes are in `docs/design/README.md`.
 Reads: `GET /deals` (the Dashboard rows and the current deal), `GET /deals/{id}/case`, `GET /health` (the backend badge), `GET /deals/{id}/audit`, and `GET /deals/{id}/stream` for `stage` and `audit` events.
 Writes: `POST /deals` (the upload), `POST /deals/{id}/run`, `POST /work-items/{id}/answer`, `POST /work-items/{id}/hold`, `POST /work-items/{id}/approve`, `POST /work-items/{id}/reject`, and `POST /dev/reset` for the second-run moment.
 Review edits (D19, Tri's T2): `POST /deals/{id}/edits`, `POST /edits/{id}/reason`, and `DELETE /edits/{id}`; `/case` carries `edits` and `adjustments`.
+The Brief Reader (D20, Tri's T4): `POST /deals` with `agreement_txt`, `POST /deals/{id}/brief/amounts` (`field`, `value`, `source_ref`), and `POST /deals/{id}/brief/approve`; `/case` carries `brief_draft`.
 After approval, Download final files reads `GET /deals/{id}/export.xlsx` (Tri's T3) and `GET /deals/{id}/certificate`.
 Every write carries `X-Actor: human:controller`.
 The console computes no number. Every figure comes from a tool run and shows its run id.
@@ -49,6 +50,7 @@ In the Electron window (`titleBarStyle: hiddenInset`), the layout detects Electr
 - Your edits sits under the verdict: a click scrolls to the cell and flashes it, and Undo reverts the edit. Approve stays off while an edit has no reason.
 - After approval, Download final files calls `window.stochastic.saveFiles([{url, name}])` in the Electron window (Eric's preload), and downloads both files in a browser.
 - An adjustment flag (a learned adjustment the Preparer offers on a later deal) shows as "Learned adjustment" with apply and skip.
+- On a deal made from agreement text, the Case opens on the Brief card before mapping: every field with the quote it came from, the open questions on the Brief, the EBITDA adjustment amounts to enter from the books with their source, and "Approve the Brief and map". `deal.brief` is null until the reader has drafted it.
 - A "Learned" chip marks a mapping or a tag the gateway tied to a live policy (`policy_id`). After "Run it again with what was learned", Run again shows no flag. "Fresh deal (clear memory)" resets for the next judge.
 
 ## The companion

@@ -197,6 +197,14 @@ T2 is not on `origin` yet, so it was tested through a local dev shim over the re
 - Adjustment flags (`payload.kind` `adjustment`) show as "Learned adjustment" with each option's effect. `State` has `SUPERSEDED`.
 Waiting on: T2 (the routes and `edits` on `/case`), T1 (edit-aware tools; until then the gateway answers 503), T3 (the workbook), E1 (the preload), and Josie's sign-off.
 
+The Brief card (D20) built 2026-10-24 night in the same branch, after merging C3 from `main`.
+Josie has no frame for it, and the Figma Components page has nothing named Brief, so it follows the v3 flag card and tokens.
+- The upload's third slot takes a Brief (`.json`) or the credit agreement (`.txt`, sent as `agreement_txt`).
+- The Case shows the reader's draft before mapping: each field with its quote and section, the open `brief_field` questions (confirm or remove), the adjustment amounts with their source (`POST /deals/{id}/brief/amounts`, one field per call: `field`, `value`, `source_ref`), and "Approve the Brief and map" (`POST /deals/{id}/brief/approve`, then the run).
+- `deal.brief` may be null at stage `new`; the stages `reading_brief`, `awaiting_brief`, and `brief_ready` have words on the Dashboard, a "Brief Reader reading the agreement, N s" progress row, and the Brief Reader is the fourth agent on the Agents page.
+- Tested headless through the dev shim over the real gateway: the full Ex 10.1 text, then the Brief card (one scope question, three amounts from the 10-K with their source, two kept at 0), approve, map, the two flags, 0.76x, the edit beat, approve, and download.
+Waiting on: T4 (the routes; the amounts body above is my assumption, so Tri should match it or tell me), and Josie's frame.
+
 ### C5. The companion (about 2 hours, after C4)
 
 A React layer in `frontend/src/components/companion.tsx`, from `review-companion.md` sections 5 and 6:
