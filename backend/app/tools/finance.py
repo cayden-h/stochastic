@@ -258,7 +258,10 @@ def limit_test(leverage_value: float, limit: float, wording: str = "less than", 
     Sensitivity, when naive_debt (the whole-line reading of debt) and EBITDA are given: the naive ratio, and
     naive_flip_addback, the EBITDA add-back at which the naive reading reaches the limit (positive means that much
     more EBITDA is needed; zero or negative means it already passes). With rent_deduction also given,
-    naive_flip_rent is the rent deduction at which the naive reading reaches the limit."""
+    naive_flip_rent is the rent deduction at which the naive reading reaches the limit; it is left out when it would
+    be below zero, since no rent change can then flip the verdict. naive_ok is tested on the unrounded naive ratio,
+    while ok is tested on the leverage as given (rounded to 3 places by the leverage tool), so the two can disagree
+    for a ratio within 0.0005 of the limit."""
     given = [leverage_value, limit] + [v for v in (ebitda_value, debt, naive_debt, rent_deduction) if v is not None]
     if not all(math.isfinite(v) for v in given):
         raise ValueError("limit_test inputs must be finite numbers")
@@ -279,7 +282,7 @@ def limit_test(leverage_value: float, limit: float, wording: str = "less than", 
         flip = round(naive_debt / limit - ebitda_value, 3)
         out.update({"naive_debt": round(naive_debt, 3), "naive_leverage": round(naive_debt / ebitda_value, 3),
                     "naive_ok": passes(naive_debt / ebitda_value), "naive_flip_addback": flip})
-        if rent_deduction is not None:
+        if rent_deduction is not None and round(rent_deduction - flip, 3) >= 0:
             out["naive_flip_rent"] = round(rent_deduction - flip, 3)
     return out
 

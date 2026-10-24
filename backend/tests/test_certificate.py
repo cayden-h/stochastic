@@ -70,8 +70,11 @@ def test_after_approval_all_formats(client):
     h = cert["header"]
     assert h["draft"] is True and h["backend"] == "scripted" and h["unit"] == "USD thousands"
     assert h["limit_section"] == "Section 4.8(a)" and h["debt_term"] == "Senior Funded Bank Debt"
-    assert set(cert["test_period"]["periods"]) == {PLATFORM, TARGET}
-    assert all(cert["test_period"]["periods"].values())
+    periods = cert["test_period"]["periods"]
+    assert set(periods) == {PLATFORM, TARGET}
+    for p in periods.values():
+        assert set(p) == {"income_statement", "balance_sheet"} and p["income_statement"] and p["balance_sheet"]
+    assert cert["companies"] == {"platform": PLATFORM, "target": TARGET}
     # Hand-computed figures (test_demo_run.py): EBITDA 28,378.845, debt 21,633, leverage 0.762, capacity 49,314.113.
     assert cert["ebitda"]["ebitda"] == pytest.approx(28378.845, abs=0.001)
     assert cert["debt"]["debt"] == pytest.approx(21633.0, abs=0.001)
@@ -84,8 +87,11 @@ def test_after_approval_all_formats(client):
     fin = next(d for d in cert["decisions"] if "Financing liability" in d["question"])
     assert fin["option_id"] == "b" and fin["effect"].startswith("Senior Funded Bank Debt 21,633K")
     assert cert["approval"]["state"] == "POSTED"
-    assert cert["approval"]["audit"]["chain_valid"] is True and cert["approval"]["audit"]["denied"] >= 0
-    assert cert["mappings"]["count"] > 0
+    audit = client.get(f"/deals/{DEAL_ID}/audit").json()["rows"]
+    assert cert["approval"]["audit"]["chain_valid"] is True and cert["approval"]["audit"]["denied"] == 0
+    assert cert["approval"]["audit"]["rows"] == len(audit)
+    assert cert["mappings"]["count"] == len(client.get(f"/deals/{DEAL_ID}/mappings").json())
+    assert cert["mappings"]["from_policy"] == 0  # first run: no policy learned yet
 
 
 def test_every_figure_matches_its_run(client):
@@ -123,6 +129,12 @@ def test_markdown_carries_the_figures_and_run_ids(client):
     assert f"49,314.113 [{cert['limit_test']['run_id']}]" in md
     assert "1,970.000" in md  # the Statesville rent deduction
     assert "scripted backend" in md and "the audit log are real" in md
+    assert f"{PLATFORM}: net income" in md and f"{TARGET}: net income" in md
+    assert "platform: net income" not in md and "target: net income" not in md
+    assert f"{PLATFORM} income statement periods:" in md and f"{TARGET} balance sheet dates:" in md
+    assert "no run" not in md
+    mapping = next(d for d in cert["decisions"] if d["kind"] == "mapping")
+    assert f"[from source line {', '.join(mapping['line_ids'])}]" in md
     titles = [line[3:] for line in md.splitlines() if line.startswith("## ")]
     assert titles == ["Header", "Test period", "EBITDA", "Debt", "Leverage", "Limit test", "Tie-out", "Decisions",
                       "Approval", "Mappings"]
@@ -135,3 +147,13 @@ def test_html_escapes_strings(client):
     page = render_html(cert)
     assert "<b>this</b>" not in page and "&lt;b&gt;this&lt;/b&gt; debt &amp; more?" in page
     assert client.get(f"{URL}?format=html").text.count("<li>") > 10
+
+
+def test_gateway_rejects_naive_debt_run_that_is_not_covenant_debt(client):
+    run_to_posted(client)
+    by_tool = case(client)["result"]["run_ids_by_tool"]
+    r = client.post("/tools/limit_test", headers={"X-Actor": "system:gateway"},
+                    json={"deal_id": DEAL_ID, "inputs": {"leverage_run_id": by_tool["leverage"],
+                                                         "naive_debt_run_id": by_tool["ebitda"]}})
+    assert r.status_code == 422, r.text
+    assert "naive_debt_run_id must name a covenant_debt run" in r.json()["detail"]

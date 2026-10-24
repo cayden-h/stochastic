@@ -265,7 +265,9 @@ class Gateway:
                     erun = self._run(deal_id, inputs["ebitda_run_id"])
                     if erun.tool != "ebitda":
                         raise ValueError("ebitda_run_id must name an ebitda run")
-                    rents = [d["amount"] for d in erun.outputs["deductions"] if "rent" in d["name"].lower()]
+                    import re  # used only here: rent as a word, so "Parent" or "Current" do not match
+                    rents = [d["amount"] for d in erun.outputs["deductions"]
+                             if re.search(r"\brent(al)?\b", d["name"], re.I)]
                     rent = sum(rents) if rents else None
                 outputs = fn(float(lev), deal.brief.limit, ebitda_value=eb, debt=debt, naive_debt=naive,
                              rent_deduction=rent)

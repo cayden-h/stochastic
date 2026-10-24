@@ -365,3 +365,46 @@ def test_timeline_buckets_floor_to_the_time_bucket_origin():
         {"start": "2026-10-24T18:01:00+00:00", "actor": "human:controller", "kind": "answer", "rows": 1, "denied": 0},
     ]
     assert store.timeline("d1", 7)["buckets"][0]["start"] == "2026-10-24T18:00:04+00:00"
+
+
+def test_no_sensitivity_on_second_run_without_a_covenant_flag():
+    # After /dev/reset with memory kept, the policy settles the financing lines and no covenant flag opens, so
+    # there is no whole-line covenant_debt run to read. The five keys are left out and no extra run is made.
+    c = TestClient(create_app())
+    first = full_run(c)
+    assert c.post(f"/work-items/{first['verdict']['approval_item']}/approve").json()["state"] == "POSTED"
+    assert c.post("/dev/reset").json()["ok"]
+    body = full_run(c)
+    assert body["open_flags"] == [] and body["verdict"]["review"]["verdict"] == "pass"
+    v = body["verdict"]
+    for key in ("naive_debt", "naive_leverage", "naive_flip_addback", "naive_flip_rent", "sensitivity_run_id"):
+        assert key not in v
+    runs = c.get(f"/deals/{DEAL_ID}/runs").json()
+    assert not any(r["tool"] == "limit_test" and r["inputs"].get("sensitivity") for r in runs)
+    assert not any(r["tool"] == "covenant_debt" and r["inputs"].get("sensitivity") for r in runs)
+    assert len(c.get(f"/deals/{DEAL_ID}/runs").json()) == len(runs)  # reading again adds nothing
+
+
+def test_sensitivity_failure_does_not_fail_case(monkeypatch):
+    # A gateway error in the optional sensitivity run returns the verdict without the keys, and is not retried.
+    from app.api import routes
+    from app.gateway.gateway import Gateway
+    monkeypatch.setattr(routes, "_SENSITIVITY_FAILED", set())
+    real = Gateway.run_tool
+
+    def failing(self, actor, deal_id, name, inputs=None):
+        if name == "limit_test" and (inputs or {}).get("sensitivity"):  # a leverage run is not a covenant_debt run
+            inputs = {**inputs, "naive_debt_run_id": inputs["leverage_run_id"]}
+        return real(self, actor, deal_id, name, inputs)
+
+    monkeypatch.setattr(Gateway, "run_tool", failing)
+    c = TestClient(create_app())
+    body = full_run(c)
+    assert body["verdict"]["leverage"] == pytest.approx(0.762, abs=0.0005) and "naive_debt" not in body["verdict"]
+    audit = c.get(f"/deals/{DEAL_ID}/audit").json()["rows"]
+    errors = [a for a in audit if a["action"] == "tool:limit_test" and "covenant_debt run" in (a.get("reason") or "")]
+    assert len(errors) == 1  # the failure happened once and was audited
+    rows = len(audit)
+    again = c.get(f"/deals/{DEAL_ID}/case")
+    assert again.status_code == 200 and "naive_debt" not in again.json()["verdict"]
+    assert len(c.get(f"/deals/{DEAL_ID}/audit").json()["rows"]) == rows

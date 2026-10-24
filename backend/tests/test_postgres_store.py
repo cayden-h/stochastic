@@ -161,6 +161,7 @@ def test_the_timeline_falls_back_to_memory_on_a_database_error(schema):
     store._dsn = "postgresql://nobody@127.0.0.1:1/none?connect_timeout=1"
     out = store.timeline(DEAL_ID, 60)
     store._dsn = good_dsn
-    assert out["source"] == "memory" and out["error"]
+    assert out["source"] == "memory" and out["error"] == "timeline query failed; see the server log"
+    assert "nobody" not in out["error"] and "127.0.0.1" not in out["error"]  # host and user stay in the log
     assert sum(b["rows"] for b in out["buckets"]) == len([a for a in store.audit if a.deal_id == DEAL_ID])
     store.close()

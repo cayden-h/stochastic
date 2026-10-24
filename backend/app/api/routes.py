@@ -80,15 +80,27 @@ def _whole_line_debt_run(store, deal_id: str) -> str | None:
     return None
 
 
+# Leverage runs whose sensitivity run failed, keyed by (deal id, run id, run time) because /dev/reset restarts the
+# run ids. Not retried on later reads, so a failure adds one audit row, not one per read.
+_SENSITIVITY_FAILED: set[tuple[str, str, str]] = set()
+
+
 def _sensitivity(gw: Gateway, deal: Deal, result) -> dict | None:
     """How far the whole-line reading of debt is from the limit, from a limit_test run made by the gateway.
 
-    Only for a result the Reviewer passed. A run already made for this result's leverage run is reused, so
-    reading /case twice does not add runs."""
+    Only for a result the Reviewer passed, and only when a covenant flag option gives the whole-line covenant_debt
+    run. With no such flag (for example a second run where a policy settled the lines) nothing runs and the keys
+    are left out: a fresh naive run would read the settled tags, not the whole-line reading.
+    A run already made for this result's leverage run is reused, so reading /case twice does not add runs.
+    A gateway error returns None and is remembered per leverage run, so an optional figure never fails /case."""
     if not result or not result.review or result.review.verdict != "pass":
         return None
     lev_id = result.run_ids_by_tool.get("leverage")
-    if not lev_id:
+    lev = gw.store.tool_runs.get(lev_id) if lev_id else None
+    if lev is None:
+        return None
+    failed_key = (deal.id, lev.run_id, lev.at.isoformat())
+    if failed_key in _SENSITIVITY_FAILED:
         return None
     with gw.lock:  # find-or-create in one step, so two reads cannot both create a run
         run = next((t for t in reversed(list(gw.store.tool_runs.values()))
@@ -96,11 +108,15 @@ def _sensitivity(gw: Gateway, deal: Deal, result) -> dict | None:
                     and t.inputs.get("leverage_run_id") == lev_id), None)
         if run is None:
             naive_id = _whole_line_debt_run(gw.store, deal.id)
-            if naive_id is None:  # no covenant flag: the naive reading counts any unclear line as debt
-                naive_id = gw.run_tool(SYSTEM, deal.id, "covenant_debt", {"naive": True, "sensitivity": True}).run_id
-            run = gw.run_tool(SYSTEM, deal.id, "limit_test",
-                              {"leverage_run_id": lev_id, "naive_debt_run_id": naive_id,
-                               "ebitda_run_id": result.run_ids_by_tool.get("ebitda"), "sensitivity": True})
+            if naive_id is None:
+                return None
+            try:
+                run = gw.run_tool(SYSTEM, deal.id, "limit_test",
+                                  {"leverage_run_id": lev_id, "naive_debt_run_id": naive_id,
+                                   "ebitda_run_id": result.run_ids_by_tool.get("ebitda"), "sensitivity": True})
+            except GatewayError:
+                _SENSITIVITY_FAILED.add(failed_key)
+                return None
     out = {k: run.outputs.get(k) for k in SENSITIVITY_KEYS}
     out["sensitivity_run_id"] = run.run_id
     return out
@@ -188,7 +204,7 @@ def build_router(gw: Gateway) -> APIRouter:
                        "approval_item": approval.id if approval else None,
                        "approval_state": approval.state.value if approval else None,
                        "posted": d.stage == "posted"}
-            verdict.update(guard(lambda: _sensitivity(gw, d, result)) or {})
+            verdict.update(_sensitivity(gw, d, result) or {})
         return {
             "deal": dump(d),
             "stage": d.stage,
@@ -213,7 +229,8 @@ def build_router(gw: Gateway) -> APIRouter:
         items = store.deal_items(deal_id)
         result = store.latest_result(deal_id)
         approval = cert_doc.approval_item(items, result) if result else None
-        if not result or not approval or approval.state != State.POSTED or d.stage != "posted":
+        if (not result or not approval or approval.payload.get("result_id") != result.id
+                or approval.state != State.POSTED or d.stage != "posted"):
             raise HTTPException(status_code=409, detail="certificate is available after the controller approves the result")
         doc = cert_doc.build_certificate(store, d, result, items, chain_valid=gw.verify_chain())
         if format == "json":

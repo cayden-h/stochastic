@@ -30,6 +30,8 @@ from app.core.models import AgentSession, AuditRow, Deal, Mapping, Policy, Resul
 from app.db.memory import MemoryStore
 
 log = logging.getLogger("stochastic.store")
+TIMELINE_CONNECT_TIMEOUT_S = 2
+TIMELINE_ERROR = "timeline query failed; see the server log"
 
 MEMORY_LEDGER = 0
 
@@ -353,13 +355,14 @@ class PostgresStore(MemoryStore):
         It runs on its own short-lived connection, because the writer thread owns `self._conn`. Rows still in the
         write queue are not counted yet. On a database error it falls back to the memory computation."""
         try:
-            with psycopg.connect(self._dsn, connect_timeout=self._timeout, autocommit=True,
-                                 options="-c TimeZone=UTC") as conn:
+            with psycopg.connect(self._dsn, connect_timeout=TIMELINE_CONNECT_TIMEOUT_S, autocommit=True,
+                                 options="-c TimeZone=UTC") as conn:  # short timeout: a read must not hold a worker
                 rows = conn.execute(TIMELINE.format(schema=self.schema),
                                     (bucket_seconds, self.ledger, deal_id)).fetchall()
         except psycopg.Error as error:
+            log.warning("timeline query failed, using the memory timeline: %s: %s", type(error).__name__, error)
             out = super().timeline(deal_id, bucket_seconds)
-            out["error"] = f"{type(error).__name__}: {error}".strip()
+            out["error"] = TIMELINE_ERROR  # fixed text: the detail can name the host and user, so it stays in the log
             return out
         buckets = sorted(({"start": start.isoformat(), "actor": actor, "kind": kind, "rows": n, "denied": d}
                           for start, actor, kind, n, d in rows),

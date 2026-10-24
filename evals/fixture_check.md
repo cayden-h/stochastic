@@ -65,7 +65,7 @@ Sources were read with WebFetch on 2026-10-24: the Kewaunee 10-K for fiscal 2024
 
 The `/case` verdict now carries `naive_flip_addback` 403.155 and `naive_flip_rent` 1,566.845, from a gateway `limit_test` run. [verified: `test_verdict_sensitivity_from_limit_test_run`]
 The whole-line reading (71,955) reaches the 2.50x limit when covenant EBITDA is 71,955 / 2.5 = 28,782. [verified: arithmetic]
-So the controller's answer changes the verdict only while the add-backs stay below 403.155 more, or the rent deduction stays above 1,566.845. [verified: arithmetic]
+So the controller's answer changes the verdict only while the add-backs stay below 403.155 more and the rent deduction stays above 1,566.845; together, the extra add-backs plus the cut in rent must stay below 403.155. [verified: arithmetic]
 
 ### Statesville cash rent (fixture deduction 1,970)
 

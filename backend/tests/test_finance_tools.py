@@ -247,6 +247,12 @@ def test_limit_test_sensitivity_without_rent_or_naive():
     assert out["naive_leverage"] == 3.0 and out["naive_ok"] is False
     assert out["naive_flip_addback"] == 10.0
     assert "naive_flip_rent" not in out
+    # Rent 5 is below the flip add-back 10: 5 - 10 = -5, a rent below zero, so no rent change flips it; key left out.
+    low = finance.limit_test(1.0, 2.5, ebitda_value=50, debt=50, naive_debt=150, rent_deduction=5)
+    assert low["naive_flip_addback"] == 10.0 and "naive_flip_rent" not in low
+    # Rent exactly 10: 10 - 10 = 0, the edge, still shown.
+    edge = finance.limit_test(1.0, 2.5, ebitda_value=50, debt=50, naive_debt=150, rent_deduction=10)
+    assert edge["naive_flip_rent"] == 0.0
     plain = finance.limit_test(1.0, 2.5, ebitda_value=50, debt=50, rent_deduction=5)
     assert not any(k.startswith("naive") for k in plain)
 

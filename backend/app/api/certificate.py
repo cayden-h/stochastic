@@ -9,7 +9,6 @@ from __future__ import annotations
 import html
 from datetime import datetime, timezone
 
-from app.core.models import State
 
 UNIT = "USD thousands"
 DRAFT_NOTE = ("Draft. Not signed. Prepared from the approved result; an officer of the borrower signs the "
@@ -33,12 +32,11 @@ def _review_run(store, result, tool: str, prefer_key: str | None = None):
 
 
 def approval_item(items, result):
-    """The approve_result item for this result, else the last one that was not rejected or reversed."""
-    approvals = [i for i in items if i.type == "approve_result"]
-    for i in reversed(approvals):
-        if result is not None and i.payload.get("result_id") == result.id:
-            return i
-    return next((i for i in reversed(approvals) if i.state not in (State.REJECTED, State.REVERSED)), None)
+    """The approve_result item that names this result, or None. An older approval never stands in for a new result."""
+    if result is None:
+        return None
+    return next((i for i in reversed(items)
+                 if i.type == "approve_result" and i.payload.get("result_id") == result.id), None)
 
 
 def build_certificate(store, deal, result, items, chain_valid: bool) -> dict:
@@ -46,9 +44,13 @@ def build_certificate(store, deal, result, items, chain_valid: bool) -> dict:
     brief = deal.brief
     by_tool = result.run_ids_by_tool
 
-    periods = {}
+    periods = {}  # per company: income statement periods and balance sheet dates, kept apart
     for company in (deal.platform, deal.target):
-        periods[company] = sorted({l.period for l in store.lines(deal.id, company)})
+        lines = store.lines(deal.id, company)
+        periods[company] = {
+            "income_statement": sorted({l.period for l in lines if l.section == "income_statement"}),
+            "balance_sheet": sorted({l.period for l in lines if l.section == "balance_sheet"}),
+        }
 
     eb = _run(store, by_tool.get("ebitda"))
     ebitda = None
@@ -93,7 +95,8 @@ def build_certificate(store, deal, result, items, chain_valid: bool) -> dict:
         chosen = next((o for o in i.options if o.id == i.answer), None)
         decisions.append({"id": i.id, "kind": i.payload.get("kind"), "question": i.question, "option_id": i.answer,
                           "label": chosen.label if chosen else None, "effect": chosen.effect if chosen else None,
-                          "run_id": chosen.run_id if chosen else None, "state": i.state.value})
+                          "run_id": chosen.run_id if chosen else None, "state": i.state.value,
+                          "line_ids": list(i.payload.get("line_ids", []))})
 
     appr = approval_item(items, result)
     rows = [a for a in store.audit if a.deal_id == deal.id]
@@ -107,6 +110,7 @@ def build_certificate(store, deal, result, items, chain_valid: bool) -> dict:
                    "generated_at": datetime.now(timezone.utc).isoformat(), "backend": result.backend,
                    "result_id": result.id, "draft": True},
         "test_period": {"periods": periods, "note": brief.test_period_note},
+        "companies": {"platform": deal.platform, "target": deal.target},
         "ebitda": ebitda,
         "debt": debt,
         "leverage": leverage,
@@ -156,7 +160,10 @@ def _sections(cert: dict) -> list[tuple[str, list[str]]]:
     ]))
 
     tp = cert["test_period"]
-    lines = [f"{company}: {', '.join(p) or 'no lines'}" for company, p in tp["periods"].items()]
+    lines = []
+    for company, p in tp["periods"].items():
+        lines.append(f"{company} income statement periods: {', '.join(p['income_statement']) or 'none'}")
+        lines.append(f"{company} balance sheet dates: {', '.join(p['balance_sheet']) or 'none'}")
     if tp["note"]:
         lines.append(tp["note"])
     out.append(("Test period", lines))
@@ -165,8 +172,9 @@ def _sections(cert: dict) -> list[tuple[str, list[str]]]:
     if e:
         rid = e["run_id"]
         lines = []
+        names = cert.get("companies", {})
         for p in e["parts"]:
-            lines.append(f"{p['company']}: net income {_fig(p['net_income'], rid)}, interest expense "
+            lines.append(f"{names.get(p['company'], p['company'])}: net income {_fig(p['net_income'], rid)}, interest expense "
                          f"{_fig(p['interest_expense'], rid)}, interest income {_fig(p['interest_income'], rid)}, "
                          f"income taxes {_fig(p['income_taxes'], rid)}, depreciation and amortization "
                          f"{_fig(p['depreciation_amortization'], rid)}, subtotal {_fig(p['subtotal'], rid)}")
@@ -223,8 +231,14 @@ def _sections(cert: dict) -> list[tuple[str, list[str]]]:
 
     lines = []
     for x in cert["decisions"]:
+        if x["run_id"]:
+            source = x["run_id"]
+        elif x.get("line_ids"):  # a mapping flag: its figure comes from the source line, not a tool run
+            source = f"from source line {', '.join(x['line_ids'])}"
+        else:
+            source = "from source line"
         lines.append(f"{x['id']} ({x['kind'] or 'flag'}, {x['state']}): {x['question']} Chosen: {x['option_id']} "
-                     f"- {x['label']}. Effect: {x['effect']} [{x['run_id'] or 'no run'}]")
+                     f"- {x['label']}. Effect: {x['effect']} [{source}]")
     out.append(("Decisions", lines or ["No flags on this deal."]))
 
     a = cert["approval"]

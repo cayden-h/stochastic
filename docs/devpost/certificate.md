@@ -53,7 +53,7 @@ The output is a draft built from the approved result, not advice and not a signe
 | Draft section | What it shows | Clause it comes from |
 | --- | --- | --- |
 | Header | Lender, agreement, Section 4.8(a) wording, debt term, unit, backend, "Draft" | Section 4.8(a) [verified] |
-| Test period | The period of each company's source lines and the brief's note | Section 4.8(a) and the Nu Aire clause in EBITDA [verified]; our periods differ, see below [verified] |
+| Test period | Each company's income statement periods and balance sheet dates, from its source lines, and the brief's note | Section 4.8(a) and the Nu Aire clause in EBITDA [verified]; our periods differ, see below [verified] |
 | EBITDA | Per-company net income, interest, taxes, D&A, each add-back with cap and applied amount, the rent deduction, the total | Addendum I, EBITDA [verified] |
 | Debt | Lines counted as Senior Funded Bank Debt and lines excluded with the reason | Definition of Senior Funded Bank Debt and Subordinated Debt [verified] |
 | Leverage | Debt divided by EBITDA | Section 4.8(a) [verified] |
@@ -71,8 +71,8 @@ Every figure in the draft is followed by the run id of the tool run that produce
 - The statement on whether any Event of Default exists, and any corrective measures. [verified: Section 4.2(g) asks for it; the draft does not say it]
 - The other financial covenants, such as the fixed charge coverage ratio in Section 4.8(b). [verified: the draft tests only Section 4.8(a)]
 - The lender's own form, if it has one. [inferred: we found none in Ex 10.1]
-- Extraordinary gains. The draft has no line for them, so none are subtracted. [inferred: none appear in the source lines]
-- The agreement's test period. Our combined income statement adds Kewaunee's year to April 30, 2024 and Nu Aire's year to September 30, 2024. [verified: the source line periods]
+- Extraordinary gains: the draft has no line for them, so none are subtracted. [inferred: none appear in the source lines]
+- The agreement's test period: our combined income statement adds Kewaunee's year to April 30, 2024 and Nu Aire's year to September 30, 2024. [verified: the source line periods]
 - The agreement uses Nu Aire's four quarters to October 31, 2024 and a quarter-end test date. [verified: Ex 10.1, Addendum I and Section 4.8(a)]
 - So the draft figure is not the figure a quarter-end certificate would carry. [inferred]
 - The transaction and integration cost add-backs are applied at 0, because the filings we read do not quantify them. [verified: the brief marks both inferred]

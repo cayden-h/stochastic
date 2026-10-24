@@ -49,6 +49,15 @@ class Verdict(BaseModel):
     approval_state: str | None = None
     posted: bool
 
+    @model_serializer(mode="wrap")
+    def _drop_unset_sensitivity(self, handler):
+        """With no sensitivity run (no covenant flag to read the whole-line debt from), the five keys are absent."""
+        out = handler(self)
+        for key in ("naive_debt", "naive_leverage", "naive_flip_addback", "naive_flip_rent", "sensitivity_run_id"):
+            if key not in self.model_fields_set:
+                out.pop(key, None)
+        return out
+
 
 class CaseResponse(BaseModel):
     """The whole screen in one read: lines, mappings, flags, result, verdict, work items, memory, log summary."""
