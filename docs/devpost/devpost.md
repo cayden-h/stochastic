@@ -134,6 +134,7 @@ Real:
 - The flag and the leverage effect of each answer are computed by the tools, not written by a model. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 - Agent memory is real: it is policies the gateway wrote from the controller's answers. It is not a change to model weights. [verified: `backend/app/gateway/gateway.py`, `_learn`]
 - The store is real: with `STORE=postgres`, every gateway write reaches Postgres on Tiger Cloud, and a restart loads the record, the log, and the memory back. If Tiger Cloud is unreachable, the API runs in memory and the console says so. [verified: `backend/tests/test_postgres_store.py`, `backend/tests/test_store_fallback.py`]
+- The what-if forks are real: each covenant flag's options are written into a zero-copy fork of the ledger on Tiger Cloud, never into the live record, and the controller's answer deletes the fork. On the free plan there is room for one fork at a time; if a fork fails, the flag works the same and says so. [verified: `backend/tests/test_whatif_forks.py`, live run 2026-10-24 09:00]
 
 Not real, or not claimed:
 - The statement lines come from public filings, not from the companies' internal books.
@@ -168,7 +169,7 @@ Claim nothing unconfirmed.
 - Factory: the agents ran through the Droid SDK on 2026-10-24, with Sonnet 5.5 and Haiku 5.5 requested. [verified: `docs/agents.md`, run log]
   Say "built with the Droid SDK" only about `droid` runs.
 - Figma: the console's design system and screen frames are in the Figma file. [verified: `docs/design/README.md`]
-- Tiger Data: the record, the audit log, and the agents' memory are stored in Postgres on Tiger Cloud, and the audit log is a TimescaleDB hypertable that refuses edits. [verified: `backend/tests/test_postgres_store.py`]
+- Tiger Data: the record, the audit log, and the agents' memory are stored in Postgres on Tiger Cloud, and the audit log is a TimescaleDB hypertable that refuses edits. Each covenant flag's what-ifs live in a zero-copy fork of the ledger, made in about 35 s and deleted by the answer. [verified: `backend/tests/test_postgres_store.py`, `backend/tests/test_whatif_forks.py`]
   Say how the shipped screen was built from it only once Josie confirms.
 
 ## Open before submission

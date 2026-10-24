@@ -174,6 +174,7 @@ Also found: Droid accepts an unknown model id without an error, so a wrong `DROI
 | Wi-Fi fails | No network | `scripted` or `replay` need none. The demo makes no live SEC calls. The store keeps working in memory and queues its writes to Tiger until the network is back (`GET /health` `store.pending`). | None needed. |
 | Tiger Cloud unreachable at start | The badge says "In memory" and "Tiger unreachable" | The API runs in memory; nothing is lost from the screen | "The database is down, so this run is in memory. The log and the chain are the same." |
 | A Run click while a run is going | 409 "a run is already in progress" | Nothing; the running job finishes | None needed. |
+| The Tiger fork fails or is slow | The flag card says "no fork (...)" or still "Forking ..." | The options and effects are computed in process as always; answer when ready | "The fork is still coming up; the figures are already computed." |
 
 ### The restart moment (Tiger), rehearsed 2026-10-24 08:09 [verified]
 

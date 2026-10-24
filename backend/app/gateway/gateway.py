@@ -119,6 +119,7 @@ class Gateway:
         self.store = store
         self.lock = threading.RLock()  # background runs and requests write through one gateway
         self._depth = 0
+        self.forks = None  # WhatIfForks when STORE=postgres and FORKS=tiger (app/gateway/whatif.py)
 
     # ------------------------------------------------------------------ audit log
     def _log(self, deal_id: str, actor: str, action: str, result: str, target: str | None = None,
@@ -359,7 +360,16 @@ class Gateway:
                                  "option_actions": {o.id: o.model_dump() for o in flag.options}})
         self.store.items[item.id] = item
         self._log(deal.id, MAPPER, "ask:flag", "ALLOWED", item.id, reason=flag.question, evidence=flag.evidence)
+        if self.forks:
+            self.forks.flag_opened(item)
         return item
+
+    @_writes
+    def note_fork(self, item_id: str, fork: dict, action: str, reason: str) -> None:
+        """Record a step of a flag's what-if fork on the flag and in the log. Only the gateway's fork helper calls it."""
+        item = self._item(item_id)
+        item.payload = {**item.payload, "fork": fork}
+        self._log(item.deal_id, SYSTEM, action, "ALLOWED", item.id, reason=reason)
 
     @staticmethod
     def _with_baseline(flag: FlagProposal) -> FlagProposal:
@@ -437,6 +447,8 @@ class Gateway:
             self._post(item)
             deal = self._deal(item.deal_id)
             deal.stage = "awaiting_flag" if self.open_flags(deal.id) else "flags_answered"
+            if self.forks:
+                self.forks.flag_answered(item)
         else:
             item.state = State.PROPOSED
             self._log(item.deal_id, actor, "answer", "ALLOWED", item.id, reason=f"option {option_id}")

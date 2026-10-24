@@ -143,6 +143,7 @@ Haiku 5.5 is the default for that reason. A full deal on Haiku 5.5 is three Droi
 | 2026-10-24 08:20 | droid, Haiku 5.5, browser, cold | 3 flags; the covenant flag's three readings were all under the limit (0.76x, 1.74x, 1.53x), so the moment did not show | not run | Led to the gateway's baseline option (lessons) |
 | 2026-10-24 08:22 | droid, Haiku 5.5, browser, cold, with the baseline | flag at 64 s; the gateway's baseline showed 2.54x over; the mapping flag's suggested answer mapped Interest Income - Net to Interest expense | approve enabled 36 s after the last answer | 0.76x OK. Second run: 8 of 9 policies applied, the wrong interest policy declined after the sign rule, and a new 3-line mapping flag, so not a clean second run |
 | 2026-10-24 08:30 | droid, Mapper Sonnet 5.5, Preparer and Reviewer Haiku 5.5, API trial | 49 s; covenant flag with the 2.54x reading from the model itself, 1 mapping flag | 29 s and 9 s, pass | 0.76x OK; second run: no flag, ready for approval in 58 s |
+| 2026-10-24 08:53 | droid, Mapper Sonnet 5.5, `FORKS=tiger`, browser, cold | flag at 48 s; Tiger fork ready 33 s later with 3 what-ifs | fork deleted 1 s after the answer; approve live 33 s after the last answer | 0.76x OK, approved; three FORK rows in the log |
 | 2026-10-24 08:33 | same, second trial | 47 s; same two flags | pass | 0.76x OK; second run: no flag, 58 s |
 
 Figures in the log are as computed at the time. Since Tri's interest-income fix on 2026-10-24, the same recordings replay at 0.76x covenant and 2.54x whole-line.

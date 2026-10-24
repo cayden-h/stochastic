@@ -398,3 +398,15 @@ Decision:
 
 Evidence: `agents.md` section 9, rows 08:06 to 08:33; tests `test_covenant_flag_always_shows_the_count_everything_reading`, `test_learned_lines_are_marked_by_the_gateway_not_by_the_model_wording`, `test_second_run_while_one_is_in_progress_is_refused`.
 
+## D17. A covenant flag's what-ifs live in a Tiger fork
+
+Date: 2026-10-24, 09:00. Cayden chose to delete the paused `larp-city` service (backed up first) to free the free plan's second service slot.
+
+Decision: when the Mapper raises a covenant flag, the gateway forks the ledger on Tiger Cloud in the background and writes each option's what-if (tags, effect, tool outputs, run id) into a `what_if` table in the fork. The live record never holds a hypothetical. The controller's answer keeps one option in the ledger, and the gateway deletes the fork with the alternatives, which frees the slot. Each step is a gateway write: `fork:create`, `fork:ready`, `fork:delete` (or `fork:failed`, `fork:skip`) in the hash-chained log, and the fork state on the flag.
+
+Why: a plain Postgres store does not stand out for Tiger Data, and forks are what Tiger Data pushes (`sponsors/tiger-data.md`). The fit is honest: a what-if is exactly a copy of the ledger that may be thrown away.
+
+Limits: a fork takes 33 to 35 s, so it never blocks the flag; the options and effects are computed in process as before. The free plan allows one fork beside the main service, so a second covenant flag while a fork is open gets none and says so. A fork left by a crash is deleted on the next start (`FORK_PREFIX`).
+
+Evidence: `backend/tests/test_whatif_forks.py` (lifecycle, answer before ready, failure, one slot, cleanup, and an opt-in round trip against Tiger that passed on 2026-10-24); the live browser run at 08:53 in `agents.md` section 9.
+

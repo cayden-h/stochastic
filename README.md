@@ -142,7 +142,7 @@ We target four tracks. [set by Cayden, 2026-10-24]
 | Hyphenate (main) | A real messy corner (two charts of accounts from a real deal), an answer key, limits in code, and one moment: the flagged line that changes the leverage verdict. |
 | Factory | The agents run through the Droid SDK, one resumed session per role, with a tool allowlist and typed output. |
 | Figma | The console is designed in Figma and built from the Figma frame. The Figma file and one agent-driven edit are on screen in the pitch. |
-| Tiger Data | The record, the hash-chained audit log, and the agents' memory live in Postgres on Tiger Cloud. The audit log is a TimescaleDB hypertable that refuses edits, and a restart loads everything back. |
+| Tiger Data | The record, the hash-chained audit log, and the agents' memory live in Postgres on Tiger Cloud. The audit log is a TimescaleDB hypertable that refuses edits, and a restart loads everything back. Each covenant flag's what-ifs live in a zero-copy fork of the ledger until the answer deletes it. |
 
 Other tracks are not targeted. The details, the per-track checklist, and the open questions are in section 15 of `docs/STOCHASTIC.md`.
 

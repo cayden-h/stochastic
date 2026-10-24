@@ -50,7 +50,7 @@ export function isLearnedTag(l: SourceLine): boolean {
 const VERBS: Record<string, string> = {
   create: "CREATED", create_deal: "CREATED", propose: "PROPOSED", ask: "ASKED", answer: "ANSWERED",
   approve: "APPROVED", reject: "REJECTED", post: "POSTED", hold: "HELD", reverse: "REVERSED",
-  tool: "RAN", policy: "POLICY", session: "SESSION", event: "EVENT",
+  tool: "RAN", policy: "POLICY", session: "SESSION", event: "EVENT", fork: "FORK",
 };
 
 /** Fixed verb list so the log stays scannable. */

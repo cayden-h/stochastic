@@ -25,7 +25,8 @@ Done at 08:00 (commit 08b2629): the Tiger Cloud store (`STORE=postgres`, write-t
 Done at 08:50 (Cayden's agent, live end-to-end tests on Droid and Tiger; details in `agents.md` section 9 and `decisions.md` D16):
 - Task 1: the demo laptop runs `STORE=postgres`; `GET /health` shows `postgres`, no fallback reason.
 - Task 2: the restart moment is rehearsed and written into `demo-script.md` section 5. Every field of the case came back identical.
-- Task 3: the fork spike failed on the free plan's two-service limit (`sponsors/tiger-data.md`). Forks are dropped unless Cayden deletes `larp-city` or the booth raises the limit.
+- Task 3: done at 09:00. Cayden chose to delete `larp-city` (backed up to `HackRice/backups/`); each covenant flag's what-ifs now live in a Tiger fork that the answer deletes (D17, `sponsors/tiger-data.md`). Tested live in the browser and against Tiger.
+- Task 9: scheduled in Cayden's Claude session for Sunday 07:52 (wake the service if paused, check `/health`). It runs only if that session is still open, so keep the manual check too.
 - Task 4: Anthropic is out of the default fallback chain (no key); the default is `scripted`.
 - Task 5, the machine part: three cold runs in a headless browser, timed. The stopwatch run of the 2:00 is still Cayden's.
 - Task 7, the prepared part: the backend line in `devpost/devpost.md` is filled in as planned. Submitting on devpost.com is still Cayden's (it needs his login).

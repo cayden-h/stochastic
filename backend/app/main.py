@@ -1,5 +1,7 @@
 """App entry point. Run: uvicorn app.main:app --reload --port 8000"""
 import logging
+import os
+import shutil
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -39,6 +41,13 @@ def open_store() -> MemoryStore:
 def create_app() -> FastAPI:
     store = open_store()
     gateway = Gateway(store)
+    if settings.forks == "tiger" and store.kind == "postgres" and settings.tiger_service_id:
+        from app.db.forks import TigerCliForks
+        from app.gateway.whatif import WhatIfForks
+        binary = os.getenv("TIGER_BIN") or shutil.which("tiger") or os.path.expanduser("~/.local/bin/tiger")
+        gateway.forks = WhatIfForks(gateway, TigerCliForks(settings.tiger_service_id, binary=binary),
+                                    schema=settings.db_schema)
+        gateway.forks.clean_leftovers()
     if not store.deals:  # a Postgres store that loaded a ledger keeps it
         seed(store, gateway)
     app = FastAPI(title="Stochastic gateway API", version="0.2.0")

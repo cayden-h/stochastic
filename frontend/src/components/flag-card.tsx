@@ -5,6 +5,26 @@ import type { SourceLine, WorkItem } from "@/lib/types";
 import { SourceChip } from "./source";
 import { ActorChip, Button, Mono, Shape, Tag } from "./ui";
 
+type Fork = { state: string; service_id?: string; seconds?: number; reason?: string };
+
+/** Where this flag's what-ifs live: a Tiger fork of the ledger, made by the gateway (app/gateway/whatif.py). */
+function ForkLine({ fork }: { fork?: Fork }) {
+  if (!fork) return null;
+  const text =
+    fork.state === "creating" ? "Forking the ledger on Tiger Cloud to hold these what-ifs. About 35 s."
+    : fork.state === "ready" ? `What-ifs held in Tiger fork ${fork.service_id}, outside the live ledger. Ready in ${fork.seconds} s.`
+    : fork.state === "failed" || fork.state === "skipped" ? `What-ifs computed here; no fork (${fork.reason}).`
+    : null;
+  if (!text) return null;
+  const live = fork.state === "creating" || fork.state === "ready";
+  return (
+    <p className="flex items-center gap-2 text-[14px] leading-5 text-muted">
+      <span className={fork.state === "ready" ? "text-clear" : "text-muted"}><Shape kind="circle" size={10} /></span>
+      <span className={live ? "" : "italic"}>{text}</span>
+    </p>
+  );
+}
+
 /**
  * One flag: the question, the filing evidence, and the options with their computed effects.
  * The effect text and run id come from the gateway's tool runs. Nothing here is computed.
@@ -30,6 +50,8 @@ export function FlagCard({
         <span className="flex-1" />
         <Button kind="link" onClick={onHold} disabled={busy}>Not sure. Hold this item.</Button>
       </div>
+
+      <ForkLine fork={item.payload.fork as Fork | undefined} />
 
       <h2 className="font-serif text-[26px] leading-8 font-medium">{item.question}</h2>
 

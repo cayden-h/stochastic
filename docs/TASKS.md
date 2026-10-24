@@ -42,7 +42,7 @@ Done at 05:10: Haiku 5.5 as the default model with per-role overrides, the failu
 
 Done at 08:00: the Tiger Cloud store and Tiger Data as a target.
 
-Done at 08:50 (`tasks/cayden.md`): tasks 1 to 4 and 8, plus the machine half of 5 and 7. Still open: the stopwatch rehearsal, the mentor questions, the Devpost submission, the Sunday wake-up, and forks only if `larp-city` is deleted.
+Done at 08:50 (`tasks/cayden.md`): tasks 1 to 4 and 8, plus the machine half of 5 and 7. Done at 09:00: Tiger forks (task 3), after Cayden chose to delete `larp-city`. Still open, and each needs a person: the stopwatch rehearsal, the mentor questions, and the Devpost submission. The Sunday wake-up is scheduled in Cayden's Claude session for 07:52 (it runs only if that session is still open).
 
 Open (details in `tasks/cayden.md`):
 1. Run the demo on `STORE=postgres` and rehearse the restart moment (the case, the log, and the policy come back).
@@ -114,7 +114,7 @@ Inputs for the design:
 | Hyphenate | Cayden (demo, Devpost, the real-versus-simulated list) | The real deal runs end to end with the flag on the console. The video opens with the flag moment. The second run shows memory. |
 | Factory | Cayden | Done: all three agents ran on Droid with Claude Sonnet 5.5, recorded. Keep it working through the rehearsals. |
 | Figma | Josie (design) | The console frame exists in Figma and the console follows it. Figma is on screen in the pitch. |
-| Tiger Data | Cayden (store, forks), Tri (timeline, write time) | Done: the store writes through to Postgres on Tiger Cloud, with the audit log as a TimescaleDB hypertable. Still to do: run the demo with `STORE=postgres`, show the restart and the tables once in the pitch, and add forks if the spike allows. Opt in on Devpost. |
+| Tiger Data | Cayden (store, forks), Tri (timeline, write time) | Done: the store writes through to Postgres on Tiger Cloud, with the audit log as a TimescaleDB hypertable. Done: `STORE=postgres` on the demo laptop, the restart moment rehearsed, and what-if forks per covenant flag (D17). Still to do: show the fork line and the restart once in the pitch, and opt in on Devpost. |
 
 ## Order of work
 

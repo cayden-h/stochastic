@@ -126,7 +126,9 @@ def build_router(gw: Gateway) -> APIRouter:
     # ------------------------------------------------------------------ reads
     @r.get("/health", response_model=HealthResponse)
     def health():
-        return {"ok": True, "chain_valid": gw.verify_chain(), "backend": backend_status(), "store": store.status()}
+        forks = gw.forks.status() if gw.forks else {"enabled": False}
+        return {"ok": True, "chain_valid": gw.verify_chain(), "backend": backend_status(),
+                "store": {**store.status(), "forks": forks}}
 
     @r.get("/deals")
     def deals():

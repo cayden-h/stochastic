@@ -81,7 +81,7 @@ The system has four parts.
 - **People and files.** The console, the two data files, and the brief.
 - **Agents.** Three stateful agents and a plain job runner.
 - **The gateway.** It is the only writer. It checks permissions, enforces work-item states, runs the tools, writes the log, and writes the agents' memory.
-- **The store.** In memory for every read, written through to Postgres on Tiger Cloud when `STORE=postgres`. It holds the record, the work items, the tool runs, the audit log, the policies, and the agent sessions. The audit log is a TimescaleDB hypertable that refuses edits, and a restart loads everything back. [verified: `backend/tests/test_postgres_store.py`, run against the `stochastic` service on 2026-10-24]
+- **The store.** In memory for every read, written through to Postgres on Tiger Cloud when `STORE=postgres`. It holds the record, the work items, the tool runs, the audit log, the policies, and the agent sessions. The audit log is a TimescaleDB hypertable that refuses edits, and a restart loads everything back. [verified: `backend/tests/test_postgres_store.py`, run against the `stochastic` service on 2026-10-24] When the Mapper raises a covenant flag, the gateway forks the ledger on Tiger Cloud (a zero-copy fork, about 35 s) and writes every option's what-if into the fork, never into the live record; the controller's answer keeps one option in the ledger and deletes the fork with the alternatives. [verified: `backend/app/gateway/whatif.py`, live on 2026-10-24 09:00]
 
 Code tools hold all the math: consolidation, tie-out, EBITDA, covenant debt, leverage, and the limit test. [verified: `backend/app/tools/finance.py`]
 Agents call tools through the gateway. They do not talk to each other.
@@ -272,7 +272,7 @@ Status as of 2026-10-24. Sponsor research is in `sponsors/`.
 | Hyphenate (main) | Target | $8K, $5K, $3K, plus interviews for the top 5. Select it on Devpost. |
 | Factory | Target (build runner) | Cayden has a Factory account on the Plus plan. Droid runs the agents we show. Confirm prize rules and Claude model access with a Factory mentor, because the Friday workshop has passed. |
 | Figma | Target | Five prizes at $1,000 each (self-reported): Best Use Case of Figma, Best Use Case of Figma Agent, Most Creative Use Case of Figma Agent, Best Design, Most Creative. Josie designs the console in Figma, and the Figma MCP is in the loop. Prompts are not published, so read the Live Site. |
-| Tiger Data (MLH) | Target | Added 2026-10-24 evening, once the store ran on Tiger Cloud. MLH prize "Best Use of Tiger Data". Proof: the record, the audit log, and the agents' memory live in Postgres on Tiger Cloud. |
+| Tiger Data (MLH) | Target | Added 2026-10-24 evening, once the store ran on Tiger Cloud. MLH prize "Best Use of Tiger Data". Proof: the record, the audit log, and the agents' memory live in Postgres on Tiger Cloud, and each covenant flag's what-ifs live in a zero-copy fork that the answer discards (D17). |
 | Microsoft | Not targeted | Dropped as a target. It needs Microsoft products that we do not use. |
 | Most Technically Advanced | Not targeted | Costs no extra work if it is open to all. Do not build for it. |
 | Mana | Skip | Needs the founders' confirmation that it counts. |
@@ -311,7 +311,8 @@ Figma:
 Tiger Data:
 - The store runs on Tiger Cloud (`STORE=postgres`): every gateway write reaches Postgres, and a restart loads the record, the audit log, and the agents' memory back. [verified: `backend/tests/test_postgres_store.py`]
 - The audit log is a TimescaleDB hypertable that refuses UPDATE and DELETE. A reset starts a new ledger, so nothing is deleted.
-- Show it in the pitch: the "Tiger Cloud" badge on the console, then the `ledger` and `audit_log` tables in SQL after a restart.
+- Forks: each covenant flag's what-ifs go to a zero-copy fork of the ledger, and the answer deletes it. The flag card says "What-ifs held in Tiger fork ..." and the log has the three FORK rows. [verified: live run 2026-10-24 09:00; `backend/tests/test_whatif_forks.py`]
+- Show it in the pitch: the "Tiger Cloud" badge, the fork line on the flag card, then the `ledger` and `audit_log` tables in SQL after a restart.
 - Open: whether forks for comparing two flag answers are worth building this weekend (see `sponsors/tiger-data.md`).
 Cal Hacks has not confirmed that one project can opt into several sponsor tracks. Ask at kickoff.
 
