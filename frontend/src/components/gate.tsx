@@ -6,7 +6,18 @@ import { API_URL } from "@/lib/api";
 /** Shows a plain note when the gateway API is not running. */
 export function Gate({ children }: { children: React.ReactNode }) {
   const { error, kase, loading } = useDeal();
-  if (loading) return <div className="mx-auto max-w-[960px] py-12 text-muted">Loading the deal.</div>;
+  if (loading) return <div className="px-[32px] py-[28px] text-slate">Loading the deal.</div>;
+  if (error?.kind === "no_deal") {
+    return (
+      <div className="drag flex flex-col gap-[12px] px-[32px] py-[28px]">
+        <h1 className="font-serif text-[32px] text-forest">No deal is loaded.</h1>
+        <p className="text-slate">The gateway at {API_URL} is running but holds no deal. Reset it to load the demo deal, then reload.</p>
+        <pre className="max-w-[640px] rounded-[12px] border border-line bg-white p-4 font-mono text-[12px]">
+          curl -X POST &apos;{API_URL}/dev/reset?keep_memory=false&apos;
+        </pre>
+      </div>
+    );
+  }
   if (error && kase) {
     // The API dropped after the first load: say so instead of leaving a stale screen that looks live.
     return (
@@ -20,10 +31,10 @@ export function Gate({ children }: { children: React.ReactNode }) {
   }
   if (error && !kase) {
     return (
-      <div className="mx-auto max-w-[960px] py-12">
-        <h1 className="font-serif text-[40px] leading-[48px] font-medium">The gateway is not running.</h1>
-        <p className="mt-2 text-muted">The console could not reach {API_URL}. Start the backend, then reload.</p>
-        <pre className="mt-4 rounded-chip border border-hairline bg-card p-4 font-mono text-[14px] leading-5">
+      <div className="drag flex flex-col gap-[12px] px-[32px] py-[28px]">
+        <h1 className="font-serif text-[32px] text-forest">The gateway is not running.</h1>
+        <p className="text-slate">The console could not reach {API_URL}. Start the backend, then reload.</p>
+        <pre className="max-w-[640px] rounded-[12px] border border-line bg-white p-4 font-mono text-[12px]">
           cd backend{"\n"}.venv/bin/uvicorn app.main:app --port 8000
         </pre>
       </div>

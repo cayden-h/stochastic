@@ -1,4 +1,4 @@
-import type { AuditRow, Mapping, SourceLine, WorkItem } from "./types";
+import type { AuditRow, Mapping, SourceLine, Stage, WorkItem } from "./types";
 
 export function clock(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-GB", { timeZone: "America/Los_Angeles", hour12: false });
@@ -18,10 +18,18 @@ export function fmtK(v: number): string {
   return `${Math.round(v).toLocaleString("en-US")}K`;
 }
 
-/** A source line's amount in USD thousands, whatever unit the filing used (Nu Aire files in dollars). */
+/** An amount in USD thousands from the unit the filing used, as backend finance.to_thousands does: Kewaunee files
+ * thousands, Nu Aire whole dollars. An unknown unit is left as it is. */
+export function toK(amount: number, unit: string): number {
+  const u = unit.trim().toLowerCase();
+  if (["usd", "dollars", "usd dollars", "$"].includes(u)) return amount / 1000;
+  if (["usd millions", "millions", "mm"].includes(u)) return amount * 1000;
+  return amount;
+}
+
+/** A source line's amount in USD thousands, whatever unit the filing used. */
 export function lineK(amount: number, unit: string): string {
-  const dollars = ["usd", "dollars", "usd dollars", "$"].includes(unit.trim().toLowerCase());
-  return fmtK(dollars ? amount / 1000 : amount);
+  return fmtK(toK(amount, unit));
 }
 
 /** USD thousands shown in millions for a headline figure: $49.3M. */
@@ -29,9 +37,51 @@ export function fmtM(v: number): string {
   return `$${(v / 1000).toFixed(1)}M`;
 }
 
-/** A leverage ratio, two places, formatted from the unrounded value like the gateway does. */
+/** A leverage ratio, two places, formatted from the unrounded value like the gateway does. v3 writes the times sign. */
 export function fmtX(v: number): string {
-  return `${v.toFixed(2)}x`;
+  return `${v.toFixed(2)}\u00d7`;
+}
+
+/** A confidence as a whole percent: 0.42 is 42%. */
+export function pct(v: number): string {
+  return `${Math.round(v * 100)}%`;
+}
+
+/** How long ago, in words a controller reads at a glance. Past a day it falls back to the PT clock. */
+export function ago(iso: string, now = Date.now()): string {
+  const s = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  return clock(iso);
+}
+
+/** The Brief comes first on a deal made from agreement text (D20): these stages are the Brief Reader's. */
+export function isBriefStage(stage: Stage): boolean {
+  return stage === "reading_brief" || stage === "awaiting_brief" || stage === "brief_ready";
+}
+
+/** A run can start from a new deal or from a run that stopped. */
+export function canStart(stage: Stage): boolean {
+  return stage === "new" || stage === "run_failed";
+}
+
+/** The stage in the controller's words, and whether it waits on them. */
+export function stageWords(stage: Stage): { text: string; tone: "you" | "work" | "done" | "bad" | "idle" } {
+  switch (stage) {
+    case "new": return { text: "Not started", tone: "idle" };
+    case "reading_brief": return { text: "Reading the agreement", tone: "work" };
+    case "awaiting_brief": case "brief_ready": return { text: "Brief \u00b7 needs you", tone: "you" };
+    case "mapping": return { text: "Mapping", tone: "work" };
+    case "awaiting_flag": return { text: "Mapping \u00b7 needs you", tone: "you" };
+    case "mapped": case "flags_answered": case "preparing": return { text: "Preparing", tone: "work" };
+    case "awaiting_review": return { text: "Reviewing", tone: "work" };
+    case "awaiting_approval": return { text: "Approval \u00b7 needs you", tone: "you" };
+    case "needs_attention": return { text: "Needs attention", tone: "bad" };
+    case "posted": return { text: "Posted", tone: "done" };
+    case "run_failed": return { text: "Run stopped", tone: "bad" };
+    default: return { text: titleCase(stage), tone: "work" };
+  }
 }
 
 export function plural(n: number, word: string): string {
@@ -56,14 +106,27 @@ export function learnedPolicies(mappings: Mapping[], lines: SourceLine[]): Set<s
 
 const VERBS: Record<string, string> = {
   create: "CREATED", create_deal: "CREATED", propose: "PROPOSED", ask: "ASKED", answer: "ANSWERED",
-  approve: "APPROVED", reject: "REJECTED", post: "POSTED", hold: "HELD", reverse: "REVERSED",
+  approve: "APPROVED", approve_brief: "APPROVED", reject: "REJECTED", post: "POSTED", hold: "HELD", reverse: "REVERSED",
+  brief: "BRIEF", agreement: "LOADED", edit: "EDITED",
   tool: "RAN", policy: "POLICY", session: "SESSION", event: "EVENT", fork: "FORK",
 };
 
-/** Fixed verb list so the log stays scannable. */
-export function verbOf(row: AuditRow): string {
+/** What the gateway's `post` row recorded, in words. Only the approval post puts the books on the record. */
+const POSTED: Record<string, string> = {
+  map_lines: "Mapping recorded.", prepare_result: "Draft books recorded.", review_result: "Review recorded.",
+  flag: "Answer recorded.", approve_result: "Approved and posted to the record.", draft_brief: "Brief approved and locked.",
+};
+
+function isApprovalPost(row: AuditRow, items: WorkItem[]): boolean {
+  return items.find((i) => i.id === row.target)?.type === "approve_result";
+}
+
+/** Fixed verb list so the log stays scannable. A post of anything but the approval is RECORDED, not POSTED. */
+export function verbOf(row: AuditRow, items: WorkItem[] = []): string {
   if (row.result === "DENIED") return "DENIED";
-  return VERBS[row.action.split(":")[0]] ?? row.action.toUpperCase();
+  const verb = row.action.split(":")[0];
+  if (verb === "post" && !isApprovalPost(row, items)) return "RECORDED";
+  return VERBS[verb] ?? row.action.toUpperCase();
 }
 
 /** One plain line for the log. Uses names the controller already knows. */
@@ -80,9 +143,15 @@ export function describe(row: AuditRow, items: WorkItem[]): string {
   if (verb === "propose") return `${titleCase(rest ?? "item")} proposed. ${row.reason ?? ""}`.trim();
   if (verb === "create") return `${titleCase(rest ?? "item")} opened.`;
   if (verb === "create_deal") return `Deal created. ${row.reason ?? ""}`.trim();
+  if (verb === "agreement") return `Agreement loaded. ${row.reason ?? ""}`.trim();
+  if (verb === "approve_brief") return `Brief approved and locked. ${row.reason ?? ""}`.trim();
+  if (verb === "brief") return `${rest === "reuse" ? "Brief reused" : "Brief amended"}. ${row.reason ?? ""}`.trim();
   if (verb === "policy") return `${rest === "learn" ? "Policy learned" : "Policy applied"}. ${row.reason ?? ""}`.trim();
   if (verb === "session") return `Agent session turn. ${row.reason ?? ""}`.trim();
-  if (verb === "post") return `${titleCase(item?.type ?? "item")} posted to the record.`;
+  if (verb === "post") {
+    if (item?.type.startsWith("reverse:")) return `Reversal recorded. ${row.reason ?? ""}`.trim();
+    return POSTED[item?.type ?? ""] ?? `${titleCase(item?.type ?? "item")} recorded.`;
+  }
   if (verb === "approve") return `${titleCase(item?.type ?? "item")} approved. ${row.reason ?? ""}`.trim();
   if (verb === "reject") return `${titleCase(item?.type ?? "item")} rejected. ${row.reason ?? ""}`.trim();
   if (verb === "hold") return "Flag held. The controller is not sure.";
