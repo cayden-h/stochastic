@@ -33,16 +33,15 @@ Stochastic/
       core/                config.py, models.py
     tests/                 test_trust_rules.py
   frontend/                Next.js, React, TypeScript, Tailwind
-    src/app/               page.tsx, plans/, log/
-    src/components/        gate, escalation-card, plan-table, top-bar, source, audit-log, ui
+    src/app/               page.tsx (Dashboard), case/, mapping/, agents/, log/
+    src/components/        shell, sidebar, gate, flag-card, verdict-line, combined-table, mappings, upload-modal, source, audit-log, icons, ui
     src/lib/               api.ts, types.ts, deal-context.tsx, format.ts
   evals/                   README only (answer key and scoring, planned)
   data/                    Cached public filings (git-ignored, README tracked)
   scripts/                 README only (helper scripts, planned)
 ```
 
-The frontend `plans/` route and the plan components belong to the earlier framing.
-Josie decides what stays.
+The frontend follows Figma Hi-fi v3: `/` is the Dashboard and `/case` the Case (`frontend/README.md`).
 
 ## Where new agent code goes
 

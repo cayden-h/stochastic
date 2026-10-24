@@ -1,7 +1,9 @@
 # The Brief Reader: a fourth agent that reads the credit agreement
 
 Last updated: 2026-10-24, evening.
-Status: decided (D20), not built.
+Status: decided (D20).
+Stage 1 is built in the gateway and the agents (2026-10-24); the routes are Tri's T4.
+The gateway functions are in `gateway-and-api.md`.
 Research: `research/brief-reader.md`.
 Claims are tagged [verified] when a file or a filing shows them, and [inferred] when they are our judgment.
 
@@ -154,7 +156,8 @@ Until stage 1 is built and tested, say instead: "Today a person writes the Brief
 ## 12. Open questions
 
 - When to build stage 1. The order of work in `TASKS.md` has a feature freeze on Saturday at 8pm, before judging. [verified: `TASKS.md`]
-- Which model runs the reader. The text is long and the job is exact, so Sonnet 5.5 is the likely pick. [inferred]
-- Whether `DROID_TIMEOUT` (90 s) is enough for the reader. The input is larger than the Mapper's. [inferred]
+- Which model runs the reader. Sonnet 5.5 on Droid drafted a Brief that passed every check on the full Ex 10.1, on the runner's retry after one refused three-word quote. [verified: `backend/recordings/brief_reader.json`, 2026-10-25]
+- Whether `DROID_TIMEOUT` is enough. A reader turn took 21 to 24 s on 10.8K characters of input, so the demo's 75 s is enough. [verified: the same run]
+- The first live run (before two fixes) was refused twice: the limit's quote did not repeat the debt term, a rule stricter than check 3 that is now "the limit is quoted from limit_section", and it changed the text's capitals. [verified: `docs/tasks/cayden.md`, C3]
 - Whether the reader keeps one session across agreements, as the other roles do, or starts fresh per agreement so its context does not grow. [inferred]
 - `fetch_filings.py` needs `SEC_USER_AGENT` with a real email, which is not set in `.env` today. [verified: key names in `.env`]

@@ -6,6 +6,7 @@
 # data (cached filings and downloads are large and may carry license limits)
 data/*
 !data/README.md
+!data/brief/
 
 # python
 __pycache__/

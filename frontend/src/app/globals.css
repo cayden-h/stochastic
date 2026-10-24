@@ -1,7 +1,27 @@
 @import "tailwindcss";
 
-/* Tokens from docs/design/README.md (Paper and ink). Contrast is checked in docs/design/ui-ux-research.md. */
+/* Tokens from Figma Hi-fi v3 (docs/design/README.md). The older Paper and ink roles stay for the state colors. */
 @theme {
+  /* v3 surface and text */
+  --color-forest: #1A5140;      /* brand, headings, primary button, figures */
+  --color-body: #23302D;        /* body text */
+  --color-slate: #62736D;       /* labels and secondary text */
+  --color-faint: #9AA8A1;       /* unavailable rows */
+  --color-line: #DEE8E3;        /* card borders and row dividers */
+  --color-fog: #F2F5F3;         /* waiting verdict */
+  --color-mint: #E1F0EA;        /* model card, Mapper chip */
+  --color-mint-select: #EEF7F2; /* suggested option */
+  --color-mint-file: #C9E3D4;   /* chosen file */
+  --color-mint-file-ink: #3F5F52;
+  --color-mint-edge: #A8CFBA;   /* upload button border */
+  --color-amber-line: #E8C98A;  /* flag card border */
+  --color-amber-tint: #FDF6E7;  /* unsure mapping row */
+  --color-preparer: #B3266F;
+  --color-preparer-tint: #FDE4EE;
+  --color-reviewer: #5B3FA6;
+  --color-reviewer-tint: #ECE6FB;
+
+  /* Paper and ink roles still in use */
   --color-paper: #F7F4EC;
   --color-card: #FFFFFF;
   --color-ink: #1B1F24;
@@ -19,26 +39,61 @@
   --color-clear: #1E6B52;
   --color-clear-tint: #E1F0EA;
 
-  --font-sans: var(--font-public-sans), system-ui, sans-serif;
-  --font-serif: var(--font-newsreader), Georgia, serif;
+  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
+  --font-serif: var(--font-instrument-serif), Georgia, serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-ui: var(--font-public-sans), system-ui, sans-serif;
 
   --radius-chip: 4px;
-  --radius-card: 8px;
+  --radius-card: 16px;
 }
 
 html, body {
-  background: var(--color-paper);
-  color: var(--color-ink);
+  background: #FFFFFF;
+  color: var(--color-body);
 }
 
 body {
   font-family: var(--font-sans);
-  font-size: 18px;
-  line-height: 28px;
+  font-size: 14px;
+  line-height: normal;
+  font-variation-settings: "opsz" 14;
   font-variant-numeric: tabular-nums lining-nums;
 }
 
+/* The page wash behind each screen, as in the v3 frames: a tint at the top that is white by 20% of the height. */
+.wash-green  { background-image: linear-gradient(180deg, #D8EEE3 0%, #EDF7F2 10%, #FFFFFF 20%, #FFFFFF 100%); }
+.wash-pink   { background-image: linear-gradient(180deg, #FBDDEA 0%, #FEF1F6 10%, #FFFFFF 20%, #FFFFFF 100%); }
+.wash-purple { background-image: linear-gradient(180deg, #E5DDF9 0%, #F4F1FC 10%, #FFFFFF 20%, #FFFFFF 100%); }
+
+/* Electron window (titleBarStyle hiddenInset): the top strip drags the window, the controls inside it do not. */
+.drag { -webkit-app-region: drag; app-region: drag; }
+.drag a, .drag button, .drag input, .drag label, .drag select, .no-drag { -webkit-app-region: no-drag; app-region: no-drag; }
+
+/* The companion's reason bubble and note: the neutral glass of Josie's Reason popover (Figma 545:408). */
+.glass {
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86) 0%, rgba(246, 246, 246, 0.8) 48%, rgba(255, 255, 255, 0.84) 100%);
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+  box-shadow: 0 8px 28px rgba(27, 31, 36, 0.14), 0 1px 3px rgba(27, 31, 36, 0.06), inset 0 1px 3px rgba(255, 255, 255, 0.8);
+}
+
+/* The companion asking: a slow pulse ring in agent-tint. */
+@keyframes companion-pulse {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+.companion-pulse { animation: companion-pulse 1.6s ease-out infinite; }
+
+/* An edited cell after its Your edits row is clicked. */
+@keyframes cell-flash {
+  0%, 30% { box-shadow: inset 0 0 0 2px var(--color-agent); background-color: var(--color-agent-tint); }
+  100% { box-shadow: inset 0 0 0 2px transparent; }
+}
+.cell-flash { animation: cell-flash 1.2s ease-out 1; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
+  .cell-flash { box-shadow: inset 0 0 0 2px var(--color-agent); }
 }

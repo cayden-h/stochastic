@@ -38,7 +38,8 @@ def open_store(schema):
 
 def snapshot(store):
     return {attr: {k: v.model_dump(mode="json") for k, v in getattr(store, attr).items()}
-            for attr in ("deals", "source_lines", "mappings", "items", "results", "tool_runs", "policies", "sessions")}
+            for attr in ("deals", "source_lines", "mappings", "items", "results", "tool_runs", "policies", "sessions",
+                         "edits", "adjustments", "agreements", "approved_briefs")}
 
 
 def run_to_posted(gw):
@@ -92,6 +93,60 @@ def test_a_reset_starts_a_new_ledger_and_keeps_the_old_log(schema):
     assert counts[1] == first_rows and counts[2] == len(again.audit)
     assert reasons == ["first start", "reset, agent memory kept"]
     again.close()
+
+
+def test_review_edits_survive_a_restart_and_adjustments_survive_a_reset(schema, monkeypatch):
+    from tests.test_edits import _recompute_without_edits  # the flow stand-in until T1; no figures are checked
+    monkeypatch.setattr(Gateway, "_recompute", _recompute_without_edits)
+    store = open_store(schema)
+    gw = Gateway(store)
+    seed(store, gw)
+    advance(gw, DEAL_ID, backend="scripted")
+    for flag in gw.open_flags(DEAL_ID):
+        gw.answer(CONTROLLER, flag.id, flag.default)
+    advance(gw, DEAL_ID, backend="scripted")
+    edit = gw.apply_edit(CONTROLLER, DEAL_ID, "amount", "Nu Aire", "General and Administrative", value=5662.806)["edit"]
+    gw.reason_edit(CONTROLLER, edit.id, chip=0)
+    assert store.flush() and store.status()["last_error"] is None
+    before = snapshot(store)
+    store.close()
+
+    again = open_store(schema)
+    assert snapshot(again) == before and again.edits[edit.id].status == "reasoned"
+    assert again.items[again.deal_items(DEAL_ID, "approve_result")[0].id].state.value == "SUPERSEDED"
+    with Gateway(again).lock:
+        again.reset_deals(keep_memory=True)
+    assert again.flush()
+    again.close()
+    third = open_store(schema)
+    assert not third.edits and set(third.adjustments) == {edit.adjustment_id}
+    third.close()
+
+
+def test_an_agreement_and_its_draft_brief_survive_a_restart(schema):
+    from tests.test_brief_reader_gateway import new_deal
+    store = open_store(schema)
+    gw = Gateway(store)
+    new_deal(store, gw)
+    advance(gw, DEAL_ID, backend="scripted")
+    assert store.deals[DEAL_ID].brief_status == "draft"
+    assert store.flush() and store.status()["last_error"] is None
+    before = snapshot(store)
+    store.close()
+    again = open_store(schema)
+    assert snapshot(again) == before and len(again.agreements) == 1
+    gw = Gateway(again)
+    assert gw.brief_draft(DEAL_ID).citations
+    from tests.test_brief_reader_gateway import answer_kewaunee
+    answer_kewaunee(gw)
+    gw.approve_brief(CONTROLLER, DEAL_ID)
+    with gw.lock:
+        again.reset_deals(keep_memory=True)  # an approved Brief is memory: kept by its agreement hash
+    assert again.flush()
+    again.close()
+    third = open_store(schema)
+    assert len(third.approved_briefs) == 1 and not third.agreements
+    third.close()
 
 
 def test_the_audit_log_refuses_update_and_delete(schema):

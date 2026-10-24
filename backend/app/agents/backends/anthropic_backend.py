@@ -9,12 +9,11 @@ The session transcript from the store is replayed first, so the agent keeps cont
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from pydantic import BaseModel
 
-from app.agents.roles import Role
+from app.agents.roles import READER_TOOL_DESCRIPTIONS, Role
 from app.core.models import MapperInput
 from app.agents.settings import role_model
 from app.tools.finance import TOOL_DESCRIPTIONS
@@ -29,7 +28,12 @@ TOOL_SCHEMAS: dict[str, dict] = {
                  "required": ["debt_run_id", "ebitda_run_id"], "additionalProperties": False},
     "limit_test": {"type": "object", "properties": {"leverage_run_id": {"type": "string"}},
                    "required": ["leverage_run_id"], "additionalProperties": False},
+    "get_section": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"],
+                    "additionalProperties": False},
+    "get_definition": {"type": "object", "properties": {"term": {"type": "string"}}, "required": ["term"],
+                       "additionalProperties": False},
 }
+DESCRIPTIONS = {**TOOL_DESCRIPTIONS, **READER_TOOL_DESCRIPTIONS}
 
 
 def _obj(props: dict) -> dict:
@@ -108,7 +112,7 @@ def mapper_output_from_submit(raw: dict) -> dict:
 
 
 def _tool_defs(role: Role, inp: BaseModel | None = None) -> list[dict]:
-    defs = [{"name": n, "description": TOOL_DESCRIPTIONS[n], "input_schema": TOOL_SCHEMAS[n]} for n in role.tools]
+    defs = [{"name": n, "description": DESCRIPTIONS[n], "input_schema": TOOL_SCHEMAS[n]} for n in role.tools]
     submit = {"name": "submit", "description": f"Submit the final typed result ({role.output_type.__name__}). "
                                                "Call exactly once, when done."}
     if isinstance(inp, MapperInput):

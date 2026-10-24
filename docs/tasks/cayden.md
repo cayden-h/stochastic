@@ -122,6 +122,13 @@ In `backend/app/core/models.py`:
 - `CaseView` gains `edits: list[Edit]`, `adjustments: list[Adjustment]`, and `brief_draft` (the draft and its citations, or null).
 Done when: the models import, the 176 existing tests still pass, and `architecture/gateway-and-api.md` shows the new fields with example JSON.
 
+Done 2026-10-24 night (`cayden/phase2`, merged alone to `main`): 188 offline tests pass, 197 with Tiger.
+Notes for Tri and Eric:
+- The spec's `Adjustment` is `LearnedAdjustment` in code, because `Adjustment` already names the Brief's add-back.
+- There is no `CaseView`. The case response is `CaseResponse` in `backend/app/api/schemas.py` (Tri, T2 and T4). The three fields to add are in `architecture/gateway-and-api.md`.
+- `Deal.brief` is optional now, but a deal with `brief_status="approved"` must have one. A platform `Policy` must name its `platform`.
+- The policy matchers treat `company=None` as any company. The remap path in C2 must check `scope` and `platform`.
+
 ### C2. Edits in the gateway (about 3 hours)
 
 In `backend/app/gateway/gateway.py`:
@@ -146,26 +153,78 @@ In `backend/app/gateway/gateway.py`:
   - every recompute figure equals its tool run
 Done when: the tests pass, and the demo beat in `design/review-companion.md` section 9 runs through the API with curl.
 
+Status (2026-10-24 night, branch `cayden/edits`): the gateway side is built, and `backend/tests/test_edits.py` passes.
+Six figure tests skip with "needs T1 edit-aware tools" and run by themselves when Tri's T1 lands; until then an edit is refused with 503.
+Deviation on remap: the edit carries the new mapping, and `store_mapping` is not used, so the agents' `Mapping` is unchanged and a revert is lossless.
+The console must overlay `edits[]` on the mapping view.
+The Preparer offers a learned adjustment on a later deal as a flag (apply or skip); applying it is an amount edit through the same recompute.
+Open: the curl run of the demo beat waits on T2.
+
 ### C3. The Brief Reader, stage 1 (about 4 hours, after C2)
 
 Build `architecture/brief-reader.md` sections 5 to 7, in the gateway and agent folders:
 - `roles.py`: `BRIEF_READER_ROLE` with the read-only tools `get_section(id)` and `get_definition(term)`.
 - `gateway.py`: `store_brief`, `_check_brief` (the nine checks in section 6), the `brief_field` branch in the flag answer, Brief approval, and the gates in `store_mapping` and `run_tool`.
-- `jobs.py`: the `draft_brief` step before mapping. The runner stops on open `brief_field` flags.
-- `runner.py` and `backends/scripted.py`: the scripted reader. On the Kewaunee Ex 10.1 text (matched by SHA-256), it returns the fixture Brief with Eric's quotes (E3). On any other text, it uses regex, with low confidence and flags.
-- Droid: run the reader live once on Sonnet 5.5 and record it to `backend/recordings/brief_reader.json` with `scripts/record_run.py`. Check whether `DROID_TIMEOUT` is enough.
+- `jobs.py`: the `draft_brief` step before mapping.
+  The runner stops on open `brief_field` flags.
+- `runner.py` and `backends/scripted.py`: the scripted reader.
+  On the Kewaunee Ex 10.1 text (matched by SHA-256), it returns the fixture Brief with Eric's quotes (E3).
+  On any other text, it uses regex, with low confidence and flags.
+- Droid: run the reader live once on Sonnet 5.5 and record it to `backend/recordings/brief_reader.json` with `scripts/record_run.py`.
+  Check whether `DROID_TIMEOUT` is enough.
 - `db/postgres.py`: the `agreement` kind and the new role.
 Done when: Tri's `test_brief_reader.py` passes (section 8), and a deal created from agreement text stops on the Brief, takes the controller's answers, and then maps.
+
+Status (2026-10-25, branch `cayden/brief-reader`): stage 1 is built in the gateway and the agents, and a deal created from agreement text stops on the Brief, takes the controller's answers, and then maps to 0.76x (`test_a_deal_from_agreement_text_stops_on_the_brief_then_maps_and_ends_at_0_76x`).
+Tri's T4 and Eric's E3 had not landed, so the ten section 8 behaviors are tested at gateway level in `backend/tests/test_brief_reader_gateway.py`, which Tri's `test_brief_reader.py` may replace.
+The Kewaunee quotes are in `data/brief/kewaunee_quotes.json`, extracted by Cayden's agent from the SEC copy of Ex 10.1 (each verbatim, under 15 words, with its section); Eric should check them against E3 and replace the file if his differ.
+The test agreement is `backend/tests/fixtures/kewaunee_ex101_excerpt.txt`, stitched from those quotes; the full text stays out of git.
+Droid, run once on Sonnet 5.5 over the full Ex 10.1 (10.8K characters of input): the whole script took about 51 s for two reader turns, so `DROID_TIMEOUT=75` is enough. [measured, 2026-10-25]
+Both drafts of that first run were refused: once by an extra rule (the limit's quote must repeat the debt term) that was then relaxed to "the limit is quoted from limit_section", and once for writing "THIS LOAN AGREEMENT" as "This Loan Agreement", which is correct.
+That run fell back to scripted, and nothing was kept.
+Second live run, after those fixes (2026-10-25, same settings, `DROID_TIMEOUT=75`): about 52 s for the script.
+The first draft was refused for a three-word quote ("any stock-based compensation"; the minimum is four).
+The runner's built-in retry with that reason then passed every check, in 23.7 s and 22,481 Factory credits for that turn (the refused turn's cost was not reported).
+It is pinned in `backend/recordings/brief_reader.json` (backend `droid`, input key matches the full Ex 10.1), and it replays through `store_brief` with no refusal.
+The Droid draft finds two items the hand-written fixture Brief leaves out: the add-back of Nu Aire's pro forma EBITDA and the deduction of extraordinary gains.
+It flags the 4.8(b) fixed charge covenant and the 2.00x threshold in 5.10(a) for seller note prepayments.
+One of its 18 quotes is 16 words; the gateway sets no upper limit, and the under-15 rule applies to the committed test excerpts.
 
 ### C4. The console screens (after Josie's frames, with her review)
 
 Build the frames from Hi-fi v3 with the Figma MCP (`design/README.md` has the links), against `GET /deals/{id}/case`:
-- The v3 shell: a 240 px sidebar with the deal, the five pages, the model, and the "Always learning from" counters (Human answers, Policies, Edits). Leave 72 px at the top left for the macOS traffic lights.
+- The v3 shell: a 240 px sidebar with the deal, the five pages, the model, and the "Always learning from" counters (Human answers, Policies, Edits).
+  Leave 72 px at the top left for the macOS traffic lights.
 - V3-3 Case with the editable amount cells, the Your edits section, and Download final files (`review-companion.md` sections 3, 4, 7, and 8).
 - V3-4 Mapping with the Platform line dropdown and the Edited filter.
 - The Brief card at the start of a deal (D20 section 7, Frontend), when Josie has the frame.
 - Download final files calls `window.stochastic.saveFiles(...)` when Eric's preload is there, and a normal browser download when it is not.
 Done when: each screen matches its frame at 1440 by 900 (Josie signs off), and the demo beat runs in the app.
+
+Part 2 (the editable review) built 2026-10-24 night in `cayden/phase2-console`, against Tri's T2 shapes.
+T2 is not on `origin` yet, so it was tested through a local dev shim over the real gateway (not committed).
+- V3-3: the platform and target amounts in Combined books are editable, with the section 4 cell states, the change under the Combined cell, and a tooltip with who, when, the reason, and the policy or adjustment id.
+- An edit names one source line, and a combined row can gather several target lines (Operating expenses holds Selling, G&A, and R&D), so such a row opens to show its target lines, and those are edited.
+- Your edits sits under the verdict (check or waiting dot, line, old and new, reason, id, Undo; a click scrolls to the cell and flashes it), the header copy follows section 3, and the Review tile says "Re-checking your edit".
+- V3-4: the Platform line is a dropdown that sends a remap, with an Edited filter; a remap edit is shown over the Mapper's record.
+- Download final files appears after approval: `window.stochastic.saveFiles` when Eric's preload is there, else a browser download of `export.xlsx` (Tri's T3) and the certificate.
+- Adjustment flags (`payload.kind` `adjustment`) show as "Learned adjustment" with each option's effect. `State` has `SUPERSEDED`.
+Waiting on: T2 (the routes and `edits` on `/case`), T1 (edit-aware tools; until then the gateway answers 503), T3 (the workbook), E1 (the preload), and Josie's sign-off.
+
+The Brief card (D20) built 2026-10-24 night in the same branch, after merging C3 from `main`.
+Josie has no frame for it, and the Figma Components page has nothing named Brief, so it follows the v3 flag card and tokens.
+- The upload's third slot takes a Brief (`.json`) or the credit agreement (`.txt`, sent as `agreement_txt`).
+- The Case shows the reader's draft before mapping: each field with its quote and section, the open `brief_field` questions (confirm or remove), the adjustment amounts with their source (`POST /deals/{id}/brief/amounts`, one field per call: `field`, `value`, `source_ref`), and "Approve the Brief and map" (`POST /deals/{id}/brief/approve`, then the run).
+- `deal.brief` may be null at stage `new`; the stages `reading_brief`, `awaiting_brief`, and `brief_ready` have words on the Dashboard, a "Brief Reader reading the agreement, N s" progress row, and the Brief Reader is the fourth agent on the Agents page.
+- Tested headless through the dev shim over the real gateway: the full Ex 10.1 text, then the Brief card (one scope question, three amounts from the 10-K with their source, two kept at 0), approve, map, the two flags, 0.76x, the edit beat, approve, and download.
+Waiting on: T4 (the routes; the amounts body above is my assumption, so Tri should match it or tell me), and Josie's frame.
+
+Review fixes, 2026-10-24 night:
+- Adjustment flags: Apply waits for a PROPOSED approval item, approval waits for them, and they do not hold the progress row or the "no flag this time" note.
+- Until T2 puts `edits` on `/case`, the console keeps the edits the gateway returned, so an edit left for Later stays; `/case` wins by id. Chips come from `/case` `reason_chips`, else the last edit's response, else the demo list.
+- A reset (the deal's first audit row changes) closes the bubble and drops the session's edits and leverage moves.
+- A Brief question on a field path can be answered with a corrected value through the same amend route; the flag's `payload.unverified_evidence` shows as "Reader's words".
+- One unit conversion (`toK` in `frontend/src/lib/format.ts`, with millions as in `finance.to_thousands`).
 
 ### C5. The companion (about 2 hours, after C4)
 
@@ -174,3 +233,8 @@ A React layer in `frontend/src/components/companion.tsx`, from `review-companion
 - Glide to the edited cell, the bubble with chips (keys 1 to 3, Enter, Esc), Later and Save, the learned note, and the waiting dot.
 - Port the follow physics from Squeek's `halo.js` (https://github.com/syedkazmi14/squeek), restyled to our tokens.
 Done when: the demo beat takes 10 seconds or less and looks right on the demo laptop.
+
+Built 2026-10-24 night in `cayden/phase2-console`: `frontend/src/components/companion.tsx`, with the follow physics ported from Squeek's `halo.js` and credited in the file.
+The bubble follows Josie's Reason popover (Figma 545:408) for looks and section 5 for behavior.
+The demo beat runs headless through the shim in about 3 seconds, from opening the income statement to approved, with Download in the browser.
+Waiting on: the run on the demo laptop, and T1 and T2 for the real routes.

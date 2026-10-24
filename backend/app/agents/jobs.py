@@ -6,14 +6,19 @@ will find the next thing to do.
 """
 from __future__ import annotations
 
-from app.agents.roles import MAPPER_ROLE, PREPARER_ROLE, REVIEWER_ROLE, Role
+from app.agents.roles import BRIEF_READER_ROLE, MAPPER_ROLE, PREPARER_ROLE, REVIEWER_ROLE, Role
 from app.agents.runner import run_agent
 from app.core.models import MapperInput, PreparerInput, ReviewerInput, State
 from app.gateway.gateway import Gateway, Invalid
 
 
+READ_TOOLS = ("get_section", "get_definition")  # the Brief Reader's read-only agreement tools
+
+
 def _call_tool(gw: Gateway, actor: str, deal_id: str):
     def call(name: str, inputs: dict):
+        if name in READ_TOOLS:
+            return gw.read_agreement(actor, deal_id, name, inputs)
         return gw.run_tool(actor, deal_id, name, inputs)
     return call
 
@@ -77,7 +82,19 @@ def _remember(gw: Gateway, role: Role, run, item_id: str, summary: str) -> None:
 
 
 def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: int = 6) -> list[str]:
-    """Do every step that needs no human until the deal waits on a human or is posted. Returns what happened."""
+    """Do every step that needs no human until the deal waits on a human or is posted. Returns what happened.
+
+    A run that stops on an error marks the deal `run_failed` with a `run:failed` row before the error goes up, so
+    the console offers Run again on the sync route too, not only after a background run."""
+    try:
+        return _advance(gw, deal_id, backend, max_steps)
+    except Exception as error:
+        if deal_id in gw.store.deals:  # the deal may have been reset meanwhile
+            gw.note_run_failed(deal_id, f"{type(error).__name__}: {error}")
+        raise
+
+
+def _advance(gw: Gateway, deal_id: str, backend: str | None, max_steps: int) -> list[str]:
     log: list[str] = []
     store = gw.store
     for _ in range(max_steps):
@@ -89,13 +106,30 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
         by_type = {}
         for i in items:
             by_type.setdefault(i.type, []).append(i)
+        if deal.brief_status != "approved":
+            # The Brief comes first (D20): the reader drafts it, the controller answers its flags and approves it.
+            drafts = [i for i in by_type.get("draft_brief", []) if i.state not in (State.REJECTED, State.REVERSED)]
+            live = drafts[-1] if drafts else None
+            if live is None or live.state == State.NEW:
+                item = live or gw.create_item(deal_id, "draft_brief")
+                inp = gw.brief_reader_input(deal_id, item.id).model_copy(
+                    update={"session": store.sessions.get(BRIEF_READER_ROLE.name)})
+                run, _ = _store_or_fall_back(gw, BRIEF_READER_ROLE, inp, deal_id, item.id, backend,
+                                             lambda r: gw.store_brief(BRIEF_READER_ROLE.actor, item.id, r.output),
+                                             log, retry_with_reason=True)
+                _remember(gw, BRIEF_READER_ROLE, run, item.id,
+                          f"drafted the Brief: {len(run.output.citations)} citations, {len(run.output.flags)} flags")
+                log.append(f"brief reader ran on {run.backend}")
+                continue
+            log.append("waiting on the controller to approve the Brief")
+            break
         mapped = any(i.state in (State.POSTED, State.PROPOSED) for i in by_type.get("map_lines", []))
         if not mapped:
             item = gw.create_item(deal_id, "map_lines")
             inp = MapperInput(deal_id=deal_id, platform=deal.platform, target=deal.target,
                               target_lines=store.lines(deal_id, deal.target),
                               platform_lines=store.lines(deal_id, deal.platform), brief=deal.brief,
-                              policies=store.role_policies(MAPPER_ROLE.actor),
+                              policies=gw.policies_for(MAPPER_ROLE.actor, deal_id),
                               session=store.sessions.get(MAPPER_ROLE.name))
             run, _ = _store_or_fall_back(gw, MAPPER_ROLE, inp, deal_id, item.id, backend,
                                          lambda r: gw.store_mapping(MAPPER_ROLE.actor, item.id, r.output), log,
@@ -111,7 +145,8 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
             inp = PreparerInput(deal_id=deal_id, item_id=item.id, platform_lines=store.lines(deal_id, deal.platform),
                                 target_lines=store.lines(deal_id, deal.target),
                                 mappings=[m for m in store.deal_mappings(deal_id) if not m.flagged or m.approved_by],
-                                brief=deal.brief, session=store.sessions.get(PREPARER_ROLE.name))
+                                brief=deal.brief, adjustments=gw.adjustments_for(deal_id),
+                                session=store.sessions.get(PREPARER_ROLE.name))
             run, result = _store_or_fall_back(
                 gw, PREPARER_ROLE, inp, deal_id, item.id, backend,
                 lambda r: gw.store_result(PREPARER_ROLE.actor, item.id, r.output, backend=r.backend), log)

@@ -45,6 +45,7 @@ In `backend/app/tools/finance.py`:
   - A `remap` edit moves the target line to its new platform line, which can change its section.
 - Each tool returns the edits it applied, with their ids, so a run shows which edits it used.
 - Reverted edits are ignored.
+- Update (Cayden's agent, 2026-10-24): the gateway's contract is the "T1 contract" section of `architecture/gateway-and-api.md`; `tie_out` takes no edits, and `consolidate`, `ebitda`, and `covenant_debt` return `edits_applied`.
 Tests in `backend/tests/test_tools_edits.py`, with hand-computed values:
 - An amount edit on a target income-statement line moves covenant EBITDA by exactly the change, and leverage by the hand-computed amount.
 - A remap from cash to other current assets moves the amount between those lines, and the balance sheet still ties out.
@@ -79,7 +80,32 @@ Tests in `backend/tests/test_api_edits.py`: the demo beat end to end through the
 - `GET /deals/{id}/case` includes `brief_draft` and its citations.
 - `db/memory.py`: the `agreement` kind.
 - `backend/tests/test_brief_reader.py`: the ten tests in `architecture/brief-reader.md` section 8. Use the synthetic agreement text from Eric (E3), never the cached filings.
+- Status (2026-10-24, verified by `backend/tests/test_api_brief.py`, 27 tests): the three routes and `brief_draft` on `/case` are in, the `stage` event carries `brief_status`, and only `human:controller` amends or approves the Brief.
+  The gateway rule tests are Cayden's `test_brief_reader_gateway.py`; the route tests use a synthetic agreement written in the test and the Ex 10.1 excerpt in `backend/tests/fixtures/`, not Eric's E3 text, which is not in the repo yet.
 
 ### T5. Keep the tests green
 
 Run the full suite and the Tiger tests on every merge (rule 5 in `tasks/README.md`). The count goes up from 176, so update it in `backend/README.md`.
+
+## Notes for Cayden (phase 2, from tri/tool/new)
+
+These come from the review of `tri/tool/new` (findings C-1, I-1, I-4, I-6, M-1, M-4, M-6) and need changes in files Tri does not own.
+- `backend/app/db/postgres.py` needs three `KINDS` entries, or edits, learned adjustments, and agreements are lost on a Tiger restart: `"edit": ("edits", Edit, False)`, `"adjustment": ("adjustments", LearnedAdjustment, True)`, `"agreement": ("agreements", AgreementText, False)`.
+- A Tiger round-trip test of one `Edit` and one `LearnedAdjustment` across `reset_deals(keep_memory=True)` would prove those entries.
+- `gateway.run_tool` must pass `edits=store.active_edits(deal_id)` to `consolidate`, `tie_out`, `ebitda`, and `covenant_debt`, and record the edit ids in the run inputs.
+- `Edit.line` must be the source line name (`SourceLine.line`) of the company named, not the row name the Combined table shows (I-1).
+- A table cell that holds several target lines is edited one source line at a time; the console has `row.target_lines` for that.
+- The comment on `Edit.line` in `models.py` and the e_001 example in `docs/architecture/gateway-and-api.md` should say this, since "Selling, general and administrative" is not a Nu Aire line.
+- The remap path must replace the stored mapping's `platform_line` rather than add a second `Mapping`, or `consolidate` raises "mapped twice" (I-4).
+- The simpler path is to store only the `Edit` and pass it as `edits=`, since `apply_remap_edits` already moves the line; revert is then just status "reverted".
+- C-1 roll-up rule (P4a, verified by `backend/tests/test_tools_edits.py`): an amount edit on an income statement detail line now carries into the totals by a defined rule in `backend/app/tools/edits.py`.
+- The sign of a line is inferred from its name, not read from the filing (the fixture figures are verified by the tests): it is -1 when its name contains "cost", "expense", "tax", "provision", or "attributable to the non-controlling", else +1 when it contains "revenue", "sales", "income", "profit", "earnings", or "gain", else -1 (named under `rollup_notes` in the run output).
+- With delta = new value - old value in USD thousands, the first total after the edited line moves by +delta when its name starts with "Total" (a group total), and every later total whose name does not start with "Total" (a running total such as Net Income) moves by sign * delta.
+- No other line moves and taxes are not recomputed, so a 500 cut in Nu Aire "General and Administrative" raises covenant EBITDA by exactly 500 (28,378.845 to 28,878.845, leverage 0.749).
+- Every line the carry moved is listed under `rollup` as `{edit_id, company, line, delta}` in the consolidate, ebitda, and covenant_debt outputs.
+- An income statement detail edit is refused when no later total line of that company is a net income line (its name holds "net income", "net earnings", or "net loss"), because the edit could not reach EBITDA and would look applied.
+- A balance sheet detail edit stays refused, because its nesting is not derivable from order alone and the tie-out would hide a wrong carry.
+- A `rolls_into` field with a sign on each fixture line would replace this rule later.
+- `tie_out` lists the edits passed to it; the gateway should take `edits_applied` from the consolidate run it checks (M-1).
+- Each result revision C2 writes should carry the Reviewer's run ids (`limit_test` with `debt_capacity`, `tie_out`), or the Audit sheet shows "no run" (M-4).
+- C2 should copy the chip label into `reason_text`, or the final files say "Reason: chip 1." (M-6).
