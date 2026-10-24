@@ -56,6 +56,9 @@ A forbidden action returns 403 and writes a DENIED row.
 The gateway is the only writer of agent memory too.
 When the controller answers a flag, the gateway writes a `Policy` for the Mapper: the line name, the decision (a covenant tag or a platform line), who decided, and the flag it came from.
 On the next run the Mapper applies the policy instead of asking, and the gateway logs `policy:apply`.
+A policy has a `scope`.
+Flag answers make `company` policies, which apply only to the company whose line they were learned on (D18).
+Remap edits (D19, planned) make `platform` policies, which apply to every add-on of the platform named in `Policy.platform`.
 Each role has an `AgentSession` (backend, session id, turns, a short transcript).
 `POST /dev/reset` keeps both unless `keep_memory=false`.
 
@@ -95,7 +98,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 
 ```json
 {
-  "deal": { "id": "d_kequ_nuaire", "name": "Kewaunee Scientific acquires Nu Aire", "platform": "Kewaunee", "target": "Nu Aire", "stage": "awaiting_flag", "brief": { "limit": 2.5, "debt_term": "Senior Funded Bank Debt", "...": "..." } },
+  "deal": { "id": "d_kequ_nuaire", "name": "Kewaunee Scientific acquires Nu Aire", "platform": "Kewaunee", "target": "Nu Aire", "stage": "awaiting_flag", "brief": { "limit": 2.5, "debt_term": "Senior Funded Bank Debt", "...": "..." }, "brief_status": "approved", "ebitda_basis": "covenant" },
   "stage": "awaiting_flag",
   "source_lines": [ { "id": "sl_001", "company": "Kewaunee", "line": "Cash and cash equivalents", "section": "balance_sheet", "period": "2024-10-31", "amount": 25963, "unit": "USD thousands", "source_ref": "10-Q ...", "is_total": false, "note": null, "covenant_tag": "na", "covenant_note": null, "covenant_policy_id": null } ],
   "mappings": [ { "id": "m_001", "target_line": "Net Revenues", "platform_line": "Net sales", "confidence": 0.95, "reason": "...", "flagged": false, "approved_by": null, "policy_id": null } ],
@@ -107,8 +110,22 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
   "policies": [ "..." ],
   "sessions": [ "..." ],
   "audit": { "rows": 12, "chain_valid": true, "denied": 0 },
-  "backend": { "configured": "scripted", "fallback": "scripted", "anthropic_key": false, "factory_key": true, "last_runs": [ "..." ] }
+  "backend": { "configured": "scripted", "fallback": "scripted", "anthropic_key": false, "factory_key": true, "last_runs": [ "..." ] },
+  "edits": [],
+  "adjustments": [],
+  "brief_draft": null
 }
+```
+
+`edits`, `adjustments`, and `brief_draft` are the phase 2 additions (planned, shapes in the next section).
+They are empty lists and null on the demo deal until an edit is made or a deal is created from agreement text.
+They are not on `CaseResponse` yet.
+Tri adds them to `CaseResponse` in `backend/app/api/schemas.py` (T2 and T4), with `Field` imported from pydantic:
+
+```python
+edits: list[Edit] = Field(default_factory=list)
+adjustments: list[LearnedAdjustment] = Field(default_factory=list)
+brief_draft: BriefDraft | None = None
 ```
 
 After the Preparer and the Reviewer run, `verdict` is filled:
@@ -143,6 +160,121 @@ The memory store has no such keys.
 
 `result.rows` is the combined table: `line`, `section`, `platform`, `target`, `combined`, `run_id`, in platform order and in USD thousands.
 The three closing financing lines (term loan, revolver, seller notes) carry `period` "2024-11-01 (closing)".
+
+## Phase 2 shapes: review edits (D19) and the Brief Reader (D20)
+
+The models are in `backend/app/core/models.py`.
+The routes that use them are planned: `design/review-companion.md` section 10 for edits, `brief-reader.md` section 7 for the reader.
+Amounts are in USD thousands.
+
+### Edit
+
+One change the controller made to the combined books, recorded on top of the agents' run.
+`kind` is `amount` (uses `old_value` and `new_value`) or `remap` (uses `old_platform_line` and `new_platform_line`).
+`status` is `needs_reason`, `reasoned`, or `reverted`.
+A `reasoned` edit has `reason_chip` (0 to 2) or `reason_text`.
+An `amount` edit must have `new_value` and no platform lines; a `remap` edit must have `new_platform_line` and no values.
+Planned (C2): approval will be refused while any edit is `needs_reason`.
+The gateway does not check this yet.
+`policy_id` and `adjustment_id` are set by the gateway when a reasoned edit with `remember` teaches something.
+`run_ids` are the recompute runs, all new.
+
+```json
+{
+  "id": "e_001", "deal_id": "d_kequ_nuaire", "kind": "amount", "company": "Nu Aire",
+  "line": "Selling, general and administrative", "section": "income_statement",
+  "old_value": 9812.0, "new_value": 9312.0, "old_platform_line": null, "new_platform_line": null,
+  "status": "reasoned", "reason_chip": 0, "reason_text": "One-time acquisition cost, an allowed add-back",
+  "remember": true, "policy_id": null, "adjustment_id": "a_001", "actor": "human:controller",
+  "at": "2026-10-25T10:42:00Z", "run_ids": ["run_021", "run_022", "run_023", "run_024", "run_025", "run_026"]
+}
+```
+
+A remap edit:
+
+```json
+{
+  "id": "e_002", "deal_id": "d_kequ_nuaire", "kind": "remap", "company": "Nu Aire",
+  "line": "Short-term investments", "section": "balance_sheet", "old_value": null, "new_value": null,
+  "old_platform_line": "Cash and cash equivalents", "new_platform_line": "Short-term investments",
+  "status": "needs_reason", "reason_chip": null, "reason_text": null, "remember": true,
+  "policy_id": null, "adjustment_id": null, "actor": "human:controller", "at": "2026-10-25T10:44:00Z", "run_ids": ["run_027"]
+}
+```
+
+The figures above are placeholders; the demo figures come from the filing.
+
+### LearnedAdjustment (the `adjustments` list)
+
+What a reasoned amount edit teaches.
+The Preparer proposes it as a flag on a later deal, and it is never applied silently.
+`status` is `applied` (learned on this deal), `proposed` (offered on a later deal), or `retired` (its edit was reverted).
+In the spec this is called `Adjustment`; the code names it `LearnedAdjustment`, because `Adjustment` is already the Brief's EBITDA add-back or deduction.
+
+```json
+{
+  "id": "a_001", "deal_id": "d_kequ_nuaire", "company": "Nu Aire", "line": "Selling, general and administrative",
+  "amount": 9312.0, "reason": "One-time acquisition cost, an allowed add-back", "edit_id": "e_001", "status": "applied",
+  "at": "2026-10-25T10:45:00Z"
+}
+```
+
+### ReasonChip
+
+The reasons the bubble offers, `id` 0 to 2.
+They are hardcoded per deal for the demo, and the pitch says so.
+
+```json
+[ { "id": 0, "label": "One-time acquisition cost, an allowed add-back" },
+  { "id": 1, "label": "Auditor's late adjustment" },
+  { "id": 2, "label": "Correcting a typo in the source" } ]
+```
+
+### Policy.scope
+
+`Policy` gains `scope` (`company` by default, or `platform`) and `platform` (the platform name, for `platform` scope).
+A `platform` policy must name its platform, and a `company` policy must leave `platform` null.
+Existing policies read back as `company`, so the D18 rule on `not_debt` tags is unchanged.
+
+```json
+{
+  "id": "p_012", "role": "agent:mapper", "kind": "mapping", "pattern": "short-term investments",
+  "decision": "Short-term investments", "reason": "Not a cash equivalent (over 90 days)",
+  "approved_by": "human:controller", "learned_from": "e_002", "deal_id": "d_kequ_nuaire",
+  "company": null, "scope": "platform", "platform": "Kewaunee", "retired_by": null,
+  "at": "2026-10-25T10:45:00Z", "times_applied": 0
+}
+```
+
+### The Brief Reader types
+
+- The actor `agent:brief_reader` (`BRIEF_READER`) and the work item type `draft_brief`.
+- `Deal.brief_status` is `approved`, `draft`, or `none`.
+  The default is `approved`, so a deal created with a Brief JSON, like the demo deal, is unchanged.
+  `Deal.brief` is null only while a deal created from agreement text has no draft yet.
+  A deal with `brief_status` `approved` must have a Brief; the model refuses it otherwise.
+- `AgreementText` holds the agreement apart from `Deal`, because `/case` returns the whole deal: `id`, `deal_id`, `text`, `sha256`, `source`.
+- `BriefCitation` is the quote behind one field: `field` (a path such as `ebitda_addbacks[1].cap`), `quote`, `section`, `confidence` (0 to 1), `note`.
+- `BriefFieldFlag` is a field the controller must settle: `kind` (`brief_field`), `field`, `question`, `evidence`, `proposed` (the reader's value, or null).
+- `BriefReaderInput` gets the indexes and the leverage sections, never the whole agreement: `deal_id`, `item_id`, `agreement_id`, `sha256`, `section_index` (section id to heading), `definition_index` (term to section id), `excerpts` (section id to text), `amendments_supplied`, `session`, `previous_refusal`.
+- `BriefReaderOutput` is `brief`, `citations`, `flags`, `note`.
+- `BriefDraft` is what `/case` shows as `brief_draft` while the controller reviews: `item_id`, `agreement_id`, `sha256`, `brief`, `citations`, and `flags` (the `brief_field` flag work item ids).
+
+```json
+{
+  "brief_draft": {
+    "item_id": "wi_001", "agreement_id": "ag_001", "sha256": "9f2c...e41a",
+    "brief": { "lender": "PNC Bank, National Association", "limit": 2.5, "limit_section": "4.8(a)", "...": "..." },
+    "citations": [
+      { "field": "limit", "quote": "...", "section": "4.8(a)", "confidence": 0.95, "note": "" },
+      { "field": "ebitda_addbacks[2].cap", "quote": "...", "section": "1.1", "confidence": 0.8, "note": "" }
+    ],
+    "flags": ["wi_002"]
+  }
+}
+```
+
+The quotes are elided here; the gateway checks each one is an exact substring of the agreement (`brief-reader.md` section 6).
 
 ## The stream
 

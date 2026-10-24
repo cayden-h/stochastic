@@ -122,6 +122,13 @@ In `backend/app/core/models.py`:
 - `CaseView` gains `edits: list[Edit]`, `adjustments: list[Adjustment]`, and `brief_draft` (the draft and its citations, or null).
 Done when: the models import, the 176 existing tests still pass, and `architecture/gateway-and-api.md` shows the new fields with example JSON.
 
+Done 2026-10-24 night (`cayden/phase2`, merged alone to `main`): 188 offline tests pass, 197 with Tiger.
+Notes for Tri and Eric:
+- The spec's `Adjustment` is `LearnedAdjustment` in code, because `Adjustment` already names the Brief's add-back.
+- There is no `CaseView`. The case response is `CaseResponse` in `backend/app/api/schemas.py` (Tri, T2 and T4). The three fields to add are in `architecture/gateway-and-api.md`.
+- `Deal.brief` is optional now, but a deal with `brief_status="approved"` must have one. A platform `Policy` must name its `platform`.
+- The policy matchers treat `company=None` as any company. The remap path in C2 must check `scope` and `platform`.
+
 ### C2. Edits in the gateway (about 3 hours)
 
 In `backend/app/gateway/gateway.py`:
