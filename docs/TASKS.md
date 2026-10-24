@@ -42,6 +42,8 @@ Done at 05:10: Haiku 5.5 as the default model with per-role overrides, the failu
 
 Done at 08:00: the Tiger Cloud store and Tiger Data as a target.
 
+Done at 08:50 (`tasks/cayden.md`): tasks 1 to 4 and 8, plus the machine half of 5 and 7. Still open: the stopwatch rehearsal, the mentor questions, the Devpost submission, the Sunday wake-up, and forks only if `larp-city` is deleted.
+
 Open (details in `tasks/cayden.md`):
 1. Run the demo on `STORE=postgres` and rehearse the restart moment (the case, the log, and the policy come back).
 2. Tiger forks, one per flag option: spike the fork time first, build only if it is fast enough, drop it by 8pm if not.

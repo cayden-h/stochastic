@@ -175,6 +175,6 @@ Claim nothing unconfirmed.
 
 - Done 2026-10-24: the one-screen console (flag card, verdict line, combined table, mapping, log link) is built against `GET /deals/{id}/case` and shows the backend badge from `GET /health`. [verified: `frontend/README.md`]
 - Josie: what was done in Figma and through the Figma MCP (`use_figma`), and is there a frame for the new one-screen console? `docs/decisions.md` D11 says the design system was built through `use_figma`, but `docs/design/README.md` does not say so.
-- Cayden, on the day: which backend produced the run in the video and at the table (droid, anthropic, scripted, or replay). Write it into the list above.
+- Cayden, on the day: which backend produced the run in the video and at the table. Planned: `droid`, with the Mapper on Claude Sonnet 5.5 and the Preparer and Reviewer on Claude Haiku 5.5 (`agents.md` section 9, 08:30). Confirm it from the badge, then write it into the list above.
 - Done 2026-10-24: the EBITDA items are decided (stock compensation and the $4,019K pension figure applied, transaction costs kept at zero), and every leverage figure in this file, `flag-card.md`, and `brief.md` was updated.
 - Anyone, with a Cal Hacks organizer: can one project enter several sponsor tracks?

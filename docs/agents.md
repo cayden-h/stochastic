@@ -71,26 +71,26 @@ One function, `run_agent(role, item)` in `backend/app/agents/runner.py`.
 | `AGENT_BACKEND` | What runs | Needs | Use |
 | --- | --- | --- | --- |
 | `droid` | Factory Droid Python SDK 0.5.0: `run(prompt, output=Model, config=SessionConfig(mcp_servers, restrict_tools, autonomy=HIGH, system_prompt))`, one resumed session per role in its own empty folder | `droid` CLI on PATH, `FACTORY_API_KEY` | The Factory track. Say "built with the Droid SDK" only about these runs. |
-| `anthropic` | Anthropic SDK, `messages.create` with the role's tools and a `submit` tool typed as the output model, up to 12 turns | `ANTHROPIC_API_KEY` | The real model path without Droid, and the stage fallback. Not yet run live (no key). |
+| `anthropic` | Anthropic SDK, `messages.create` with the role's tools and a `submit` tool typed as the output model, up to 12 turns | `ANTHROPIC_API_KEY` | The real model path without Droid. Not run live (no key), so it is out of the default fallback chain since 2026-10-24 08:00; add it to `AGENT_FALLBACK` when a key is in `.env`. |
 | `scripted` | Deterministic rules: policies, synonyms (accounting practice and Ex 99.2 Note 2), name similarity, flags below 0.6 | nothing | Last fallback and the reference answer. |
 | `replay` | Recorded outputs from `backend/recordings/`; the Preparer and Reviewer re-run their tools so run ids are real | the recordings | No-network fallback. |
 
-The runner tries `AGENT_BACKEND`, then each entry of `AGENT_FALLBACK` (default `anthropic,scripted`), and every result carries the backend that produced it (`result.backend`, the audit log, `GET /health`). [verified: `runner.run_agent`]
+The runner tries `AGENT_BACKEND`, then each entry of `AGENT_FALLBACK` (default `scripted`), and every result carries the backend that produced it (`result.backend`, the audit log, `GET /health`). [verified: `runner.run_agent`]
 
 Settings (all in `.env`, read by `backend/app/agents/settings.py`):
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `AGENT_BACKEND` | `scripted` (`droid` on the demo laptop) | The backend to try first |
-| `AGENT_FALLBACK` | `anthropic,scripted` | Fallbacks in order; empty means none |
+| `AGENT_FALLBACK` | `scripted` | Fallbacks in order; empty means none |
 | `DROID_MODEL` | `claude-haiku-5-5` | Model for Droid runs |
-| `DROID_MODEL_MAPPER`, `DROID_MODEL_PREPARER`, `DROID_MODEL_REVIEWER` | unset | Per-role override; the Mapper is the one to raise to `claude-sonnet-5-5` if it misreads an exclusion |
+| `DROID_MODEL_MAPPER`, `DROID_MODEL_PREPARER`, `DROID_MODEL_REVIEWER` | unset (`DROID_MODEL_MAPPER=claude-sonnet-5-5` on the demo laptop) | Per-role override; the Mapper runs on Sonnet 5.5 for the demo (section 9, 08:30) |
 | `ANTHROPIC_MODEL` and the per-role forms | `claude-haiku-5-5` | Same for the Anthropic backend |
 | `DROID_TIMEOUT` | 240 seconds | Per run |
 | `DROID_RESTRICT_TOOLS` | unset | Override the allowlist. The default (tool names with and without the `MCP:stochastic/` prefix) worked on 2026-10-24. |
-| `RECORD_RUNS` | `1` | Record model runs; `force` records scripted too; `0` records nothing |
+| `RECORD_RUNS` | `1` | Record model runs to `recordings/latest/` (git-ignored), so a live run never replaces the pinned replay; `force` (used by `scripts/record_run.py`) writes the pinned `recordings/<role>.json`; `0` records nothing |
 
-Model choice: Haiku 5.5 is the default on both backends to keep the weekend cheap, as Cayden asked. With the filing notes on the lines and the tightened prompts, Haiku 5.5 produced the intended flag on the demo deal (section 9). The Preparer and Reviewer are mechanical and run well on Haiku. If a Haiku Mapper run ever misreads an exclusion again, set `DROID_MODEL_MAPPER=claude-sonnet-5-5` and keep the other two on Haiku.
+Model choice: Haiku 5.5 is the default on both backends to keep the weekend cheap, as Cayden asked. With the filing notes on the lines and the tightened prompts, Haiku 5.5 produced the intended flag on the demo deal (section 9). The Preparer and Reviewer are mechanical and run well on Haiku. Since 2026-10-24 08:30 the demo Mapper runs on Sonnet 5.5 and the other two stay on Haiku: in the live end-to-end tests a Haiku Mapper varied too much from run to run (section 9), and Sonnet held both moments in two trials of two.
 
 Models the Factory key can run, from `scripts/droid_probe.py` on 2026-10-24: Claude Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5 and older Claude models, plus GPT-5.x, Gemini 3.x and 4, Mistral, GLM, Kimi, Qwen, DeepSeek, and Grok. [verified]
 
@@ -138,6 +138,13 @@ Haiku 5.5 is the default for that reason. A full deal on Haiku 5.5 is three Droi
 | 2026-10-24 late | droid, claude-haiku-5-5 at medium effort, model confirmed from the session record | same flags | ran, pass | 0.76x OK, not recorded. Credits: Mapper 5,845, Preparer 5,045, Reviewer 1,052, so 11,942 for the whole deal on Haiku 5.5 |
 | 2026-10-24 evening | droid, claude-haiku-5-5 at medium, sessions resumed: two deals in a row on one store | deal 1: same flags; deal 2: none, 6 policies applied | ran, pass on both | 0.76x OK on both, not recorded. All three roles resumed their deal-1 session on deal 2. Credits deal 1: 5,169 + 3,992 + 1,128 = 10,289; deal 2: 2,950 + 4,000 + 341 = 7,291 |
 
+| 2026-10-24 08:06 | droid, Haiku 5.5, `STORE=postgres` | 1 covenant flag with the whole-line reading (2.54x over), 1 mapping flag | ran, pass; a second Preparer started by a Run click during the auto-advance was DENIED by the gateway (now a 409, see lessons) | 0.76x OK, approved; a restart of the API loaded all 55 audit rows, 11 policies, and 3 sessions back from Tiger |
+| 2026-10-24 08:10 | same, second run after a reset with memory kept | no flag, 11 policies applied | ran, pass | 0.76x OK in 58 s; but no Learned chip on screen, because the model's reasons read "Controller policy maps ...": fixed with `policy_id` (lessons) |
+| 2026-10-24 08:20 | droid, Haiku 5.5, browser, cold | 3 flags; the covenant flag's three readings were all under the limit (0.76x, 1.74x, 1.53x), so the moment did not show | not run | Led to the gateway's baseline option (lessons) |
+| 2026-10-24 08:22 | droid, Haiku 5.5, browser, cold, with the baseline | flag at 64 s; the gateway's baseline showed 2.54x over; the mapping flag's suggested answer mapped Interest Income - Net to Interest expense | approve enabled 36 s after the last answer | 0.76x OK. Second run: 8 of 9 policies applied, the wrong interest policy declined after the sign rule, and a new 3-line mapping flag, so not a clean second run |
+| 2026-10-24 08:30 | droid, Mapper Sonnet 5.5, Preparer and Reviewer Haiku 5.5, API trial | 49 s; covenant flag with the 2.54x reading from the model itself, 1 mapping flag | 29 s and 9 s, pass | 0.76x OK; second run: no flag, ready for approval in 58 s |
+| 2026-10-24 08:33 | same, second trial | 47 s; same two flags | pass | 0.76x OK; second run: no flag, 58 s |
+
 Figures in the log are as computed at the time. Since Tri's interest-income fix on 2026-10-24, the same recordings replay at 0.76x covenant and 2.54x whole-line.
 
 Lessons written into the code after these runs:
@@ -145,10 +152,14 @@ Lessons written into the code after these runs:
 - Multi-line mapping flags are allowed and resolved by name or id.
 - The Preparer names its run ids, and the Reviewer is told to use them and to return needs-attention only on a failed check.
 - Every option of a covenant flag must settle every flagged line as debt or not_debt. The gateway rejects a proposal that leaves one unclear, and the Mapper prompt says so.
+- A covenant flag always shows the reading that counts every flagged line as debt. When the Mapper does not offer it, the gateway adds it, computed by the same tools and labelled as the gateway's (`Option.added_by`). The moment no longer depends on the model's wording. (08:20 run)
+- A learned line is marked by the gateway from the policy record (`Mapping.policy_id`, `SourceLine.covenant_policy_id`), and only when the cited policy decided the same thing. The console's Learned chip reads that field, not the reason text. (08:10 run)
+- The Mapper keeps the sign of a line (an income line never maps to an expense line), and names lines by name in a flag's question, never by id. (08:22 run, and the 08:20 question that read "Sl_015 and sl_023")
+- One run per deal at a time: answering the last flag starts the job runner, so `POST /deals/{id}/run` during that run returns 409. (08:06 run)
 
 ## 10. Honest limits of the agent layer
 
-- The Anthropic backend has not run live; no key was available on 2026-10-24.
+- The Anthropic backend has not run live; no key was available on 2026-10-24, so it is out of the default fallback chain.
 - Each role's Droid context grows with every turn, because the whole work item input goes into the conversation. Droid compacts long sessions itself; we have not run enough turns to see it. [inferred]
 - The served model comes from the droid CLI's own session record, not from Factory's API (section 8). Say "Claude Haiku 5.5 through Droid, confirmed from the session record".
 - The scripted backend knows this deal's line names; on a new deal it would flag more and map less. That is the point of the model backends.

@@ -1,0 +1,172 @@
+<!doctype html>
+<!--
+  The printed one-page summary (page 1) and the honest-limits card (page 2) for the judging table.
+  Print from a browser on US Letter, or regenerate one-pager.pdf. Figures are the tool outputs of the
+  2026-10-24 08:30 live run (docs/agents.md section 9); re-read them if the fixture or the tools change.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stochastic one-pager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Public+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+  :root {
+    --paper: #F7F4EC; --card: #FFFFFF; --ink: #1B1F24; --muted: #5A6068; --rule: #8C8676; --hairline: #D9D3C4;
+    --agent: #274C77; --code: #4A5560; --escalation: #8A5300; --escalation-bar: #C77700;
+    --denied: #B3261E; --denied-tint: #FBE4E1; --clear: #1E6B52; --clear-tint: #E1F0EA;
+  }
+  @page { size: letter; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: "Public Sans", system-ui, sans-serif; font-size: 9.5pt; line-height: 1.38; }
+  .page { width: 8.5in; height: 11in; padding: 0.42in 0.55in; display: flex; flex-direction: column; gap: 10pt;
+          break-after: page; overflow: hidden; }
+  .page:last-child { break-after: auto; }
+  h1, h2, h3 { font-family: "Newsreader", Georgia, serif; font-weight: 500; margin: 0; }
+  h1 { font-size: 28pt; line-height: 1.05; }
+  h2 { font-size: 14pt; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 8.5pt; color: var(--code); }
+  .eyebrow { font-size: 8.5pt; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--hairline); border-radius: 8px; padding: 10pt 12pt; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12pt; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10pt; }
+  ol, ul { margin: 0; padding-left: 15pt; }
+  li + li { margin-top: 2pt; }
+  .verdicts { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+  .verdict { border-radius: 8px; padding: 10pt 12pt; }
+  .verdict .big { font-family: "Newsreader", Georgia, serif; font-size: 24pt; line-height: 1; }
+  .ok { background: var(--clear-tint); color: var(--clear); }
+  .over { background: var(--denied-tint); color: var(--denied); }
+  .verdict p { color: var(--ink); margin-top: 4pt; font-size: 9.5pt; }
+  .flag { border-left: 5px solid var(--escalation-bar); }
+  .stat .v { font-weight: 600; font-size: 12pt; }
+  footer { margin-top: auto; display: flex; justify-content: space-between; gap: 24pt; border-top: 1px solid var(--hairline); padding-top: 8pt; }
+  .limits { counter-reset: n; list-style: none; padding: 0; display: flex; flex-direction: column; gap: 13pt; }
+  .limits li { counter-increment: n; display: grid; grid-template-columns: 28pt 1fr; gap: 6pt; font-size: 14.5pt; line-height: 1.35; margin: 0; }
+  .limits li::before { content: counter(n); font-family: "Newsreader", Georgia, serif; font-size: 20pt; line-height: 1; color: var(--escalation); }
+  .real li { font-size: 11pt; }
+  footer span:first-child { white-space: nowrap; }
+  footer span:last-child { text-align: right; }
+  @media screen { body { padding: 16px 0; } .page { margin: 0 auto 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); max-width: 100%; height: auto; min-height: 11in; } }
+</style>
+</head>
+<body>
+
+<section class="page">
+  <div>
+    <div class="eyebrow">Cal Hacks 13.0 &middot; Hyphenate track &middot; UTSA</div>
+    <h1>Stochastic</h1>
+    <p style="font-size:12pt; margin-top:4pt">Merge an add-on's books into the platform's, flag the lines a human must decide, and test the result against the lender's own limit.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="eyebrow">The seat</div>
+      <p style="margin-top:4pt">A portfolio controller at a private equity backed company, right after an add-on closes. The lender tests a leverage limit on the combined company, and the next deal waits until two sets of books are merged.</p>
+      <p class="muted" style="margin-top:6pt">Today: a controller, a spreadsheet, and weeks. Compliance certificates are due 45 to 60 days after quarter end (self-reported, Aleph; terms vary per deal).</p>
+    </div>
+    <div class="card">
+      <div class="eyebrow">What it does</div>
+      <ol style="margin-top:4pt">
+        <li><b>Map.</b> A Mapper agent matches each target line to a platform line and tags covenant debt.</li>
+        <li><b>Flag.</b> It stops on what it must not decide alone. Code computes the effect of each answer.</li>
+        <li><b>Combine and test.</b> A Preparer combines the books with tools, a Reviewer checks the tie-out, a human approves.</li>
+        <li><b>Remember.</b> The controller's answer becomes a policy. The next run does not ask again.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="card flag">
+    <div class="eyebrow" style="color:var(--escalation)">The moment: a real public deal</div>
+    <h2 style="margin-top:4pt">Kewaunee Scientific acquires Nu Aire. Does the combined company stay under 2.50x?</h2>
+    <p class="muted" style="margin-top:4pt">PNC loan agreement, Section 4.8(a): Senior Funded Bank Debt to EBITDA below 2.50 to 1.00. Kewaunee's "financing liability" lines hold a sale-leaseback, PNC debt, and subordinated seller notes, and the agreement excludes two of them. The Mapper flags the lines; the controller decides.</p>
+    <div class="verdicts" style="margin-top:8pt">
+      <div class="verdict ok">
+        <div class="eyebrow" style="color:var(--clear)">The agreement's own reading</div>
+        <div class="big">0.76x &middot; OK</div>
+        <p>Senior Funded Bank Debt 21,633K over covenant EBITDA 28,379K. About $49M of room for the next deal.</p>
+      </div>
+      <div class="verdict over">
+        <div class="eyebrow" style="color:var(--denied)">Counting every financing line</div>
+        <div class="big">2.54x &middot; Over</div>
+        <p>71,955K over the same EBITDA. One reading of one line decides whether the lender's limit is breached.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card">
+      <div class="eyebrow">Trust</div>
+      <ul style="margin-top:4pt">
+        <li>A gateway is the only writer. Agents cannot approve or post.</li>
+        <li>Every number comes from a tool run with a run id; a model-made number is refused.</li>
+        <li>A hash-chained, append-only log of every action, denials included.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Stateful agents</div>
+      <ul style="margin-top:4pt">
+        <li>Each role keeps its Droid session across deals.</li>
+        <li>Answers become policies the gateway writes. Second run: no flag, ready in 58 s.</li>
+        <li>A restart loads the record, the log, and the memory back from Postgres.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Built with</div>
+      <ul style="margin-top:4pt">
+        <li><b>Factory Droid SDK:</b> the three agents, Claude Sonnet 5.5 and Haiku 5.5.</li>
+        <li><b>Tiger Cloud:</b> Postgres with an append-only TimescaleDB audit log.</li>
+        <li><b>Figma:</b> the console's design system.</li>
+        <li>FastAPI, Next.js, 125 tests.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="muted" style="font-size:9pt">Inputs: 54 Kewaunee and 53 Nu Aire statement lines from SEC filings (10-Q, 8-K/A Ex 99.1 and 99.2, 8-K Ex 10.1). The honest limits are on the back. The output is a combined set of books and a limit check that a human approves. It is not advice.</p>
+
+  <footer>
+    <span class="mono">github.com/cayden-h/stochastic (private)</span>
+    <span class="mono">Travel supported by the UTSA College of AI, Cyber and Computing (CAICC) Student Success Center.</span>
+  </footer>
+</section>
+
+<section class="page">
+  <div>
+    <div class="eyebrow">Read this before you trust a number</div>
+    <h1>What is real, and what is not</h1>
+  </div>
+
+  <div class="card real">
+    <div class="eyebrow" style="color:var(--clear)">Real, and running live</div>
+    <ul style="margin-top:4pt">
+      <li>The deal, the filings, and the lender's covenant are public. Every input amount matches its SEC filing.</li>
+      <li>The gateway, the math tools, the tie-out, the limit test, and the hash-chained log run live on screen.</li>
+      <li>The effect of each flag answer is computed by the tools. When the Mapper leaves out the count-everything reading, the gateway adds it, labelled as its own.</li>
+      <li>Agent memory is policies the gateway wrote from the controller's answers. It is not a change to model weights.</li>
+    </ul>
+  </div>
+
+  <ol class="limits">
+    <li><span>The statement lines come from public filings, not from the companies' internal books.</span></li>
+    <li><span>Account-level detail is not public, so we do not claim it. We map statement lines, not trial balances.</span></li>
+    <li><span>Agent text comes from the backend named on screen: Droid (Mapper on Claude Sonnet 5.5, Preparer and Reviewer on Haiku 5.5), or the scripted rules if Droid fails.</span></li>
+    <li><span>The fiscal years differ (Kewaunee April 30, Nu Aire September 30), so the combined income statement adds two different years.</span></li>
+    <li><span>The combined table is historical plus target. No purchase accounting is applied, so it is not the filed pro forma.</span></li>
+    <li><span>Two inputs are our estimates: the Statesville cash rent we deduct ($1,970K), and transaction costs, set to zero ($698K expected after close).</span></li>
+    <li><span>The filing calls its own reclassification table, Note 2, preliminary. We use it only to check which line goes where.</span></li>
+  </ol>
+
+  <p class="muted" style="font-size:11pt">Also not built: the fixed charge coverage test in Section 4.8(b), other deals, and other situations. No practitioner has used the tool yet.</p>
+
+  <footer>
+    <span class="mono">Stochastic &middot; Cal Hacks 13.0</span>
+    <span class="mono">Figures from the 2026-10-24 live run. Code does the math; a human approves. Not advice.</span>
+  </footer>
+</section>
+
+</body>
+</html>

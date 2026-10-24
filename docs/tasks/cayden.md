@@ -22,6 +22,16 @@ Done at 05:10 (the three areas, each documented before the next):
 
 Done at 08:00 (commit 08b2629): the Tiger Cloud store (`STORE=postgres`, write-through, audit log as an append-only TimescaleDB hypertable, reload on start), stateful Droid sessions, medium reasoning effort, Tiger Data as a target track (D15). A console Droid run at 07:51 is kept in `recordings/droid-console-0751/` (33 of 33).
 
+Done at 08:50 (Cayden's agent, live end-to-end tests on Droid and Tiger; details in `agents.md` section 9 and `decisions.md` D16):
+- Task 1: the demo laptop runs `STORE=postgres`; `GET /health` shows `postgres`, no fallback reason.
+- Task 2: the restart moment is rehearsed and written into `demo-script.md` section 5. Every field of the case came back identical.
+- Task 3: the fork spike failed on the free plan's two-service limit (`sponsors/tiger-data.md`). Forks are dropped unless Cayden deletes `larp-city` or the booth raises the limit.
+- Task 4: Anthropic is out of the default fallback chain (no key); the default is `scripted`.
+- Task 5, the machine part: three cold runs in a headless browser, timed. The stopwatch run of the 2:00 is still Cayden's.
+- Task 7, the prepared part: the backend line in `devpost/devpost.md` is filled in as planned. Submitting on devpost.com is still Cayden's (it needs his login).
+- Task 8: `devpost/one-pager.html` and `one-pager.pdf` (page 1 the summary, page 2 the honest-limits card), Letter size.
+- Found and fixed on the way: the count-everything reading on every covenant flag, the Learned chip from `policy_id`, 409 on a second run, live runs no longer overwrite the pinned replay, the Mapper on Sonnet 5.5, and console overflow at 768 and 1440.
+
 ## Open, in order
 
 1. **Make the demo run on Tiger.** Set `STORE=postgres` in `.env` on the demo laptop, restart the API, and check that `GET /health` shows `store.kind` = `postgres` with no `fallback_reason`. The API running at 07:50 was on the memory store. About 15 minutes.
