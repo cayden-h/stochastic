@@ -31,6 +31,7 @@ class State(str, Enum):
     REJECTED = "REJECTED"
     POSTED = "POSTED"
     REVERSED = "REVERSED"
+    SUPERSEDED = "SUPERSEDED"  # an approval item replaced by a newer one after a review edit; it stays in the log
 
 
 # Work-item types used by the job runner and the gateway.
@@ -202,6 +203,9 @@ class Result(BaseModel):
     run_ids: list[str]
     run_ids_by_tool: dict[str, str] = Field(default_factory=dict)
     backend: str = "scripted"  # which agent backend produced it: anthropic, droid, scripted, replay
+    # A revision after a review edit (D19): the result it replaces, and the live edits its runs applied.
+    supersedes: str | None = None
+    edit_ids: list[str] = Field(default_factory=list)
 
 
 class Policy(BaseModel):
@@ -296,6 +300,7 @@ class Edit(BaseModel):
     remember: bool = True
     policy_id: str | None = None  # set by the gateway when a reasoned remap made a policy
     adjustment_id: str | None = None  # set by the gateway when a reasoned amount edit made an adjustment
+    from_adjustment_id: str | None = None  # set when the controller applied a learned adjustment the Preparer offered
     actor: str = CONTROLLER
     at: datetime = Field(default_factory=now)
     run_ids: list[str] = Field(default_factory=list)  # the recompute runs, all new run ids
@@ -321,16 +326,22 @@ class Edit(BaseModel):
 class LearnedAdjustment(BaseModel):
     """What an amount edit teaches. The Preparer proposes it as a flag on a later deal; it is never applied silently.
 
+    `amount` is the signed change the controller made (new value minus the agents' value, USD thousands), not the
+    value: an add-back is "remove 500 of cost", which carries to another deal only as a change. Applying it on a later
+    deal sets that deal's line to its own agent value plus `amount`.
+
     Named apart from `Adjustment`, which is the Brief's EBITDA add-back or deduction.
     """
 
     id: str
     deal_id: str  # the deal it was learned on
     company: str
+    platform: str | None = None  # the deal's platform company, so a later add-on of that platform is offered it
     line: str
-    amount: float  # the edited value, in USD thousands
+    amount: float  # the signed change, new minus old, in USD thousands (-500.0 removes 500 of cost)
     reason: str
     edit_id: str
+    # "applied": learned and live. "proposed": offered on a later deal's open flag. "retired": its edit was reverted.
     status: Literal["applied", "proposed", "retired"] = "applied"
     at: datetime = Field(default_factory=now)
 
@@ -487,6 +498,14 @@ class MapperOutput(BaseModel):
     note: str = ""
 
 
+class AdjustmentProposal(BaseModel):
+    """The Preparer offers a learned adjustment on a later deal. The gateway opens it as a flag; never applied silently."""
+
+    adjustment_id: str
+    line_id: str  # the statement line of this deal it would change
+    question: str
+
+
 class PreparerInput(BaseModel):
     deal_id: str
     item_id: str
@@ -494,6 +513,7 @@ class PreparerInput(BaseModel):
     target_lines: list[SourceLine]
     mappings: list[Mapping]
     brief: Brief
+    adjustments: list[LearnedAdjustment] = Field(default_factory=list)  # learned on earlier deals; offer, never apply
     session: AgentSession | None = None
 
 
@@ -508,6 +528,7 @@ class PreparerOutput(BaseModel):
     ebitda_run_id: str | None = None
     debt_run_id: str | None = None
     leverage_run_id: str | None = None
+    adjustment_flags: list[AdjustmentProposal] = Field(default_factory=list)
     note: str = ""
 
 
