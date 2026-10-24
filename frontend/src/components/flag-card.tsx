@@ -151,11 +151,11 @@ export function FlagCard({
 }
 
 /** The fog card in the verdict's place while there is no verdict yet. */
-export function WaitingVerdict({ text, limit }: { text: string; limit: number }) {
+export function WaitingVerdict({ text, limit }: { text: string; limit?: number }) {
   return (
     <div className="flex w-full items-center gap-[12px] rounded-card border border-line bg-fog p-[14px] text-[16px] font-semibold text-slate">
       <span className="min-w-0 flex-1">{text}</span>
-      <span className="whitespace-nowrap">- of {fmtX(limit)}</span>
+      {limit != null ? <span className="whitespace-nowrap">- of {fmtX(limit)}</span> : null}
     </div>
   );
 }

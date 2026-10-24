@@ -15,7 +15,8 @@ interface Picked { file: File; sub: string }
 const SLOTS: { key: Slot; label: string; accept: string }[] = [
   { key: "platform", label: "Platform", accept: ".csv,text/csv" },
   { key: "target", label: "Target", accept: ".csv,text/csv" },
-  { key: "brief", label: "Brief", accept: ".json,application/json" },
+  // A Brief as JSON skips the reader; the credit agreement as text is read by the Brief Reader first (D20).
+  { key: "brief", label: "Brief or agreement", accept: ".json,application/json,.txt,text/plain" },
 ];
 
 /** A company name from a statement file name: "Kewaunee_10Q_2024-10-31.csv" gives "Kewaunee". */
@@ -23,9 +24,15 @@ function companyOf(file: File): string {
   return file.name.replace(/\.[^.]+$/, "").split(/[_.]/)[0].replace(/-/g, " ").trim() || file.name;
 }
 
-/** What the chip says under a chosen file: the CSV's row count, or the brief's own limit. Nothing is computed. */
+const isAgreement = (file: File) => /\.txt$/i.test(file.name) || file.type === "text/plain";
+
+/** What the chip says under a chosen file: the CSV's row count, the brief's own limit, or the agreement's size.
+ * Nothing is computed. */
 async function summarize(slot: Slot, file: File): Promise<string> {
   const text = await file.text();
+  if (slot === "brief" && isAgreement(file)) {
+    return `Agreement text \u00b7 ${Math.max(1, Math.round(text.length / 1000))}K characters \u00b7 the Brief Reader reads it`;
+  }
   if (slot === "brief") {
     try {
       const limit = JSON.parse(text)?.limit;
@@ -39,7 +46,8 @@ async function summarize(slot: Slot, file: File): Promise<string> {
 }
 
 /**
- * V3-2: a new deal from two statement CSVs and a brief (POST /deals), then the run.
+ * V3-2: a new deal from two statement CSVs and a Brief (JSON) or the credit agreement (text), then the run.
+ * With agreement text the run starts with the Brief Reader, and the Case shows its draft to check.
  * With no files chosen, the slots show the current deal's inputs and Begin runs it.
  */
 export function UploadModal({ onClose }: { onClose: () => void }) {
@@ -97,7 +105,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   async function putMany(files: FileList | null) {
     if (!files) return;
     const csvs = [...files].filter((f) => f.name.toLowerCase().endsWith(".csv"));
-    const brief = [...files].find((f) => f.name.toLowerCase().endsWith(".json"));
+    const brief = [...files].find((f) => /\.(json|txt)$/i.test(f.name));
     if (csvs[0]) await put("platform", csvs[0]);
     if (csvs[1]) await put("target", csvs[1]);
     if (brief) await put("brief", brief);
@@ -115,21 +123,25 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   const current: Record<Slot, { name: string; sub: string }> = {
     platform: { name: `${deal.platform} statements`, sub: plural(source_lines.filter((l) => l.company === deal.platform).length, "line") },
     target: { name: `${deal.target} statements`, sub: plural(source_lines.filter((l) => l.company === deal.target).length, "line") },
-    brief: { name: `${deal.brief.lender.split(",")[0]} agreement`, sub: `Limit ${fmtX(deal.brief.limit)}` },
+    brief: deal.brief
+      ? { name: `${deal.brief.lender.split(",")[0]} agreement`, sub: `Limit ${fmtX(deal.brief.limit)}` }
+      : { name: "Credit agreement (text)", sub: "The Brief Reader reads it first" },
   };
 
   async function begin() {
     setBusy(true); setNote(null);
     try {
       const chosen = Object.values(picked).filter(Boolean).length;
-      if (chosen && chosen < 3) throw new Error("Choose the platform CSV, the target CSV, and the brief, or close to keep this deal.");
+      if (chosen && chosen < 3) throw new Error("Choose the platform CSV, the target CSV, and the brief or the agreement text, or close to keep this deal.");
       if (chosen && !created.current) {
         const p = picked.platform!.file, t = picked.target!.file;
         const form = new FormData();
         form.set("platform", companyOf(p));
         form.set("target", companyOf(t));
         form.set("name", `${companyOf(p)} acquires ${companyOf(t)}`);
-        form.set("brief", await picked.brief!.file.text());
+        const b = picked.brief!.file;
+        if (isAgreement(b)) form.set("agreement_txt", b);
+        else form.set("brief", await b.text());
         form.set("platform_csv", p);
         form.set("target_csv", t);
         created.current = (await api.createDeal(form)).deal_id;
@@ -169,7 +181,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
             <UploadIcon />
             Upload files
           </button>
-          <input ref={many} type="file" multiple accept=".csv,.json" className="hidden" onChange={(e) => { putMany(e.target.files); e.target.value = ""; }} />
+          <input ref={many} type="file" multiple accept=".csv,.json,.txt" className="hidden" onChange={(e) => { putMany(e.target.files); e.target.value = ""; }} />
         </div>
 
         <div className="flex w-full gap-[12px]">

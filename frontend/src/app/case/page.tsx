@@ -7,16 +7,19 @@ import { FlagCard, MoreFlags, WaitingVerdict } from "@/components/flag-card";
 import { Page } from "@/components/shell";
 import { Button, Card, Label, Mono, PageHeader, Shape, Tag } from "@/components/ui";
 import { VerdictLine } from "@/components/verdict-line";
+import { BriefCard } from "@/components/brief-card";
 import { DownloadFinal, YourEdits } from "@/components/your-edits";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
 import { canEdit } from "@/lib/edits";
-import { canStart, fmtX, learnedPolicies, plural } from "@/lib/format";
+import { canStart, fmtX, isBriefStage, learnedPolicies, plural } from "@/lib/format";
 import type { AuditRow, Stage } from "@/lib/types";
 
-/** The three agents in order, which stage means each one is working, and the work item the gateway opens for it. */
-const STEPS: { role: string; item: string; working: Stage[]; done: Stage[] }[] = [
+/** The agents in order, which stage means each one is working, and the work item the gateway opens for it.
+ * The Brief Reader runs first, and only on a deal made from agreement text (D20). */
+const READER = { role: "Brief Reader", item: "draft_brief", working: ["reading_brief"] as Stage[], doing: "reading the agreement", done: ["awaiting_brief", "brief_ready", "new", "mapping", "awaiting_flag", "mapped", "flags_answered", "preparing", "awaiting_review", "awaiting_approval", "needs_attention", "posted"] as Stage[] };
+const STEPS: { role: string; item: string; working: Stage[]; done: Stage[]; doing?: string }[] = [
   { role: "Mapper", item: "map_lines", working: ["mapping"], done: ["awaiting_flag", "mapped", "flags_answered", "preparing", "awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
   { role: "Preparer", item: "prepare_result", working: ["mapped", "flags_answered", "preparing"], done: ["awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
   { role: "Reviewer", item: "review_result", working: ["awaiting_review"], done: ["awaiting_approval", "needs_attention", "posted"] },
@@ -26,8 +29,9 @@ const STEPS: { role: string; item: string; working: Stage[]; done: Stage[] }[] =
  * The clock starts when this session saw the stage begin. On a fresh load it starts at the audit row where the
  * gateway opened the working agent's item, unless a failed run came after that row: a rerun reuses the item and
  * logs no new row (backend/app/agents/jobs.py), so then it counts from when the row appeared. */
-function Progress({ stage, rows, stageSince }: { stage: Stage; rows: AuditRow[]; stageSince: number }) {
-  const step = STEPS.find((s) => s.working.includes(stage));
+function Progress({ stage, rows, stageSince, reader }: { stage: Stage; rows: AuditRow[]; stageSince: number; reader: boolean }) {
+  const steps = reader ? [READER, ...STEPS] : STEPS;
+  const step = steps.find((s) => s.working.includes(stage));
   const opened = step ? rows.findLast((r) => r.action === `create:${step.item}`)?.at : undefined;
   const failed = rows.findLast((r) => r.action === "run:failed")?.at;
   const [shown] = useState(() => Date.now());
@@ -40,14 +44,14 @@ function Progress({ stage, rows, stageSince }: { stage: Stage; rows: AuditRow[];
   const seconds = Math.max(0, Math.round((now - since) / 1000));
   return (
     <ol className="flex w-full flex-wrap items-center gap-x-[24px] gap-y-[8px] rounded-card border border-line bg-fog p-[14px] text-[16px]" aria-live="polite">
-      {STEPS.map((s) => {
+      {steps.map((s) => {
         const done = s.done.includes(stage);
         const working = !done && s.working.includes(stage);
         return (
           <li key={s.role} className={`flex items-center gap-[8px] font-semibold ${done ? "text-clear" : working ? "text-forest" : "text-slate"}`}>
             <Shape kind={done ? "check" : "circle"} size={12} />
             {s.role}
-            {working ? <span className="font-medium text-slate">working, {seconds} s</span> : null}
+            {working ? <span className="font-medium text-slate">{s.doing ?? "working"}, {seconds} s</span> : null}
           </li>
         );
       })}
@@ -79,8 +83,12 @@ export default function CaseScreen() {
 
   if (!kase) return null;
   const { deal, stage, flags, open_flags, verdict, result, mappings, source_lines, policies, audit } = kase;
-  const open = flags.filter((f) => open_flags.includes(f.id));
-  const answered = flags.filter((f) => f.answer);
+  // The Brief's own questions sit in the Brief card, not the flag card (D20).
+  const open = flags.filter((f) => open_flags.includes(f.id) && f.payload.kind !== "brief_field");
+  const fromAgreement = kase.work_items.some((w) => w.type === "draft_brief") || stage === "reading_brief";
+  const briefing = isBriefStage(stage) || deal.brief_status === "draft";
+  const draft = deal.brief_status === "draft" ? kase.brief_draft ?? null : null;
+  const answered = flags.filter((f) => f.answer && f.payload.kind !== "brief_field");
   // One flag is expanded at a time: the one the controller opened, else the first open one.
   const current = open.find((f) => f.id === currentId) ?? open[0] ?? null;
   const runIds = result?.run_ids_by_tool ?? {};
@@ -96,7 +104,7 @@ export default function CaseScreen() {
     ? { leverage: asFiledOpt.leverage!, ok: Boolean(asFiledOpt.ok), run_id: asFiledOpt.run_id } : null;
   const failed = stage === "run_failed";
   const idle = canStart(stage);
-  const working = !idle && !open.length && (!verdict || !verdict.review);
+  const working = !idle && !open.length && (!verdict || !verdict.review) && (!briefing || stage === "reading_brief");
   const review = verdict?.review?.verdict ?? null;
   const over = verdict?.verdict === "over_limit";
   // The controller's edits (D19). Approval is refused while one has no reason (check 5e).
@@ -110,9 +118,9 @@ export default function CaseScreen() {
 
   const unsure = mappings.filter((m) => m.flagged || m.confidence < 0.8).length;
 
-  async function act(fn: () => Promise<unknown>) {
+  async function act(fn: () => Promise<unknown>): Promise<boolean> {
     setBusy(true); setNote(null);
-    try { await fn(); await refresh(); } catch (e) { setNote(e instanceof Error ? e.message : "Action failed"); }
+    try { await fn(); await refresh(); return true; } catch (e) { setNote(e instanceof Error ? e.message : "Action failed"); await refresh(); return false; }
     finally { setBusy(false); }
   }
 
@@ -135,9 +143,9 @@ export default function CaseScreen() {
       <PageHeader title="Case">
         {idle ? (
           <Button kind="primary" disabled={busy} onClick={() => act(() => api.start(deal.id))}>
-            {policies.length || failed ? "Run again" : "Run the deal"}
+            {!deal.brief ? "Read the agreement" : policies.length || failed ? "Run again" : "Run the deal"}
           </Button>
-        ) : verdict?.posted ? (
+        ) : briefing ? null : verdict?.posted ? (
           <span className="flex min-h-11 items-center gap-[6px] text-[14px] font-semibold text-clear"><Shape kind="check" size={12} />Approved and posted</span>
         ) : (
           <>
@@ -174,13 +182,17 @@ export default function CaseScreen() {
               <p className="text-[14px] leading-[20px] text-slate">
                 {failed
                   ? "Nothing was posted. Run again to continue from where it stopped; the log has the reason."
-                  : `${deal.platform} acquires ${deal.target}. The limit is ${deal.brief.debt_term} below ${fmtX(deal.brief.limit)}, ${deal.brief.limit_section} of the ${deal.brief.lender} agreement.`}
+                  : deal.brief
+                    ? `${deal.platform} acquires ${deal.target}. The limit is ${deal.brief.debt_term} below ${fmtX(deal.brief.limit)}, ${deal.brief.limit_section} of the ${deal.brief.lender} agreement.`
+                    : `${deal.platform} acquires ${deal.target}. The Brief Reader reads the credit agreement first and drafts the Brief: the limit, what counts as debt, and the EBITDA adjustments, each with its quote. You check it before the agents map.`}
               </p>
               <Mono>
                 {plural(source_lines.filter((l) => l.company === deal.platform).length, `${deal.platform} line`)}, {plural(source_lines.filter((l) => l.company === deal.target).length, `${deal.target} line`)}, from public filings.
               </Mono>
             </Card>
           ) : null}
+
+          {draft ? <BriefCard deal={deal} draft={draft} flags={flags} busy={busy} onAct={act} /> : null}
 
           {current ? (
             <FlagCard
@@ -196,7 +208,7 @@ export default function CaseScreen() {
           <MoreFlags items={open.filter((f) => f !== current)} onOpen={setCurrentId} />
 
           {/* While an agent works the row shows who and for how long, also beside a verdict the Reviewer is checking. */}
-          {working ? <Progress stage={stage} rows={auditRows} stageSince={stageSince} /> : null}
+          {working ? <Progress stage={stage} rows={auditRows} stageSince={stageSince} reader={fromAgreement} /> : null}
 
           {verdict ? (
             <VerdictLine
@@ -212,14 +224,14 @@ export default function CaseScreen() {
               action={verdict.posted ? <DownloadFinal deal={deal} /> : null}
             />
           ) : open.length ? (
-            <WaitingVerdict text={open.length === 1 ? "Verdict waits on the flag." : `Verdict waits on ${open.length} flags.`} limit={deal.brief.limit} />
+            <WaitingVerdict text={open.length === 1 ? "Verdict waits on the flag." : `Verdict waits on ${open.length} flags.`} limit={deal.brief?.limit} />
           ) : null}
 
           {verdict ? <YourEdits locked={!canEdit(kase)} /> : null}
 
           {result ? (
             <CombinedTable result={result} flagged={flaggedNames} kase={kase} />
-          ) : !idle ? (
+          ) : !idle && !briefing ? (
             <CombinedPending text={open.length ? "Code combines the books after you answer." : "Code is combining the books."} />
           ) : null}
 
@@ -257,7 +269,7 @@ export default function CaseScreen() {
             href="/mapping"
             label="Mapping"
             value={mappings.length ? `${mappings.length} placed` : "Not run"}
-            sub={mappings.length ? `${mappings.length - unsure} sure · ${unsure} unsure${learnedLines ? ` · ${plural(learnedLines, "line")} learned` : ""}` : "The Mapper runs first"}
+            sub={mappings.length ? `${mappings.length - unsure} sure · ${unsure} unsure${learnedLines ? ` · ${plural(learnedLines, "line")} learned` : ""}` : briefing ? "Starts after you approve the Brief" : "The Mapper runs first"}
           >
             {learned > 0 ? <Tag tone="agent">Learned</Tag> : null}
           </CaseTile>
