@@ -65,6 +65,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /deals/{id}/source-lines?company=` | any | Statement lines, both companies or one |
 | `GET /deals/{id}/mappings` | any | Mappings with confidence, reason, flagged, approved_by |
 | `GET /deals/{id}/result` | any | The latest result (404 before the Preparer ran) |
+| `GET /deals/{id}/certificate?format=md\|html\|json` | any | Draft compliance certificate from the approved, posted result (default `md`). Every figure is followed by the id of the tool run that produced it. 409 until the approve_result item is POSTED and the deal stage is `posted`. The `json` dict has `header`, `test_period`, `ebitda`, `debt`, `leverage`, `limit_test`, `tie_out`, `decisions`, `approval`, `mappings`; each figure block carries `run_id`, and its keys are the tool's own output keys. It is a draft, not signed. |
 | `GET /deals/{id}/work-items?state=&type=` | any | Work items |
 | `GET /deals/{id}/audit` | any | Audit rows for the deal and `chain_valid` |
 | `GET /deals/{id}/runs` | any | Every tool run for the deal |

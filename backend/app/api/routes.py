@@ -9,13 +9,16 @@ import json
 import math
 import os
 
+from typing import Literal
+
 from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
 from app.agents import runner as agent_runner
 from app.agents import settings as agent_settings
 from app.agents.jobs import advance
+from app.api import certificate as cert_doc
 from app.api.events import next_events
 from app.api.schemas import CaseResponse, DealCreated, HealthResponse
 from app.core.models import CONTROLLER, Brief, Deal, State
@@ -150,6 +153,22 @@ def build_router(gw: Gateway) -> APIRouter:
                       "denied": len([a for a in store.audit if a.deal_id == deal_id and a.result == "DENIED"])},
             "backend": backend_status(),
         }
+
+    @r.get("/deals/{deal_id}/certificate")
+    def certificate(deal_id: str, format: Literal["md", "html", "json"] = "md"):
+        """Draft compliance certificate from the approved, posted result. Every figure carries its run id."""
+        d = need_deal(deal_id)
+        items = store.deal_items(deal_id)
+        result = store.latest_result(deal_id)
+        approval = cert_doc.approval_item(items, result) if result else None
+        if not result or not approval or approval.state != State.POSTED or d.stage != "posted":
+            raise HTTPException(status_code=409, detail="certificate is available after the controller approves the result")
+        doc = cert_doc.build_certificate(store, d, result, items, chain_valid=gw.verify_chain())
+        if format == "json":
+            return doc
+        if format == "html":
+            return HTMLResponse(cert_doc.render_html(doc))
+        return Response(cert_doc.render_markdown(doc), media_type="text/markdown; charset=utf-8")
 
     @r.get("/deals/{deal_id}/source-lines")
     def source_lines(deal_id: str, company: str | None = None):
