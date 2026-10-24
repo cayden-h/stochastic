@@ -68,6 +68,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /deals/{id}/certificate?format=md\|html\|json` | any | Draft compliance certificate from the approved, posted result (default `md`). Every figure is followed by the id of the tool run that produced it. 409 until the approve_result item is POSTED and the deal stage is `posted`. The `json` dict has `header`, `test_period`, `ebitda`, `debt`, `leverage`, `limit_test`, `tie_out`, `decisions`, `approval`, `mappings`; each figure block carries `run_id`, and its keys are the tool's own output keys. It is a draft, not signed. |
 | `GET /deals/{id}/work-items?state=&type=` | any | Work items |
 | `GET /deals/{id}/audit` | any | Audit rows for the deal and `chain_valid` |
+| `GET /deals/{id}/timeline?bucket=60` | any | Audit rows counted per time bucket, actor, and action family (the action before the colon). Returns `{"deal_id", "bucket_seconds", "source", "buckets": [{"start", "actor", "kind", "rows", "denied"}]}`, sorted by start, actor, kind. `bucket` is whole seconds, 1 to 86400 (422 otherwise); 404 for an unknown deal. On the Postgres store `source` is `time_bucket` (TimescaleDB `time_bucket` on the written audit log of the current ledger); on the memory store, or after a database error (with `error`), it is `memory`. Both floor to the TimescaleDB origin 2000-01-03 00:00 UTC, so they give the same buckets. Counts only, no deal figures. |
 | `GET /deals/{id}/runs` | any | Every tool run for the deal |
 | `GET /runs/{run_id}` | any | One tool run: tool, inputs, outputs |
 | `GET /agents/memory` | any | Policies and sessions |
@@ -129,6 +130,8 @@ They come from a separate `limit_test` run the gateway makes as `system:gateway`
 `source_lines[].note` is what the filing says about a line (for example the 10-Q note that the financing liability is the Statesville sale-leaseback). Show it on the flag card's evidence.
 A mapping flag may cover several target lines; its options then carry `mappings` (target line id to platform line) in `payload.option_actions`, and the option `effect` text lists each line.
 `GET /health` returns `backend.settings` with the configured backend, the fallback chain, and the model per role on each backend.
+On the Postgres store, `GET /health` `store` also has `writes` (batches written), `avg_write_ms`, and `last_write_ms`: the time from queueing a batch to its commit on Tiger Cloud, rounded to 0.1 ms.
+The memory store has no such keys.
 
 `result.rows` is the combined table: `line`, `section`, `platform`, `target`, `combined`, `run_id`, in platform order and in USD thousands.
 The three closing financing lines (term loan, revolver, seller notes) carry `period` "2024-11-01 (closing)".

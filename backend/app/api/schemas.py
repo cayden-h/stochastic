@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_serializer
 
 from app.core.models import AgentSession, Deal, Mapping, Policy, Result, Review, SourceLine, WorkItem
 
@@ -74,6 +74,18 @@ class StoreStatus(BaseModel):
     model_config = ConfigDict(extra="allow")
     kind: Literal["memory", "postgres"]
     fallback_reason: str | None = None
+    writes: int | None = None  # Postgres only: batches written, and queue-to-commit time per batch
+    avg_write_ms: float | None = None
+    last_write_ms: float | None = None
+
+    @model_serializer(mode="wrap")
+    def _drop_unset_timing(self, handler):
+        """The memory store reports no write timing, so its status keeps only its own keys."""
+        out = handler(self)
+        for key in ("writes", "avg_write_ms", "last_write_ms"):
+            if key not in self.model_fields_set:
+                out.pop(key, None)
+        return out
 
 
 class HealthResponse(BaseModel):

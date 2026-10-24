@@ -131,3 +131,36 @@ def test_a_second_process_cannot_write_the_same_schema(schema):
         open_store(schema)
     store.close()
     open_store(schema).close()  # free again once the first one closes
+
+
+def test_the_time_bucket_timeline_matches_memory_and_writes_are_timed(schema):
+    from app.db.memory import MemoryStore
+    store = open_store(schema)
+    gw = Gateway(store)
+    seed(store, gw)
+    advance(gw, DEAL_ID, backend="scripted")
+    assert store.flush()
+    for bucket in (60, 7):
+        pg = store.timeline(DEAL_ID, bucket)
+        mem = MemoryStore.timeline(store, DEAL_ID, bucket)
+        assert pg["source"] == "time_bucket" and "error" not in pg
+        assert sum(b["rows"] for b in pg["buckets"]) == sum(b["rows"] for b in mem["buckets"]) > 0
+        assert sum(b["denied"] for b in pg["buckets"]) == sum(b["denied"] for b in mem["buckets"])
+        assert pg["buckets"] == mem["buckets"]  # same origin, same floor, same order
+    status = store.status()
+    assert status["writes"] > 0 and status["avg_write_ms"] > 0 and status["last_write_ms"] is not None
+    print(f"writes={status['writes']} avg_write_ms={status['avg_write_ms']} last_write_ms={status['last_write_ms']}")
+    store.close()
+
+
+def test_the_timeline_falls_back_to_memory_on_a_database_error(schema):
+    store = open_store(schema)
+    seed(store, Gateway(store))
+    assert store.flush()
+    good_dsn = store._dsn
+    store._dsn = "postgresql://nobody@127.0.0.1:1/none?connect_timeout=1"
+    out = store.timeline(DEAL_ID, 60)
+    store._dsn = good_dsn
+    assert out["source"] == "memory" and out["error"]
+    assert sum(b["rows"] for b in out["buckets"]) == len([a for a in store.audit if a.deal_id == DEAL_ID])
+    store.close()

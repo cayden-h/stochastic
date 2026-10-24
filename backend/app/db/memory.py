@@ -5,7 +5,22 @@ docs/architecture/data-model.md section 3.1.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from app.core.models import AgentSession, AuditRow, Deal, Mapping, Policy, Result, SourceLine, ToolRun, WorkItem
+
+
+# TimescaleDB's default time_bucket origin for timestamptz, so both stores floor a row to the same bucket.
+BUCKET_ORIGIN = datetime(2000, 1, 3, tzinfo=timezone.utc)
+
+
+def bucket_start(at: datetime, bucket_seconds: int) -> datetime:
+    """`at` floored to its bucket, counted in whole microseconds from BUCKET_ORIGIN."""
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=timezone.utc)
+    micros = (at - BUCKET_ORIGIN) // timedelta(microseconds=1)
+    size = bucket_seconds * 1_000_000
+    return BUCKET_ORIGIN + timedelta(microseconds=micros // size * size)
 
 
 class MemoryStore:
@@ -70,3 +85,17 @@ class MemoryStore:
     def latest_result(self, deal_id: str) -> Result | None:
         rs = self.deal_results(deal_id)
         return rs[-1] if rs else None
+
+    def timeline(self, deal_id: str, bucket_seconds: int = 60) -> dict:
+        """Audit rows per time bucket, actor, and action family (the action before the colon). Counts only."""
+        counts: dict[tuple[datetime, str, str], list[int]] = {}
+        for row in self.audit:
+            if row.deal_id != deal_id:
+                continue
+            key = (bucket_start(row.at, bucket_seconds), row.actor, row.action.split(":", 1)[0])
+            c = counts.setdefault(key, [0, 0])
+            c[0] += 1
+            c[1] += row.result == "DENIED"
+        buckets = [{"start": start.isoformat(), "actor": actor, "kind": kind, "rows": n, "denied": d}
+                   for (start, actor, kind), (n, d) in sorted(counts.items())]
+        return {"deal_id": deal_id, "bucket_seconds": bucket_seconds, "source": "memory", "buckets": buckets}

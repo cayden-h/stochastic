@@ -11,7 +11,7 @@ import os
 
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
@@ -252,6 +252,12 @@ def build_router(gw: Gateway) -> APIRouter:
     def audit(deal_id: str):
         need_deal(deal_id)
         return {"chain_valid": gw.verify_chain(), "rows": [dump(a) for a in store.audit if a.deal_id == deal_id]}
+
+    @r.get("/deals/{deal_id}/timeline")
+    def timeline(deal_id: str, bucket: int = Query(60, ge=1, le=86400)):
+        """Audit rows per time bucket, actor, and action family. On Postgres it runs TimescaleDB time_bucket."""
+        need_deal(deal_id)
+        return store.timeline(deal_id, bucket)
 
     @r.get("/deals/{deal_id}/runs")
     def runs(deal_id: str):

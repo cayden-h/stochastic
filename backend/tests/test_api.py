@@ -313,3 +313,55 @@ def test_verdict_sensitivity_from_limit_test_run():
     again = c.get(f"/deals/{DEAL_ID}/case").json()["verdict"]
     assert again["sensitivity_run_id"] == v["sensitivity_run_id"]
     assert len(c.get(f"/deals/{DEAL_ID}/runs").json()) == before
+
+
+def test_timeline_counts_match_the_audit_log():
+    c = TestClient(create_app())
+    full_run(c)
+    audit = c.get(f"/deals/{DEAL_ID}/audit").json()["rows"]
+    body = c.get(f"/deals/{DEAL_ID}/timeline").json()
+    assert body["deal_id"] == DEAL_ID and body["bucket_seconds"] == 60 and body["source"] == "memory"
+    buckets = body["buckets"]
+    assert buckets and set(buckets[0]) == {"start", "actor", "kind", "rows", "denied"}
+    assert sum(b["rows"] for b in buckets) == len(audit)
+    assert sum(b["denied"] for b in buckets) == len([a for a in audit if a["result"] == "DENIED"])
+    assert {b["kind"] for b in buckets} == {a["action"].split(":")[0] for a in audit}
+    keys = [(b["start"], b["actor"], b["kind"]) for b in buckets]
+    assert keys == sorted(keys) and len(keys) == len(set(keys))
+    hourly = c.get(f"/deals/{DEAL_ID}/timeline?bucket=3600").json()
+    assert hourly["bucket_seconds"] == 3600 and sum(b["rows"] for b in hourly["buckets"]) == len(audit)
+
+
+def test_timeline_bucket_bounds_and_unknown_deal():
+    c = TestClient(create_app())
+    for bad in (0, -5, 86401, "x"):
+        assert c.get(f"/deals/{DEAL_ID}/timeline?bucket={bad}").status_code == 422
+    for ok in (1, 86400):
+        assert c.get(f"/deals/{DEAL_ID}/timeline?bucket={ok}").status_code == 200
+    assert c.get("/deals/nope/timeline").status_code == 404
+
+
+def test_timeline_buckets_floor_to_the_time_bucket_origin():
+    # Hand-made rows. 18:00:05 and 18:00:59 share the 18:00:00 minute; 18:01:00 starts the next one.
+    # With 7 s buckets from the TimescaleDB origin 2000-01-03 00:00 UTC: 2026-10-24 18:00:05 is
+    # 9,791 days + 64,805 s after the origin = 846,007,205 s; 846,007,205 // 7 * 7 = 846,007,204, so 18:00:04.
+    from datetime import datetime, timezone
+    from app.core.models import AuditRow
+    from app.db.memory import MemoryStore
+    store = MemoryStore()
+    t = lambda s: datetime(2026, 10, 24, 18, 0, 0, tzinfo=timezone.utc).replace(minute=s // 60, second=s % 60)
+    rows = [(5, "agent:mapper", "propose:map_lines", "ALLOWED"), (59, "agent:mapper", "tool:consolidate", "DENIED"),
+            (59, "agent:mapper", "propose:map_lines", "ALLOWED"), (60, "human:controller", "answer", "ALLOWED")]
+    for i, (s, actor, action, result) in enumerate(rows):
+        store.audit.append(AuditRow(id=i + 1, at=t(s), deal_id="d1", actor=actor, action=action, result=result,
+                                    prev_hash="x", hash="y"))
+    store.audit.append(AuditRow(id=9, at=t(5), deal_id="other", actor="a", action="b", result="ALLOWED",
+                                prev_hash="x", hash="y"))
+    out = store.timeline("d1", 60)
+    assert out["source"] == "memory" and out["bucket_seconds"] == 60
+    assert out["buckets"] == [
+        {"start": "2026-10-24T18:00:00+00:00", "actor": "agent:mapper", "kind": "propose", "rows": 2, "denied": 0},
+        {"start": "2026-10-24T18:00:00+00:00", "actor": "agent:mapper", "kind": "tool", "rows": 1, "denied": 1},
+        {"start": "2026-10-24T18:01:00+00:00", "actor": "human:controller", "kind": "answer", "rows": 1, "denied": 0},
+    ]
+    assert store.timeline("d1", 7)["buckets"][0]["start"] == "2026-10-24T18:00:04+00:00"
