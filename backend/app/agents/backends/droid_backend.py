@@ -9,6 +9,18 @@ The working directory is an empty folder per role (`DROID_WORKDIR/<role>`), beca
 reads files by default, and a resumed session must find the folder it started in. Droid groups sessions by folder,
 so each role's sessions sit together. If a session cannot be resumed, a new one starts and the meta says why.
 Structured output uses the role's Pydantic output type.
+
+Rewind before a retry: when the gateway refuses a result, the job runner retries once and passes `rewind_to`, the
+id of the user message that started the refused turn (returned in the meta as `turn_message_id`). The resumed
+session is rewound to before that message, so the refused answer is not in the agent's memory, and the retry runs
+on the successor. `Session.rewind(message_id)` keeps every message before `message_id` and drops it and everything
+after; it works on a session reopened with `Session.resume`; and the successor has a new session id, which the meta
+returns as `session_id` so the store keeps it. [verified: `scripts/droid_rewind_probe.py` on 2026-10-24, Haiku 5.5:
+after rewinding to the second turn's prompt, the successor recalled PELICAN and not HERON, and its CLI session record
+holds no HERON] A new session's first turn also streams a `context-...` user message, which is not the turn's start.
+[verified: same probe] If the rewind fails, the retry runs in the same session and the meta sets `rewind_error`.
+Only the Mapper is rewound today; it has no tools, so whether a successor keeps the in-process MCP server is untested.
+[inferred]
 Needs the `droid` CLI on PATH and FACTORY_API_KEY. Any failure raises, and the runner falls back.
 """
 from __future__ import annotations
@@ -77,11 +89,16 @@ def role_dir(role_name: str) -> str:
 
 
 async def _turn(session, prompt: str, output, timeout: float):
+    """Run one turn. Returns the result and the id of the user message that started the turn: the id a later
+    rewind needs to drop this turn. A new session's first turn also streams a `context-...` user message
+    before the prompt, which is not the turn's start."""
+    starts: list[str] = []
     stream = session.stream(prompt, output=output, timeout=timeout)
     async with stream:
-        async for _ in stream:
-            pass
-    return stream.result
+        async for item in stream:
+            if type(item).__name__ == "UserMessage" and not str(item.id).startswith("context-"):
+                starts.append(item.id)
+    return stream.result, (starts[0] if starts else None)
 
 
 def setup_key(role: Role, model: str | None, effort: str | None, restrict: list[str]) -> str:
@@ -91,7 +108,20 @@ def setup_key(role: Role, model: str | None, effort: str | None, restrict: list[
     return hashlib.sha256(body.encode()).hexdigest()[:16]
 
 
-async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None, session_key: str | None = None):
+async def _rewind(session, message_id: str, role: Role):
+    """Drop `message_id` and every message after it. Rewind forks: the successor has a new session id and the old
+    session is left as it was. Returns (successor, old session id)."""
+    old_id = session.id
+    outcome = await session.rewind(message_id, title=f"{role.name}: rewound before a refused turn")
+    try:
+        await session.close()
+    except Exception:  # the old session may already be replaced or closed by the rewind
+        pass
+    return outcome.session, old_id
+
+
+async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None, session_key: str | None = None,
+               rewind_to: str | None = None):
     from droid_sdk import Autonomy, DroidError, Session, SessionConfig
 
     server, names = _build_server(role, call_tool)
@@ -124,12 +154,21 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None, se
         except DroidError as error:  # the session is gone or cannot load: start a new one
             resume_error = f"{type(error).__name__}: {error}"[:200]
             await session.close()
+    rewound, rewound_from, rewind_error = False, None, None
+    if rewind_to and resumed:
+        try:
+            session, rewound_from = await _rewind(session, rewind_to, role)
+            rewound = True
+        except Exception as error:  # keep the resumed session: the retry still runs, and the meta says why
+            rewind_error = f"{type(error).__name__}: {error}"[:200]
+    elif rewind_to:
+        rewind_error = "no resumed session to rewind" + (f" ({resume_error})" if resume_error else "")
     if not resumed:
         session = fresh()
     try:
         if not resumed:
             await session.open()
-        result = await _turn(session, prompt, role.output_type, timeout)
+        result, turn_message_id = await _turn(session, prompt, role.output_type, timeout)
     finally:
         await session.close()
     if not result.success or result.output is None:
@@ -145,7 +184,9 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None, se
                 cost[k] = v
     served = served_model(result.session_id)
     return result.output, {"session_id": result.session_id, "session_key": key, "resumed": resumed,
-                           "resume_error": resume_error,
+                           "resume_error": resume_error, "turn_message_id": turn_message_id,
+                           "rewound": rewound, "rewound_from_session": rewound_from,
+                           "rewound_to_message": rewind_to if rewound else None, "rewind_error": rewind_error,
                            "turns": result.turn_count,
                            "duration": getattr(result, "duration", None), "model_requested": model or "droid default",
                            "reasoning_effort_requested": effort,
@@ -192,13 +233,14 @@ def served_model(session_id: str | None, sessions_dir: str | None = None) -> dic
 
 
 def run_droid(role: Role, inp: BaseModel, call_tool, session_id: str | None = None,
-              session_key: str | None = None) -> tuple[BaseModel, dict]:
-    """Synchronous wrapper. Runs the asyncio session in this thread."""
+              session_key: str | None = None, rewind_to: str | None = None) -> tuple[BaseModel, dict]:
+    """Synchronous wrapper. Runs the asyncio session in this thread. `rewind_to` is the message id that started a
+    turn to drop from the resumed session before this turn runs."""
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         loop = None
-    coro = _run(role, inp, call_tool, session_id, session_key)
+    coro = _run(role, inp, call_tool, session_id, session_key, rewind_to)
     if loop and loop.is_running():
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:

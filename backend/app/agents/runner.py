@@ -45,7 +45,8 @@ def _scripted(role: Role, inp: BaseModel, call_tool) -> BaseModel:
     raise TypeError(f"no scripted agent for {type(inp).__name__}")
 
 
-def _attempt(backend: str, role: Role, inp: BaseModel, call_tool, session) -> tuple[BaseModel, dict]:
+def _attempt(backend: str, role: Role, inp: BaseModel, call_tool, session,
+             rewind_to: str | None = None) -> tuple[BaseModel, dict]:
     if backend == "scripted":
         return _scripted(role, inp, call_tool), {}
     if backend == "replay":
@@ -65,13 +66,16 @@ def _attempt(backend: str, role: Role, inp: BaseModel, call_tool, session) -> tu
         if not os.getenv("FACTORY_API_KEY"):
             raise RuntimeError("FACTORY_API_KEY is not set")
         from app.agents.backends.droid_backend import run_droid
+        extra = {"rewind_to": rewind_to} if rewind_to else {}  # only a retry after a refusal asks for a rewind
         return run_droid(role, inp, call_tool, session.session_id if session else None,
-                         session.session_key if session else None)
+                         session.session_key if session else None, **extra)
     raise RuntimeError(f"unknown backend '{backend}'")
 
 
-def run_agent(role: Role, inp: BaseModel, call_tool, session=None, backend: str | None = None) -> AgentRun:
-    """Run one role on one work item. Returns the typed output and the backend that produced it."""
+def run_agent(role: Role, inp: BaseModel, call_tool, session=None, backend: str | None = None,
+              rewind_to: str | None = None) -> AgentRun:
+    """Run one role on one work item. Returns the typed output and the backend that produced it.
+    `rewind_to` asks the Droid backend to drop a turn from the resumed session first; other backends ignore it."""
     chosen = backend or os.getenv("AGENT_BACKEND", "scripted")
     chain = [chosen] + [b for b in os.getenv("AGENT_FALLBACK", DEFAULT_FALLBACK).split(",") if b and b != chosen]
     attempts: list[dict] = []
@@ -79,7 +83,7 @@ def run_agent(role: Role, inp: BaseModel, call_tool, session=None, backend: str 
     for b in chain:
         t0 = time.time()
         try:
-            out, meta = _attempt(b, role, inp, call_tool, session)
+            out, meta = _attempt(b, role, inp, call_tool, session, rewind_to)
             out = role.output_type.model_validate(out.model_dump())
             attempts.append({"backend": b, "ok": True, "seconds": round(time.time() - t0, 2), **meta})
             rec = os.getenv("RECORD_RUNS", "1")

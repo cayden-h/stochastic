@@ -18,10 +18,23 @@ def _call_tool(gw: Gateway, actor: str, deal_id: str):
     return call
 
 
-def _run(gw: Gateway, role: Role, inp, deal_id: str, item_id: str, backend: str | None):
+def _run(gw: Gateway, role: Role, inp, deal_id: str, item_id: str, backend: str | None,
+         rewind_to: str | None = None):
     """Run a role with its saved session, so a backend that can resume (Droid) continues the same conversation."""
+    extra = {"rewind_to": rewind_to} if rewind_to else {}  # only a retry after a refusal asks for a rewind
     return run_agent(role, inp, _call_tool(gw, role.actor, deal_id), session=gw.store.sessions.get(role.name),
-                     backend=backend)
+                     backend=backend, **extra)
+
+
+def _refused_turn(gw: Gateway, role: Role, run) -> str | None:
+    """The message id that started a refused turn, when that turn was added to the role's saved session.
+    The retry rewinds the session to before it, so the refused answer never becomes the agent's memory.
+    A turn that ran in a new session needs no rewind: `_remember` was not called, so that session is not kept."""
+    ok = next((a for a in reversed(run.attempts) if a.get("ok")), {})
+    saved = gw.store.sessions.get(role.name)
+    if ok.get("resumed") and saved and ok.get("session_id") == saved.session_id:
+        return ok.get("turn_message_id")
+    return None
 
 
 def _store_or_fall_back(gw: Gateway, role: Role, inp, deal_id: str, item_id: str, backend: str | None, store_fn,
@@ -36,8 +49,16 @@ def _store_or_fall_back(gw: Gateway, role: Role, inp, deal_id: str, item_id: str
     except Invalid as error:
         log.append(f"{role.name} result refused on {run.backend}: {error.message}")
         if retry_with_reason and run.backend != "scripted":
+            # The agent forgets its refused answer (rewind) but still learns why it was refused (previous_refusal).
+            rewind_to = _refused_turn(gw, role, run)
             inp = inp.model_copy(update={"previous_refusal": error.message})
-            run = _run(gw, role, inp, deal_id, item_id, backend)
+            run = _run(gw, role, inp, deal_id, item_id, backend, rewind_to=rewind_to)
+            ok = next((a for a in reversed(run.attempts) if a.get("ok")), {})
+            if ok.get("rewound"):
+                log.append(f"{role.name} session rewound before the retry: {ok.get('rewound_from_session')} "
+                           f"-> {ok.get('session_id')}")
+            elif rewind_to:
+                log.append(f"{role.name} session not rewound: {ok.get('rewind_error') or 'the retry ran on ' + run.backend}")
             try:
                 return run, store_fn(run)
             except Invalid as again:

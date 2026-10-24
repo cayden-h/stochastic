@@ -29,8 +29,8 @@ def _mapper_that_copies_a_platform_id(store, bad_calls):
     real = jobs.run_agent
     inputs = []
 
-    def run_agent(role, inp, call_tool, session=None, backend=None):
-        run = real(role, inp, call_tool, session=session, backend=backend)
+    def run_agent(role, inp, call_tool, session=None, backend=None, rewind_to=None):
+        run = real(role, inp, call_tool, session=session, backend=backend, rewind_to=rewind_to)
         if role.name != "mapper":
             return run
         inputs.append(inp)
@@ -89,3 +89,53 @@ def test_a_refused_scripted_result_is_not_hidden(world, monkeypatch):
     with pytest.raises(Invalid, match="unknown target line"):
         jobs.advance(gw, DEAL_ID)
     assert not store.deal_mappings(DEAL_ID)
+
+
+def test_retry_rewinds_the_saved_droid_session_and_keeps_the_successor(world, monkeypatch):
+    """A refused turn that ran in the saved session is rewound before the retry, and the store then points at the
+    successor session, so the refused answer is not in the agent's memory. Droid's meta is faked; no API call."""
+    store, gw = world
+    saved = gw.session("mapper", "droid")
+    saved.session_id, saved.session_key = "S-old", "key-1"
+    real = jobs.run_agent
+    calls = []
+
+    def run_agent(role, inp, call_tool, session=None, backend=None, rewind_to=None):
+        run = real(role, inp, call_tool, session=session, backend=backend)
+        if role.name != "mapper":
+            return run
+        calls.append({"rewind_to": rewind_to, "session_id": session.session_id if session else None})
+        if len(calls) == 1:  # the refused turn: resumed S-old and was appended to it
+            meta = {"ok": True, "backend": "droid", "resumed": True, "session_id": "S-old", "session_key": "key-1",
+                    "turn_message_id": "m-bad"}
+            deal = store.deals[DEAL_ID]
+            first = run.output.mappings[0].model_copy(update={"target_line_id": store.lines(DEAL_ID, deal.platform)[0].id})
+            out = run.output.model_copy(update={"mappings": [first, *run.output.mappings[1:]]})
+            return dataclasses.replace(run, output=out, backend="droid", attempts=[meta])
+        meta = {"ok": True, "backend": "droid", "resumed": True, "session_id": "S-new", "session_key": "key-1",
+                "turn_message_id": "m-good", "rewound": rewind_to is not None, "rewound_from_session": "S-old",
+                "rewound_to_message": rewind_to}
+        return dataclasses.replace(run, backend="droid", attempts=[meta])
+
+    monkeypatch.setattr(jobs, "run_agent", run_agent)
+    log = jobs.advance(gw, DEAL_ID)
+    assert calls[0]["rewind_to"] is None
+    assert calls[1] == {"rewind_to": "m-bad", "session_id": "S-old"}
+    assert store.sessions["mapper"].session_id == "S-new"
+    assert any("rewound before the retry: S-old -> S-new" in line for line in log)
+
+
+def test_no_rewind_when_the_refused_turn_ran_in_a_new_session(world, monkeypatch):
+    """A refused turn in a session that was never saved needs no rewind: that session is not kept."""
+    store, gw = world
+    fake, inputs = _mapper_that_copies_a_platform_id(store, bad_calls=1)
+    seen = []
+
+    def run_agent(role, inp, call_tool, session=None, backend=None, rewind_to=None):
+        if role.name == "mapper":
+            seen.append(rewind_to)
+        return fake(role, inp, call_tool, session=session, backend=backend, rewind_to=rewind_to)
+
+    monkeypatch.setattr(jobs, "run_agent", run_agent)
+    jobs.advance(gw, DEAL_ID)
+    assert seen == [None, None]
