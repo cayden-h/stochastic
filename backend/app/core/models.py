@@ -1,6 +1,8 @@
 """Shared types: the contract between the data, the tools, the agents, the gateway, and the console.
 
 Shapes follow docs/TASKS.md (shared contract), docs/architecture/gateway-and-api.md, and data-model.md.
+Review edits follow docs/design/review-companion.md (D19).
+The Brief Reader follows docs/architecture/brief-reader.md (D20).
 Cayden owns this file. Send change requests to Cayden.
 """
 from __future__ import annotations
@@ -32,12 +34,16 @@ class State(str, Enum):
 
 
 # Work-item types used by the job runner and the gateway.
-ItemType = Literal["map_lines", "flag", "prepare_result", "review_result", "approve_result"]
+ItemType = Literal["map_lines", "flag", "prepare_result", "review_result", "approve_result", "draft_brief"]
+
+# The kind of a flag work item, in its payload. "brief_field" is a Brief Reader field the controller must settle (D20).
+FlagKind = Literal["covenant_tag", "mapping", "brief_field"]
 
 CONTROLLER = "human:controller"
 MAPPER = "agent:mapper"
 PREPARER = "agent:preparer"
 REVIEWER = "agent:reviewer"
+BRIEF_READER = "agent:brief_reader"
 SYSTEM = "system:gateway"
 
 
@@ -119,7 +125,10 @@ class Deal(BaseModel):
     platform: str  # company name of the acquirer
     target: str  # company name of the acquired company
     stage: str = "new"
-    brief: Brief
+    brief: Brief | None = None  # None only while a deal created from agreement text has no draft yet (D20)
+    # "approved" for a Brief sent as JSON (the fixture deal); "draft" while the controller reviews the reader's draft;
+    # "none" before the reader ran. Mapping and the covenant tools wait for "approved".
+    brief_status: Literal["approved", "draft", "none"] = "approved"
     # "covenant" (the agreement's EBITDA) unless the controller chose the as-filed whole-line reading on a flag.
     ebitda_basis: Literal["covenant", "as_filed"] = "covenant"
     situation: str = "PE add-on integration"
@@ -208,6 +217,10 @@ class Policy(BaseModel):
     learned_from: str  # the flag work item id
     deal_id: str
     company: str | None = None  # the company whose line it was learned on; it applies to that company's lines only
+    # "company" for flag answers (D18: a not_debt tag cites a policy learned on that company's line).
+    # "platform" for remap edits (D19): it applies to every add-on of the platform named in `platform`.
+    scope: Literal["company", "platform"] = "company"
+    platform: str | None = None  # the platform company name, for scope "platform"
     retired_by: str | None = None  # the reversal item that withdrew it; a retired policy is never applied
     at: datetime = Field(default_factory=now)
     times_applied: int = 0
@@ -239,6 +252,109 @@ class ToolRun(BaseModel):
     inputs: dict[str, Any]
     outputs: dict[str, Any]
     at: datetime = Field(default_factory=now)
+
+
+# ---------------------------------------------------------------------------
+# Review edits (D19): the controller changes the combined books, gives a reason, and the agents learn from it
+# ---------------------------------------------------------------------------
+
+EditKind = Literal["amount", "remap"]
+EditStatus = Literal["needs_reason", "reasoned", "reverted"]
+
+
+class Edit(BaseModel):
+    """One change the controller made to the agents' books, recorded on top of the run, never over it."""
+
+    id: str
+    deal_id: str
+    kind: EditKind
+    company: str
+    line: str  # the line name as the table shows it
+    section: Section
+    # For "amount", in USD thousands.
+    old_value: float | None = None
+    new_value: float | None = None
+    # For "remap": the target line's platform line before and after.
+    old_platform_line: str | None = None
+    new_platform_line: str | None = None
+    status: EditStatus = "needs_reason"
+    reason_chip: int | None = None  # the ReasonChip id the controller picked
+    reason_text: str | None = None  # the chip's label, or what the controller typed
+    remember: bool = True
+    policy_id: str | None = None  # set by the gateway when a reasoned remap made a policy
+    adjustment_id: str | None = None  # set by the gateway when a reasoned amount edit made an adjustment
+    actor: str = CONTROLLER
+    at: datetime = Field(default_factory=now)
+    run_ids: list[str] = Field(default_factory=list)  # the recompute runs, all new run ids
+
+
+class LearnedAdjustment(BaseModel):
+    """What an amount edit teaches. The Preparer proposes it as a flag on a later deal; it is never applied silently.
+
+    Named apart from `Adjustment`, which is the Brief's EBITDA add-back or deduction.
+    """
+
+    id: str
+    deal_id: str  # the deal it was learned on
+    company: str
+    line: str
+    amount: float  # the edited value, in USD thousands
+    reason: str
+    edit_id: str
+    status: Literal["applied", "proposed", "retired"] = "applied"
+
+
+class ReasonChip(BaseModel):
+    """One reason the bubble offers. Hardcoded per deal for the demo, and the pitch says so."""
+
+    id: int = Field(ge=0, le=2)
+    label: str
+
+
+# ---------------------------------------------------------------------------
+# The Brief Reader (D20): the model points at quotes, code checks them, the controller approves
+# ---------------------------------------------------------------------------
+
+
+class AgreementText(BaseModel):
+    """The credit agreement as text. Stored apart from Deal, because /case returns the whole deal."""
+
+    id: str
+    deal_id: str
+    text: str
+    sha256: str  # an approved Brief is keyed by it, so the next deal under the same agreement reuses it
+    source: str  # the filing and exhibit, or the uploaded file name
+
+
+class BriefCitation(BaseModel):
+    """The quote behind one Brief field. The gateway refuses a quote that is not in the agreement."""
+
+    field: str  # path in the Brief, such as "limit" or "ebitda_addbacks[1].cap"
+    quote: str  # verbatim, at least four words
+    section: str
+    confidence: float = Field(ge=0, le=1)
+    note: str = ""
+
+
+class BriefFieldFlag(BaseModel):
+    """A Brief field the controller must settle: low confidence, no quote, not found, or an amount from the books."""
+
+    kind: Literal["brief_field"] = "brief_field"
+    field: str
+    question: str
+    evidence: list[Evidence] = Field(default_factory=list)
+    proposed: str | None = None  # the reader's value, if it has one
+
+
+class BriefDraft(BaseModel):
+    """The draft Brief with its citations and flags, as /case shows it while the controller reviews it."""
+
+    item_id: str  # the draft_brief work item
+    agreement_id: str
+    sha256: str
+    brief: Brief
+    citations: list[BriefCitation] = Field(default_factory=list)
+    flags: list[str] = Field(default_factory=list)  # the brief_field flag work item ids
 
 
 # ---------------------------------------------------------------------------
@@ -383,3 +499,26 @@ class ReviewerOutput(BaseModel):
     verdict: Literal["pass", "needs_attention"]
     reasons: list[str] = Field(default_factory=list)
     run_ids: list[str] = Field(default_factory=list)
+
+
+class BriefReaderInput(BaseModel):
+    """Never the whole agreement: the indexes and the sections that mention a leverage ratio.
+    The reader asks for more through get_section(id) and get_definition(term)."""
+
+    deal_id: str
+    item_id: str
+    agreement_id: str
+    sha256: str
+    section_index: dict[str, str] = Field(default_factory=dict)  # section id -> heading
+    definition_index: dict[str, str] = Field(default_factory=dict)  # defined term -> section id
+    excerpts: dict[str, str] = Field(default_factory=dict)  # section id -> text, for the leverage sections
+    amendments_supplied: bool = False  # False means the draft is the base agreement only
+    session: AgentSession | None = None
+    previous_refusal: str | None = None  # why the gateway refused the reader's last draft, on the one retry
+
+
+class BriefReaderOutput(BaseModel):
+    brief: Brief  # amounts are 0 and inferred; they come from the books, not the agreement
+    citations: list[BriefCitation]
+    flags: list[BriefFieldFlag] = Field(default_factory=list)
+    note: str = ""
