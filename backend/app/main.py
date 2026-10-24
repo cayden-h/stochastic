@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")  # keys stay in the repo-root .env, which git ignores
 
+from app.api.body_limit import MAX_BODY_BYTES, BodyLimitMiddleware  # noqa: E402
 from app.api.routes import build_router  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.db.fixtures.kewaunee import seed  # noqa: E402
@@ -19,6 +20,8 @@ def create_app() -> FastAPI:
     gateway = Gateway(store)
     seed(store, gateway)
     app = FastAPI(title="Stochastic gateway API", version="0.2.0")
+    app.add_middleware(BodyLimitMiddleware, max_bytes=MAX_BODY_BYTES)
+    # CORS is added last so it is outermost and a 413 still carries CORS headers
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins),
                        allow_methods=["*"], allow_headers=["*"])
     app.include_router(build_router(gateway))

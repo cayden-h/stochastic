@@ -323,7 +323,7 @@ A judge reads the policy as the agent approving its own future work. The answer 
 Date: 2026-10-24.
 
 Decision:
-Covenant EBITDA is $28,033K. Senior Funded Bank Debt under the agreement's reading is $21,633K, leverage 0.77x. Counting the whole financing liability line gives $71,955K and 2.57x, over the 2.50x limit. [verified: `backend/tests/test_trust_rules.py`]
+Covenant EBITDA is $27,519K. Senior Funded Bank Debt under the agreement's reading is $21,633K, leverage 0.79x. Counting the whole financing liability line gives $71,955K and 2.61x, over the 2.50x limit. [verified: `backend/tests/test_trust_rules.py`]
 The default option on the flag is the agreement's reading (b).
 Two inputs are inferred and are said out loud: the Statesville cash rent deduction ($1,970K from the 10-K obligations table) and transaction and integration costs applied as 0.
 

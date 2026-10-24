@@ -7,7 +7,7 @@ Swap tasks freely and tell the team when you do.
 
 ## State of the build
 
-The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.77x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 17 tests pass. [verified: `backend/tests/test_trust_rules.py`]
+The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.79x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 103 tests pass. [verified: `backend/tests/test_trust_rules.py`]
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded. Not yet run live: the Anthropic backend (no key in `.env`).
 Not yet done: the console on the new API, the Note 2 answer key, the Devpost text, the recorded model run, the rehearsals.
 
@@ -52,11 +52,11 @@ Open:
 
 ## Tri
 
-1. Review `backend/app/tools/finance.py` and own it. Check the EBITDA build (net income plus interest, taxes, D&A; add-backs; rent deduction) against Ex 10.1's definition. Add any add-back the agreement names that we left at zero, with its source.
-2. Add tests: a test per tool with hand-computed expected values from the fixture, a test that `consolidate` refuses an unapproved flagged mapping, and a test for `limit_test` at exactly 2.50x.
-3. Add `debt_capacity` to the verdict in `GET /deals/{id}/case` (it is already in the `limit_test` output) so the console can show "room for the next deal".
-4. Make `POST /deals` accept two CSV uploads and a brief, using Eric's loader, so a judge can try an unseen input. Keep the route thin.
-5. Make the SSE stream also emit stage changes, so the console can refresh the case without polling.
+1. Review `backend/app/tools/finance.py` and own it. Check the EBITDA build (net income plus interest, taxes, D&A; add-backs; rent deduction) against Ex 10.1's definition. Add any add-back the agreement names that we left at zero, with its source. Done 2026-10-24. Reviewed against Ex 10.1; covenant EBITDA now subtracts interest income as Addendum I requires.
+2. Add tests: a test per tool with hand-computed expected values from the fixture, a test that `consolidate` refuses an unapproved flagged mapping, and a test for `limit_test` at exactly 2.50x. Done 2026-10-24. Per-tool tests with hand-computed values, the unapproved-flag refusal, and `limit_test` at exactly 2.50x.
+3. Add `debt_capacity` to the verdict in `GET /deals/{id}/case` (it is already in the `limit_test` output) so the console can show "room for the next deal". Done 2026-10-24. `debt_capacity` and `debt_capacity_run_id` are on the verdict.
+4. Make `POST /deals` accept two CSV uploads and a brief, using Eric's loader, so a judge can try an unseen input. Keep the route thin. Done 2026-10-24. `POST /deals` takes two CSVs and a brief; 422 names the file, row, and column.
+5. Make the SSE stream also emit stage changes, so the console can refresh the case without polling. Done 2026-10-24. `GET /deals/{id}/stream` sends `stage` events as well as audit rows.
 6. Cut the demo video if the team agrees on one. Hyphenate wants a video that opens with the moment. [verified: `hyphenate-workshop.md`]
 
 ## Josie (UI and UX only)
@@ -95,5 +95,6 @@ Inputs for the design:
 ## Risks to watch
 
 - The naive-versus-covenant gap rests on the inferred rent deduction and zero transaction costs. If Tri or Eric change them, re-read the flag effects before the pitch. The code recomputes; the words must follow.
+- The interest-income subtraction moved EBITDA to 27,519 and leverage to 0.79x; the pitch words and the Devpost must use the new figures.
 - The Droid subprocess can fail live. The switch, the fallback chain, and the recording are the answer. Rehearse it.
 - The console is the only part not yet on the new API. Everything else waits on it for the live demo.

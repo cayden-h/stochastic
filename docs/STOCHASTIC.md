@@ -20,7 +20,7 @@ The second was an investment-bank analysis tool that recommends plans.
 Both are archived in `planning-notes.md` and `research/`.
 They are roadmap ideas only. The product is the integration workflow in this file.
 
-Build status on 2026-10-24, 02:30: the backend runs the whole deal end to end on the real filing figures through the gateway, the tools, and the audit log, on the scripted backend. [verified: `backend/tests/test_trust_rules.py`, 17 tests pass]
+Build status on 2026-10-24, 02:30: the backend runs the whole deal end to end on the real filing figures through the gateway, the tools, and the audit log, on the scripted backend. [verified: `backend/tests/test_trust_rules.py`, 103 tests pass]
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 (recorded in `backend/recordings/`). The Anthropic backend is written and not yet run live (no Anthropic key in `.env`).
 The console still implements the earlier workflow. Josie is rebuilding it against `GET /deals/{id}/case`.
 
@@ -196,11 +196,12 @@ The Mapper tags the line "unclear" and asks which parts count. The gateway compu
 
 | Option | Senior Funded Bank Debt | Leverage | Verdict |
 | --- | --- | --- | --- |
-| a. Whole line counts | $71,955K | 2.57x | Over the 2.50x limit |
-| b. Only the PNC term loan and revolver count (the agreement's reading, the default) | $21,633K | 0.77x | OK, 1.73x of room, about $48M of debt capacity |
-| c. PNC debt plus the seller notes | $44,173K | 1.58x | OK |
+| a. Whole line counts | $71,955K | 2.61x | Over the 2.50x limit |
+| b. Only the PNC term loan and revolver count (the agreement's reading, the default) | $21,633K | 0.79x | OK, 1.71x of room, about $47M of debt capacity |
+| c. PNC debt plus the seller notes | $44,173K | 1.61x | OK |
 
-Covenant EBITDA is $28,033K: Kewaunee $18,043K (net earnings 19,057, plus interest 1,799, less the tax benefit 5,938, plus depreciation 3,125), Nu Aire $7,783K (net income 5,438, plus taxes 514, plus D&A 1,830), plus the noncash pension termination $4,177K, less Statesville cash rent $1,970K. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
+Covenant EBITDA is $27,519K: Kewaunee $18,043K (net earnings 19,057, plus interest 1,799, less the tax benefit 5,938, plus depreciation 3,125), Nu Aire $7,269K (net income 5,438, plus taxes 514, plus D&A 1,830, less interest income 514), plus the noncash pension termination $4,177K, less Statesville cash rent $1,970K. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
+Covenant EBITDA subtracts interest income, as Addendum I of Ex 10.1 requires; Nu Aire's $514K of interest income is taken out. [verified: `test_ebitda_subtracts_interest_income`]
 Two inputs are inferred and must be said out loud: the rent deduction uses the 10-K's next-year obligation, and transaction and integration costs are applied as 0 because the filings do not quantify them.
 The verdict changes with the controller's answer, so the moment holds. [verified]
 
@@ -218,7 +219,7 @@ The whole screen comes from `GET /deals/{id}/case`. [verified: `architecture/gat
 
 ### The 30-second run
 
-Press Run. The Mapper maps 54 lines and stops on one flag. The controller picks the covenant reading. Code combines the books and tests the limit. The verdict line shows 0.77x against 2.50x, Reviewer pass. The controller approves and the gateway posts.
+Press Run. The Mapper maps 54 lines and stops on one flag. The controller picks the covenant reading. Code combines the books and tests the limit. The verdict line shows 0.79x against 2.50x, Reviewer pass. The controller approves and the gateway posts.
 If time allows, reset and run again: no flag, because the Mapper learned.
 The agent text is hardcoded, recorded, or scripted, and we say which. The gateway, tools, and log run for real.
 

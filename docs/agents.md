@@ -46,7 +46,7 @@ Two kinds:
 - `covenant_tag`: lines whose treatment under the covenant is the controller's call. The prompt says exclusions are never decided by the model: a line that one of the brief's exclusions may apply to, or a family of lines that holds more than one instrument, must be tagged `unclear` and put into one flag with two or three readings, the agreement's reading as the default.
 - `mapping`: a target line with no honest platform home.
 
-For every option the gateway runs the tools as a what-if (`covenant_debt` naive, `ebitda`, `leverage`, `limit_test`) and writes the effect on the option with a run id. The card never says "goes up"; it says "Senior Funded Bank Debt 71,955K. Leverage 2.57x against 2.50x. Over the limit." [verified]
+For every option the gateway runs the tools as a what-if (`covenant_debt` naive, `ebitda`, `leverage`, `limit_test`) and writes the effect on the option with a run id. The card never says "goes up"; it says "Senior Funded Bank Debt 71,955K. Leverage 2.62x against 2.50x. Over the limit." [verified]
 
 On the demo deal the intended result is one covenant flag with three readings and one small mapping flag (certificates of deposit). The scripted backend produces that every time. [verified] Model backends are judged against it in section 9.
 

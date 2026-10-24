@@ -58,10 +58,10 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 
 | Method and path | Who | Purpose |
 | --- | --- | --- |
-| `GET /health` | any | `ok`, `chain_valid`, and the backend status |
+| `GET /health` | any | `ok`, `chain_valid`, and the backend status (typed response) |
 | `GET /deals` | any | List deals |
 | `GET /deals/{id}` | any | One deal, with its brief |
-| `GET /deals/{id}/case` | any | The whole screen in one read (shape below) |
+| `GET /deals/{id}/case` | any | The whole screen in one read (shape below; response model `CaseResponse`, visible at `/docs`) |
 | `GET /deals/{id}/source-lines?company=` | any | Statement lines, both companies or one |
 | `GET /deals/{id}/mappings` | any | Mappings with confidence, reason, flagged, approved_by |
 | `GET /deals/{id}/result` | any | The latest result (404 before the Preparer ran) |
@@ -70,7 +70,8 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /deals/{id}/runs` | any | Every tool run for the deal |
 | `GET /runs/{run_id}` | any | One tool run: tool, inputs, outputs |
 | `GET /agents/memory` | any | Policies and sessions |
-| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written |
+| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, and `stage` events (shape below) |
+| `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, `brief` (a JSON string of the Brief), and files `platform_csv` and `target_csv`. Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}}`. 422 names the file, row, and column. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
 | `POST /deals/{id}/run` | human | Run the job runner until the deal waits on a human. Body `{"backend": "droid", "sync": true}` is optional. |
 | `POST /work-items/{id}/answer` | human | `{"option_id": "b"}`. Posts the flag and, if no flag is open, continues the run in the background. `?auto_advance=false` turns that off. |
 | `POST /work-items/{id}/approve` | human | Approve the result. The gateway posts it. |
@@ -90,7 +91,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
   "stage": "awaiting_flag",
   "source_lines": [ { "id": "sl_001", "company": "Kewaunee", "line": "Cash and cash equivalents", "section": "balance_sheet", "period": "2024-10-31", "amount": 25963, "unit": "USD thousands", "source_ref": "10-Q ...", "is_total": false, "note": null, "covenant_tag": "na", "covenant_note": null } ],
   "mappings": [ { "id": "m_001", "target_line": "Net Revenues", "platform_line": "Net sales", "confidence": 0.95, "reason": "...", "flagged": false, "approved_by": null } ],
-  "flags": [ { "id": "wi_002", "type": "flag", "state": "NEEDS_INFO", "question": "...", "evidence": [ { "quote": "...", "document_id": "8-K Ex 10.1, Section 4.8(a)" } ], "options": [ { "id": "a", "label": "Whole line counts (70,885K)", "effect": "Senior Funded Bank Debt 71,955K. Leverage 2.57x against 2.50x. Over the limit.", "run_id": "run_004" } ], "default": "b", "answer": null } ],
+  "flags": [ { "id": "wi_002", "type": "flag", "state": "NEEDS_INFO", "question": "...", "evidence": [ { "quote": "...", "document_id": "8-K Ex 10.1, Section 4.8(a)" } ], "options": [ { "id": "a", "label": "Whole line counts (70,885K)", "effect": "Senior Funded Bank Debt 71,955K. Leverage 2.62x against 2.50x. Over the limit.", "run_id": "run_004" } ], "default": "b", "answer": null } ],
   "open_flags": ["wi_002", "wi_003"],
   "result": null,
   "verdict": null,
@@ -106,14 +107,16 @@ After the Preparer and the Reviewer run, `verdict` is filled:
 
 ```json
 {
-  "leverage": 0.772, "limit": 2.5, "verdict": "ok", "headroom_turns": 1.728,
-  "ebitda": 28032.615, "debt": 21633.0, "debt_term": "Senior Funded Bank Debt",
+  "leverage": 0.786, "limit": 2.5, "verdict": "ok", "headroom_turns": 1.714,
+  "ebitda": 27518.845, "debt": 21633.0, "debt_term": "Senior Funded Bank Debt",
   "review": { "verdict": "pass", "reasons": [], "run_ids": ["run_017", "run_018"] },
   "tie_out_ok": true, "backend": "scripted",
+  "debt_capacity": 47164.113, "debt_capacity_run_id": "run_018",
   "approval_item": "wi_006", "approval_state": "PROPOSED", "posted": false
 }
 ```
 
+`debt_capacity` (a float, or null before the Reviewer runs) is the room for the next deal in USD thousands, and `debt_capacity_run_id` is the Reviewer's `limit_test` run (or null).
 `result.run_ids_by_tool` maps `consolidate`, `ebitda`, `covenant_debt`, and `leverage` to their run ids, so the console can link each figure to `GET /runs/{run_id}`.
 `source_lines[].note` is what the filing says about a line (for example the 10-Q note that the financing liability is the Statesville sale-leaseback). Show it on the flag card's evidence.
 A mapping flag may cover several target lines; its options then carry `mappings` (target line id to platform line) in `payload.option_actions`, and the option `effect` text lists each line.
@@ -121,6 +124,19 @@ A mapping flag may cover several target lines; its options then carry `mappings`
 
 `result.rows` is the combined table: `line`, `section`, `platform`, `target`, `combined`, `run_id`, in platform order and in USD thousands.
 The three closing financing lines (term loan, revolver, seller notes) carry `period` "2024-11-01 (closing)".
+
+## The stream
+
+`GET /deals/{id}/stream` sends two kinds of event.
+Audit events are unchanged.
+A `stage` event is sent once on connect and again whenever the stage changes:
+
+```
+event: stage
+data: {"deal_id": "d_kequ_nuaire", "stage": "awaiting_flag", "open_flags": ["wi_002"], "at": "<iso timestamp>"}
+```
+
+A `: keepalive` comment is sent every 15 seconds.
 
 ## Stages
 

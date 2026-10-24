@@ -6,16 +6,20 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.agents import runner as agent_runner
 from app.agents import settings as agent_settings
 from app.agents.jobs import advance
-from app.core.models import CONTROLLER, State
+from app.api.events import next_events
+from app.api.schemas import CaseResponse, DealCreated, HealthResponse
+from app.core.models import CONTROLLER, Brief, Deal, State
+from app.db.loader import MAX_BYTES, LoaderError, parse_statement_csv
 from app.gateway.gateway import Gateway, GatewayError
 
 
@@ -35,6 +39,27 @@ class ToolBody(BaseModel):
 class RunBody(BaseModel):
     backend: str | None = None  # anthropic, droid, scripted, replay; default from AGENT_BACKEND
     sync: bool = True
+
+
+def _debt_capacity(store, result) -> tuple[float | None, str | None]:
+    """Room for the next deal. The number comes from the Reviewer's limit_test tool run, never from the route."""
+    ids = result.review.run_ids if result and result.review else []
+    runs = [t for t in store.tool_runs.values() if t.tool == "limit_test" and t.run_id in ids]
+    for t in reversed(runs):
+        value = t.outputs.get("debt_capacity")
+        if value is not None:
+            return value, t.run_id
+    return None, None
+
+
+def first_non_finite(brief: Brief) -> str | None:
+    """Path of the first NaN or infinite figure in the brief, or None. A cap may be None."""
+    fields = []  # limit has its own check in the route
+    for group in ("ebitda_addbacks", "ebitda_deductions"):
+        for i, adj in enumerate(getattr(brief, group)):
+            fields += [(f"{group}[{i}].amount", adj.amount), (f"{group}[{i}].cap", adj.cap)]
+    fields += [(f"closing_financing[{i}].amount", f.amount) for i, f in enumerate(brief.closing_financing)]
+    return next((path for path, v in fields if v is not None and not math.isfinite(v)), None)
 
 
 def build_router(gw: Gateway) -> APIRouter:
@@ -77,7 +102,7 @@ def build_router(gw: Gateway) -> APIRouter:
             agent_runner.LAST_RUNS.append({"role": "runner", "backend": backend, "error": str(error)[:300]})
 
     # ------------------------------------------------------------------ reads
-    @r.get("/health")
+    @r.get("/health", response_model=HealthResponse)
     def health():
         return {"ok": True, "chain_valid": gw.verify_chain(), "backend": backend_status()}
 
@@ -89,7 +114,7 @@ def build_router(gw: Gateway) -> APIRouter:
     def deal(deal_id: str):
         return dump(need_deal(deal_id))
 
-    @r.get("/deals/{deal_id}/case")
+    @r.get("/deals/{deal_id}/case", response_model=CaseResponse)
     def case(deal_id: str):
         """The whole screen in one read: lines, mappings, flags, result, verdict, log summary."""
         d = need_deal(deal_id)
@@ -100,9 +125,11 @@ def build_router(gw: Gateway) -> APIRouter:
                          and i.state not in (State.REJECTED, State.REVERSED)), None)
         verdict = None
         if result:
+            capacity, capacity_run = _debt_capacity(store, result)
             verdict = {"leverage": result.leverage, "limit": result.limit, "verdict": result.verdict,
                        "headroom_turns": result.headroom_turns, "ebitda": result.ebitda, "debt": result.debt,
-                       "debt_term": d.brief.debt_term, "review": dump(result.review) if result.review else None,
+                       "debt_term": d.brief.debt_term, "debt_capacity": capacity,
+                       "debt_capacity_run_id": capacity_run, "review": dump(result.review) if result.review else None,
                        "tie_out_ok": result.tie_out_ok, "backend": result.backend,
                        "approval_item": approval.id if approval else None,
                        "approval_state": approval.state.value if approval else None,
@@ -173,6 +200,57 @@ def build_router(gw: Gateway) -> APIRouter:
                 "sessions": [dump(s) for s in store.sessions.values()], "backend": backend_status()}
 
     # ------------------------------------------------------------------ writes (human)
+    async def read_upload(field: str, upload: UploadFile) -> str:
+        """Read one CSV upload with a hard size cap. Never trusts content-length."""
+        if not (upload.filename or "").lower().endswith(".csv"):
+            raise HTTPException(status_code=422, detail=f"{field}: file name must end in .csv")
+        raw = await upload.read(MAX_BYTES + 1)
+        if len(raw) > MAX_BYTES:
+            raise HTTPException(status_code=422, detail=f"{field}: file is larger than {MAX_BYTES // (1024 * 1024)} MB")
+        try:
+            return raw.decode("utf-8", errors="strict")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=422, detail=f"{field}: file is not valid UTF-8")
+
+    @r.post("/deals", status_code=201, response_model=DealCreated)
+    async def create_deal(name: str = Form(..., min_length=1, max_length=200),
+                          platform: str = Form(..., min_length=1, max_length=100),
+                          target: str = Form(..., min_length=1, max_length=100),
+                          brief: str = Form(...),
+                          platform_csv: UploadFile = File(...), target_csv: UploadFile = File(...),
+                          x_actor: str = Header(default=CONTROLLER)):
+        """Load an unseen deal from two statement CSVs and a brief (JSON). Does not run the deal.
+
+        The console calls POST /deals/{id}/run next. /dev/reset reseeds only the demo deal, so uploaded deals
+        are lost on reset, which is fine for the demo.
+        """
+        guard(lambda: gw._require(x_actor, "create_deal", deal_id="-"))  # a denial is audited, before any file is parsed
+        name, platform, target = name.strip(), platform.strip(), target.strip()
+        if not name or not platform or not target or platform.lower() == target.lower():
+            raise HTTPException(status_code=422, detail="name, platform and target are required, and platform and target must differ")
+        platform_text = await read_upload("platform_csv", platform_csv)
+        target_text = await read_upload("target_csv", target_csv)
+        try:
+            parsed_brief = Brief.model_validate_json(brief)
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail=f"brief: {error.errors()[0]['loc']} {error.errors()[0]['msg']}")
+        bad_path = first_non_finite(parsed_brief)
+        if bad_path:
+            raise HTTPException(status_code=422, detail=f"brief: {bad_path} must be finite")
+        if not math.isfinite(parsed_brief.limit) or parsed_brief.limit <= 0:
+            raise HTTPException(status_code=422, detail="brief: limit must be a finite number greater than 0")
+        deal_id = store.next_id("d")
+        loaded = {}
+        for field, company, text in (("platform_csv", platform, platform_text), ("target_csv", target, target_text)):
+            try:
+                loaded[field] = parse_statement_csv(text, company, deal_id, store.next_id)
+            except (LoaderError, ValueError, ValidationError) as error:
+                raise HTTPException(status_code=422, detail=f"{field}: {error}")
+        deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=parsed_brief)
+        guard(lambda: gw.create_deal(x_actor, deal, loaded["platform_csv"] + loaded["target_csv"]))
+        return {"deal_id": deal_id, "stage": deal.stage,
+                "lines": {"platform": len(loaded["platform_csv"]), "target": len(loaded["target_csv"])}}
+
     @r.post("/deals/{deal_id}/run")
     def run_deal(deal_id: str, body: RunBody | None = None, tasks: BackgroundTasks = None,
                  x_actor: str = Header(default=CONTROLLER)):
@@ -226,12 +304,16 @@ def build_router(gw: Gateway) -> APIRouter:
         need_deal(deal_id)
 
         async def gen():
-            seen = 0
+            seen, last, tick = 0, None, 0
             while not await request.is_disconnected():
-                rows = [a for a in store.audit if a.deal_id == deal_id]
-                for row in rows[seen:]:
-                    yield f"event: audit\ndata: {json.dumps(dump(row))}\n\n"
-                seen = len(rows)
+                if deal_id not in store.deals:
+                    return
+                events, seen, last = next_events(store, deal_id, seen, last)
+                for e in events:
+                    yield e
+                tick += 1
+                if tick % 15 == 0:
+                    yield ": keepalive\n\n"
                 await asyncio.sleep(1)
 
         return StreamingResponse(gen(), media_type="text/event-stream")

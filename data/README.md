@@ -7,3 +7,35 @@ Rules:
 - Cache everything before the demo. The demo makes no live SEC calls.
 - Send a real contact email in the SEC User-Agent. Do not exceed 10 requests per second.
 - The SEC redistribution wording is unresolved, so do not publish the cached files.
+
+## CSV columns for POST /deals
+
+Upload one UTF-8 CSV per company, each with a header row, at most 2,000 data rows and 2 MB.
+`line` is the statement line name, 1 to 200 characters.
+`section` is one of `income_statement`, `balance_sheet`, or `cash_flow`.
+`period` is the period label, 1 to 64 characters.
+`amount` is a number; commas are allowed and parentheses mean negative, so `(1,234)` is -1234.
+`unit` is `USD thousands`, `USD`, or `USD millions` (see `finance.to_thousands` for the accepted spellings).
+`source_ref` is where the figure comes from, up to 500 characters, and may be empty.
+`is_total` is `true`, `false`, `1`, `0`, `yes`, or `no`; empty means false, and subtotals must be marked true.
+An optional `covenant_tag` column pre-tags a line as `debt`, `not_debt`, `unclear`, or `na` (the default).
+The scripted Mapper re-tags every balance-sheet line by name, so a `covenant_tag` in the CSV is a hint, not a guarantee.
+It tags as debt any line whose name contains "borrowings", "financing lease", "finance lease", "notes payable", "term loan", "line of credit", or "revolv".
+It tags "operating lease" and "lease liability - operating" as not debt, and "financing liability" as unclear (one flag).
+Any other balance-sheet name, such as "Long-term debt", is tagged `na`, and the covenant debt guardrail then raises and `POST /deals/{id}/run` returns 500.
+Name borrowings with one of the recognized phrases.
+The `ebitda` tool needs a net income line in `income_statement` and a D&A line in `cash_flow`, for each company.
+Net income names: "net earnings", "net income", "net income (loss)", "net earnings (loss)".
+D&A names: "depreciation and amortization", "depreciation", "amortization".
+Extra columns are ignored.
+A bad file is rejected with a message naming the file, row, and column, and nothing is loaded.
+
+Example:
+
+```
+line,section,period,amount,unit,source_ref,is_total
+Net sales,income_statement,FY2025,"10,000",USD thousands,10-K p5,false
+Net income,income_statement,FY2025,900,USD thousands,10-K p5,false
+Depreciation,cash_flow,FY2025,300,USD thousands,10-K p6,false
+Short-term borrowings,balance_sheet,FY2025,"3,000",USD thousands,10-K p7,false
+```
