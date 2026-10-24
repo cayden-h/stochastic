@@ -205,13 +205,14 @@ class Policy(BaseModel):
 class AgentSession(BaseModel):
     """One agent's running state: its backend session id and a short transcript of what it did.
 
-    The Droid backend resumes the same session per role, so the agent keeps context across work items.
-    The Anthropic backend replays the transcript. Either way the state is in the store and survives a restart.
+    The Droid backend resumes the same Droid session per role (`session_id`), so the agent keeps its conversation
+    across work items and deals. The Anthropic backend replays the transcript. Either way the state is in the store and survives a restart.
     """
 
     role: str
     backend: str
     session_id: str | None = None
+    session_key: str | None = None  # fingerprint of the setup the backend session was opened with
     turns: int = 0
     transcript: list[dict[str, Any]] = Field(default_factory=list)  # [{item, summary, at}]
     updated_at: datetime = Field(default_factory=now)

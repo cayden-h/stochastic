@@ -81,7 +81,7 @@ The system has four parts.
 - **People and files.** The console, the two data files, and the brief.
 - **Agents.** Three stateful agents and a plain job runner.
 - **The gateway.** It is the only writer. It checks permissions, enforces work-item states, runs the tools, writes the log, and writes the agents' memory.
-- **The store.** In memory. It holds the record, the work items, the tool runs, the audit log, the policies, and the agent sessions. Postgres on Tiger Cloud is a later swap.
+- **The store.** In memory for every read, written through to Postgres on Tiger Cloud when `STORE=postgres`. It holds the record, the work items, the tool runs, the audit log, the policies, and the agent sessions. The audit log is a TimescaleDB hypertable that refuses edits, and a restart loads everything back. [verified: `backend/tests/test_postgres_store.py`, run against the `stochastic` service on 2026-10-24]
 
 Code tools hold all the math: consolidation, tie-out, EBITDA, covenant debt, leverage, and the limit test. [verified: `backend/app/tools/finance.py`]
 Agents call tools through the gateway. They do not talk to each other.
@@ -245,7 +245,7 @@ Should (if the schedule holds):
 - An answer-key score for the mapping against Note 2 (Eric).
 - The second-run memory moment on stage.
 - A downloadable draft compliance certificate.
-- Tiger Cloud Postgres in place of the memory store.
+- Tiger Cloud Postgres in place of the memory store. Built on 2026-10-24 as a write-through store (`backend/app/db/postgres.py`).
 
 Cut (do not build this weekend):
 - Purchase accounting beyond a "provisional" label. The combined table is historical plus target; the pro forma adjustments are not applied.
@@ -259,7 +259,7 @@ Cut (do not build this weekend):
 - Frontend: Next.js, React, TypeScript, Tailwind. Josie leads the design.
 - Backend: Python 3.12, FastAPI, Pydantic. The gateway, tools, agents, and tests are in Python. [verified]
 - Agents: `run_agent(role, item)` with backends `anthropic` (Anthropic SDK, tool use), `droid` (Factory Droid Python SDK 0.5.0), `scripted`, and `replay`. [verified: installed in `backend/.venv`]
-- Store: in memory. Postgres on Tiger Cloud is optional.
+- Store: in memory, written through to Postgres on Tiger Cloud (TimescaleDB 2.31, PostgreSQL 18.6) with `STORE=postgres`. [verified]
 - Models: Claude Haiku 5.5 by default on both backends (`ANTHROPIC_MODEL`, `DROID_MODEL`), with per-role overrides (`DROID_MODEL_MAPPER` and so on). Haiku 5.5 produced the intended flag on the demo deal once the filing notes were on the lines. Details and the run log are in `agents.md`.
 - Keys: `ANTHROPIC_API_KEY` and `FACTORY_API_KEY` live in the repo-root `.env`, which git ignores and the app loads. `.env.example` lists every setting.
 
@@ -272,16 +272,16 @@ Status as of 2026-10-24. Sponsor research is in `sponsors/`.
 | Hyphenate (main) | Target | $8K, $5K, $3K, plus interviews for the top 5. Select it on Devpost. |
 | Factory | Target (build runner) | Cayden has a Factory account on the Plus plan. Droid runs the agents we show. Confirm prize rules and Claude model access with a Factory mentor, because the Friday workshop has passed. |
 | Figma | Target | Five prizes at $1,000 each (self-reported): Best Use Case of Figma, Best Use Case of Figma Agent, Most Creative Use Case of Figma Agent, Best Design, Most Creative. Josie designs the console in Figma, and the Figma MCP is in the loop. Prompts are not published, so read the Live Site. |
-| Tiger Data (MLH) | Not targeted | Dropped as a target on 2026-10-24. Revisit only if the Postgres store gets built anyway. |
+| Tiger Data (MLH) | Target | Added 2026-10-24 evening, once the store ran on Tiger Cloud. MLH prize "Best Use of Tiger Data". Proof: the record, the audit log, and the agents' memory live in Postgres on Tiger Cloud. |
 | Microsoft | Not targeted | Dropped as a target. It needs Microsoft products that we do not use. |
 | Most Technically Advanced | Not targeted | Costs no extra work if it is open to all. Do not build for it. |
 | Mana | Skip | Needs the founders' confirmation that it counts. |
 | GoDaddy, Vultr, Gemini API (MLH) | Cheap | Count only if the integration is real. |
 | Others | Skip | No honest fit. |
 
-The three target tracks are Hyphenate, Factory, and Figma. [set by Cayden, 2026-10-24]
-Stacking three prizes is rare. [verified: 22 of 1,324 winners in the scrape, for three or more]
-The three tracks ask for different proof, so the work does not overlap much.
+The four target tracks are Hyphenate, Factory, Figma, and Tiger Data. [set by Cayden, 2026-10-24; Tiger Data added that evening]
+Stacking three or more prizes is rare. [verified: 22 of 1,324 winners in the scrape, for three or more]
+The tracks ask for different proof, so the work does not overlap much.
 Cal Hacks has not confirmed that one project can opt into several sponsor tracks. Ask a Cal Hacks organizer today.
 
 ### What each target track needs from us
@@ -294,10 +294,10 @@ Hyphenate:
 - A demo video that opens with that moment, a live demo, a one-line seat, and a real-versus-simulated list.
 
 Factory:
-- The agents we show run through the Droid SDK, one fresh `run()` per work item.
+- The agents we show run through the Droid SDK. Each role keeps one Droid session and resumes it on every work item and deal.
 - `AGENT_BACKEND=droid` must work for at least one agent in the demo, or we do not claim "built with Droid".
-- A short statement of what the SDK made possible: a tool allowlist (`restrict_tools`), typed output, and per-run isolation.
-- Each agent runs in an empty working directory with only our tools allowed, because Droid is a coding agent that reads files by default. [from Factory's Cal Hacks deck, see `sponsors/factory.md`]
+- A short statement of what the SDK made possible: a tool allowlist (`restrict_tools`), typed output, and resumable sessions per role.
+- Each role runs in its own empty working directory with only our tools allowed, because Droid is a coding agent that reads files by default. [from Factory's Cal Hacks deck, see `sponsors/factory.md`]
 - Each team member can claim Factory credits with the form linked in `sponsors/factory.md`.
 - Open: the prize rubric, and whether our key can run Claude models. The deck does not answer either one.
 
@@ -307,6 +307,12 @@ Figma:
 - Figma is on screen in the pitch: the frame, the component set, and one agent-driven edit through `use_figma`.
 - Design polish counts for Best Design: one hero screen, plain verdict words, state shown by color plus word plus shape, and a clickable prototype.
 - Open: the exact prompts for the five prizes, and whether our team has Figma Agent access (the Education plan is free).
+
+Tiger Data:
+- The store runs on Tiger Cloud (`STORE=postgres`): every gateway write reaches Postgres, and a restart loads the record, the audit log, and the agents' memory back. [verified: `backend/tests/test_postgres_store.py`]
+- The audit log is a TimescaleDB hypertable that refuses UPDATE and DELETE. A reset starts a new ledger, so nothing is deleted.
+- Show it in the pitch: the "Tiger Cloud" badge on the console, then the `ledger` and `audit_log` tables in SQL after a restart.
+- Open: whether forks for comparing two flag answers are worth building this weekend (see `sponsors/tiger-data.md`).
 Cal Hacks has not confirmed that one project can opt into several sponsor tracks. Ask at kickoff.
 
 ## 16. Hyphenate judging

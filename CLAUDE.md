@@ -22,7 +22,7 @@ If that file and any other file disagree, `docs/STOCHASTIC.md` is correct.
 ## Commands
 
 Backend and console commands are in `README.md`, section "Getting started".
-Backend tests: `cd backend && .venv/bin/python -m pytest -q` (105 tests on the real Kewaunee figures).
+Backend tests: `cd backend && .venv/bin/python -m pytest -q` (115 tests on the real Kewaunee figures; the 5 Postgres store tests run only with `TEST_DATABASE_URL` set).
 Run the whole deal from the command line: `backend/.venv/bin/python scripts/record_run.py --backend scripted`.
 The backend runs the deal end to end as of 2026-10-24, and the console runs on `GET /deals/{id}/case`. Console checks: `cd frontend && npx eslint src && npx next build`.
 Project code could not start before Friday Oct 23, about 6pm (Cal Hacks rule).

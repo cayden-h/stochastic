@@ -22,7 +22,7 @@ export function CombinedTable({ result, platform, target }: { result: Result; pl
   const consolidateRun = result.run_ids_by_tool.consolidate;
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 className="font-serif text-[26px] leading-8 font-medium">Combined books</h2>
         <span className={`inline-flex items-center gap-2 rounded-chip px-3 py-1 font-semibold ${result.tie_out_ok ? "bg-clear-tint text-clear" : "bg-denied-tint text-denied"}`}>
           <Shape kind={result.tie_out_ok ? "check" : "cross"} />
@@ -31,7 +31,8 @@ export function CombinedTable({ result, platform, target }: { result: Result; pl
         <Mono>USD thousands. {consolidateRun}</Mono>
       </div>
 
-      <div className="overflow-hidden rounded-card border border-rule bg-card">
+      <div className="overflow-x-auto rounded-card border border-rule bg-card">
+        <div className="min-w-[680px]">
         <div className="grid grid-cols-[1fr_160px_160px_160px] gap-4 border-b border-hairline px-4 py-2">
           <Label>Line</Label>
           <span className="text-right"><Label>{platform}</Label></span>
@@ -66,6 +67,7 @@ export function CombinedTable({ result, platform, target }: { result: Result; pl
             </div>
           );
         })}
+        </div>
       </div>
     </section>
   );

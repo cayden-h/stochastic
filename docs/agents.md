@@ -55,11 +55,14 @@ On the demo deal the intended result is one covenant flag with three readings an
 Decided by Cayden on 2026-10-24 (decision D12).
 
 - `Policy`: when the controller answers a flag, the gateway writes one policy per decided line: role, kind, the normalized line name, the decision, who approved, the flag it came from. The Mapper reads its policies before it maps. A policy match becomes a mapping or tag with confidence 0.98 and the reason "Policy p_001: human:controller decided this on wi_002". The gateway counts each application and logs `policy:apply`. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
-- `AgentSession`: one per role: backend, backend session id, turn count, a short transcript of what it did. The Anthropic backend replays the transcript at the top of the prompt. The Droid backend records the session id. [verified: `gateway.update_session`]
+- `AgentSession`: one per role: backend, backend session id, turn count, a short transcript of what it did. The Anthropic backend replays the transcript at the top of the prompt. The Droid backend records the session id and resumes it on the role's next turn. [verified: `gateway.update_session`, `backend/tests/test_agent_sessions.py`]
 - Both live in the store and survive `POST /dev/reset` (unless `keep_memory=false`). The second run of the demo deal asks nothing.
 - What memory is not: model weights, a vector store, or anything the model writes itself. The gateway is the only writer, and a reversal of a flag clears the way for a new decision.
 
-Droid session resume is deliberately not used yet. `Session.resume()` accepts MCP servers and a deny list but not the `restrict_tools` allowlist, so a resumed session could see Droid's built-in tools again. One fresh `run()` per work item keeps the allowlist; memory travels through the store instead. [verified: `droid_sdk.Session.resume` signature; inferred for the risk]
+Droid sessions are resumed since 2026-10-24 evening. Each role keeps one Droid session across work items and deals, in its own empty folder (`DROID_WORKDIR/<role>`, default `~/.cache/stochastic/droid/<role>`), so the Factory session list groups each role's turns together.
+Before this, every call opened a new session in a new temp folder, so Droid showed a new project on every call; and a backend name mismatch (`auto` against `droid`) reset the stored session each run, so turn counts never passed 1.
+`Session.resume()` does not take the `restrict_tools` allowlist, but a resumed session keeps the one it was opened with, along with its model, reasoning effort, and system prompt. [verified: a probe on 2026-10-24 listed the same two tools on both turns and recalled a word from turn 1 without a tool call; the live deal below confirmed Haiku 5.5 at medium on resumed turns]
+Because a resumed session keeps its system prompt, the backend stores a fingerprint of the role's prompt, model, effort, and tools (`session_key`) and starts a new session when it changes. If a session cannot be loaded, a new one starts and the run meta says why (`resume_error`).
 
 ## 7. Backends and settings
 
@@ -67,7 +70,7 @@ One function, `run_agent(role, item)` in `backend/app/agents/runner.py`.
 
 | `AGENT_BACKEND` | What runs | Needs | Use |
 | --- | --- | --- | --- |
-| `droid` | Factory Droid Python SDK 0.5.0: `run(prompt, output=Model, config=SessionConfig(mcp_servers, restrict_tools, autonomy=HIGH, system_prompt))` in an empty temp directory | `droid` CLI on PATH, `FACTORY_API_KEY` | The Factory track. Say "built with the Droid SDK" only about these runs. |
+| `droid` | Factory Droid Python SDK 0.5.0: `run(prompt, output=Model, config=SessionConfig(mcp_servers, restrict_tools, autonomy=HIGH, system_prompt))`, one resumed session per role in its own empty folder | `droid` CLI on PATH, `FACTORY_API_KEY` | The Factory track. Say "built with the Droid SDK" only about these runs. |
 | `anthropic` | Anthropic SDK, `messages.create` with the role's tools and a `submit` tool typed as the output model, up to 12 turns | `ANTHROPIC_API_KEY` | The real model path without Droid, and the stage fallback. Not yet run live (no key). |
 | `scripted` | Deterministic rules: policies, synonyms (accounting practice and Ex 99.2 Note 2), name similarity, flags below 0.6 | nothing | Last fallback and the reference answer. |
 | `replay` | Recorded outputs from `backend/recordings/`; the Preparer and Reviewer re-run their tools so run ids are real | the recordings | No-network fallback. |
@@ -113,7 +116,8 @@ Failure switch, rehearsed on 2026-10-24, 04:50 [verified]: the API was started w
 Two findings about Droid and models [verified by a probe on 2026-10-24, 05:00]:
 - The run result does not say which model ran, but the droid CLI's own session record does: every assistant message in `~/.factory/sessions/<cwd>/<session id>.jsonl` carries `modelId` and `reasoningEffort`. Since 2026-10-24 evening the backend reads that record after each run (`served_model`), and `model_confirmed` is true when it matches the request; the health view shows `model_served` and `reasoning_effort_served` next to the requested values. [verified: a probe with `DROID_MODEL=claude-sonnet-5-5` was recorded as `claude-sonnet-5-5`, and the three deal runs as `claude-haiku-5-5`]
 - Droid has a router model with the id `auto` ("Auto Model", kind router). Our sessions never use it: every role passes its model id, and the record confirms it. The interactive `droid` CLI may still show "Auto Model" as its own default; that setting is separate from SDK sessions and is changed with `/model` in the CLI. Do not set `DROID_MODEL=auto`.
-- Reasoning effort is pinned as well (`DROID_REASONING_EFFORT`, default `high`, per-role overrides). Without it Droid used `high` on every run, whatever the model's own default (Haiku 5.5's is `medium`).
+- Reasoning effort is pinned as well (`DROID_REASONING_EFFORT`, default `medium`, per-role overrides). Without it Droid used `high` on every run, whatever the model's own default (Haiku 5.5's is `medium`).
+The default is `medium` since 2026-10-24: the confirmed medium run gave the same flags and verdict as the three high runs, at lower cost. [verified for one run]
 - An unknown model id does not fail. `DROID_MODEL=not-a-real-model` ran and returned a result, at about 2.7 times the credits of the same prompt on Haiku 5.5, so Droid fell back to a default model silently. Keep `DROID_MODEL` set to an id the probe listed, and never claim a model name for a Droid run beyond "requested".
 
 ## 8a. Cost
@@ -132,6 +136,7 @@ Haiku 5.5 is the default for that reason. A full deal on Haiku 5.5 is three Droi
 | 2026-10-24 04:30 | droid, claude-haiku-5-5, with line notes, named run ids, and the tightened prompts | 1 covenant flag with 3 readings (agreement 0.77x, short-term borrowings excluded 0.74x, all counted 2.57x over), 2 mapping flags of three lines each, by name | ran, pass, with reasons citing the run ids | 0.77x OK, recorded in `recordings/haiku-5-5/`; no longer the default replay, see section 7 |
 | 2026-10-24 evening | droid, claude-haiku-5-5, after the settle-every-line rule, the add-backs, and the console rebuild | 1 covenant flag over six lines with 3 readings, every option settling every line (agreement 0.76x, none excluded 2.54x, short-term arrangements unsecured 0.73x); 1 mapping flag over six lines | ran, pass, reasons cite the tie-out and limit_test run ids | 0.76x OK, recorded in `recordings/haiku-5-5-run2/`; Mapper scored 33 of 33 against Note 2 |
 | 2026-10-24 late | droid, claude-haiku-5-5 at medium effort, model confirmed from the session record | same flags | ran, pass | 0.76x OK, not recorded. Credits: Mapper 5,845, Preparer 5,045, Reviewer 1,052, so 11,942 for the whole deal on Haiku 5.5 |
+| 2026-10-24 evening | droid, claude-haiku-5-5 at medium, sessions resumed: two deals in a row on one store | deal 1: same flags; deal 2: none, 6 policies applied | ran, pass on both | 0.76x OK on both, not recorded. All three roles resumed their deal-1 session on deal 2. Credits deal 1: 5,169 + 3,992 + 1,128 = 10,289; deal 2: 2,950 + 4,000 + 341 = 7,291 |
 
 Figures in the log are as computed at the time. Since Tri's interest-income fix on 2026-10-24, the same recordings replay at 0.76x covenant and 2.54x whole-line.
 
@@ -144,7 +149,7 @@ Lessons written into the code after these runs:
 ## 10. Honest limits of the agent layer
 
 - The Anthropic backend has not run live; no key was available on 2026-10-24.
-- Droid sessions are not resumed (section 6), so "stateful" means memory in the store, not a long-lived model context.
-- Droid runs cannot prove which model served them (section 8). Say "Claude Haiku 5.5 requested through Droid".
+- Each role's Droid context grows with every turn, because the whole work item input goes into the conversation. Droid compacts long sessions itself; we have not run enough turns to see it. [inferred]
+- The served model comes from the droid CLI's own session record, not from Factory's API (section 8). Say "Claude Haiku 5.5 through Droid, confirmed from the session record".
 - The scripted backend knows this deal's line names; on a new deal it would flag more and map less. That is the point of the model backends.
 - The Mapper's flag quality depends on the model. The run log above is the evidence; say which run is on screen.

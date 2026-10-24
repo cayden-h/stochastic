@@ -60,7 +60,8 @@ def _attempt(backend: str, role: Role, inp: BaseModel, call_tool, session) -> tu
         if not os.getenv("FACTORY_API_KEY"):
             raise RuntimeError("FACTORY_API_KEY is not set")
         from app.agents.backends.droid_backend import run_droid
-        return run_droid(role, inp, call_tool, session.session_id if session else None)
+        return run_droid(role, inp, call_tool, session.session_id if session else None,
+                         session.session_key if session else None)
     raise RuntimeError(f"unknown backend '{backend}'")
 
 

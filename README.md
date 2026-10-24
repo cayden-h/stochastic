@@ -135,13 +135,14 @@ Cut for the weekend: purchase accounting, intercompany eliminations, other deals
 
 ## Tracks
 
-We target three tracks. [set by Cayden, 2026-10-24]
+We target four tracks. [set by Cayden, 2026-10-24]
 
 | Track | What we show |
 | --- | --- |
 | Hyphenate (main) | A real messy corner (two charts of accounts from a real deal), an answer key, limits in code, and one moment: the flagged line that changes the leverage verdict. |
-| Factory | The agents run through the Droid SDK, one fresh `run()` per work item, with a tool allowlist and typed output. |
+| Factory | The agents run through the Droid SDK, one resumed session per role, with a tool allowlist and typed output. |
 | Figma | The console is designed in Figma and built from the Figma frame. The Figma file and one agent-driven edit are on screen in the pitch. |
+| Tiger Data | The record, the hash-chained audit log, and the agents' memory live in Postgres on Tiger Cloud. The audit log is a TimescaleDB hypertable that refuses edits, and a restart loads everything back. |
 
 Other tracks are not targeted. The details, the per-track checklist, and the open questions are in section 15 of `docs/STOCHASTIC.md`.
 
@@ -152,7 +153,7 @@ Other tracks are not targeted. The details, the per-track checklist, and the ope
 | Frontend | Next.js, React, TypeScript, Tailwind (the console) |
 | Backend | Python, FastAPI (gateway, tools, tests) |
 | Agents | Python, `run_agent(role, item)`: `anthropic`, `droid` (Factory Droid Python SDK 0.5.0), `scripted`, `replay` |
-| Store | In memory, with agent memory kept across resets. Postgres on Tiger Cloud is optional |
+| Store | In memory, written through to Postgres on Tiger Cloud with `STORE=postgres`; agent memory kept across resets |
 | Models | Claude Haiku 5.5 by default on both backends (`DROID_MODEL`, `ANTHROPIC_MODEL`), with per-role overrides such as `DROID_MODEL_MAPPER`. The Factory key lists Claude, GPT, and Gemini models |
 | Keys | `ANTHROPIC_API_KEY` and `FACTORY_API_KEY` live in the repo-root `.env`, which git ignores and the app loads |
 

@@ -1,4 +1,5 @@
 """App entry point. Run: uvicorn app.main:app --reload --port 8000"""
+import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -15,10 +16,31 @@ from app.db.memory import MemoryStore  # noqa: E402
 from app.gateway.gateway import Gateway  # noqa: E402
 
 
+log = logging.getLogger("stochastic")
+
+
+def open_store() -> MemoryStore:
+    """STORE=postgres writes through to Tiger Cloud. If the database cannot be reached, the API still starts
+    in memory and says so on /health, so the demo is never blocked by the network."""
+    if settings.store != "postgres":
+        return MemoryStore()
+    if not settings.database_url:
+        raise RuntimeError("STORE=postgres needs DATABASE_URL in .env")
+    from app.db.postgres import PostgresStore
+    try:
+        return PostgresStore(settings.database_url, schema=settings.db_schema)
+    except Exception as error:  # noqa: BLE001 - any connect or schema failure falls back the same way
+        log.error("Postgres store unavailable, running in memory: %s", error)
+        store = MemoryStore()
+        store.fallback_reason = f"{type(error).__name__}: {error}"
+        return store
+
+
 def create_app() -> FastAPI:
-    store = MemoryStore()
+    store = open_store()
     gateway = Gateway(store)
-    seed(store, gateway)
+    if not store.deals:  # a Postgres store that loaded a ledger keeps it
+        seed(store, gateway)
     app = FastAPI(title="Stochastic gateway API", version="0.2.0")
     app.add_middleware(BodyLimitMiddleware, max_bytes=MAX_BODY_BYTES)
     # CORS is added last so it is outermost and a 413 still carries CORS headers
@@ -30,8 +52,9 @@ def create_app() -> FastAPI:
     def reset(keep_memory: bool = True):
         """Demo helper: reseed the deal. Agent memory (policies, sessions) is kept unless keep_memory=false,
         so a second run shows the Mapper applying what the controller taught it."""
-        store.reset_deals(keep_memory=keep_memory)
-        seed(store, gateway)
+        with gateway.lock:
+            store.reset_deals(keep_memory=keep_memory)
+            seed(store, gateway)
         return {"ok": True, "policies": len(store.policies), "sessions": len(store.sessions)}
 
     return app

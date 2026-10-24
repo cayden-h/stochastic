@@ -1,19 +1,24 @@
 """The Factory Droid backend: the agent runs as a droid session with only our tools.
 
 Each role keeps one Droid session (stateful): the first call creates it, later calls resume it by session id, so
-the agent carries context across work items. Tools are an in-process MCP server whose handlers call the gateway,
-`restrict_tools` allows nothing but them, and the working directory is an empty temp folder, because Droid is a
-coding agent that reads files by default. Structured output uses the role's Pydantic output type.
+the agent carries its conversation across work items and deals. A resumed session keeps its model, reasoning
+effort, system prompt, and tool restriction; only the in-process MCP server is passed again. [verified: probe on
+2026-10-24, the resumed turn recalled a word from the first turn without a tool call and listed the same tools]
+Tools are an in-process MCP server whose handlers call the gateway, and `restrict_tools` allows nothing but them.
+The working directory is an empty folder per role (`DROID_WORKDIR/<role>`), because Droid is a coding agent that
+reads files by default, and a resumed session must find the folder it started in. Droid groups sessions by folder,
+so each role's sessions sit together. If a session cannot be resumed, a new one starts and the meta says why.
+Structured output uses the role's Pydantic output type.
 Needs the `droid` CLI on PATH and FACTORY_API_KEY. Any failure raises, and the runner falls back.
 """
 from __future__ import annotations
 
 import asyncio
 import glob
+import hashlib
 import json
 import os
 import re
-import tempfile
 
 from pydantic import BaseModel
 
@@ -61,8 +66,33 @@ def _build_server(role: Role, call_tool):
     return create_sdk_mcp_server(name="stochastic", tools=droid_tools), [t.name for t in droid_tools] if droid_tools else []
 
 
-async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None):
-    from droid_sdk import Autonomy, SessionConfig, run
+WORKDIR = os.getenv("DROID_WORKDIR", os.path.expanduser("~/.cache/stochastic/droid"))
+
+
+def role_dir(role_name: str) -> str:
+    """An empty folder that belongs to one role and stays put, so its sessions can be resumed."""
+    path = os.path.join(WORKDIR, role_name)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+async def _turn(session, prompt: str, output, timeout: float):
+    stream = session.stream(prompt, output=output, timeout=timeout)
+    async with stream:
+        async for _ in stream:
+            pass
+    return stream.result
+
+
+def setup_key(role: Role, model: str | None, effort: str | None, restrict: list[str]) -> str:
+    """A fingerprint of what a session was opened with. A resumed session keeps its system prompt, model, effort,
+    and tool list, so a session opened with an older setup is not resumed."""
+    body = json.dumps([role.system, model, effort, sorted(restrict)])
+    return hashlib.sha256(body.encode()).hexdigest()[:16]
+
+
+async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None, session_key: str | None = None):
+    from droid_sdk import Autonomy, DroidError, Session, SessionConfig
 
     server, names = _build_server(role, call_tool)
     allow = os.getenv("DROID_RESTRICT_TOOLS")
@@ -70,16 +100,38 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None):
     config = SessionConfig(mcp_servers=[server] if names else [], restrict_tools=restrict or ["none"],
                            autonomy=Autonomy.HIGH, system_prompt=role.system)
     prompt = f"Work item input (JSON):\n{inp.model_dump_json()}\nReturn the typed result."
-    with tempfile.TemporaryDirectory(prefix="stochastic-droid-") as cwd:
-        kwargs = dict(cwd=cwd, output=role.output_type, config=config,
-                      timeout=float(os.getenv("DROID_TIMEOUT", "240")))
-        model = role_model("DROID_MODEL", role.name)
+    timeout = float(os.getenv("DROID_TIMEOUT", "240"))
+    model = role_model("DROID_MODEL", role.name)
+    effort = role_reasoning("DROID", role.name)
+    key = setup_key(role, model, effort, restrict)
+
+    def fresh():
+        kwargs = dict(cwd=role_dir(role.name), config=config)
         if model:
             kwargs["model"] = model
-        effort = role_reasoning("DROID", role.name)
         if effort:
             kwargs["reasoning_effort"] = reasoning_enum(effort)
-        result = await run(prompt, **kwargs)
+        return Session(**kwargs)
+
+    session, resumed, resume_error = None, False, None
+    if session_id and session_key != key:
+        resume_error = "the role's prompt, model, effort, or tools changed since this session started"
+    elif session_id:
+        session = Session.resume(session_id, mcp_servers=[server] if names else [])
+        try:
+            await session.open()
+            resumed = True
+        except DroidError as error:  # the session is gone or cannot load: start a new one
+            resume_error = f"{type(error).__name__}: {error}"[:200]
+            await session.close()
+    if not resumed:
+        session = fresh()
+    try:
+        if not resumed:
+            await session.open()
+        result = await _turn(session, prompt, role.output_type, timeout)
+    finally:
+        await session.close()
     if not result.success or result.output is None:
         raise RuntimeError(f"droid run failed: {getattr(result, 'error', None)} "
                            f"{getattr(result, 'structured_output_error', None) or getattr(result, 'output_validation_error', None)}")
@@ -92,7 +144,9 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None):
             if v is not None:
                 cost[k] = v
     served = served_model(result.session_id)
-    return result.output, {"session_id": result.session_id, "turns": result.turn_count,
+    return result.output, {"session_id": result.session_id, "session_key": key, "resumed": resumed,
+                           "resume_error": resume_error,
+                           "turns": result.turn_count,
                            "duration": getattr(result, "duration", None), "model_requested": model or "droid default",
                            "reasoning_effort_requested": effort,
                            "model_served": served.get("model"), "reasoning_effort_served": served.get("reasoning_effort"),
@@ -137,13 +191,14 @@ def served_model(session_id: str | None, sessions_dir: str | None = None) -> dic
     return out
 
 
-def run_droid(role: Role, inp: BaseModel, call_tool, session_id: str | None = None) -> tuple[BaseModel, dict]:
+def run_droid(role: Role, inp: BaseModel, call_tool, session_id: str | None = None,
+              session_key: str | None = None) -> tuple[BaseModel, dict]:
     """Synchronous wrapper. Runs the asyncio session in this thread."""
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         loop = None
-    coro = _run(role, inp, call_tool, session_id)
+    coro = _run(role, inp, call_tool, session_id, session_key)
     if loop and loop.is_running():
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:

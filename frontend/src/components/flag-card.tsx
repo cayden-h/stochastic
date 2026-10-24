@@ -18,8 +18,8 @@ export function FlagCard({
   const flagged = lines.filter((l) => lineIds.includes(l.id));
   const wide = item.options.length > 2;
   return (
-    <section className="flex flex-col gap-4 rounded-card border border-escalation-bar border-l-[6px] bg-card p-6">
-      <div className="flex items-center gap-3">
+    <section className="flex flex-col gap-4 rounded-card border border-escalation-bar border-l-[6px] bg-card p-4 sm:p-6">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <ActorChip actor={item.proposed_by} />
         <span className="inline-flex items-center gap-2 text-[14px] leading-5 font-semibold uppercase tracking-[0.04em] text-escalation">
           <Shape kind="triangle" />
@@ -35,8 +35,8 @@ export function FlagCard({
       {flagged.length ? (
         <div className="flex flex-col gap-1 rounded-chip border border-hairline bg-paper px-4 py-3">
           {flagged.map((l) => (
-            <div key={l.id} className="flex items-baseline gap-3">
-              <span className="flex-1 truncate" title={l.line}>{l.line}</span>
+            <div key={l.id} className="flex flex-wrap items-baseline gap-x-3">
+              <span className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1" title={l.line}>{l.line}</span>
               <Mono>{l.company}</Mono>
               <span className="font-semibold tabular-nums">{Math.round(l.amount).toLocaleString("en-US")}</span>
               <Mono>{l.unit}</Mono>
@@ -59,7 +59,7 @@ export function FlagCard({
         </div>
       ) : null}
 
-      <div className={`grid gap-4 ${wide ? "grid-cols-3" : "grid-cols-2"}`}>
+      <div className={`grid gap-4 ${wide ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         {item.options.map((o) => {
           const suggested = o.id === item.default;
           return (

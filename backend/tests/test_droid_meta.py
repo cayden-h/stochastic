@@ -40,11 +40,11 @@ def test_served_model_is_empty_when_missing_or_mixed(tmp_path):
 def test_reasoning_effort_is_explicit_per_role(monkeypatch):
     monkeypatch.delenv("DROID_REASONING_EFFORT", raising=False)
     monkeypatch.delenv("DROID_REASONING_EFFORT_MAPPER", raising=False)
-    assert role_reasoning("DROID", "mapper") == "high"
-    monkeypatch.setenv("DROID_REASONING_EFFORT", "medium")
     assert role_reasoning("DROID", "mapper") == "medium"
+    monkeypatch.setenv("DROID_REASONING_EFFORT", "high")
+    assert role_reasoning("DROID", "mapper") == "high"
     monkeypatch.setenv("DROID_REASONING_EFFORT_MAPPER", "xhigh")
-    assert role_reasoning("DROID", "mapper") == "xhigh" and role_reasoning("DROID", "reviewer") == "medium"
+    assert role_reasoning("DROID", "mapper") == "xhigh" and role_reasoning("DROID", "reviewer") == "high"
 
 
 def test_reasoning_effort_becomes_the_sdk_enum():

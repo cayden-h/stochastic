@@ -51,6 +51,7 @@ Both recorded Droid runs were scored without a key, by replaying the Mapper's re
 | `backend/recordings/` (the default replay; a copy is in `sonnet-5-5/`) | Claude Sonnet 5.5 | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/haiku-5-5/` | Claude Haiku 5.5 (04:30) | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/haiku-5-5-run2/` | Claude Haiku 5.5 (evening, after the settle-every-line rule) | 23 of 23 | 10 of 10 | 33 of 33 |
+| `backend/recordings/droid-console-0751/` | Droid run from the console on 2026-10-24 at 07:51 (model not stored in the recording; the backend default was Haiku 5.5) | 23 of 23 | 10 of 10 | 33 of 33 |
 
 The Sonnet run was scored with `backend/.venv/bin/python evals/score_mapper.py --backend replay`; it is the default recording since 2026-10-24. [verified]
 The Haiku run was scored straight from `backend/recordings/haiku-5-5/mapper.json`, because the gateway rejects that Mapper output (see below). [verified]

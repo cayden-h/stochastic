@@ -37,7 +37,7 @@ export function VerdictLine({
         ) : null}
       </div>
 
-      <dl className="grid grid-cols-4 gap-4">
+      <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Figure label={verdict.debt_term} value={fmtK(verdict.debt)} run={runIds.covenant_debt} />
         <Figure label="Covenant EBITDA" value={fmtK(verdict.ebitda)} run={runIds.ebitda} />
         <Figure

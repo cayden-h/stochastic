@@ -17,7 +17,7 @@ export function Mappings({ mappings, lines }: { mappings: Mapping[]; lines: Sour
   const low = mappings.filter((m) => m.confidence < 0.8 && !m.flagged);
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 className="font-serif text-[26px] leading-8 font-medium">Mapping</h2>
         <span className="text-muted">
           {plural(mappings.length, "target line")} mapped. {flagged.length} flagged. {low.length} below 0.80 confidence.
@@ -46,7 +46,8 @@ export function Mappings({ mappings, lines }: { mappings: Mapping[]; lines: Sour
       ) : null}
 
       {open ? (
-        <div className="overflow-hidden rounded-card border border-rule bg-card">
+        <div className="overflow-x-auto rounded-card border border-rule bg-card">
+          <div className="min-w-[640px]">
           {mappings.map((m) => (
             <div key={m.id} className="grid grid-cols-[1fr_24px_1fr_72px_140px] items-center gap-3 border-b border-hairline px-4 py-1 last:border-b-0">
               <span className="truncate" title={m.target_line}>{m.target_line}</span>
@@ -62,6 +63,7 @@ export function Mappings({ mappings, lines }: { mappings: Mapping[]; lines: Sour
               </span>
             </div>
           ))}
+          </div>
         </div>
       ) : null}
     </section>

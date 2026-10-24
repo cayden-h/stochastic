@@ -19,9 +19,15 @@ def _call_tool(gw: Gateway, actor: str, deal_id: str):
 
 
 def _run(gw: Gateway, role: Role, inp, deal_id: str, item_id: str, backend: str | None):
-    session = gw.session(role.name, backend or "auto")
-    run = run_agent(role, inp, _call_tool(gw, role.actor, deal_id), session=session, backend=backend)
-    return run
+    """Run a role with its saved session, so a backend that can resume (Droid) continues the same conversation."""
+    return run_agent(role, inp, _call_tool(gw, role.actor, deal_id), session=gw.store.sessions.get(role.name),
+                     backend=backend)
+
+
+def _remember(gw: Gateway, role: Role, run, item_id: str, summary: str) -> None:
+    """Record the turn on the role's session, with the backend session id when the backend returned one."""
+    ok = next((a for a in reversed(run.attempts) if a.get("ok")), {})
+    gw.update_session(role.name, run.backend, item_id, summary, ok.get("session_id"), ok.get("session_key"))
 
 
 def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: int = 6) -> list[str]:
@@ -47,9 +53,8 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
                               session=store.sessions.get(MAPPER_ROLE.name))
             run = _run(gw, MAPPER_ROLE, inp, deal_id, item.id, backend)
             gw.store_mapping(MAPPER_ROLE.actor, item.id, run.output)
-            gw.update_session(MAPPER_ROLE.name, run.backend, item.id,
-                              f"mapped {len(run.output.mappings)} lines, {len(run.output.flags)} flags",
-                              next((a.get("session_id") for a in run.attempts if a.get("session_id")), None))
+            _remember(gw, MAPPER_ROLE, run, item.id,
+                      f"mapped {len(run.output.mappings)} lines, {len(run.output.flags)} flags")
             log.append(f"mapper ran on {run.backend}")
             continue
         prep = [i for i in by_type.get("prepare_result", []) if i.state not in (State.REJECTED, State.REVERSED)]
@@ -62,8 +67,7 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
                                 brief=deal.brief, session=store.sessions.get(PREPARER_ROLE.name))
             run = _run(gw, PREPARER_ROLE, inp, deal_id, item.id, backend)
             result = gw.store_result(PREPARER_ROLE.actor, item.id, run.output, backend=run.backend)
-            gw.update_session(PREPARER_ROLE.name, run.backend, item.id,
-                              f"result {result.id}: leverage {result.leverage:.2f}x")
+            _remember(gw, PREPARER_ROLE, run, item.id, f"result {result.id}: leverage {result.leverage:.2f}x")
             log.append(f"preparer ran on {run.backend}: leverage {result.leverage:.2f}x")
             continue
         result_id = live_prep.payload.get("result_id")
@@ -78,7 +82,7 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
                                 session=store.sessions.get(REVIEWER_ROLE.name))
             run = _run(gw, REVIEWER_ROLE, inp, deal_id, item.id, backend)
             gw.store_review(REVIEWER_ROLE.actor, item.id, run.output)
-            gw.update_session(REVIEWER_ROLE.name, run.backend, item.id, f"{run.output.verdict} on {result.id}")
+            _remember(gw, REVIEWER_ROLE, run, item.id, f"{run.output.verdict} on {result.id}")
             log.append(f"reviewer ran on {run.backend}: {run.output.verdict}")
             continue
         log.append(f"waiting on the controller ({deal.stage})")

@@ -378,7 +378,7 @@ Rules for the swap:
 - Pydantic models stay the single definition of shape. The tables follow them. [inferred]
 - The gateway keeps the same logic. Only the store class changes. [inferred]
 - Each gateway write becomes one transaction: the change and its audit row commit together, or neither does. [inferred, from the workshop: log "in the same commit as the change"; `../hyphenate-workshop.md`]
-- Postgres on Tiger Cloud is optional. Do it only if the schedule holds. [verified: `../STOCHASTIC.md`, section 13]
+- Built on 2026-10-24 as a write-through store: the memory store stays the working set, and a writer thread commits each gateway write with its audit rows in one transaction, behind the request. The tables are generic (`record` holds one JSONB body per model) rather than the per-table design in section 2, and `audit_log` is a TimescaleDB hypertable. Details in `../../backend/app/db/README.md`. [verified: `backend/tests/test_postgres_store.py`]
 
 ### 3.3 A fork to compare two answers
 

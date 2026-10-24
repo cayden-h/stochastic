@@ -93,7 +93,7 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 
 ## Accomplishments that we're proud of
 
-- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 105 tests pass]
+- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 115 tests pass]
 - The flag is real. It comes from a real line in a real filing, and the answer moves the leverage verdict. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 - The whole deal ran through Factory Droid with our gateway tools, once with Claude Sonnet 5.5 and once with Claude Haiku 5.5 requested, and both passed review at 0.77x as computed then; the Sonnet recording replays at 0.76x today, after the EBITDA definition items were applied. [verified: `docs/agents.md`, run log]
 - After a reset, the same deal runs with no flag, because the Mapper applies the controller's policy, and the log shows `policy:apply`. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
@@ -118,7 +118,7 @@ None is built.
 
 ## Built with
 
-Python, FastAPI, Pydantic, Uvicorn, pytest, Factory Droid SDK, Claude, Anthropic Python SDK, Next.js, React, TypeScript, Tailwind CSS, Figma.
+Python, FastAPI, Pydantic, Uvicorn, pytest, Factory Droid SDK, Claude, Anthropic Python SDK, Tiger Cloud (PostgreSQL, TimescaleDB), psycopg, Next.js, React, TypeScript, Tailwind CSS, Figma.
 All are in `backend/pyproject.toml`, `frontend/package.json`, or `docs/design/README.md`. [verified]
 The Anthropic SDK backend is written but has not run live, because no key was available. [verified: `docs/agents.md`, section 10]
 
@@ -133,6 +133,7 @@ Real:
 - The gateway, the math tools, the tie-out check, and the audit log with its hash chain are real code, and they run live in the demo. [verified: `backend/tests/test_trust_rules.py`]
 - The flag and the leverage effect of each answer are computed by the tools, not written by a model. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 - Agent memory is real: it is policies the gateway wrote from the controller's answers. It is not a change to model weights. [verified: `backend/app/gateway/gateway.py`, `_learn`]
+- The store is real: with `STORE=postgres`, every gateway write reaches Postgres on Tiger Cloud, and a restart loads the record, the log, and the memory back. If Tiger Cloud is unreachable, the API runs in memory and the console says so. [verified: `backend/tests/test_postgres_store.py`, `backend/tests/test_store_fallback.py`]
 
 Not real, or not claimed:
 - The statement lines come from public filings, not from the companies' internal books.
@@ -167,6 +168,7 @@ Claim nothing unconfirmed.
 - Factory: the agents ran through the Droid SDK on 2026-10-24, with Sonnet 5.5 and Haiku 5.5 requested. [verified: `docs/agents.md`, run log]
   Say "built with the Droid SDK" only about `droid` runs.
 - Figma: the console's design system and screen frames are in the Figma file. [verified: `docs/design/README.md`]
+- Tiger Data: the record, the audit log, and the agents' memory are stored in Postgres on Tiger Cloud, and the audit log is a TimescaleDB hypertable that refuses edits. [verified: `backend/tests/test_postgres_store.py`]
   Say how the shipped screen was built from it only once Josie confirms.
 
 ## Open before submission

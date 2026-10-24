@@ -1,6 +1,7 @@
-"""In-memory store for the prototype. Postgres replaces it later without changing the API.
+"""In-memory store. It is the working set for every read; `postgres.py` writes it through to Tiger Cloud.
 
-Only the gateway writes here. Collections follow docs/architecture/data-model.md section 3.1.
+Only the gateway writes here, and it calls `commit()` after each write. Collections follow
+docs/architecture/data-model.md section 3.1.
 """
 from __future__ import annotations
 
@@ -8,7 +9,13 @@ from app.core.models import AgentSession, AuditRow, Deal, Mapping, Policy, Resul
 
 
 class MemoryStore:
+    kind = "memory"
+    fallback_reason: str | None = None  # set when STORE=postgres could not connect
+
     def __init__(self) -> None:
+        self._clear()
+
+    def _clear(self) -> None:
         self.deals: dict[str, Deal] = {}
         self.source_lines: dict[str, SourceLine] = {}
         self.mappings: dict[str, Mapping] = {}
@@ -23,10 +30,16 @@ class MemoryStore:
     def reset_deals(self, keep_memory: bool = True) -> None:
         """Clear the record. Agent memory (policies and sessions) is kept unless asked otherwise."""
         policies, sessions, seq = self.policies, self.sessions, dict(self._seq)
-        self.__init__()
+        self._clear()
         if keep_memory:
             self.policies, self.sessions = policies, sessions
             self._seq["p"] = seq.get("p", 0)
+
+    def commit(self) -> None:
+        """Called by the gateway after every write. Nothing to do in memory."""
+
+    def status(self) -> dict:
+        return {"kind": self.kind, "fallback_reason": self.fallback_reason}
 
     def next_id(self, prefix: str) -> str:
         self._seq[prefix] = self._seq.get(prefix, 0) + 1

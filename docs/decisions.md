@@ -354,6 +354,21 @@ Rejected:
 Revisit if:
 Factory's rubric requires the TypeScript SDK. Then a small Node runner behind the same function is the swap.
 
+## D15. Tiger Data becomes a target track
+
+Date: 2026-10-24, evening.
+
+Decision:
+Tiger Data is the fourth target track, beside Hyphenate, Factory, and Figma. [set by Cayden, 2026-10-24]
+This replaces the "Rejected: Tiger Data as a target" line in D11.
+
+Why:
+D11 rejected Tiger Data because the Postgres store was only a Should item.
+The store is now built: the record, the audit log, and the agents' memory are written through to Postgres on Tiger Cloud, and the audit log is a TimescaleDB hypertable that refuses edits. [verified: `backend/app/db/postgres.py`, `backend/tests/test_postgres_store.py`]
+
+Revisit if:
+Cal Hacks says one project cannot opt into this many sponsor tracks.
+
 ---
 
 ## Open decisions

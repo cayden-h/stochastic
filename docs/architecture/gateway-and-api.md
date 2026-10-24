@@ -156,7 +156,7 @@ One function runs every agent (`backend/app/agents/runner.py`).
 | Backend | `AGENT_BACKEND` | Use |
 | --- | --- | --- |
 | Anthropic API with tool use and a `submit` tool typed as the output model | `anthropic` | The real model path and the stage fallback |
-| Factory Droid Python SDK, `run(prompt, output=Model, config=SessionConfig(mcp_servers, restrict_tools))` in an empty temp directory | `droid` | The agents we show as built with Droid |
+| Factory Droid Python SDK, `Session(..., config=SessionConfig(mcp_servers, restrict_tools))`, one resumed session per role in its own empty folder | `droid` | The agents we show as built with Droid |
 | Deterministic rules, no model | `scripted` | Last fallback and reference answer |
 | Recorded outputs from `backend/recordings/` (the Preparer and Reviewer re-run their tools) | `replay` | No-network fallback |
 

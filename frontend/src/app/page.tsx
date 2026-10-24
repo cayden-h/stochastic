@@ -58,7 +58,7 @@ export default function CaseScreen() {
       {note ? <p role="alert" className="rounded-chip bg-denied-tint px-4 py-3 font-semibold text-denied">{note}</p> : null}
 
       {stage === "new" ? (
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <Button kind="primary" disabled={busy} onClick={() => act(() => api.start(deal.id))}>
             {policies.length ? "Run again" : "Run the deal"}
           </Button>
@@ -99,21 +99,21 @@ export default function CaseScreen() {
           {answered.map((f) => (
             <div key={f.id} className="flex items-center gap-3 rounded-chip border border-hairline bg-card px-4 py-2">
               <span className="text-clear"><Shape kind="check" /></span>
-              <span className="flex-1 truncate" title={f.question ?? ""}>{f.question}</span>
-              <strong className="whitespace-nowrap">{f.options.find((o) => o.id === f.answer)?.label}</strong>
+              <span className="hidden min-w-0 flex-1 truncate sm:block" title={f.question ?? ""}>{f.question}</span>
+              <strong className="min-w-0 flex-1 sm:flex-none sm:whitespace-nowrap">{f.options.find((o) => o.id === f.answer)?.label}</strong>
               <Mono>{f.id}</Mono>
             </div>
           ))}
         </section>
       ) : null}
 
-      <footer className="flex items-center gap-4 border-t border-hairline pt-4">
-        <Link href="/log" className="font-semibold underline underline-offset-4 hover:text-code">
+      <footer className="flex flex-col items-start gap-4 border-t border-hairline pt-4 sm:flex-row sm:items-center">
+        <Link href="/log" className="font-semibold sm:whitespace-nowrap underline underline-offset-4 hover:text-code">
           Log: {plural(audit.rows, "row")}, {audit.denied} denied, chain {audit.chain_valid ? "intact" : "broken"}
         </Link>
         <span className="flex-1" />
         {verdict?.posted ? (
-          <Button kind="link" disabled={busy} onClick={() => act(() => api.reset())}>Reset the deal, keep what was learned</Button>
+          <Button kind="link" className="text-left sm:whitespace-nowrap" disabled={busy} onClick={() => act(() => api.reset())}>Reset the deal, keep what was learned</Button>
         ) : null}
         <Mono>Figures from public SEC filings. Code does the math; a human approves. Not advice.</Mono>
       </footer>

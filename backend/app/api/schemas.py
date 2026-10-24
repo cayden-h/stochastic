@@ -62,11 +62,19 @@ class CaseResponse(BaseModel):
     backend: BackendStatus
 
 
+class StoreStatus(BaseModel):
+    """Where the record lives: memory, or Postgres on Tiger Cloud with the write-through queue."""
+    model_config = ConfigDict(extra="allow")
+    kind: Literal["memory", "postgres"]
+    fallback_reason: str | None = None
+
+
 class HealthResponse(BaseModel):
-    """Liveness plus the audit chain check and backend status."""
+    """Liveness plus the audit chain check, backend status, and the store."""
     ok: bool
     chain_valid: bool
     backend: BackendStatus
+    store: StoreStatus
 
 
 class DealCreated(BaseModel):

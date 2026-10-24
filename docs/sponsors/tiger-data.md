@@ -9,11 +9,13 @@ The demo uses a real public deal: Kewaunee Scientific buying Nu Aire. [verified:
 
 ### How Tiger Data fits now
 
-The fit got weaker.
-The MVP can keep its tables in memory, so Postgres on Tiger Cloud is a later swap. [verified: `../STOCHASTIC.md` section 6]
-Forks now hold the two answers to the flag (which part of the financing liability counts as covenant debt).
-This is only a Should item, and only if the Postgres store is built.
-Do not plan the demo around it.
+Tiger Data is a target track since 2026-10-24 evening. [set by Cayden; `../decisions.md` D15]
+The store is built on Tiger Cloud: service `stochastic`, PostgreSQL 18.6 with TimescaleDB 2.31, in us-east-1. [verified: 2026-10-24]
+- With `STORE=postgres`, every gateway write reaches Postgres, and a restart loads the record, the audit log, and the agents' memory (policies and Droid session ids) back. [verified: `../../backend/tests/test_postgres_store.py`]
+- The audit log is a TimescaleDB hypertable on `at`, and a trigger refuses UPDATE and DELETE on it.
+- A reset starts a new ledger instead of deleting, so every earlier run stays queryable.
+- The Tiger CLI (0.26.0) is installed and lists the service; the Tiger MCP is installed for Claude Code.
+- Not built: forks that hold the two answers to the flag. That is the strongest remaining fit with what Tiger Data pushes, if there is time.
 
 ### Which old notes still apply
 

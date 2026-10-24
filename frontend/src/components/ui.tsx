@@ -84,8 +84,8 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { kind?: "primary" 
 export function Button({ kind = "secondary", className = "", ...props }: ButtonProps) {
   const base = "font-semibold transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed";
   const tone =
-    kind === "primary" ? "min-h-11 rounded-chip bg-ink px-6 py-3 text-paper hover:bg-code"
-    : kind === "secondary" ? "min-h-11 rounded-chip border border-rule bg-card px-6 py-3 text-ink hover:bg-paper"
+    kind === "primary" ? "min-h-11 whitespace-nowrap rounded-chip bg-ink px-6 py-3 text-paper hover:bg-code"
+    : kind === "secondary" ? "min-h-11 whitespace-nowrap rounded-chip border border-rule bg-card px-6 py-3 text-ink hover:bg-paper"
     : "px-2 py-3 text-ink underline underline-offset-4 hover:text-code";
   return <button className={`${base} ${tone} ${className}`} {...props} />;
 }

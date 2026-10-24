@@ -26,7 +26,7 @@ export default function Log() {
         </p>
       </header>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className={`flex items-center gap-2 font-semibold ${audit.chain_valid ? "text-clear" : "text-denied"}`}>
           <Shape kind={audit.chain_valid ? "check" : "cross"} size={16} />
           {audit.chain_valid ? `Chain intact. ${plural(audit.rows.length, "row")}. Head ${head}.` : "Chain broken. A past row changed."}

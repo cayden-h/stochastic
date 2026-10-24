@@ -11,7 +11,7 @@ import os
 DEFAULT_MODEL = "claude-haiku-5-5"
 # Droid picks "high" when no effort is given, whatever the model's own default. We set it explicitly so a session is
 # never left to the CLI's or the router's choice.
-DEFAULT_REASONING_EFFORT = "high"
+DEFAULT_REASONING_EFFORT = "medium"
 
 
 def role_model(prefix: str, role_name: str) -> str | None:

@@ -1,0 +1,13 @@
+{
+  "role": "reviewer",
+  "backend": "droid",
+  "input_key": "627f92c63084",
+  "output": {
+    "verdict": "pass",
+    "reasons": [],
+    "run_ids": [
+      "run_005",
+      "run_006"
+    ]
+  }
+}

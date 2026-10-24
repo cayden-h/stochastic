@@ -61,7 +61,11 @@ export interface Case {
   audit: { rows: number; chain_valid: boolean; denied: number }; backend: BackendStatus;
 }
 
-export interface Health { ok: boolean; chain_valid: boolean; backend: BackendStatus }
+export interface StoreStatus {
+  kind: "memory" | "postgres"; fallback_reason: string | null;
+  host?: string; schema?: string; ledger?: number; pending?: number; last_error?: string | null; last_write_at?: string | null;
+}
+export interface Health { ok: boolean; chain_valid: boolean; backend: BackendStatus; store: StoreStatus }
 
 export interface AuditRow {
   id: number; at: string; deal_id: string; actor: string; action: string; target: string | null;

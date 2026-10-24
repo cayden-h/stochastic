@@ -7,7 +7,7 @@ Swap tasks freely and tell the team when you do.
 
 ## State of the build
 
-The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.76x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 105 tests pass. [verified: `backend/tests/`]
+The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.76x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 115 tests pass. [verified: `backend/tests/`]
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded. Not yet run live: the Anthropic backend (no key in `.env`).
 Done 2026-10-24 and merged to `main`: the Note 2 answer key and Mapper score (Eric), the Devpost text (Eric), the recorded model runs (Sonnet 5.5 is the default replay), the tool guardrails, typed case, stage events, and CSV upload (Tri).
 Done 2026-10-24, evening: the console on `GET /deals/{id}/case` (flag card, verdict line, combined table, mapping, log, backend badge, second-run moment), and the EBITDA items (stock compensation and the $4,019K pension figure applied, transaction costs kept at zero).
@@ -90,6 +90,7 @@ Inputs for the design:
 | Hyphenate | Cayden (demo), Eric (Devpost and the real-versus-simulated list) | The real deal runs end to end with the flag on the console. The video opens with the flag moment. The second run shows memory. |
 | Factory | Cayden | Done: all three agents ran on Droid with Claude Sonnet 5.5, recorded. Keep it working through the rehearsals. |
 | Figma | Josie (design) | The console frame exists in Figma and the console follows it. Figma is on screen in the pitch. |
+| Tiger Data | Cayden | Done: the store writes through to Postgres on Tiger Cloud, with the audit log as a TimescaleDB hypertable. Run the demo with `STORE=postgres` and show the tables once in the pitch. |
 
 ## Order of work
 

@@ -6,8 +6,10 @@ every denied attempt, chained by hash. Rules are in docs/architecture/gateway-an
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
+import threading
 from typing import Any
 
 from app.core.models import (
@@ -91,9 +93,26 @@ def _fmt(x: float) -> str:
     return f"{x:,.0f}"
 
 
+def _writes(method):
+    """A public write holds the gateway lock, and the outermost one commits the store, also when it is denied."""
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self.lock:
+            self._depth += 1
+            try:
+                return method(self, *args, **kwargs)
+            finally:
+                self._depth -= 1
+                if self._depth == 0:
+                    self.store.commit()
+    return wrapper
+
+
 class Gateway:
     def __init__(self, store: MemoryStore):
         self.store = store
+        self.lock = threading.RLock()  # background runs and requests write through one gateway
+        self._depth = 0
 
     # ------------------------------------------------------------------ audit log
     def _log(self, deal_id: str, actor: str, action: str, result: str, target: str | None = None,
@@ -167,6 +186,7 @@ class Gateway:
         return [i for i in self.store.deal_items(deal_id, "flag") if i.state == State.NEEDS_INFO]
 
     # ------------------------------------------------------------------ deals and items
+    @_writes
     def create_deal(self, actor: str, deal: Deal, lines: list[SourceLine]) -> Deal:
         self._require(actor, "create_deal", deal.id)
         if deal.id in self.store.deals:
@@ -177,6 +197,7 @@ class Gateway:
         self._log(deal.id, actor, "create_deal", "ALLOWED", deal.id, reason=f"{len(lines)} source lines loaded")
         return deal
 
+    @_writes
     def create_item(self, deal_id: str, type_: str, proposed_by: str = SYSTEM, payload: dict | None = None) -> WorkItem:
         """The job runner asks the gateway to open the next work item. Only the system may do this."""
         self._deal(deal_id)
@@ -187,6 +208,7 @@ class Gateway:
         return item
 
     # ------------------------------------------------------------------ tools
+    @_writes
     def run_tool(self, actor: str, deal_id: str, name: str, inputs: dict[str, Any] | None = None) -> ToolRun:
         """Run one math tool for a deal and record the run. The agent passes arguments, never numbers it made."""
         inputs = dict(inputs or {})
@@ -252,6 +274,7 @@ class Gateway:
         return run
 
     # ------------------------------------------------------------------ mapper result
+    @_writes
     def store_mapping(self, actor: str, item_id: str, out: MapperOutput) -> WorkItem:
         item = self._item(item_id)
         self._require(actor, "propose:map_lines", item.deal_id, item.id)
@@ -367,6 +390,7 @@ class Gateway:
                 lines[lid].covenant_note = note
 
     # ------------------------------------------------------------------ human moments
+    @_writes
     def answer(self, actor: str, item_id: str, option_id: str) -> WorkItem:
         item = self._item(item_id)
         self._require(actor, "answer", item.deal_id, item.id)
@@ -444,31 +468,40 @@ class Gateway:
         self._log(item.deal_id, SYSTEM, "policy:learn", "ALLOWED", policy.id, reason=f"{key} -> {decision}")
         return policy
 
+    @_writes
     def note_policy_applied(self, policy_id: str, deal_id: str, line: str) -> None:
         p = self.store.policies.get(policy_id)
         if p:
             p.times_applied += 1
             self._log(deal_id, SYSTEM, "policy:apply", "ALLOWED", p.id, reason=line)
 
+    @_writes
     def session(self, role: str, backend: str) -> AgentSession:
+        """The role's one session. A change of backend keeps the turns and transcript; only the backend's own
+        session id is dropped, because a Droid session id means nothing to another backend."""
         s = self.store.sessions.get(role)
-        if s is None or s.backend != backend:
+        if s is None:
             s = AgentSession(role=role, backend=backend)
             self.store.sessions[role] = s
+        elif s.backend != backend:
+            s.backend, s.session_id, s.session_key = backend, None, None
         return s
 
-    def update_session(self, role: str, backend: str, item_id: str, summary: str, session_id: str | None = None) -> AgentSession:
+    @_writes
+    def update_session(self, role: str, backend: str, item_id: str, summary: str, session_id: str | None = None,
+                       session_key: str | None = None) -> AgentSession:
         s = self.session(role, backend)
         s.turns += 1
         s.updated_at = now()
         if session_id:
-            s.session_id = session_id
+            s.session_id, s.session_key = session_id, session_key
         s.transcript.append({"item": item_id, "summary": summary, "at": now().isoformat()})
         s.transcript = s.transcript[-20:]
         deal_id = self.store.items[item_id].deal_id if item_id in self.store.items else ""
         self._log(deal_id, SYSTEM, "session:turn", "ALLOWED", role, reason=f"{backend} turn {s.turns}")
         return s
 
+    @_writes
     def hold(self, actor: str, item_id: str) -> WorkItem:
         item = self._item(item_id)
         self._require(actor, "hold", item.deal_id, item.id)
@@ -479,6 +512,7 @@ class Gateway:
         self._log(item.deal_id, actor, "hold", "ALLOWED", item.id, reason="controller is not sure")
         return item
 
+    @_writes
     def approve(self, actor: str, item_id: str) -> WorkItem:
         item = self._item(item_id)
         self._require(actor, "approve", item.deal_id, item.id)
@@ -499,6 +533,7 @@ class Gateway:
             self._deal(item.deal_id).stage = "posted"
         return item
 
+    @_writes
     def reject(self, actor: str, item_id: str, reason: str) -> WorkItem:
         item = self._item(item_id)
         self._require(actor, "reject", item.deal_id, item.id)
@@ -510,6 +545,7 @@ class Gateway:
         self._log(item.deal_id, actor, "reject", "ALLOWED", item.id, reason=reason)
         return item
 
+    @_writes
     def reverse(self, actor: str, item_id: str, reason: str) -> WorkItem:
         """A reversal is a new item linked to the original. Nothing is deleted."""
         item = self._item(item_id)
@@ -534,6 +570,7 @@ class Gateway:
         self._log(item.deal_id, SYSTEM, "post", "ALLOWED", item.id)
 
     # ------------------------------------------------------------------ preparer and reviewer results
+    @_writes
     def store_result(self, actor: str, item_id: str, out: PreparerOutput, backend: str = "scripted") -> Result:
         item = self._item(item_id)
         self._require(actor, "propose:prepare_result", item.deal_id, item.id)
@@ -583,6 +620,7 @@ class Gateway:
         deal.stage = "awaiting_review"
         return result
 
+    @_writes
     def store_review(self, actor: str, item_id: str, out: ReviewerOutput) -> WorkItem:
         item = self._item(item_id)
         self._require(actor, "propose:review_result", item.deal_id, item.id)
