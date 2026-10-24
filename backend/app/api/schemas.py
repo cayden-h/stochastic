@@ -209,25 +209,53 @@ class DealCreated(BaseModel):
     brief_status: Literal["approved", "draft", "none"] = "approved"
 
 
+MAX_BRIEF_FIGURE = 1e12  # USD thousands; far above any deal, and two of them cannot sum to infinity
+
+
 class BriefAmount(BaseModel):
     """One field of the draft Brief to set, by path (for example "ebitda_addbacks[2].amount"). An amount is USD
     thousands from the books and needs source_ref; the gateway checks the path, the type, and the source."""
-    field: str = Field(min_length=1, max_length=200)
+    field: str = Field(min_length=1, max_length=200, pattern=r"^[a-z_]+(\[[0-9]+\])?(\.(name|amount|cap))?$")
     value: Any = None  # a number for an amount, a cap, or the limit; text for a text field; null for no cap
     source_ref: str | None = Field(default=None, max_length=500)
     inferred: bool = False
     note: str = Field(default="", max_length=2000)
 
-    @model_validator(mode="after")
-    def _finite(self) -> "BriefAmount":
-        """A boolean is not a number, and a figure must be finite. The message names the field path."""
-        if isinstance(self.value, bool):
-            raise ValueError(f"{self.field}: value must be a JSON number or text, not a boolean")
-        if isinstance(self.value, float) and not math.isfinite(self.value):
-            raise ValueError(f"{self.field}: value must be a finite number")
-        if not isinstance(self.value, (int, float, str, type(None))):
-            raise ValueError(f"{self.field}: value must be a JSON number, text, or null")
-        return self
+    @field_validator("value")
+    @classmethod
+    def _finite(cls, value: Any, info) -> Any:
+        """A boolean is not a number, a figure must be finite and below 1e12 in size, and a number sent as text for
+        an amount, a cap, or the limit is refused. An integer too big for a float is refused here, not in the
+        gateway. The error's loc is amounts[i].value and its message names the field path."""
+        path = info.data.get("field", "value")
+        if isinstance(value, bool):
+            raise ValueError(f"{path}: value must be a JSON number or text, not a boolean")
+        if isinstance(value, (int, float)):
+            try:
+                f = float(value)
+            except OverflowError:
+                raise ValueError(f"{path}: value must be a finite number") from None
+            if not math.isfinite(f):
+                raise ValueError(f"{path}: value must be a finite number")
+            if abs(f) >= MAX_BRIEF_FIGURE:
+                raise ValueError(f"{path}: value must be below 1e12 in size")
+            return f
+        if isinstance(value, str):
+            numeric_field = path == "limit" or path.rsplit(".", 1)[-1] in ("amount", "cap")
+            if numeric_field and _looks_numeric(value):
+                raise ValueError(f"{path}: value must be a JSON number, not a number in text")
+            return value
+        if value is not None:
+            raise ValueError(f"{path}: value must be a JSON number, text, or null")
+        return value
+
+
+def _looks_numeric(text: str) -> bool:
+    try:
+        float(text.replace(",", ""))
+        return True
+    except ValueError:
+        return False
 
 
 class BriefAmountsBody(BaseModel):

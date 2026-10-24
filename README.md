@@ -195,7 +195,7 @@ cp .env.example .env                                        # then add keys; AGE
 cd backend
 uv venv --python 3.12 .venv
 uv pip install -p .venv/bin/python fastapi "uvicorn[standard]" pydantic pytest httpx python-dotenv python-multipart anthropic "droid-sdk[mcp]" "psycopg[binary]" openpyxl
-.venv/bin/python -m pytest -q                               # 220 passed, 10 skipped on the real figures; the skips are the Tiger store tests, which need TEST_DATABASE_URL
+.venv/bin/python -m pytest -q                               # 318 passed, 14 skipped on the real figures (verified 2026-10-24); the skips are the Tiger store tests, which need TEST_DATABASE_URL
 .venv/bin/uvicorn app.main:app --port 8000 --reload
 
 cd frontend

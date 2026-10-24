@@ -26,7 +26,10 @@ from app.api.schemas import (BriefAmountsBody, BriefAmountsResponse, CaseRespons
                              EditReasonBody, EditResponse, HealthResponse)
 from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, Edit, State
 from app.db.loader import MAX_BYTES, LoaderError, parse_statement_csv
-from app.gateway.gateway import Gateway, GatewayError
+from app.gateway.gateway import Denied, Gateway, GatewayError, Invalid
+
+BRIEF_TEXT_FIELDS = ("lender", "limit_section", "limit_wording", "debt_term", "debt_definition", "ebitda_definition",
+                     "test_period_note")  # the text fields gateway.amend_brief sets
 
 
 class AnswerBody(BaseModel):
@@ -420,26 +423,105 @@ def build_router(gw: Gateway) -> APIRouter:
                 "lines": {"platform": len(loaded["platform_csv"]), "target": len(loaded["target_csv"])}}
 
     # ------------------------------------------------------------------ the Brief Reader (D20), thin over the gateway
+    def controller_only(actor: str, action: str, deal_id: str) -> None:
+        """Only the controller sets or approves the Brief: an agent, the system, or another human (human:intern) is
+        403 with a DENIED row. Held under the gateway lock and committed, like a gateway write."""
+        with gw.lock:
+            try:
+                gw._require(actor, action, deal_id, deal_id)  # an agent or a malformed actor, with the usual message
+                if actor != CONTROLLER:
+                    gw._deny(Denied(f"{actor} may not {action}: only {CONTROLLER} sets or approves the Brief"),
+                             deal_id, actor, action, deal_id)
+            except GatewayError as error:
+                raise HTTPException(status_code=error.status, detail=error.message)
+            finally:
+                gw.store.commit()
+
+    def amount_problem(a, lengths: dict[str, int]) -> str | None:
+        """The gateway's path and value checks for one entry of /brief/amounts, without writing (a dry run), so a
+        list with a bad entry is refused before any entry is applied. lengths counts the draft's lists and grows
+        when an entry adds an item at the next index, as the gateway would."""
+        m = Gateway._PATH.fullmatch(a.field)
+        if not m:
+            return f"unknown field '{a.field}'"
+        name, i, attr, v = m.group("field"), m.group("i"), m.group("attr"), a.value
+        number = isinstance(v, (int, float)) and not isinstance(v, bool)
+        if name in BRIEF_TEXT_FIELDS and i is None and attr is None:
+            if not isinstance(v, str) or not v.strip() or len(v) > 2000:
+                return f"{a.field} must be text of 1 to 2000 characters"
+        elif name == "limit" and i is None and attr is None:
+            if not number or v <= 0:
+                return "limit must be a number above zero"
+        elif name == "debt_excludes" and i is not None and attr is None:
+            k = int(i)
+            if not isinstance(v, str) or not v.strip() or k > lengths[name]:
+                return f"{a.field} must be text, at an index up to {lengths[name]}"
+            lengths[name] = max(lengths[name], k + 1)
+        elif name in ("ebitda_addbacks", "ebitda_deductions") and i is not None and attr:
+            k = int(i)
+            if k > lengths[name] or (k == lengths[name] and attr != "name"):
+                return f"{a.field}: add a new adjustment by its name first, at index {lengths[name]}"
+            lengths[name] = max(lengths[name], k + 1)
+            if attr == "name" and (not isinstance(v, str) or not v.strip()):
+                return f"{a.field} must be text"
+            if attr == "cap" and v is not None and (not number or v < 0):
+                return f"{a.field} must be a number of USD thousands, or null for no cap"
+            if attr == "amount":
+                if not number:
+                    return f"{a.field} must be a number of USD thousands"
+                if not (a.source_ref or "").strip():
+                    return f"{a.field} needs its source: the filing and the line it comes from"
+        else:
+            return f"unknown field '{a.field}'"
+        return None
+
+    # ------------------------------------------------------------------ the Brief Reader (D20), thin over the gateway
     @r.post("/deals/{deal_id}/brief/amounts", response_model=BriefAmountsResponse)
     def brief_amounts(deal_id: str, body: BriefAmountsBody, x_actor: str = Header(default=CONTROLLER)):
         """The controller sets fields of the draft Brief, most often an add-back amount from the books with its
-        source. Each entry goes through gateway.amend_brief in order; a refusal stops the list there (the entries
-        before it stay applied, each with its own audit row)."""
-        need_deal(deal_id)
-        guard(lambda: gw._require(x_actor, "amend_brief", deal_id, deal_id))  # an agent is refused before any write
-        brief = None
-        for a in body.amounts:
-            brief = guard(lambda a=a: gw.amend_brief(x_actor, deal_id, a.field, a.value, source_ref=a.source_ref,
-                                                     inferred=a.inferred, note=a.note))
-        d = store.deals[deal_id]
-        draft = gw.brief_draft(deal_id)
-        return {"brief": dump(brief), "brief_draft": dump(draft) if draft else None,
-                "brief_status": d.brief_status, "stage": d.stage}
+        source. Any draft field can be set by its path; only an amount needs a source.
 
-    @r.post("/deals/{deal_id}/brief/approve")
+        Every entry is checked first (path, index, type, source), so a bad entry refuses the whole list with 422
+        naming amounts[i], and nothing is applied (the refusal is audited). The entries are then applied in order
+        through gateway.amend_brief under the gateway lock, so no other request lands between them. The gateway
+        cannot roll back: if it still refuses entry i, the 422 names amounts[i] and says which earlier entries
+        were applied (each with its own audit row)."""
+        d = need_deal(deal_id)
+        controller_only(x_actor, "amend_brief", deal_id)
+        with gw.lock:
+            if d.brief_status == "draft" and d.brief is not None:
+                lengths = {g: len(getattr(d.brief, g)) for g in ("debt_excludes", "ebitda_addbacks", "ebitda_deductions")}
+                for n, a in enumerate(body.amounts):
+                    problem = amount_problem(a, lengths)
+                    if problem:
+                        try:
+                            gw._deny(Invalid(f"amounts[{n}] ({a.field}): {problem}; nothing was applied"),
+                                     deal_id, x_actor, "amend_brief", a.field)
+                        except GatewayError as error:
+                            raise HTTPException(status_code=error.status, detail=error.message)
+                        finally:
+                            gw.store.commit()
+            brief = None
+            for n, a in enumerate(body.amounts):
+                try:
+                    brief = gw.amend_brief(x_actor, deal_id, a.field, a.value, source_ref=a.source_ref,
+                                           inferred=a.inferred, note=a.note)
+                except GatewayError as error:
+                    applied = ", ".join(f"amounts[{j}] ({e.field})" for j, e in enumerate(body.amounts[:n]))
+                    raise HTTPException(status_code=error.status, detail=(
+                        f"amounts[{n}] ({a.field}): {error.message}; "
+                        + (f"applied before it and kept (no rollback): {applied}" if applied else "nothing was applied")))
+            d = store.deals[deal_id]
+            draft = gw.brief_draft(deal_id)
+            return {"brief": dump(brief), "brief_draft": dump(draft) if draft else None,
+                    "brief_status": d.brief_status, "stage": d.stage}
+
+    @r.post("/deals/{deal_id}/brief/approve", response_model=Deal)
     def brief_approve(deal_id: str, x_actor: str = Header(default=CONTROLLER)):
-        """The controller approves the draft Brief; it is then locked and mapping can start. No agent can."""
+        """The controller approves the draft Brief; it is then locked and the deal is back at stage new. The run does
+        not continue by itself: the console calls POST /deals/{id}/run next. No agent and no other human can."""
         need_deal(deal_id)
+        controller_only(x_actor, "approve_brief", deal_id)
         return dump(guard(lambda: gw.approve_brief(x_actor, deal_id)))
 
     @r.post("/deals/{deal_id}/run")

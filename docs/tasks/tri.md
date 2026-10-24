@@ -79,7 +79,8 @@ Tests in `backend/tests/test_api_edits.py`: the demo beat end to end through the
 - `GET /deals/{id}/case` includes `brief_draft` and its citations.
 - `db/memory.py`: the `agreement` kind.
 - `backend/tests/test_brief_reader.py`: the ten tests in `architecture/brief-reader.md` section 8. Use the synthetic agreement text from Eric (E3), never the cached filings.
-- Status (2026-10-24, verified by `backend/tests/test_api_brief.py`, 19 tests): the three routes and `brief_draft` on `/case` are in, and the `stage` event carries `brief_status`. The gateway rule tests are Cayden's `test_brief_reader_gateway.py`; the route tests use a synthetic agreement written in the test and the Ex 10.1 excerpt in `backend/tests/fixtures/`, not Eric's E3 text, which is not in the repo yet.
+- Status (2026-10-24, verified by `backend/tests/test_api_brief.py`, 27 tests): the three routes and `brief_draft` on `/case` are in, the `stage` event carries `brief_status`, and only `human:controller` amends or approves the Brief.
+  The gateway rule tests are Cayden's `test_brief_reader_gateway.py`; the route tests use a synthetic agreement written in the test and the Ex 10.1 excerpt in `backend/tests/fixtures/`, not Eric's E3 text, which is not in the repo yet.
 
 ### T5. Keep the tests green
 

@@ -33,7 +33,7 @@ from app.core.models import BRIEF_READER, MAPPER, PREPARER, REVIEWER, State  # n
 from app.db.fixtures.kewaunee import BRIEF as FIXTURE_BRIEF  # noqa: E402
 from app.db.fixtures.kewaunee import PLATFORM, TARGET, build_lines  # noqa: E402
 from app.db.memory import MemoryStore  # noqa: E402
-from app.gateway.gateway import BRIEF_TOOLS, Gateway  # noqa: E402
+from app.gateway.gateway import BRIEF_TOOLS, Gateway, Invalid  # noqa: E402
 
 from tests.test_api import BRIEF, TARGET_CSV, platform_csv  # noqa: E402
 
@@ -136,9 +136,8 @@ def test_post_deals_needs_exactly_one_of_brief_and_agreement(world):
 def test_an_oversized_agreement_is_refused(world):
     _, _, c = world
     r = post_deal(c, agreement=SYNTHETIC + "x" * (3 * 1024 * 1024))
-    assert r.status_code in (413, 422)
-    if r.status_code == 422:
-        assert "agreement_txt" in r.json()["detail"]
+    assert r.status_code == 422  # the `world` app has no BodyLimitMiddleware, so read_upload refuses it
+    assert "agreement_txt" in r.json()["detail"]
 
 
 # ---- 2. a deal from agreement text starts with no Brief ---------------------------------------------------------
@@ -248,7 +247,7 @@ def test_a_new_add_back_is_added_by_its_name_then_its_amount(world):
         ("Transaction costs", 250.0, "Bolt GL 6100, FY2025")]
 
 
-@pytest.mark.parametrize("value", ["1e400", "-1e400", "NaN", "Infinity"])
+@pytest.mark.parametrize("value", ["1e400", "-1e400", "NaN", "Infinity", "1" + "0" * 400, "true", "1e12", '"4019"'])
 def test_a_non_finite_amount_is_422_naming_the_field(world, value):
     store, _, c = world
     did = kewaunee_deal(c)
@@ -256,7 +255,8 @@ def test_a_non_finite_amount_is_422_naming_the_field(world, value):
     raw = ('{"amounts": [{"field": "ebitda_addbacks[2].amount", "value": %s, "source_ref": "GL"}]}' % value)
     r = c.post(f"/deals/{did}/brief/amounts", content=raw, headers={"Content-Type": "application/json"})
     assert r.status_code == 422, r.text
-    assert "ebitda_addbacks[2].amount" in json.dumps(r.json()["detail"])
+    err = r.json()["detail"][0]
+    assert err["loc"] == ["body", "amounts", 0, "value"] and "ebitda_addbacks[2].amount" in err["msg"]
     assert not [a for a in store.audit if a.action == "brief:amend"]
 
 
@@ -281,8 +281,87 @@ def test_amounts_refusals(world):
         r = c.post(f"/deals/{did}/brief/amounts", headers={"X-Actor": actor},
                    json={"amounts": [{"field": "ebitda_addbacks[0].amount", "value": 1.0, "source_ref": "GL"}]})
         assert r.status_code == 403
-    assert len(denied(store, "amend_brief")) >= 3 + 2  # three agents, the unknown field, and the missing source
+    # no draft, the unknown field, the missing source, and the three agents (the empty list and the boolean are
+    # refused by the request model before the gateway, with no row)
+    assert len(denied(store, "amend_brief")) == 6
     assert store.deals[did].brief.ebitda_addbacks[0].amount == 0.0
+
+
+def test_a_trailing_newline_in_the_field_path_is_refused(world):
+    store, _, c = world
+    did = post_deal(c).json()["deal_id"]
+    c.post(f"/deals/{did}/run")
+    r = c.post(f"/deals/{did}/brief/amounts", json={"amounts": [{"field": "lender\n", "value": "X"}]})
+    assert r.status_code == 422 and r.json()["detail"][0]["loc"] == ["body", "amounts", 0, "field"]
+    assert store.deals[did].brief.lender == "First Harbor Bank, N.A."
+
+
+KEWAUNEE_FOUR = [{"field": "ebitda_addbacks[0].amount", "value": 4019.0, "source_ref": "10-K MD&A"},
+                 {"field": "ebitda_addbacks[1].amount", "value": 1018.0, "source_ref": "10-K cash flow"},
+                 {"field": "ebitda_addbacks[2].amount", "value": 500.0, "source_ref": ""},
+                 {"field": "ebitda_deductions[0].amount", "value": 1970.0, "source_ref": "10-K lease note"}]
+
+
+def test_a_bad_entry_refuses_the_whole_list_before_any_is_applied(world):
+    """The review's case: entry [2] has no source. The dry run refuses the list naming amounts[2], and none of the
+    four is applied (no brief:amend row, the add-backs still 0)."""
+    store, _, c = world
+    did = kewaunee_deal(c)
+    c.post(f"/deals/{did}/run")
+    r = c.post(f"/deals/{did}/brief/amounts", json={"amounts": KEWAUNEE_FOUR})
+    assert r.status_code == 422
+    detail = r.json()["detail"]
+    assert detail.startswith("amounts[2] (ebitda_addbacks[2].amount): ") and "needs its source" in detail
+    assert detail.endswith("nothing was applied")
+    brief = store.deals[did].brief
+    assert [a.amount for a in brief.ebitda_addbacks[:2]] == [0.0, 0.0] and brief.ebitda_deductions[0].amount == 0.0
+    assert not [a for a in store.audit if a.action == "brief:amend"]
+    assert denied(store, "amend_brief")[-1].target == "ebitda_addbacks[2].amount"
+
+
+def test_a_gateway_refusal_mid_list_names_the_index_and_what_was_applied(world, monkeypatch):
+    """When the dry run passes and the gateway still refuses entry [2] (here forced, the gateway cannot roll back),
+    entries [0] and [1] stay applied, [3] is never tried, and the 422 says so."""
+    store, gw, c = world
+    did = kewaunee_deal(c)
+    c.post(f"/deals/{did}/run")
+    real, calls = gw.amend_brief, []
+
+    def amend(actor, deal_id, field, value, **kw):
+        calls.append(field)
+        if len(calls) == 3:
+            raise Invalid(f"{field}: refused by the gateway")
+        return real(actor, deal_id, field, value, **kw)
+
+    monkeypatch.setattr(gw, "amend_brief", amend)
+    four = [dict(e, source_ref=e["source_ref"] or "10-K MD&A") for e in KEWAUNEE_FOUR]
+    r = c.post(f"/deals/{did}/brief/amounts", json={"amounts": four})
+    assert r.status_code == 422
+    assert r.json()["detail"] == ("amounts[2] (ebitda_addbacks[2].amount): ebitda_addbacks[2].amount: refused by the "
+                                  "gateway; applied before it and kept (no rollback): amounts[0] "
+                                  "(ebitda_addbacks[0].amount), amounts[1] (ebitda_addbacks[1].amount)")
+    assert calls == ["ebitda_addbacks[0].amount", "ebitda_addbacks[1].amount", "ebitda_addbacks[2].amount"]
+    brief = store.deals[did].brief
+    assert [a.amount for a in brief.ebitda_addbacks[:3]] == [4019.0, 1018.0, 0.0]
+    assert brief.ebitda_deductions[0].amount == 0.0
+    assert [a.target for a in store.audit if a.action == "brief:amend"] == calls[:2]
+
+
+def test_only_the_controller_amends_and_approves_the_brief(world):
+    store, _, c = world
+    did = post_deal(c).json()["deal_id"]
+    c.post(f"/deals/{did}/run")
+    answer_open_brief_flags(c, did)
+    intern = {"X-Actor": "human:intern"}
+    r = c.post(f"/deals/{did}/brief/amounts", headers=intern, json={"amounts": [{"field": "lender", "value": "X"}]})
+    assert r.status_code == 403 and "only human:controller" in r.json()["detail"]
+    r = c.post(f"/deals/{did}/brief/approve", headers=intern)
+    assert r.status_code == 403 and "only human:controller" in r.json()["detail"]
+    for action in ("amend_brief", "approve_brief"):
+        rows = denied(store, action)
+        assert len(rows) == 1 and rows[0].actor == "human:intern"
+    assert store.deals[did].brief_status == "draft" and store.deals[did].brief.lender == "First Harbor Bank, N.A."
+    assert c.post(f"/deals/{did}/brief/approve").status_code == 200
 
 
 # ---- 6. approval ------------------------------------------------------------------------------------------------
@@ -305,7 +384,7 @@ def test_approval_by_the_controller_then_the_deal_maps(world):
     assert c.post(f"/deals/{did}/brief/approve").status_code == 409
     assert c.post(f"/deals/{did}/brief/amounts",
                   json={"amounts": [{"field": "lender", "value": "Someone else"}]}).status_code == 409
-    assert len(denied(store, "approve_brief")) >= 4
+    assert len(denied(store, "approve_brief")) == 5  # three agents, the open flag, the second approve
     run = c.post(f"/deals/{did}/run")
     assert run.status_code == 200, run.text
     assert not any("brief reader" in line for line in run.json()["log"])
