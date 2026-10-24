@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_serializer
+import math
 
-from app.core.models import (AgentSession, BriefDraft, Deal, Edit, LearnedAdjustment, Mapping, Policy, Result, Review,
-                             SourceLine, WorkItem)
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
+
+from app.core.models import (AgentSession, BriefDraft, Deal, Edit, EditKind, LearnedAdjustment, Mapping, Policy,
+                             ReasonChip, Result, Review, Section, SourceLine, WorkItem)
 
 
 class BackendStatus(BaseModel):
@@ -81,6 +83,89 @@ class CaseResponse(BaseModel):
     edits: list[Edit] = Field(default_factory=list)  # the deal's edits in order, reverted ones included
     adjustments: list[LearnedAdjustment] = Field(default_factory=list)  # learned memory, all deals, like policies
     brief_draft: BriefDraft | None = None  # filled by the Brief Reader routes when they land
+    # The reasons the edit bubble offers, per edit kind ("amount", "remap"). Hardcoded per deal for the demo.
+    reason_chips: dict[str, list[ReasonChip]] | None = None
+
+
+NON_FINITE = "not a finite number"
+
+
+class EditBody(BaseModel):
+    """POST /deals/{id}/edits. An amount edit gives value (USD thousands, finite); a remap gives platform_line.
+    The gateway checks the rest (the company, the line, the approval state) and audits every refusal."""
+    kind: EditKind
+    company: str = Field(min_length=1, max_length=200)
+    line: str = Field(min_length=1, max_length=300)
+    value: float | None = None
+    platform_line: str | None = Field(default=None, min_length=1, max_length=300)
+    section: Section | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _mark_non_finite(cls, data):
+        """NaN or an infinity (JSON NaN, 1e999) is swapped for a marker before parsing: the 422 response echoes the
+        input, and a non-finite float cannot be written as JSON, so it would turn the 422 into a 500."""
+        if isinstance(data, dict) and isinstance(data.get("value"), float) and not math.isfinite(data["value"]):
+            data = {**data, "value": NON_FINITE}
+        return data
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _finite(cls, v):
+        if v == NON_FINITE:
+            raise ValueError("value must be a finite number")
+        return v
+
+    @model_validator(mode="after")
+    def _fields_match_kind(self) -> "EditBody":
+        if self.kind == "amount":
+            if self.value is None:
+                raise ValueError("value is required for an amount edit (USD thousands)")
+            if self.platform_line is not None:
+                raise ValueError("platform_line is only for a remap edit")
+        else:
+            if self.platform_line is None:
+                raise ValueError("platform_line is required for a remap edit")
+            if self.value is not None:
+                raise ValueError("value is only for an amount edit")
+        return self
+
+
+class EditReasonBody(BaseModel):
+    """POST /edits/{id}/reason: one of chip (a ReasonChip id) or text, and whether to remember it."""
+    chip: int | None = None
+    text: str | None = None
+    remember: bool = True
+
+    @model_validator(mode="after")
+    def _one_reason(self) -> "EditReasonBody":
+        if self.chip is None and not (self.text or "").strip():
+            raise ValueError("chip or text is required: give a chip id or a text reason")
+        return self
+
+
+class EditVerdict(BaseModel):
+    """The limit check after an edit, read from the recompute's tool runs by the gateway."""
+    leverage: float
+    limit: float
+    verdict: Literal["ok", "over_limit"]
+    headroom_turns: float
+    ebitda: float
+    debt: float
+    tie_out_ok: bool | None = None
+    review: Review | None = None
+    approval_item: str
+    approval_state: str
+
+
+class EditResponse(BaseModel):
+    """What an edit or its undo returns: the edit, the new result revision, its verdict, the new approval item,
+    and the reasons the bubble offers."""
+    edit: Edit
+    result: Result
+    verdict: EditVerdict
+    approval: WorkItem
+    reasons: list[ReasonChip]
 
 
 class StoreStatus(BaseModel):

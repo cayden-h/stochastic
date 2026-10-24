@@ -23,7 +23,7 @@ The current code implements an earlier workflow and is being updated per `docs/T
 .venv/bin/python -m pytest -q
 ```
 
-The normal run uses the memory store and never touches the network. The Tiger tests skip unless `TEST_DATABASE_URL` is set: 216 pass offline with 10 skipped.
+The normal run uses the memory store and never touches the network. The Tiger tests skip unless `TEST_DATABASE_URL` is set: 259 pass offline with 13 skipped.
 To run them against Tiger Cloud, use your own schema so you do not take the demo schema's advisory lock:
 
 ```

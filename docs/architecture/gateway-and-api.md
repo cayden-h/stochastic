@@ -89,7 +89,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /deals/{id}/runs` | any | Every tool run for the deal |
 | `GET /runs/{run_id}` | any | One tool run: tool, inputs, outputs |
 | `GET /agents/memory` | any | Policies and sessions |
-| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, and `stage` events (shape below) |
+| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, `stage` events, and `edit` events (shapes below) |
 | `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, `brief` (a JSON string of the Brief), and files `platform_csv` and `target_csv`. Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}}`. 422 names the file, row, and column. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
 | `POST /deals/{id}/run` | human | Run the job runner until the deal waits on a human. Body `{"backend": "droid", "sync": true}` is optional. |
 | `POST /work-items/{id}/answer` | human | `{"option_id": "b"}`. Posts the flag and, if no flag is open, continues the run in the background. `?auto_advance=false` turns that off. |
@@ -97,6 +97,9 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `POST /work-items/{id}/reject` | human | `{"reason": "..."}` |
 | `POST /work-items/{id}/hold` | human | Keep a flag open and log the hold |
 | `POST /work-items/{id}/reverse` | human | `{"reason": "..."}`. A new item linked to the original. Nothing is deleted. |
+| `POST /deals/{id}/edits` | human (controller) | Edit the combined books after the agents and before approval (D19). Body `{"kind": "amount", "company", "line", "value", "section"?}` (`value` in USD thousands, finite) or `{"kind": "remap", "company", "line", "platform_line", "section"?}`. Returns `{"edit", "result", "verdict", "approval", "reasons"}` (response model `EditResponse`); the verdict is read from the recompute's tool runs. 404 unknown deal; 422 for a missing or non-finite `value`, a missing `platform_line`, or a gateway refusal (subtotal, unknown line or company, unchanged value); 403 for any actor but `human:controller`; 409 outside the PROPOSED window or for a second live edit on the line. An income statement detail edit carries into the totals by the roll-up rule in `backend/app/tools/edits.py`; a balance sheet detail edit is refused (422). |
+| `POST /edits/{id}/reason` | human (controller) | `{"chip": 0}` or `{"text": "..."}`, with `"remember": true` by default. Returns the edit (`status` `reasoned`, plus `adjustment_id` or `policy_id` when remembered). 422 when both `chip` and `text` are missing, or for an unknown chip; 404 unknown edit; 409 when the edit already has a reason; 403 for any other actor. |
+| `DELETE /edits/{id}` | human (controller) | Undo an edit (marked `reverted`, never deleted; its policy or adjustment is retired) and recompute. Same shape as `POST /deals/{id}/edits`. 404 unknown edit; 409 when already reverted or outside the PROPOSED window; 403 for any other actor. |
 | `POST /tools/{name}` | agent | `{"deal_id": "...", "inputs": {}}`. Runs a math tool and returns the run. |
 | `POST /dev/reset?keep_memory=true` | dev | Reseed the deal. Agent memory is kept by default; `keep_memory=false` clears it (use it between judges). 409 while a run is in flight; frees the what-if fork slot. |
 
@@ -121,13 +124,15 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
   "backend": { "configured": "scripted", "fallback": "scripted", "anthropic_key": false, "factory_key": true, "last_runs": [ "..." ] },
   "edits": [],
   "adjustments": [],
-  "brief_draft": null
+  "brief_draft": null,
+  "reason_chips": { "amount": [ { "id": 0, "label": "..." } ], "remap": [ "..." ] }
 }
 ```
 
 `edits`, `adjustments`, and `brief_draft` are the phase 2 additions (shapes in the next section).
 They are on `/case` and `CaseResponse` now (verified by `backend/tests/test_case_phase2.py`).
-The gateway's edit routes fill `edits` and `adjustments` when those routes land, and the Brief Reader routes fill `brief_draft`; until then they are empty lists and null.
+The edit routes (`POST /deals/{id}/edits`, `POST /edits/{id}/reason`, `DELETE /edits/{id}`) fill `edits` and `adjustments` (verified by `backend/tests/test_api_edits.py`); the Brief Reader routes fill `brief_draft` when they land, and until then it is null.
+`reason_chips` holds the chips the edit bubble offers, per kind (`amount`, `remap`), from the gateway's `reason_chips`; they are hardcoded per deal for the demo.
 `edits` lists the deal's edits in order, reverted ones included; `adjustments` lists every learned adjustment, as `policies` does.
 They are declared in `CaseResponse` in `backend/app/api/schemas.py`:
 
@@ -135,6 +140,7 @@ They are declared in `CaseResponse` in `backend/app/api/schemas.py`:
 edits: list[Edit] = Field(default_factory=list)
 adjustments: list[LearnedAdjustment] = Field(default_factory=list)
 brief_draft: BriefDraft | None = None
+reason_chips: dict[str, list[ReasonChip]] | None = None
 ```
 
 After the Preparer and the Reviewer run, `verdict` is filled:
@@ -339,13 +345,20 @@ Audit rows: `ask:flag` (the Preparer) and `adjustment:propose` when it opens, `a
 
 ## The stream
 
-`GET /deals/{id}/stream` sends two kinds of event.
+`GET /deals/{id}/stream` sends three kinds of event.
 Audit events are unchanged.
 A `stage` event is sent once on connect and again whenever the stage changes:
 
 ```
 event: stage
 data: {"deal_id": "d_kequ_nuaire", "stage": "awaiting_flag", "open_flags": ["wi_002"], "at": "<iso timestamp>"}
+```
+
+An `edit` event is sent whenever the deal's edits change (an edit applied, reasoned, or reverted), with every edit's id and status in order; nothing is sent on connect while the deal has no edits:
+
+```
+event: edit
+data: {"deal_id": "d_kequ_nuaire", "edits": [{"id": "e_001", "status": "needs_reason"}], "at": "<iso timestamp>"}
 ```
 
 A `: keepalive` comment is sent every 15 seconds.

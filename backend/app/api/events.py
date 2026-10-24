@@ -11,10 +11,14 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-def next_events(store, deal_id: str, seen_audit: int, last_stage: str | None) -> tuple[list[str], int, str | None]:
+def next_events(store, deal_id: str, seen_audit: int, last_stage: str | None,
+                edits_seen: dict | None = None) -> tuple[list[str], int, str | None]:
     """Return ready-to-send SSE strings, the new audit offset, and the new last stage.
 
     A missing deal yields no events and leaves the cursors unchanged.
+    edits_seen, when given, is the edit event's cursor and is updated in place: an `edit` event is sent when the
+    deal's edits (ids and statuses) differ from the last ones sent. A first call with no edits sends nothing.
+    Without it, no edit event is sent, as before.
     """
     deal = store.deals.get(deal_id)
     if deal is None:
@@ -35,6 +39,12 @@ def next_events(store, deal_id: str, seen_audit: int, last_stage: str | None) ->
     for row in rows[seen_audit:]:
         out.append(_sse("audit", row.model_dump(mode="json")))
     seen_audit = len(rows)
+    if edits_seen is not None:
+        current = [{"id": e.id, "status": e.status} for e in store.deal_edits(deal_id)]
+        if current != edits_seen.get("edits", []):
+            out.append(_sse("edit", {"deal_id": deal_id, "edits": current,
+                                     "at": datetime.now(timezone.utc).isoformat()}))
+        edits_seen["edits"] = current
     if deal.stage != last_stage:
         out.append(stage_event())
         last_stage = deal.stage

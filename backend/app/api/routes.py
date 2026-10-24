@@ -22,7 +22,7 @@ from app.agents.jobs import advance
 from app.api import certificate as cert_doc
 from app.api import export as export_doc
 from app.api.events import next_events
-from app.api.schemas import CaseResponse, DealCreated, HealthResponse
+from app.api.schemas import CaseResponse, DealCreated, EditBody, EditReasonBody, EditResponse, HealthResponse
 from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, State
 from app.db.loader import MAX_BYTES, LoaderError, parse_statement_csv
 from app.gateway.gateway import Gateway, GatewayError
@@ -255,6 +255,7 @@ def build_router(gw: Gateway) -> APIRouter:
             "edits": [dump(e) for e in store.deal_edits(deal_id)],
             "adjustments": [dump(a) for a in store.adjustments.values()],
             "brief_draft": None,  # the Brief Reader routes fill this later
+            "reason_chips": {kind: [dump(c) for c in gw.reason_chips(deal_id, kind)] for kind in ("amount", "remap")},
         }
 
     def need_posted(deal_id: str, what: str):
@@ -441,6 +442,34 @@ def build_router(gw: Gateway) -> APIRouter:
     def reverse(item_id: str, body: ReasonBody, x_actor: str = Header(default=CONTROLLER)):
         return dump(guard(lambda: gw.reverse(x_actor, item_id, body.reason)))
 
+    # ------------------------------------------------------------------ review edits (D19), thin over the gateway
+    def edit_response(out: dict) -> dict:
+        verdict = dict(out["verdict"])
+        if verdict.get("review") is not None:
+            verdict["review"] = dump(verdict["review"])
+        return {"edit": dump(out["edit"]), "result": dump(out["result"]), "verdict": verdict,
+                "approval": dump(out["approval"]), "reasons": [dump(c) for c in out["reasons"]]}
+
+    @r.post("/deals/{deal_id}/edits", response_model=EditResponse)
+    def apply_edit(deal_id: str, body: EditBody, x_actor: str = Header(default=CONTROLLER)):
+        """The controller changes one amount or one target mapping after the agents and before approval. The gateway
+        recomputes every figure through the tools with new run ids and writes a new result revision."""
+        need_deal(deal_id)
+        return edit_response(guard(lambda: gw.apply_edit(x_actor, deal_id, body.kind, body.company, body.line,
+                                                         value=body.value, platform_line=body.platform_line,
+                                                         section=body.section)))
+
+    @r.post("/edits/{edit_id}/reason")
+    def reason_edit(edit_id: str, body: EditReasonBody, x_actor: str = Header(default=CONTROLLER)):
+        """Why the controller made the edit: a chip or a typed reason. With remember, it becomes memory."""
+        return dump(guard(lambda: gw.reason_edit(x_actor, edit_id, chip=body.chip, text=body.text,
+                                                 remember=body.remember)))
+
+    @r.delete("/edits/{edit_id}", response_model=EditResponse)
+    def revert_edit(edit_id: str, x_actor: str = Header(default=CONTROLLER)):
+        """Undo an edit: marked reverted, never deleted, and the books are recomputed without it."""
+        return edit_response(guard(lambda: gw.revert_edit(x_actor, edit_id)))
+
     # ------------------------------------------------------------------ writes (agents)
     @r.post("/tools/{name}")
     def tool(name: str, body: ToolBody, x_actor: str = Header(default="agent:preparer")):
@@ -454,10 +483,11 @@ def build_router(gw: Gateway) -> APIRouter:
 
         async def gen():
             seen, last, tick = 0, None, 0
+            edits_seen: dict = {}  # the edit event's cursor, updated in place by next_events
             while not await request.is_disconnected():
                 if deal_id not in store.deals:
                     return
-                events, seen, last = next_events(store, deal_id, seen, last)
+                events, seen, last = next_events(store, deal_id, seen, last, edits_seen=edits_seen)
                 for e in events:
                     yield e
                 tick += 1
