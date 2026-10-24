@@ -95,11 +95,11 @@ Use only these figures. All are from filings or computed by the tools from them.
 | Nu Aire D&A (year to 2024-09-30) | $1,830,395 | Ex 99.1 |
 | Kewaunee financing liability at 2024-10-31 | $750K current plus $27,032K long-term; carrying value $27,782K | 10-Q |
 | Statesville cash rent (deducted from EBITDA) | $1,970K, next-year obligation; inferred as the year's rent | 10-K contractual obligations |
-| Covenant EBITDA | $28,033K | tool run `ebitda` |
+| Covenant EBITDA | $27,519K | tool run `ebitda` |
 | Senior Funded Bank Debt, agreement's reading | $21,633K | tool run `covenant_debt` |
 | Whole financing liability counted (naive) | $71,955K | tool run `covenant_debt`, naive |
-| Covenant leverage | 0.77x, 1.73x of room, about $48M of debt capacity | tool runs `leverage`, `limit_test` |
-| Naive leverage | 2.57x, over the limit | tool runs |
+| Covenant leverage | 0.79x, 1.71x of room, about $47M of debt capacity | tool runs `leverage`, `limit_test` |
+| Naive leverage | 2.61x, over the limit | tool runs |
 | Combined total assets | $182,456K, and the combined balance sheet balances | tool runs `consolidate`, `tie_out` |
 | Example reclasses (Note 2) | Accrued Commissions to Employee compensation and amounts withheld. Income taxes payable to Other accrued expenses. Interest Income - Net to Other income, net | Ex 99.2 |
 
@@ -122,9 +122,9 @@ The card shows (all from the API, nothing typed by hand):
 
 | Option | Effect on the card | Verdict |
 | --- | --- | --- |
-| a. Whole line counts (70,885K) | Senior Funded Bank Debt 71,955K. Leverage 2.57x against 2.50x. | Over the limit |
-| b. Only the PNC term loan and revolver count | Senior Funded Bank Debt 21,633K. Leverage 0.77x against 2.50x. | OK |
-| c. PNC debt and the seller notes count | Senior Funded Bank Debt 44,173K. Leverage 1.58x against 2.50x. | OK |
+| a. Whole line counts (70,885K) | Senior Funded Bank Debt 71,955K. Leverage 2.61x against 2.50x. | Over the limit |
+| b. Only the PNC term loan and revolver count | Senior Funded Bank Debt 21,633K. Leverage 0.79x against 2.50x. | OK |
+| c. PNC debt and the seller notes count | Senior Funded Bank Debt 44,173K. Leverage 1.61x against 2.50x. | OK |
 
 A second, smaller flag asks where Nu Aire's Certificates of Deposit ($991K) belong. Answer it with the default (cash equivalents) in one click, or raise the Mapper threshold to drop it.
 
@@ -132,8 +132,8 @@ A second, smaller flag asks where Nu Aire's Certificates of Deposit ($991K) belo
 
 | Answer | Verdict line | Presenter says | Reviewer badge |
 | --- | --- | --- | --- |
-| b (the agreement's reading) | OK. 0.77x against 2.50x. Room 1.73x. | "Under the limit, with the covenant's own definition of debt. Room for the next deal." | pass |
-| a (whole line) | Over the limit. 2.57x against 2.50x. | "Over the limit. The item comes back as needs-attention and cannot be approved." | needs_attention |
+| b (the agreement's reading) | OK. 0.79x against 2.50x. Room 1.71x. | "Under the limit, with the covenant's own definition of debt. Room for the next deal." | pass |
+| a (whole line) | Over the limit. 2.61x against 2.50x. | "Over the limit. The item comes back as needs-attention and cannot be approved." | needs_attention |
 
 Notes:
 - Over the limit returns the item to the human as needs-attention, and the gateway refuses approval. [verified: `test_result_cannot_be_approved_before_review_passes`]
@@ -142,7 +142,7 @@ Notes:
 
 ### The honest sensitivity
 
-The naive reading stays over 2.50x as long as covenant EBITDA stays below $28,782K. Our figure is $28,033K. An add-back above $750K that we have not found would move the naive reading under the limit; the covenant reading would still be far under. Know this before a judge asks.
+The naive reading stays over 2.50x as long as covenant EBITDA stays below $28,782K. Our figure is $27,519K. An add-back above $1,263K that we have not found would move the naive reading under the limit; the covenant reading would still be far under. Know this before a judge asks.
 
 ## 5. Failure plan
 
@@ -192,7 +192,7 @@ Also say, if time allows: other situations are roadmap, not built. The output is
 
 Before the first rehearsal:
 - [ ] Both input CSVs and the brief are final. Cached filings are in `data/` and stay out of git.
-- [ ] Both leverage figures match the tool runs on screen (0.77x covenant, 2.57x naive). No PLACEHOLDER shows anywhere.
+- [ ] Both leverage figures match the tool runs on screen (0.79x covenant, 2.61x naive). No PLACEHOLDER shows anywhere.
 - [ ] The flag card effect text matches the computed numbers.
 - [ ] The tests with the real figures pass, including the tie-out test and the naive-versus-covenant test.
 - [ ] The recorded run exists and replays.
@@ -235,7 +235,7 @@ Answers are short and honest. If we do not know, say so.
 | 11 | How do you know the mapping is right? | We check it against Note 2 in the filing, as an answer key for shape, not to the dollar. Note 2 is preliminary, and the fiscal years differ. Unsure lines become flags. Precision comes before recall. |
 | 12 | What does the audit log hold, and can it be edited? | Every action, allowed or denied, with actor, target, reason, and evidence. Each row stores the hash of the row before it, so a change in the past breaks the chain. Postgres would use a role with no update or delete rights. |
 | 13 | Why Kewaunee and Nu Aire? | It is small, it has a real 2.50x leverage covenant and a $5M acquisition basket, a filed reclass table, and one unclear line that needs a human. [verified: `research/real-deal-candidates.md`] |
-| 14 | What is the leverage result? | 0.77x under the agreement's definition, 2.57x if you count the whole financing liability line. Both are tool runs on screen with run ids. Never say a number that is not on screen. |
+| 14 | What is the leverage result? | 0.79x under the agreement's definition, 2.61x if you count the whole financing liability line. Both are tool runs on screen with run ids. Never say a number that is not on screen. |
 | 15 | Does covenant EBITDA match the pro forma EBITDA? | No. Covenant EBITDA is a defined term with capped add-backs, so it is a negotiated number, not the pro forma operating profit. [verified: `research/real-deal-candidates.md`] |
 | 16 | Does it work for other deals or other situations? | Not yet. Other deals and situations are roadmap. We built one workflow deep. [verified: `STOCHASTIC.md`, section 2] |
 | 17 | What would you build next? | Purchase accounting with a provisional label, intercompany eliminations, a second deal to show the policies carrying over, confidence calibration from the answer key, and a Postgres store. Learning from corrections is built as policies; backtesting them is not. |

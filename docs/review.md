@@ -11,12 +11,12 @@ Why it is good:
 - It has a hard check. Totals must tie and the ratio is arithmetic, so a judge can verify the output in seconds. Most finance-agent demos cannot say that. [verified: `tie_out`, `limit_test`]
 - It has a real gate with a real clock. The lender tests the covenant on the combined company, the compliance certificate has a deadline, and the next add-on waits on it. [verified: `research/ma-workflow-research.md`, self-reported vendor sources]
 - It has a real messy corner on real data. Two different charts of accounts from a filed deal, a filed reclassification table as an answer key, and one line that honestly holds three kinds of debt. [verified: Ex 99.1, Ex 99.2 Note 2 and Note 4(h), Ex 10.1]
-- The moment is real and it works. Counting the whole "Financing liability" line gives 2.57x, over the limit; the agreement's own reading gives 0.77x. The controller's answer flips the verdict. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
+- The moment is real and it works. Counting the whole "Financing liability" line gives 2.61x, over the limit; the agreement's own reading gives 0.79x. The controller's answer flips the verdict. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 - It fits every Hyphenate signal: a few roles done deep, limits enforced in code, a denied action in the log, precision over recall, and now a correction that becomes a policy. [verified: `hyphenate-workshop.md`]
 
 Caveats:
 - The user is unconfirmed. No practitioner has said the portfolio controller owns this work or wants it this way. The market scan was a handful of searches, and the closest products (Aleph, OneStream, Keboola) cover the consolidation layer without the covenant tie-out. [inferred; the research says so itself]
-- The moment rests on two inferred inputs: the Statesville cash rent ($1,970K) and transaction costs at zero. If a practitioner sets the rent at a different figure, the naive ratio moves. It is still over 2.50x for any rent deduction above about $1.2K thousand... more precisely, the naive reading crosses the limit as long as covenant EBITDA stays below $28,782K, which holds unless an add-back above $750K is found. Say it out loud and keep the sensitivity in the pocket. [inferred from the figures]
+- The moment rests on two inferred inputs: the Statesville cash rent ($1,970K) and transaction costs at zero. If a practitioner sets the rent at a different figure, the naive ratio moves. It is still over 2.50x for any rent deduction above about $1.2K thousand... more precisely, the naive reading crosses the limit as long as covenant EBITDA stays below $28,782K, which holds unless an add-back above $1,263K is found. Say it out loud and keep the sensitivity in the pocket. [inferred from the figures]
 
 ## Is the solution right?
 
@@ -44,7 +44,7 @@ What is weaker than the docs suggested:
 2. One recorded model run (Anthropic first, Droid second) so the pitch can say the agent text came from a model at least once. (Cayden)
 3. The second-run memory moment on stage: reset, run again, no flag, `policy:apply` in the log. It costs nothing and answers "did we see something new". (Cayden, Josie for the visible state)
 4. The Note 2 answer-key score, as one number on the honesty slide. (Eric)
-5. `debt_capacity` on the verdict line: "room for the next deal: $48M" is the line a PE associate hears. (Tri)
+5. `debt_capacity` on the verdict line: "room for the next deal: $47M" is the line a PE associate hears. (Tri)
 6. Judge-supplied input: `POST /deals` with two CSVs, so the system handles unseen input as the brief asks. (Tri, Eric)
 7. A one-line statement for each sponsor: what the Droid SDK made possible (per-role sessions, `restrict_tools`, typed output), and what Figma made possible.
 
