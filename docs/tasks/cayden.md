@@ -26,7 +26,8 @@ Done at 08:50 (Cayden's agent, live end-to-end tests on Droid and Tiger; details
 - Task 1: the demo laptop runs `STORE=postgres`; `GET /health` shows `postgres`, no fallback reason.
 - Task 2: the restart moment is rehearsed and written into `demo-script.md` section 5. Every field of the case came back identical.
 - Task 3: done at 09:00. Cayden chose to delete `larp-city` (backed up to `HackRice/backups/`); each covenant flag's what-ifs now live in a Tiger fork that the answer deletes (D17, `sponsors/tiger-data.md`). Tested live in the browser and against Tiger.
-- Task 9: scheduled in Cayden's Claude session for Sunday 07:52 (wake the service if paused, check `/health`). It runs only if that session is still open, so keep the manual check too.
+- Task 9: a one-shot launchd job (`~/Library/LaunchAgents/com.stochastic.sunday-wake.plist`, script `~/.stochastic/sunday-wake.sh`) runs Sunday 07:50 whether or not a Claude session is open: it starts the Tiger service if paused, logs `/health` to `~/Library/Logs/stochastic-sunday-wake.log`, shows a notification, and removes itself. Dry run passed 2026-10-24 09:02. The laptop must be awake.
+- Task 7, in progress at 09:10: on the existing Devpost draft ("Stochastic", 2 of 5 steps), the story (Inspiration through the real-versus-simulated list, from `devpost/devpost.md`) and 17 built-with tags are filled in. Not saved yet: Cayden reviews and presses Save & continue. Still empty: the video link (required by the form), images, and the next steps (Additional info with the track opt-ins and the table number).
 - Task 4: Anthropic is out of the default fallback chain (no key); the default is `scripted`.
 - Task 5, the machine part: three cold runs in a headless browser, timed. The stopwatch run of the 2:00 is still Cayden's.
 - Task 7, the prepared part: the backend line in `devpost/devpost.md` is filled in as planned. Submitting on devpost.com is still Cayden's (it needs his login).
