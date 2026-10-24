@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from app.core.models import (AgentSession, AgreementText, AuditRow, Deal, Edit, LearnedAdjustment, Mapping, Policy,
+from app.core.models import (AgentSession, AgreementText, ApprovedBrief, AuditRow, Deal, Edit, LearnedAdjustment, Mapping, Policy,
                              Result, SourceLine, ToolRun, WorkItem)
 
 
@@ -43,21 +43,24 @@ class MemoryStore:
         self.policies: dict[str, Policy] = {}  # agent memory: survives a deal reset
         self.adjustments: dict[str, LearnedAdjustment] = {}  # agent memory, ids "a_001": survives a deal reset
         self.sessions: dict[str, AgentSession] = {}  # keyed by role
+        self.approved_briefs: dict[str, ApprovedBrief] = {}  # by agreement hash: agent memory, survives a deal reset
         self.audit: list[AuditRow] = []  # append only, in order
         self._seq: dict[str, int] = {}
 
     def reset_deals(self, keep_memory: bool = True) -> None:
-        """Clear the record. Agent memory (policies, learned adjustments, sessions) is kept unless asked otherwise.
+        """Clear the record. Agent memory (policies, learned adjustments, approved Briefs, sessions) is kept unless
+        asked otherwise.
 
-        Edits and agreements are per-deal record and are cleared. The "p" and "a" id sequences are kept with the
-        memory, so a new policy or adjustment never reuses an id."""
-        policies, adjustments, sessions, seq = self.policies, self.adjustments, self.sessions, dict(self._seq)
+        Edits and agreements are per-deal record and are cleared. The counters that memory refers to keep counting,
+        so a new id never repeats one a kept record names: policies (p), adjustments (a), and the edits (e) and work
+        items (wi) in learned_from and edit_id."""
+        memory = (self.policies, self.adjustments, self.approved_briefs, self.sessions)
+        seq = dict(self._seq)
         self._clear()
         if keep_memory:
-            self.policies, self.adjustments, self.sessions = policies, adjustments, sessions
-            for prefix in ("p", "a"):
-                if prefix in seq:
-                    self._seq[prefix] = seq[prefix]
+            self.policies, self.adjustments, self.approved_briefs, self.sessions = memory
+            for prefix in ("p", "a", "e", "wi"):
+                self._seq[prefix] = seq.get(prefix, 0)
 
     def commit(self) -> None:
         """Called by the gateway after every write. Nothing to do in memory."""

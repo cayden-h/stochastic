@@ -45,6 +45,7 @@ In `backend/app/tools/finance.py`:
   - A `remap` edit moves the target line to its new platform line, which can change its section.
 - Each tool returns the edits it applied, with their ids, so a run shows which edits it used.
 - Reverted edits are ignored.
+- Update (Cayden's agent, 2026-10-24): the gateway's contract is the "T1 contract" section of `architecture/gateway-and-api.md`; `tie_out` takes no edits, and `consolidate`, `ebitda`, and `covenant_debt` return `edits_applied`.
 Tests in `backend/tests/test_tools_edits.py`, with hand-computed values:
 - An amount edit on a target income-statement line moves covenant EBITDA by exactly the change, and leverage by the hand-computed amount.
 - A remap from cash to other current assets moves the amount between those lines, and the balance sheet still ties out.
