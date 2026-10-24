@@ -18,10 +18,18 @@ export function fmtK(v: number): string {
   return `${Math.round(v).toLocaleString("en-US")}K`;
 }
 
-/** A source line's amount in USD thousands, whatever unit the filing used (Nu Aire files in dollars). */
+/** An amount in USD thousands from the unit the filing used, as backend finance.to_thousands does: Kewaunee files
+ * thousands, Nu Aire whole dollars. An unknown unit is left as it is. */
+export function toK(amount: number, unit: string): number {
+  const u = unit.trim().toLowerCase();
+  if (["usd", "dollars", "usd dollars", "$"].includes(u)) return amount / 1000;
+  if (["usd millions", "millions", "mm"].includes(u)) return amount * 1000;
+  return amount;
+}
+
+/** A source line's amount in USD thousands, whatever unit the filing used. */
 export function lineK(amount: number, unit: string): string {
-  const dollars = ["usd", "dollars", "usd dollars", "$"].includes(unit.trim().toLowerCase());
-  return fmtK(dollars ? amount / 1000 : amount);
+  return fmtK(toK(amount, unit));
 }
 
 /** USD thousands shown in millions for a headline figure: $49.3M. */

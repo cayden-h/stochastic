@@ -207,6 +207,13 @@ Josie has no frame for it, and the Figma Components page has nothing named Brief
 - Tested headless through the dev shim over the real gateway: the full Ex 10.1 text, then the Brief card (one scope question, three amounts from the 10-K with their source, two kept at 0), approve, map, the two flags, 0.76x, the edit beat, approve, and download.
 Waiting on: T4 (the routes; the amounts body above is my assumption, so Tri should match it or tell me), and Josie's frame.
 
+Review fixes, 2026-10-24 night:
+- Adjustment flags: Apply waits for a PROPOSED approval item, approval waits for them, and they do not hold the progress row or the "no flag this time" note.
+- Until T2 puts `edits` on `/case`, the console keeps the edits the gateway returned, so an edit left for Later stays; `/case` wins by id. Chips come from `/case` `reason_chips`, else the last edit's response, else the demo list.
+- A reset (the deal's first audit row changes) closes the bubble and drops the session's edits and leverage moves.
+- A Brief question on a field path can be answered with a corrected value through the same amend route; evidence marked `verified: false` shows as "Reader's words".
+- One unit conversion (`toK` in `frontend/src/lib/format.ts`, with millions as in `finance.to_thousands`).
+
 ### C5. The companion (about 2 hours, after C4)
 
 A React layer in `frontend/src/components/companion.tsx`, from `review-companion.md` sections 5 and 6:

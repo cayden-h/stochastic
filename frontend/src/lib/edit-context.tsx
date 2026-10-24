@@ -31,6 +31,7 @@ interface EditData {
   flash: { key: string; at: number } | null;
   error: string | null;
   clearError: () => void;
+  clearNote: () => void;
   /** Send an edit. A change over half the agents' value asks in the bubble first, unless `confirmed`. */
   apply: (body: EditBody, anchor: string, old?: number, confirmed?: boolean) => Promise<boolean>;
   confirmYes: () => Promise<void>;
@@ -53,8 +54,16 @@ const NOTE_MS = 4000;
 /** The review edits (D19): the controller changes the books, the companion asks why, the agents learn.
  * The console still computes no figure: every number on screen comes back from the gateway's recompute. */
 export function EditProvider({ children }: { children: React.ReactNode }) {
-  const { kase, refresh } = useDeal();
-  const edits = useMemo(() => liveEdits(kase).sort((a, b) => a.at.localeCompare(b.at)), [kase]);
+  const { kase, refresh, audit } = useDeal();
+  // Edits the gateway returned this session, by id. Until T2 adds `edits` to /case they are the only record, so an
+  // edit left for Later stays on screen; once /case carries edits, its copy wins by id.
+  const [local, setLocal] = useState<Record<string, Edit>>({});
+  const edits = useMemo(() => {
+    const byId = new Map(Object.values(local).filter((e) => e.deal_id === kase?.deal.id).map((e) => [e.id, e]));
+    for (const e of kase?.edits ?? []) byId.set(e.id, e);
+    return liveEdits(kase ? { ...kase, edits: [...byId.values()] } : null).sort((a, b) => a.at.localeCompare(b.at));
+  }, [kase, local]);
+  const remember = (e: Edit) => setLocal((m) => ({ ...m, [e.id]: e }));
   const [chipCache, setChipCache] = useState<Partial<Record<Edit["kind"], ReasonChip[]>>>({});
   const [leverage, setLeverage] = useState<Record<string, LeverageMove>>({});
   const [askingId, setAskingId] = useState<string | null>(null);
@@ -64,15 +73,17 @@ export function EditProvider({ children }: { children: React.ReactNode }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ key: string; at: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // The edit just returned by the gateway, until /case reads it back.
-  const [fresh, setFresh] = useState<Edit | null>(null);
   const dealId = kase?.deal.id;
+  // A reset reseeds the ledger: the deal's first audit row changes, so what this session held is dropped.
+  const ledger = `${dealId ?? ""}|${audit.rows[0]?.hash ?? ""}`;
   const verdictRef = useRef(kase?.verdict ?? null);
   useEffect(() => { verdictRef.current = kase?.verdict ?? null; }, [kase]);
 
-  const asking = askingId ? edits.find((e) => e.id === askingId) ?? (fresh?.id === askingId ? fresh : null) : null;
+  const asking = askingId ? edits.find((e) => e.id === askingId) ?? null : null;
 
-  const chips = useCallback((kind: Edit["kind"]) => chipCache[kind] ?? DEMO_CHIPS[kind], [chipCache]);
+  // The chips: from /case when T2 sends them, else the last edit's response, else the demo deal's list.
+  const caseChips = kase?.reason_chips;
+  const chips = useCallback((kind: Edit["kind"]) => caseChips?.[kind] ?? chipCache[kind] ?? DEMO_CHIPS[kind], [caseChips, chipCache]);
 
   const send = useCallback(async (body: EditBody): Promise<boolean> => {
     if (!dealId) return false;
@@ -83,7 +94,7 @@ export function EditProvider({ children }: { children: React.ReactNode }) {
       const res = await api.edit(dealId, body);
       setChipCache((c) => ({ ...c, [res.edit.kind]: res.reasons }));
       if (before) setLeverage((l) => ({ ...l, [res.edit.id]: { from: before.leverage, to: res.verdict.leverage, limit: res.verdict.limit } }));
-      setFresh(res.edit);
+      remember(res.edit);
       await refresh();
       setEditing(null);
       // The companion glides to the cell and opens the bubble.
@@ -122,17 +133,18 @@ export function EditProvider({ children }: { children: React.ReactNode }) {
     setConfirm(null);
   }, [confirm]);
 
+  const clearNote = useCallback(() => setNote(null), []);
   const ask = useCallback((id: string) => { setConfirm(null); setAskingId(id); }, []);
   const later = useCallback(() => setAskingId(null), []);
 
   const save = useCallback(async (edit: Edit, reason: { chip: number } | { text: string }, remember: boolean) => {
     const saved = await api.reason(edit.id, reason, remember);
+    setLocal((m) => ({ ...m, [saved.id]: saved }));
     void refresh();  // the cell turns to "reason given" while the bubble shrinks
     return saved;
   }, [refresh]);
 
   const finish = useCallback((saved: Edit) => {
-    setFresh(null);
     setAskingId(null);
     setNote({ text: learnedNote(saved.kind, saved.reason_text ?? "", saved.remember), at: Date.now() });
   }, []);
@@ -153,7 +165,8 @@ export function EditProvider({ children }: { children: React.ReactNode }) {
     setError(null); setRechecking(true);
     const started = Date.now();
     try {
-      await api.revert(id);
+      const res = await api.revert(id);
+      remember(res.edit);
       if (askingId === id) setAskingId(null);
       await refresh();
     } catch (e) {
@@ -173,15 +186,17 @@ export function EditProvider({ children }: { children: React.ReactNode }) {
     setFlash({ key, at: Date.now() });
   }, [edits]);
 
-  // A deal switch or a reset closes whatever was open.
+  // A deal switch or a reset closes whatever was open and drops what this session held for the old ledger.
   useEffect(() => {
-    const t = setTimeout(() => { setAskingId(null); setConfirm(null); setEditing(null); setFresh(null); }, 0);
+    const t = setTimeout(() => {
+      setAskingId(null); setConfirm(null); setEditing(null); setLocal({}); setLeverage({}); setNote(null);
+    }, 0);
     return () => clearTimeout(t);
-  }, [dealId]);
+  }, [ledger]);
 
   const value: EditData = {
     edits, chips, leverage, asking, confirm, note, rechecking, editing, setEditing, flash, error,
-    clearError: () => setError(null), apply, confirmYes, confirmNo, ask, later, save, finish, revert, show,
+    clearError: () => setError(null), clearNote, apply, confirmYes, confirmNo, ask, later, save, finish, revert, show,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

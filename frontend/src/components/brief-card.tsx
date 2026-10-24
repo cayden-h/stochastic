@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { parseAmount } from "@/lib/edits";
 import { fmtK, fmtX, plural } from "@/lib/format";
-import type { BriefAdjustment, BriefCitation, BriefDraft, Deal, WorkItem } from "@/lib/types";
+import type { Brief, BriefAdjustment, BriefCitation, BriefDraft, Deal, WorkItem } from "@/lib/types";
 import { ActorChip, Button, Label, Mono, Shape, Tag } from "./ui";
 
 /** "4.8(a)" reads as Section 4.8(a); "Addendum I" and "preamble" read as they are. */
@@ -36,8 +36,41 @@ function Row({ label, children, flagged, removed }: { label: string; children: R
   );
 }
 
-/** One question the reader or the gateway opened on a field: confirm the reader's value, or remove a list item. */
-function Question({ flag, busy, onAnswer }: { flag: WorkItem; busy: boolean; onAnswer: (option: string) => void }) {
+/** The Brief fields the controller can set by path through the amend route. */
+const AMENDABLE = /^(lender|limit|limit_section|limit_wording|debt_term|debt_definition|ebitda_definition|test_period_note|debt_excludes\[\d+\]|ebitda_(addbacks|deductions)\[\d+\]\.(name|cap))$/;
+const isNumberField = (f: string) => f === "limit" || f.endsWith(".cap");
+
+/** The draft's current value at a path such as `debt_excludes[1]` or `ebitda_addbacks[2].cap`. */
+function valueAt(brief: Brief, path: string): string {
+  const m = path.match(/^(\w+)(?:\[(\d+)\])?(?:\.(\w+))?$/);
+  if (!m) return "";
+  let v: unknown = (brief as unknown as Record<string, unknown>)[m[1]];
+  if (m[2] != null && Array.isArray(v)) v = v[Number(m[2])];
+  if (m[3] && v && typeof v === "object") v = (v as Record<string, unknown>)[m[3]];
+  return v == null ? "" : String(v);
+}
+
+/** One question the reader or the gateway opened on a field: confirm the reader's value, remove a list item, or
+ * correct the value, so a field the reader missed (even the limit) is never a dead end. */
+function Question({ flag, brief, busy, onAnswer, onCorrect }: {
+  flag: WorkItem; brief: Brief; busy: boolean; onAnswer: (option: string) => void;
+  onCorrect: (field: string, value: number | string, source: string) => Promise<boolean>;
+}) {
+  const field = String(flag.payload.field ?? "");
+  const amendable = AMENDABLE.test(field);
+  const numeric = isNumberField(field);
+  const [value, setValue] = useState(() => valueAt(brief, field));
+  const [source, setSource] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const correct = async () => {
+    const v = numeric ? parseAmount(value) : value.trim();
+    if (v === null || v === "" || (numeric && (v as number) < 0)) {
+      setError(numeric ? "Enter a number" : "Enter the value"); return;
+    }
+    setError(null);
+    await onCorrect(field, v, source.trim());
+  };
+  const ev = flag.evidence[0];
   return (
     <div className="flex flex-col gap-[8px] rounded-[12px] border border-amber-line bg-amber-tint px-[14px] py-[12px]">
       <span className="flex items-center gap-[8px]">
@@ -47,10 +80,18 @@ function Question({ flag, busy, onAnswer }: { flag: WorkItem; busy: boolean; onA
         <ActorChip actor={flag.proposed_by} />
       </span>
       <p className="text-[14px] leading-[20px] text-body">{flag.question}</p>
-      {flag.evidence[0] ? (
-        <p className="border-l-2 border-amber-line pl-[10px] font-serif text-[16px] leading-[21px] text-body">
-          &ldquo;{flag.evidence[0].quote}&rdquo; <Mono>{flag.evidence[0].document_id}</Mono>
-        </p>
+      {ev ? (
+        ev.verified === false ? (
+          // Not found in the agreement by the gateway: the reader's own words, never shown as a quote.
+          <p className="flex flex-wrap items-baseline gap-x-[8px] border-l-2 border-line pl-[10px] text-[14px] leading-[20px] text-slate">
+            <span className="text-[11px] font-semibold tracking-[0.88px] uppercase">Reader&apos;s words</span>
+            {ev.quote} {ev.document_id ? <Mono>{ev.document_id}</Mono> : null}
+          </p>
+        ) : (
+          <p className="border-l-2 border-amber-line pl-[10px] font-serif text-[16px] leading-[21px] text-body">
+            &ldquo;{ev.quote}&rdquo; <Mono>{ev.document_id}</Mono>
+          </p>
+        )
       ) : null}
       <span className="flex flex-wrap gap-[8px]">
         {flag.options.map((o) => (
@@ -59,6 +100,31 @@ function Question({ flag, busy, onAnswer }: { flag: WorkItem; busy: boolean; onA
           </Button>
         ))}
       </span>
+      {amendable ? (
+        <div className="flex w-full flex-col gap-[6px] border-t border-amber-line pt-[10px]">
+          <span className="text-[13px] text-escalation">Or correct it from the agreement:</span>
+          <div className="flex w-full flex-wrap items-center gap-[8px]">
+            <input
+              aria-label={`${field}: corrected value`}
+              inputMode={numeric ? "decimal" : undefined}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") void correct(); }}
+              className={`h-11 rounded-chip border border-rule bg-white px-[10px] text-[14px] text-ink outline-none focus:border-ink ${numeric ? "w-[140px] text-right tabular-nums" : "min-w-[240px] flex-[2]"}`}
+            />
+            <input
+              aria-label={`${field}: source`}
+              placeholder="Section, optional"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") void correct(); }}
+              className="h-11 min-w-[140px] flex-1 rounded-chip border border-rule bg-white px-[10px] text-[14px] text-ink outline-none focus:border-ink"
+            />
+            <Button kind="secondary" disabled={busy} onClick={() => void correct()}>Save correction</Button>
+          </div>
+          {error ? <p role="alert" className="text-[12px] text-denied">{error}</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -109,7 +175,7 @@ function AdjustmentRow({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void save(); }}
-              className="h-[36px] w-[170px] rounded-chip border border-rule bg-white px-[10px] text-right text-[14px] text-ink tabular-nums outline-none focus:border-ink"
+              className="h-11 w-[170px] rounded-chip border border-rule bg-white px-[10px] text-right text-[14px] text-ink tabular-nums outline-none focus:border-ink"
             />
             <input
               aria-label={`${adj.name}: source`}
@@ -117,9 +183,9 @@ function AdjustmentRow({
               value={source}
               onChange={(e) => setSource(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void save(); }}
-              className="h-[36px] min-w-[200px] flex-1 rounded-chip border border-rule bg-white px-[10px] text-[14px] text-ink outline-none focus:border-ink"
+              className="h-11 min-w-[200px] flex-1 rounded-chip border border-rule bg-white px-[10px] text-[14px] text-ink outline-none focus:border-ink"
             />
-            <Button kind="primary" className="min-h-[36px] py-[4px]" disabled={busy} onClick={() => void save()}>Save amount</Button>
+            <Button kind="primary" disabled={busy} onClick={() => void save()}>Save amount</Button>
             <Button kind="link" className="text-[13px]" disabled={busy} onClick={onKeep} title="0 means the adjustment is not applied">Keep 0</Button>
           </div>
           {error ? <p role="alert" className="text-[12px] text-denied">{error}</p> : null}
@@ -178,7 +244,16 @@ export function BriefCard({
 
       {questions.length ? (
         <div className="flex flex-col gap-[10px]">
-          {questions.map((f) => <Question key={f.id} flag={f} busy={busy} onAnswer={(o) => void answer(f, o)} />)}
+          {questions.map((f) => (
+            <Question
+              key={f.id}
+              flag={f}
+              brief={b}
+              busy={busy}
+              onAnswer={(o) => void answer(f, o)}
+              onCorrect={(field, value, source) => onAct(() => api.amendBrief(deal.id, { field, value, ...(source ? { source_ref: source } : {}) }))}
+            />
+          ))}
         </div>
       ) : null}
 
@@ -237,7 +312,7 @@ export function BriefCard({
                   nameQuote={cite(`${path}.name`)}
                   capQuote={a.cap != null ? cite(`${path}.cap`) : undefined}
                   busy={busy}
-                  onSave={(value, source) => onAct(() => api.briefAmount(deal.id, { field: `${path}.amount`, value, source_ref: source }))}
+                  onSave={(value, source) => onAct(() => api.amendBrief(deal.id, { field: `${path}.amount`, value, source_ref: source }))}
                   onKeep={() => flag && void answer(flag, "confirm")}
                 />
               );

@@ -37,9 +37,11 @@ function splitQuestion(q: string): [string, string] {
  * The ratio, verdict, effect text and run id come from the gateway's tool runs. Nothing here is computed.
  */
 export function FlagCard({
-  item, lines, busy, onAnswer, onHold, position,
+  item, lines, busy, onAnswer, onHold, position, approvalReady = true,
 }: {
   item: WorkItem; lines: SourceLine[]; busy: boolean; onAnswer: (optionId: string) => void; onHold: () => void;
+  /** An adjustment's Apply edits the books, which needs the result's approval item to be PROPOSED. */
+  approvalReady?: boolean;
   /** "1 of 2" when several flags are open. */
   position: string;
 }) {
@@ -78,9 +80,9 @@ export function FlagCard({
           return (
             <button
               key={o.id}
-              disabled={busy}
+              disabled={busy || (adjustment && o.id === "apply" && !approvalReady)}
               onClick={() => onAnswer(o.id)}
-              title={o.effect}
+              title={adjustment && o.id === "apply" && !approvalReady ? "Apply opens once the result is ready for your approval" : o.effect}
               className={`flex min-w-0 flex-1 flex-col items-start gap-[6px] self-stretch rounded-[12px] p-[16px] text-left transition-colors duration-150 disabled:opacity-50 ${
                 suggested ? "border-2 border-clear bg-mint-select p-[15px] hover:bg-mint" : "border border-line bg-white hover:bg-mint-select"
               }`}
@@ -102,6 +104,10 @@ export function FlagCard({
           );
         })}
       </div>
+
+      {adjustment && !approvalReady ? (
+        <p className="-mt-[4px] text-[13px] text-slate">Apply opens once the Reviewer has checked the result and it waits for your approval.</p>
+      ) : null}
 
       <details className="rounded-[12px] border border-line bg-fog px-[14px] py-[10px]">
         <summary className="cursor-pointer text-[13px] font-semibold text-forest">

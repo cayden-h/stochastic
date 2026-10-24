@@ -1,3 +1,4 @@
+import { toK } from "./format";
 import type { Case, Edit, Mapping, ReasonChip, Result, ResultRow, Section, SourceLine, WorkItem } from "./types";
 
 /** The DOM key of an editable cell, so the companion, Your edits, and the flash can find it.
@@ -99,10 +100,9 @@ export function effectivePlatformLine(m: Mapping, line: SourceLine | undefined, 
   return remap?.new_platform_line ?? m.platform_line;
 }
 
-/** A line's value as the agents used it, in USD thousands (Nu Aire files whole dollars). */
+/** A line's value as the agents used it, in USD thousands. */
 function agentValue(l: SourceLine): number {
-  const dollars = ["usd", "dollars", "usd dollars", "$"].includes(l.unit.trim().toLowerCase());
-  return dollars ? l.amount / 1000 : l.amount;
+  return toK(l.amount, l.unit);
 }
 
 export interface RowParts {

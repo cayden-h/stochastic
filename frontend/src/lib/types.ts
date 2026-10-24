@@ -8,7 +8,8 @@ export type Stage =
   | "awaiting_review" | "awaiting_approval" | "needs_attention" | "posted" | "run_failed";
 export type Backend = "scripted" | "anthropic" | "droid" | "replay" | string;
 
-export interface Evidence { quote: string; page: number | null; document_id: string | null }
+/** `verified: false` marks the reader's own words, not a quote the gateway found in the agreement. */
+export interface Evidence { quote: string; page: number | null; document_id: string | null; verified?: boolean }
 export interface Option {
   id: string; label: string; effect: string; run_id: string | null; added_by?: string | null;
   // Covenant flags only, read by the gateway from the option's limit_test run.
@@ -102,6 +103,8 @@ export interface Case {
   edits?: Edit[];
   /** What reasoned amount edits taught (D19). */
   adjustments?: LearnedAdjustment[];
+  /** The reason chips per edit kind, when T2 sends them on /case. */
+  reason_chips?: Partial<Record<Edit["kind"], ReasonChip[]>>;
   /** The Brief Reader's draft while the controller reviews it (D20, Tri's T4). */
   brief_draft?: BriefDraft | null;
 }

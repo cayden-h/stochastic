@@ -50,7 +50,9 @@ export default function Agents() {
   const timeline = story.slice(-12);
   // The Mapper session's turn count, from the gateway. Not a run count: a rerun after a failure can reuse an item,
   // and a failed Mapper attempt opens a new one, so the log's items do not count runs.
-  const mapperTurns = (kase.sessions as { role?: string; turns?: number }[]).find((x) => x.role === "mapper")?.turns ?? 0;
+  // Sessions are shared across deals, so the count shows only once this deal's Mapper has run.
+  const mapperRan = items.some((w) => w.type === "map_lines" && w.state !== "NEW");
+  const mapperTurns = mapperRan ? (kase.sessions as { role?: string; turns?: number }[]).find((x) => x.role === "mapper")?.turns ?? 0 : 0;
   const pending = kase.verdict?.approval_state === "PROPOSED";
   const briefPending = kase.stage === "awaiting_brief" || kase.stage === "brief_ready";
 

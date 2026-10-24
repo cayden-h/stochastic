@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits, type LeverageMove, type PendingConfirm } from "@/lib/edit-context";
 import { editAnchor, findAnchor, num, oldestUnreasoned } from "@/lib/edits";
@@ -247,10 +248,19 @@ function ConfirmBubble({ pending, company, onYes, onNo }: { pending: PendingConf
   );
 }
 
+/** "1 edit needs a reason." or "2 edits need a reason." */
+function waitingLabel(n: number): string {
+  return `${plural(n, "edit")} ${n === 1 ? "needs" : "need"} a reason.`;
+}
+
 /** The companion layer. Pointer-transparent, except for the waiting dot and the bubble. */
 export function Companion() {
   const { kase } = useDeal();
   const ctx = useEdits();
+  // The learned note belongs to the screen it was said on; a page change clears it.
+  const path = usePathname();
+  const clearNote = ctx.clearNote;
+  useEffect(() => { clearNote(); }, [path, clearNote]);
   const reduced = useReducedMotion();
   const markRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -279,7 +289,8 @@ export function Companion() {
     const onLeave = (e: MouseEvent) => { if (!e.relatedTarget) mouse.outside = true; };
     window.addEventListener("pointermove", onMove, { passive: true });
     document.addEventListener("mouseout", onLeave);
-    window.addEventListener("blur", () => { mouse.outside = true; });
+    const onBlur = () => { mouse.outside = true; };
+    window.addEventListener("blur", onBlur);
 
     const frame = (now: number) => {
       const { anchor: key, reduced: still, waiting: hold } = live.current;
@@ -345,6 +356,7 @@ export function Companion() {
       cancelAnimationFrame(raf);
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("mouseout", onLeave);
+      window.removeEventListener("blur", onBlur);
     };
   }, []);
 
@@ -413,7 +425,7 @@ export function Companion() {
           <button
             type="button"
             onClick={() => ctx.ask(waitingEdit.id)}
-            aria-label={`${plural(ctx.edits.filter((e) => e.status === "needs_reason").length, "edit")} needs a reason. Give it now.`}
+            aria-label={`${waitingLabel(ctx.edits.filter((e) => e.status === "needs_reason").length)} Give it now.`}
             title="An edit needs a reason. Click to give it."
             className="pointer-events-auto absolute -top-[9px] -right-[9px] flex size-[22px] cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-agent"
           >

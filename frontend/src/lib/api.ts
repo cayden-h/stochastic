@@ -57,8 +57,9 @@ export const api = {
   reason: (editId: string, reason: { chip: number } | { text: string }, remember: boolean) =>
     post<Edit>(`/edits/${editId}/reason`, { ...reason, remember }),
   revert: (editId: string) => post<EditResponse>(`/edits/${editId}`, undefined, "DELETE"),
-  // The Brief Reader (D20, Tri's T4): enter an amount from the books with its source, then approve the Brief.
-  briefAmount: (dealId: string, body: { field: string; value: number; source_ref: string; inferred?: boolean; note?: string }) =>
+  // The Brief Reader (D20, Tri's T4): set one field of the draft by path (an adjustment amount from the books with its
+  // source, or a correction to any field the reader got wrong), then approve the Brief.
+  amendBrief: (dealId: string, body: { field: string; value: number | string; source_ref?: string; inferred?: boolean; note?: string }) =>
     post<Brief>(`/deals/${dealId}/brief/amounts`, body),
   approveBrief: (dealId: string) => post<Deal>(`/deals/${dealId}/brief/approve`),
 };

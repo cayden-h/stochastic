@@ -12,7 +12,7 @@ import { DownloadFinal, YourEdits } from "@/components/your-edits";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
-import { canEdit } from "@/lib/edits";
+import { canEdit, isAdjustmentFlag } from "@/lib/edits";
 import { canStart, fmtX, isBriefStage, learnedPolicies, plural } from "@/lib/format";
 import type { AuditRow, Stage } from "@/lib/types";
 
@@ -89,6 +89,9 @@ export default function CaseScreen() {
   const briefing = isBriefStage(stage) || deal.brief_status === "draft";
   const draft = deal.brief_status === "draft" ? kase.brief_draft ?? null : null;
   const answered = flags.filter((f) => f.answer && f.payload.kind !== "brief_field");
+  // A learned adjustment flag (D19) is decided on the finished books: it does not hold the agents, only approval.
+  const openAdjustments = open.filter(isAdjustmentFlag);
+  const blocking = open.filter((f) => !isAdjustmentFlag(f));
   // One flag is expanded at a time: the one the controller opened, else the first open one.
   const current = open.find((f) => f.id === currentId) ?? open[0] ?? null;
   const runIds = result?.run_ids_by_tool ?? {};
@@ -96,7 +99,8 @@ export default function CaseScreen() {
   const learned = applied.size;
   const learnedLines = mappings.filter((m) => m.policy_id).length + source_lines.filter((l) => l.covenant_policy_id).length;
   const earlierAnswers = new Set(policies.filter((p) => applied.has(p.id)).map((p) => p.learned_from)).size;
-  const noFlagThisTime = Boolean(verdict) && answered.length === 0 && learned > 0;
+  // "No flag this time" counts the questions that hold the agents; an adjustment flag is not one of them.
+  const noFlagThisTime = Boolean(verdict) && answered.filter((f) => !isAdjustmentFlag(f)).length === 0 && learned > 0 && blocking.length === 0;
   // The whole-line reading as filed, from the answered covenant flag: the comparison stays on screen after the answer.
   const covenantFlag = answered.find((f) => f.payload.kind === "covenant_tag");
   const asFiledOpt = covenantFlag?.options.find((o) => o.basis === "as_filed" && o.leverage != null);
@@ -104,13 +108,14 @@ export default function CaseScreen() {
     ? { leverage: asFiledOpt.leverage!, ok: Boolean(asFiledOpt.ok), run_id: asFiledOpt.run_id } : null;
   const failed = stage === "run_failed";
   const idle = canStart(stage);
-  const working = !idle && !open.length && (!verdict || !verdict.review) && (!briefing || stage === "reading_brief");
+  // The Reviewer keeps working while an adjustment flag is open, so the progress row stays.
+  const working = !idle && !blocking.length && (!verdict || !verdict.review) && (!briefing || stage === "reading_brief");
   const review = verdict?.review?.verdict ?? null;
   const over = verdict?.verdict === "over_limit";
   // The controller's edits (D19). Approval is refused while one has no reason (check 5e).
   const edits = editsCtx.edits;
   const unreasoned = edits.filter((e) => e.status === "needs_reason").length;
-  const canApprove = verdict?.approval_state === "PROPOSED" && review === "pass" && !over && !unreasoned;
+  const canApprove = verdict?.approval_state === "PROPOSED" && review === "pass" && !over && !unreasoned && !openAdjustments.length;
 
   // The lines an open flag is about, by name, so the combined books can show them in amber.
   const flaggedIds = new Set(open.flatMap((f) => (Array.isArray(f.payload.line_ids) ? (f.payload.line_ids as string[]) : [])));
@@ -196,6 +201,7 @@ export default function CaseScreen() {
 
           {current ? (
             <FlagCard
+              approvalReady={verdict?.approval_state === "PROPOSED"}
               key={current.id}
               item={current}
               lines={source_lines}

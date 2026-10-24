@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useEdits } from "@/lib/edit-context";
 import { anchorKey, canEdit, editedSection, num, parseAmount, rowParts, signed } from "@/lib/edits";
-import { clock, plural } from "@/lib/format";
+import { clock, plural, toK } from "@/lib/format";
 import type { Case, Edit, Result, Section, SourceLine } from "@/lib/types";
 import { Button, Card, Label, Mono, Shape } from "./ui";
 
@@ -24,8 +24,7 @@ function neighbour(key: string, back: boolean): string | null {
 
 /** A source line's filed amount in USD thousands: the agents' value before any edit. */
 function sourceK(l: SourceLine): number {
-  const dollars = ["usd", "dollars", "usd dollars", "$"].includes(l.unit.trim().toLowerCase());
-  return dollars ? l.amount / 1000 : l.amount;
+  return toK(l.amount, l.unit);
 }
 
 /** Who changed the cell, when, why, and what it taught. Fixed to the viewport so the card's clipping never cuts it. */
