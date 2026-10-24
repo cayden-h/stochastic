@@ -38,24 +38,27 @@ class MemoryStore:
         self.items: dict[str, WorkItem] = {}
         self.results: dict[str, Result] = {}
         self.tool_runs: dict[str, ToolRun] = {}
+        self.edits: dict[str, Edit] = {}  # controller edits, per deal, ids "e_001"
+        self.agreements: dict[str, AgreementText] = {}  # credit agreement text, per deal
         self.policies: dict[str, Policy] = {}  # agent memory: survives a deal reset
+        self.adjustments: dict[str, LearnedAdjustment] = {}  # agent memory, ids "a_001": survives a deal reset
         self.sessions: dict[str, AgentSession] = {}  # keyed by role
-        self.edits: dict[str, Edit] = {}  # the controller's review edits (D19), part of the deal record
-        self.adjustments: dict[str, LearnedAdjustment] = {}  # agent memory from amount edits: survives a reset
-        self.agreements: dict[str, AgreementText] = {}  # credit agreement texts (D20), part of the deal record
-        self.approved_briefs: dict[str, ApprovedBrief] = {}  # by agreement hash: memory, survives a reset
+        self.approved_briefs: dict[str, ApprovedBrief] = {}  # by agreement hash: agent memory, survives a deal reset
         self.audit: list[AuditRow] = []  # append only, in order
         self._seq: dict[str, int] = {}
 
     def reset_deals(self, keep_memory: bool = True) -> None:
-        """Clear the record. Agent memory (policies and sessions) is kept unless asked otherwise."""
-        memory = (self.policies, self.sessions, self.adjustments, self.approved_briefs)
+        """Clear the record. Agent memory (policies, learned adjustments, approved Briefs, sessions) is kept unless
+        asked otherwise.
+
+        Edits and agreements are per-deal record and are cleared. The counters that memory refers to keep counting,
+        so a new id never repeats one a kept record names: policies (p), adjustments (a), and the edits (e) and work
+        items (wi) in learned_from and edit_id."""
+        memory = (self.policies, self.adjustments, self.approved_briefs, self.sessions)
         seq = dict(self._seq)
         self._clear()
         if keep_memory:
-            self.policies, self.sessions, self.adjustments, self.approved_briefs = memory
-            # The counters that memory refers to keep counting, so a new id never repeats one a kept record names:
-            # policies (p), adjustments (a), and the edits (e) and work items (wi) in learned_from and edit_id.
+            self.policies, self.adjustments, self.approved_briefs, self.sessions = memory
             for prefix in ("p", "a", "e", "wi"):
                 self._seq[prefix] = seq.get(prefix, 0)
 
@@ -89,7 +92,12 @@ class MemoryStore:
         return [r for r in self.results.values() if r.deal_id == deal_id]
 
     def deal_edits(self, deal_id: str) -> list[Edit]:
+        """The deal's edits in insertion order, reverted ones included."""
         return [e for e in self.edits.values() if e.deal_id == deal_id]
+
+    def active_edits(self, deal_id: str) -> list[Edit]:
+        """The deal's edits that count: not reverted, in insertion order."""
+        return [e for e in self.deal_edits(deal_id) if e.status != "reverted"]
 
     def role_policies(self, role: str) -> list[Policy]:
         return [p for p in self.policies.values() if p.role == role and not p.retired_by]

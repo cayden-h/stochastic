@@ -137,7 +137,7 @@ def test_markdown_carries_the_figures_and_run_ids(client):
     assert f"[from source line {', '.join(mapping['line_ids'])}]" in md
     titles = [line[3:] for line in md.splitlines() if line.startswith("## ")]
     assert titles == ["Header", "Test period", "EBITDA", "Debt", "Leverage", "Limit test", "Tie-out", "Decisions",
-                      "Approval", "Mappings"]
+                      "Edits in review", "Approval", "Mappings"]
 
 
 def test_html_escapes_strings(client):

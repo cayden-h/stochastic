@@ -11,6 +11,7 @@ import math
 from collections import OrderedDict
 
 from app.core.models import Brief, Mapping, SourceLine
+from app.tools.edits import active, apply_remap_edits, carry_amount_edits
 
 THOUSANDS = "USD thousands"
 
@@ -31,13 +32,36 @@ def _key(section: str, line: str) -> str:
     return f"{section}:{line.strip().lower()}"
 
 
-def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine], mappings: list[Mapping]) -> dict:
+def _with_amount_edits(platform_lines: list[SourceLine], target_lines: list[SourceLine],
+                       edits) -> tuple[list[SourceLine], list[SourceLine], list[str], dict]:
+    """Apply the active amount edits across both companies' lines, carried by the income statement roll-up rule.
+    Copies only; the inputs are never changed. The last item is {rollup, rollup_notes} for the run output."""
+    edited, applied, rollup, notes = carry_amount_edits(list(platform_lines) + list(target_lines), edits)
+    n = len(platform_lines)
+    return edited[:n], edited[n:], applied, {"rollup": rollup, "rollup_notes": notes}
+
+
+def _in_edit_order(edits, applied: set[str]) -> list[str]:
+    return [e.id for e in active(edits) if e.id in applied]
+
+
+def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine], mappings: list[Mapping],
+                edits=None) -> dict:
     """Add the target's lines onto the platform's lines using the approved mappings.
 
     A target subtotal (is_total) is added only onto a platform subtotal, never onto a detail line, so nothing
     is counted twice. Unmapped target detail lines are reported, never silently dropped.
-    Returns rows in platform order, each with platform, target, combined (USD thousands).
+    The deal's active edits are applied first: amount edits to both companies' lines, remap edits to the mappings.
+    A remapped target line lands on the platform line's own section when the platform has a line of that name.
+    Returns rows in platform order, each with platform, target, combined (USD thousands), and edits_applied.
     """
+    platform_lines, target_lines, amount_ids, carried = _with_amount_edits(platform_lines, target_lines, edits)
+    given = {id(m) for m in mappings}
+    mappings, remap_ids = apply_remap_edits(mappings, target_lines, platform_lines, edits)
+    remapped = {m.target_line_id for m in mappings if id(m) not in given}  # the copies a remap made
+    platform_section = {}
+    for p in platform_lines:
+        platform_section.setdefault(p.line.strip().lower(), p.section)
     by_id = {line.id: line for line in target_lines}
     seen: dict[str, Mapping] = {}
     for m in mappings:  # one target line may land in one place only, or it would be counted twice
@@ -69,10 +93,13 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
             if not t.is_total:
                 unmapped.append({"line": t.line, "amount": round(tv, 3)})
             continue
-        k = _key(t.section, m.platform_line)
+        section = t.section
+        if t.id in remapped:  # a remap may move the line across sections; it lands where the platform line is
+            section = platform_section.get(m.platform_line.strip().lower(), t.section)
+        k = _key(section, m.platform_line)
         row = platform_rows.get(k)
         if row is None:
-            row = platform_rows[k] = {"line": m.platform_line, "section": t.section, "platform": 0.0,
+            row = platform_rows[k] = {"line": m.platform_line, "section": section, "platform": 0.0,
                                       "target": 0.0, "is_total": t.is_total, "target_lines": []}
         if t.is_total and not row["is_total"]:
             skipped_totals.append(t.line)  # a subtotal onto a detail line would double count
@@ -89,7 +116,7 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
         r["combined"] = round(r["platform"] + r["target"], 3)
         rows.append(r)
     return {"rows": rows, "unmapped_target_lines": unmapped, "skipped_target_totals": skipped_totals,
-            "unit": THOUSANDS}
+            "unit": THOUSANDS, "edits_applied": _in_edit_order(edits, set(amount_ids) | set(remap_ids)), **carried}
 
 
 def _find(rows: list[dict], section: str, names: tuple[str, ...]) -> dict | None:
@@ -99,9 +126,10 @@ def _find(rows: list[dict], section: str, names: tuple[str, ...]) -> dict | None
     return None
 
 
-def tie_out(rows: list[dict], tolerance: float = 0.5) -> dict:
+def tie_out(rows: list[dict], tolerance: float = 0.5, edits=None) -> dict:
     """Every row's parts must add to its combined figure. If the balance sheet totals are present,
-    combined total assets must equal combined total liabilities and equity."""
+    combined total assets must equal combined total liabilities and equity.
+    The rows already carry any edits (consolidate applied them); edits_applied lists the active edit ids passed."""
     bad_rows = [r["line"] for r in rows if abs((r["platform"] + r["target"]) - r["combined"]) > tolerance]
     assets = _find(rows, "balance_sheet", ("total assets",))
     liab_eq = _find(rows, "balance_sheet", ("total liabilities and stockholders' equity",
@@ -123,7 +151,7 @@ def tie_out(rows: list[dict], tolerance: float = 0.5) -> dict:
         balance_ok = abs(assets["combined"] - liab_eq["combined"]) <= tolerance
     ok = not bad_rows and (balance_ok is not False) and not missing
     return {"ok": ok, "bad_rows": bad_rows, "balance_sheet_balances": balance_ok, "balance": balance,
-            "rows_checked": len(rows), "missing_totals": missing}
+            "rows_checked": len(rows), "missing_totals": missing, "edits_applied": [e.id for e in active(edits)]}
 
 
 def _matched(lines: list[SourceLine], names: tuple[str, ...], section: str) -> list[str]:
@@ -147,7 +175,7 @@ DA = ("depreciation and amortization", "depreciation", "amortization")
 
 
 def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], brief: Brief,
-           as_filed: bool = False) -> dict:
+           as_filed: bool = False, edits=None) -> dict:
     """Covenant EBITDA, built the way the agreement defines it.
 
     Base, per company: net income plus interest expense less interest income plus income taxes plus depreciation
@@ -157,7 +185,9 @@ def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], bri
     as_filed=True stops at the base: reported EBITDA from the filed statements, with no add-back or deduction.
     That is the reading of someone who has not read the agreement, and it pairs with the whole-line debt figure.
     Expense lines are stored as positive amounts; a tax benefit is stored as a negative amount.
+    The deal's active amount edits are applied to the lines first; edits_applied lists them.
     """
+    platform_lines, target_lines, edit_ids, carried = _with_amount_edits(platform_lines, target_lines, edits)
     parts = []
     base = 0.0
     for company, lines in (("platform", platform_lines), ("target", target_lines)):
@@ -193,7 +223,8 @@ def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], bri
     value = base + total_add - total_ded
     return {"ebitda": round(value, 3), "base": round(base, 3), "addbacks_total": round(total_add, 3),
             "deductions_total": round(total_ded, 3), "parts": parts, "addbacks": addbacks,
-            "deductions": deductions, "basis": "as_filed" if as_filed else "covenant", "unit": THOUSANDS}
+            "deductions": deductions, "basis": "as_filed" if as_filed else "covenant", "unit": THOUSANDS,
+            "edits_applied": edit_ids, **carried}
 
 
 # Borrowed money must be tagged debt, not_debt, or unclear. An 'na' on one of these names is a missed tag.
@@ -204,7 +235,7 @@ NOT_BORROWING_WORDS = ("receivable", "reserve", "allowance", "issuance cost")
 
 
 def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLine], brief: Brief,
-                  naive: bool = False) -> dict:
+                  naive: bool = False, edits=None) -> dict:
     """The covenant's debt figure, from the covenant tags on the balance sheet lines.
 
     Lines tagged `debt` count. Lines tagged `not_debt` are listed as excluded with their note.
@@ -212,7 +243,9 @@ def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLin
     careless reading of the balance sheet gives, and it is reported as naive.
     The borrowing check on `na` lines is a name heuristic that fails loudly, and the fix for a false positive
     is to tag the line `not_debt` with a note.
+    The deal's active amount edits are applied to the lines first; edits_applied lists them.
     """
+    platform_lines, target_lines, edit_ids, carried = _with_amount_edits(platform_lines, target_lines, edits)
     included = []
     excluded = []
     unclear = []
@@ -241,7 +274,7 @@ def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLin
     if unclear and not naive:
         raise ValueError(f"covenant tag is unclear for: {', '.join(unclear)}")
     return {"debt": round(total, 3), "term": brief.debt_term, "included": included, "excluded": excluded,
-            "naive": naive, "unit": THOUSANDS}
+            "naive": naive, "unit": THOUSANDS, "edits_applied": edit_ids, **carried}
 
 
 def leverage(debt: float, ebitda_value: float) -> dict:
@@ -304,18 +337,34 @@ TOOLS = {
     "limit_test": limit_test,
 }
 
+EDIT_RULE = ("An amount edit on an income statement detail line carries into the totals: the first total after it, "
+             "if its name starts with 'Total', moves by the change; every later running total (Gross Profit, "
+             "Operating profit, Income Before Income Taxes, Net Income) moves by the change times the line's sign, "
+             "which is inferred from its name (-1 for a cost, expense, tax, or provision line, +1 for a revenue, "
+             "sales, income, or profit line, -1 for a name with neither, named in rollup_notes). Taxes are not "
+             "recomputed. An income statement detail edit with no later net income total line is refused. Every "
+             "line the carry moved is listed in rollup. An edit on a total line replaces that line only. An amount "
+             "edit on a balance sheet detail line is refused: its roll-up is not defined, so code cannot recompute "
+             "the totals. An edit that matches no line or several lines, or a remap onto a platform total or a line "
+             "the platform does not have, is refused.")
+
 TOOL_DESCRIPTIONS = {
     "consolidate": "Add the target's statement lines onto the platform's lines using the approved mappings. "
-                   "No arguments. Returns rows with platform, target, combined, and the run id.",
+                   "No arguments. Applies the deal's active edits (amount and remap) first. "
+                   "Returns rows with platform, target, combined, edits_applied, and the run id. " + EDIT_RULE,
     "tie_out": "Check that every row's parts add to its combined figure and that the combined balance sheet balances. "
-               "Arguments: run_id (the consolidate run to check).",
-    "ebitda": "Compute covenant EBITDA from the statement lines and the brief's add-backs and deductions. No arguments.",
+               "Arguments: run_id (the consolidate run to check). The rows already carry the deal's active edits; "
+               "edits_applied lists them.",
+    "ebitda": "Compute covenant EBITDA from the statement lines and the brief's add-backs and deductions. "
+              "No arguments. Applies the deal's active amount edits first; edits_applied lists them. " + EDIT_RULE,
     "covenant_debt": "Compute the covenant's debt figure from the covenant tags on balance sheet lines. "
-                     "Arguments: naive (bool, default false) counts unclear lines as debt.",
+                     "Arguments: naive (bool, default false) counts unclear lines as debt. "
+                     "Applies the deal's active amount edits first; edits_applied lists them. " + EDIT_RULE,
     "leverage": "Divide debt by EBITDA. Arguments: debt_run_id and ebitda_run_id (the run ids of your covenant_debt and "
-                "ebitda runs). Numbers are not accepted.",
+                "ebitda runs). Numbers are not accepted. No edits_applied: the edits are on the input runs.",
     "limit_test": "Test leverage against the lender's limit from the brief. Arguments: leverage_run_id or leverage. "
                   "Optional sensitivity: naive_debt_run_id (a covenant_debt run with the whole-line reading) and "
                   "naive_ebitda_run_id (an as-filed ebitda run) add naive_leverage, naive_ok, and naive_flip_addback "
-                  "(the EBITDA at which the as-filed reading reaches the limit).",
+                  "(the EBITDA at which the as-filed reading reaches the limit). "
+                  "No edits_applied: the edits are on the input runs.",
 }

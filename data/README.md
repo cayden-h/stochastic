@@ -12,6 +12,10 @@ Rules:
 
 The API parses uploads with `backend/app/db/loader.py`. The export from `scripts/load_lines.py export` is in this format, with two extra columns (`company`, `note`) that the API ignores; `scripts/load_lines.py` is for exporting the fixture, checking the round-trip, and reading accounting-system exports, not for the API.
 
+With the CSVs, send either `brief` (a JSON string of the Brief) or `agreement_txt`, exactly one. `agreement_txt` is the credit agreement as a UTF-8 `.txt` file of at most 2 MB.
+The Brief Reader drafts the Brief from it, and the controller enters the adjustment amounts from the books (`POST /deals/{id}/brief/amounts`), answers its flags, and approves it (`POST /deals/{id}/brief/approve`) before mapping starts.
+Use a synthetic agreement or excerpts in tests; the cached filings stay out of git.
+
 Upload one UTF-8 CSV per company, each with a header row, at most 2,000 data rows and 2 MB.
 `line` is the statement line name, 1 to 200 characters.
 `section` is one of `income_statement`, `balance_sheet`, or `cash_flow`.

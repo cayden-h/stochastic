@@ -97,21 +97,27 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /deals/{id}/source-lines?company=` | any | Statement lines, both companies or one |
 | `GET /deals/{id}/mappings` | any | Mappings with confidence, reason, flagged, approved_by |
 | `GET /deals/{id}/result` | any | The latest result (404 before the Preparer ran) |
-| `GET /deals/{id}/certificate?format=md\|html\|json` | any | Draft compliance certificate from the approved, posted result (default `md`). Every figure is followed by the id of the tool run that produced it. 409 until the approve_result item is POSTED and the deal stage is `posted`. The `json` dict has `header`, `test_period`, `ebitda`, `debt`, `leverage`, `limit_test`, `tie_out`, `decisions`, `approval`, `mappings`; each figure block carries `run_id`, and its keys are the tool's own output keys. It is a draft, not signed. |
+| `GET /deals/{id}/certificate?format=md\|html\|json` | any | Draft compliance certificate from the approved, posted result (default `md`). Every figure is followed by the id of the tool run that produced it. 409 until the approve_result item is POSTED and the deal stage is `posted`. The `json` dict has `header`, `test_period`, `ebitda`, `debt`, `leverage`, `limit_test`, `tie_out`, `decisions`, `edits`, `approval`, `mappings`; each figure block carries `run_id`, and its keys are the tool's own output keys. `edits` lists each active controller edit (`id`, `kind`, `company`, `line`, `old`, `new`, `reason`, `actor`, `at`, `policy_id`), shown in the section "Edits in review" ("None." when there are none). It is a draft, not signed. |
+| `GET /deals/{id}/export.xlsx` | any | The final workbook, behind the same 409 gate as the certificate (shared helper; detail "final files are available after the controller approves the result"). Sheets: Combined (the result rows, numbers as numbers, with each row's run id; a cell a controller edited has an amber fill and a note with who, when, the old value, the reason, and the policy), Edits (one row per active edit), Audit (Figure, Value, Run id, Tool for EBITDA, debt, leverage, the limit test, the tie-out, and each combined row, then the audit summary, the backend, and "Draft. Not signed."). Figures are read from the same tool runs as the certificate. Served as `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` with `Content-Disposition: attachment; filename="<platform> + <target> combined books.xlsx"` (ASCII only). |
 | `GET /deals/{id}/work-items?state=&type=` | any | Work items |
 | `GET /deals/{id}/audit` | any | Audit rows for the deal and `chain_valid` |
 | `GET /deals/{id}/timeline?bucket=60` | any | Audit rows counted per time bucket, actor, and action family (the action before the colon). Returns `{"deal_id", "bucket_seconds", "source", "buckets": [{"start", "actor", "kind", "rows", "denied"}]}`, sorted by start, actor, kind. `bucket` is whole seconds, 1 to 86400 (422 otherwise); 404 for an unknown deal. On the Postgres store `source` is `time_bucket` (TimescaleDB `time_bucket` on the written audit log of the current ledger); on the memory store, or after a database error (with the fixed `error` text "timeline query failed; see the server log", the detail only in the server log), it is `memory`. Both floor to the TimescaleDB origin 2000-01-03 00:00 UTC, so they give the same buckets. Counts only, no deal figures. |
 | `GET /deals/{id}/runs` | any | Every tool run for the deal |
 | `GET /runs/{run_id}` | any | One tool run: tool, inputs, outputs |
 | `GET /agents/memory` | any | Policies and sessions |
-| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, and `stage` events (shape below) |
-| `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, `brief` (a JSON string of the Brief), and files `platform_csv` and `target_csv`. Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}}`. 422 names the file, row, and column. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
+| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, `stage` events, and `edit` events (shapes below) |
+| `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, files `platform_csv` and `target_csv`, and exactly one of `brief` (a JSON string of the Brief; the reader is skipped) or `agreement_txt` (the credit agreement as a UTF-8 `.txt` file, same 2 MB limit; the deal starts with `brief_status` `none` and the run starts with the Brief Reader, unless an approved Brief for the same agreement hash is reused). Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}, "brief_status"}`. 422 when neither or both of `brief` and `agreement_txt` are sent, for an empty or non-UTF-8 agreement or a name not ending in `.txt`, and naming the file, row, and column for a bad CSV. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
+| `POST /deals/{id}/brief/amounts` | `human:controller` only | Set fields of the draft Brief (D20), most often an adjustment amount from the books with its source. Any draft field can be set by its path (the limit, the lender, the definitions, `debt_excludes[k]`, an adjustment's name, amount, or cap); only an amount needs a `source_ref`. Body `{"amounts": [{"field": "ebitda_addbacks[2].amount", "value": 698.0, "source_ref": "...", "inferred": false, "note": ""}]}` (a new adjustment is added by its `.name` at the next index). Every entry is checked first (path, index, type, source); a bad entry refuses the whole list with 422 naming `amounts[i]`, nothing applied, and a DENIED row. The entries are then applied in order through `gateway.amend_brief` under the gateway lock. The gateway cannot roll back: if it still refuses entry i, the 422 names `amounts[i]` and lists the earlier entries, which stay applied. Returns `{"brief", "brief_draft", "brief_status", "stage"}` (response model `BriefAmountsResponse`). 404 unknown deal; 422 for an empty list, a field path that is not `name[i].attr`, or a `value` that is a boolean, non-finite, too big for a float, 1e12 or more in size, or a number sent as text for an amount, a cap, or the limit (loc `amounts[i].value`, the message names the field path); 403 with a DENIED row for any actor but `human:controller` (an agent, `human:intern`), before any write; 409 when there is no draft or the Brief is approved. |
+| `POST /deals/{id}/brief/approve` | `human:controller` only | Approve the draft Brief through `gateway.approve_brief`; it is locked and the deal is back at stage `new`. The run does not continue by itself: the console calls `POST /deals/{id}/run` next. Returns the deal (response model `Deal`, `brief_status` `approved`, `stage` `new`). 404 unknown deal; 403 with a DENIED row for any actor but `human:controller`, or while a `brief_field` flag is open; 409 when there is no draft (a second approve, or a deal whose Brief came as JSON). |
 | `POST /deals/{id}/run` | human | Run the job runner until the deal waits on a human. Body `{"backend": "droid", "sync": true}` is optional. |
 | `POST /work-items/{id}/answer` | human | `{"option_id": "b"}`. Posts the flag and, if no flag is open, continues the run in the background. `?auto_advance=false` turns that off. |
 | `POST /work-items/{id}/approve` | human | Approve the result. The gateway posts it. |
 | `POST /work-items/{id}/reject` | human | `{"reason": "..."}` |
 | `POST /work-items/{id}/hold` | human | Keep a flag open and log the hold |
 | `POST /work-items/{id}/reverse` | human | `{"reason": "..."}`. A new item linked to the original. Nothing is deleted. |
+| `POST /deals/{id}/edits` | human (controller) | Edit the combined books after the agents and before approval (D19). Body `{"kind": "amount", "company", "line", "value", "section"?}` (`value` in USD thousands, finite) or `{"kind": "remap", "company", "line", "platform_line", "section"?}`. Returns `{"edit", "result", "verdict", "approval", "reasons"}` (response model `EditResponse`); the verdict is read from the recompute's tool runs. 404 unknown deal; 422 for a missing or non-finite `value`, a missing `platform_line`, or a gateway refusal (subtotal, unknown line or company, unchanged value); 403 for any actor but `human:controller`; 409 outside the PROPOSED window or for a second live edit on the line. An income statement detail edit carries into the totals by the roll-up rule in `backend/app/tools/edits.py`; a balance sheet detail edit is refused (422). |
+| `POST /edits/{id}/reason` | human (controller) | `{"chip": 0}` or `{"text": "..."}`, with `"remember": true` by default. Returns the edit (`status` `reasoned`, plus `adjustment_id` or `policy_id` when remembered). 422 when both `chip` and `text` are missing, or for an unknown chip; 404 unknown edit; 409 when the edit already has a reason; 403 for any other actor. |
+| `DELETE /edits/{id}` | human (controller) | Undo an edit (marked `reverted`, never deleted; its policy or adjustment is retired) and recompute. Same shape as `POST /deals/{id}/edits`. 404 unknown edit; 409 when already reverted or outside the PROPOSED window; 403 for any other actor. |
 | `POST /tools/{name}` | agent | `{"deal_id": "...", "inputs": {}}`. Runs a math tool and returns the run. |
 | `POST /dev/reset?keep_memory=true` | dev | Reseed the deal. Agent memory is kept by default; `keep_memory=false` clears it (use it between judges). 409 while a run is in flight; frees the what-if fork slot. |
 
@@ -136,19 +142,24 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
   "backend": { "configured": "scripted", "fallback": "scripted", "anthropic_key": false, "factory_key": true, "last_runs": [ "..." ] },
   "edits": [],
   "adjustments": [],
-  "brief_draft": null
+  "brief_draft": null,
+  "reason_chips": { "amount": [ { "id": 0, "label": "..." } ], "remap": [ "..." ] }
 }
 ```
 
-`edits`, `adjustments`, and `brief_draft` are the phase 2 additions (planned, shapes in the next section).
-They are empty lists and null on the demo deal until an edit is made or a deal is created from agreement text.
-They are not on `CaseResponse` yet.
-Tri adds them to `CaseResponse` in `backend/app/api/schemas.py` (T2 and T4), with `Field` imported from pydantic:
+`edits`, `adjustments`, and `brief_draft` are the phase 2 additions (shapes in the next section).
+They are on `/case` and `CaseResponse` now (verified by `backend/tests/test_case_phase2.py`).
+The edit routes (`POST /deals/{id}/edits`, `POST /edits/{id}/reason`, `DELETE /edits/{id}`) fill `edits` and `adjustments` (verified by `backend/tests/test_api_edits.py`); `brief_draft` is the live draft from `gateway.brief_draft` (the Brief, its citations, its flag ids, `removed`), null for a deal whose Brief came as JSON or before the reader ran (verified by `backend/tests/test_api_brief.py`).
+`deal.brief` is null while a deal from agreement text has no draft yet.
+`reason_chips` holds the chips the edit bubble offers, per kind (`amount`, `remap`), from the gateway's `reason_chips`; they are hardcoded per deal for the demo.
+`edits` lists the deal's edits in order, reverted ones included; `adjustments` lists every learned adjustment, as `policies` does.
+They are declared in `CaseResponse` in `backend/app/api/schemas.py`:
 
 ```python
 edits: list[Edit] = Field(default_factory=list)
 adjustments: list[LearnedAdjustment] = Field(default_factory=list)
 brief_draft: BriefDraft | None = None
+reason_chips: dict[str, list[ReasonChip]] | None = None
 ```
 
 After the Preparer and the Reviewer run, `verdict` is filled:
@@ -301,7 +312,8 @@ The quotes are elided here; the gateway checks each one is an exact substring of
 
 ## Review edits in the gateway (D19)
 
-The gateway functions below are in `backend/app/gateway/gateway.py`; the routes over them are Tri's (T2, `design/review-companion.md` section 10).
+The gateway functions below are in `backend/app/gateway/gateway.py`.
+The routes over them are `POST /deals/{id}/edits`, `POST /edits/{id}/reason`, and `DELETE /edits/{id}` (routes table above; verified by `backend/tests/test_api_edits.py`).
 Every function refuses any actor but `human:controller` with 403 and a DENIED row.
 
 | Function | What it does |
@@ -424,13 +436,23 @@ The scripted reader returns the fixture Brief with the verbatim quotes in `data/
 
 ## The stream
 
-`GET /deals/{id}/stream` sends two kinds of event.
+`GET /deals/{id}/stream` sends three kinds of event.
 Audit events are unchanged.
 A `stage` event is sent once on connect and again whenever the stage changes:
 
 ```
 event: stage
-data: {"deal_id": "d_kequ_nuaire", "stage": "awaiting_flag", "open_flags": ["wi_002"], "at": "<iso timestamp>"}
+data: {"deal_id": "d_kequ_nuaire", "stage": "awaiting_flag", "open_flags": ["wi_002"], "brief_status": "approved", "at": "<iso timestamp>"}
+```
+
+`brief_status` is the deal's (`none`, `draft`, or `approved`).
+Every change of it in the gateway comes with a stage change, so it has no event of its own (verified by `test_the_stage_event_carries_brief_status` and a read of every `brief_status` write in `gateway.py`).
+
+An `edit` event is sent whenever the deal's edits change (an edit applied, reasoned, or reverted), with every edit's id and status in order; nothing is sent on connect while the deal has no edits:
+
+```
+event: edit
+data: {"deal_id": "d_kequ_nuaire", "edits": [{"id": "e_001", "status": "needs_reason"}], "at": "<iso timestamp>"}
 ```
 
 A `: keepalive` comment is sent every 15 seconds.
