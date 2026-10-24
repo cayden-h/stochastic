@@ -13,16 +13,18 @@ export function verbTone(verb: string): string {
   return "text-code";
 }
 
-/** The run column: the tool run id when the row is one, else the row's own hash. */
-function runOf(row: AuditRow): string {
-  return row.target?.startsWith("run_") ? row.target : row.hash.slice(0, 6);
+/** The run column, as in the frame: the tool run id when the row is one, the record's hash on the POSTED row,
+ * else "-". Every row's own hash is in the tooltip. */
+function runOf(row: AuditRow, verb: string): string {
+  if (row.target?.startsWith("run_")) return row.target;
+  return verb === "POSTED" ? row.hash.slice(0, 6) : "-";
 }
 
 export const LOG_COLS = { time: "w-[80px]", actor: "w-[130px]", verb: "w-[100px]", run: "w-[150px]" };
 
 export function AuditRowView({ row, items }: { row: AuditRow; items: WorkItem[] }) {
   const denied = row.result === "DENIED";
-  const verb = verbOf(row);
+  const verb = verbOf(row, items);
   const text = describe(row, items);
   return (
     <div className={`flex w-full items-center gap-[12px] border-b border-line px-[20px] py-[12px] last:border-b-0 ${denied ? "bg-denied-tint" : ""}`}>
@@ -31,7 +33,7 @@ export function AuditRowView({ row, items }: { row: AuditRow; items: WorkItem[] 
       <span className={`${LOG_COLS.actor} flex shrink-0 items-start ${row.actor.startsWith("system") ? "" : "h-[30px]"}`}><ActorChip actor={row.actor} /></span>
       <span className={`${LOG_COLS.verb} shrink-0 text-[13px] font-semibold ${verbTone(verb)}`}>{verb}</span>
       <span className={`min-w-0 flex-1 truncate text-[14px] ${denied ? "text-denied" : "text-body"}`} title={text}>{text}</span>
-      <span className={`${LOG_COLS.run} shrink-0 truncate font-mono text-[12px] text-slate`} title={`${row.target ?? ""} ${row.hash}`}>{runOf(row)}</span>
+      <span className={`${LOG_COLS.run} shrink-0 truncate font-mono text-[12px] text-slate`} title={`${row.target ?? ""} ${row.hash}`}>{runOf(row, verb)}</span>
     </div>
   );
 }

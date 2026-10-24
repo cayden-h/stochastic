@@ -58,7 +58,7 @@ export default function Agents() {
         <div className="relative flex min-w-0 flex-1 flex-col justify-end">
           <div className="flex h-[230px] w-full flex-col gap-[8px] overflow-hidden p-[16px]">
             {chat.map((r) => {
-              const verb = verbOf(r);
+              const verb = verbOf(r, items);
               const text = describe(r, items);
               return (
                 <div key={r.id} className="flex w-full items-center gap-[10px]">

@@ -110,7 +110,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-[rgba(15,41,33,0.45)] p-4" role="dialog" aria-modal="true" aria-label="New deal">
+    <div className="fixed inset-0 z-20 flex items-center justify-center bg-[rgba(15,41,33,0.45)] p-4 pt-[34px]" role="dialog" aria-modal="true" aria-label="New deal">
       <button aria-label="Close" className="absolute inset-0 cursor-default" onClick={onClose} />
       <div className="relative flex w-full max-w-[880px] flex-col gap-[18px] rounded-[20px] bg-white p-[28px] shadow-[0px_24px_60px_0px_rgba(15,41,33,0.3)]">
         <div className="flex w-full items-center gap-[12px]">
@@ -132,11 +132,12 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex w-full gap-[12px]">
+          {/* 125 px slots: the frame's height, where a long file name takes two lines. */}
           {SLOTS.map((s) => {
             const chosen = picked[s.key];
             const shown = chosen ? { name: chosen.file.name, sub: chosen.sub } : current[s.key];
             return (
-              <div key={s.key} className="flex min-w-0 flex-1 flex-col gap-[10px] rounded-[12px] border border-line bg-white p-[14px]">
+              <div key={s.key} className="flex min-h-[125px] min-w-0 flex-1 flex-col gap-[10px] rounded-[12px] border border-line bg-white p-[14px]">
                 <Label>{s.label}</Label>
                 <button
                   className="flex w-full items-center gap-[10px] rounded-[8px] bg-mint-file p-[10px] text-left hover:brightness-[0.98]"

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CombinedPending, CombinedTable } from "@/components/combined-table";
-import { FlagCard, WaitingVerdict } from "@/components/flag-card";
+import { FlagCard, MoreFlags, WaitingVerdict } from "@/components/flag-card";
 import { Page } from "@/components/shell";
 import { Button, Card, Label, Mono, PageHeader, Shape, Tag } from "@/components/ui";
 import { VerdictLine } from "@/components/verdict-line";
@@ -65,11 +65,14 @@ export default function CaseScreen() {
   const { kase, refresh } = useDeal();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [currentId, setCurrentId] = useState<string | null>(null);
 
   if (!kase) return null;
   const { deal, stage, flags, open_flags, verdict, result, mappings, source_lines, policies, audit } = kase;
   const open = flags.filter((f) => open_flags.includes(f.id));
   const answered = flags.filter((f) => f.answer);
+  // One flag is expanded at a time: the one the controller opened, else the first open one.
+  const current = open.find((f) => f.id === currentId) ?? open[0] ?? null;
   const runIds = result?.run_ids_by_tool ?? {};
   const applied = learnedPolicies(mappings, source_lines);
   const learned = applied.size;
@@ -145,17 +148,21 @@ export default function CaseScreen() {
             </Card>
           ) : null}
 
-          {open.map((f, i) => (
+          {current ? (
             <FlagCard
-              key={f.id}
-              item={f}
+              key={current.id}
+              item={current}
               lines={source_lines}
               busy={busy}
-              position={`${i + 1} of ${open.length}`}
-              onAnswer={(id) => act(() => api.answer(f.id, id))}
-              onHold={() => act(() => api.hold(f.id))}
+              position={`${open.indexOf(current) + 1} of ${open.length}`}
+              onAnswer={(id) => act(() => api.answer(current.id, id))}
+              onHold={() => act(() => api.hold(current.id))}
             />
-          ))}
+          ) : null}
+          <MoreFlags items={open.filter((f) => f !== current)} onOpen={setCurrentId} />
+
+          {/* While an agent works the row shows who and for how long, also beside a verdict the Reviewer is checking. */}
+          {working ? <Progress key={stage} stage={stage} /> : null}
 
           {verdict ? (
             <VerdictLine
@@ -164,8 +171,6 @@ export default function CaseScreen() {
               asFiled={asFiled}
               note={sub ? <>{noFlagThisTime ? <><Tag tone="agent">Learned</Tag>{" "}</> : null}{sub}</> : null}
             />
-          ) : working ? (
-            <Progress key={stage} stage={stage} />
           ) : open.length ? (
             <WaitingVerdict text={open.length === 1 ? "Verdict waits on the flag." : `Verdict waits on ${open.length} flags.`} limit={deal.brief.limit} />
           ) : null}

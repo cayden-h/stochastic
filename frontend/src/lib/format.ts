@@ -90,10 +90,22 @@ const VERBS: Record<string, string> = {
   tool: "RAN", policy: "POLICY", session: "SESSION", event: "EVENT", fork: "FORK",
 };
 
-/** Fixed verb list so the log stays scannable. */
-export function verbOf(row: AuditRow): string {
+/** What the gateway's `post` row recorded, in words. Only the approval post puts the books on the record. */
+const POSTED: Record<string, string> = {
+  map_lines: "Mapping recorded.", prepare_result: "Draft books recorded.", review_result: "Review recorded.",
+  flag: "Answer recorded.", approve_result: "Approved and posted to the record.",
+};
+
+function isApprovalPost(row: AuditRow, items: WorkItem[]): boolean {
+  return items.find((i) => i.id === row.target)?.type === "approve_result";
+}
+
+/** Fixed verb list so the log stays scannable. A post of anything but the approval is RECORDED, not POSTED. */
+export function verbOf(row: AuditRow, items: WorkItem[] = []): string {
   if (row.result === "DENIED") return "DENIED";
-  return VERBS[row.action.split(":")[0]] ?? row.action.toUpperCase();
+  const verb = row.action.split(":")[0];
+  if (verb === "post" && !isApprovalPost(row, items)) return "RECORDED";
+  return VERBS[verb] ?? row.action.toUpperCase();
 }
 
 /** One plain line for the log. Uses names the controller already knows. */
@@ -112,7 +124,10 @@ export function describe(row: AuditRow, items: WorkItem[]): string {
   if (verb === "create_deal") return `Deal created. ${row.reason ?? ""}`.trim();
   if (verb === "policy") return `${rest === "learn" ? "Policy learned" : "Policy applied"}. ${row.reason ?? ""}`.trim();
   if (verb === "session") return `Agent session turn. ${row.reason ?? ""}`.trim();
-  if (verb === "post") return `${titleCase(item?.type ?? "item")} posted to the record.`;
+  if (verb === "post") {
+    if (item?.type.startsWith("reverse:")) return `Reversal recorded. ${row.reason ?? ""}`.trim();
+    return POSTED[item?.type ?? ""] ?? `${titleCase(item?.type ?? "item")} recorded.`;
+  }
   if (verb === "approve") return `${titleCase(item?.type ?? "item")} approved. ${row.reason ?? ""}`.trim();
   if (verb === "reject") return `${titleCase(item?.type ?? "item")} rejected. ${row.reason ?? ""}`.trim();
   if (verb === "hold") return "Flag held. The controller is not sure.";

@@ -30,7 +30,7 @@ cd backend && .venv/bin/uvicorn app.main:app --port 8000     # terminal 1
 cd frontend && npm install && npm run dev                      # terminal 2
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000: `/` is the Dashboard and `/case` the Case.
 The console reads `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`).
 On another port, also set the backend's `CORS_ORIGINS`, for example `CORS_ORIGINS=http://localhost:3010`.
 

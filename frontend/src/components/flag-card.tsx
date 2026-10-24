@@ -1,6 +1,6 @@
 "use client";
 
-import { fmtX, lineK } from "@/lib/format";
+import { fmtX, lineK, plural } from "@/lib/format";
 import type { SourceLine, WorkItem } from "@/lib/types";
 import { SourceChip } from "./source";
 import { ActorChip, Button, Mono, Shape, Tag } from "./ui";
@@ -32,8 +32,8 @@ function splitQuestion(q: string): [string, string] {
 }
 
 /**
- * One flag: the question, the options with their computed effects, then the filing evidence (collapsed for a
- * covenant flag, so the readings sit right under the question on a projector).
+ * One flag: the question and the options with their readings, then the evidence, collapsed: each option's effect
+ * sentence and run id, the flagged lines, and the filing quotes. The readings sit right under the question on a projector.
  * The ratio, verdict, effect text and run id come from the gateway's tool runs. Nothing here is computed.
  */
 export function FlagCard({
@@ -48,16 +48,17 @@ export function FlagCard({
   const lineIds = Array.isArray(item.payload.line_ids) ? (item.payload.line_ids as string[]) : [];
   const flagged = lines.filter((l) => lineIds.includes(l.id));
   const [heading, detail] = splitQuestion(item.question ?? "");
+  const letter = (i: number) => String.fromCharCode(97 + i);
   return (
     <section className="flex w-full flex-col gap-[14px] rounded-card border border-amber-line bg-white p-[20px]">
-      <div className="flex w-full flex-wrap items-center gap-[10px]">
+      <div className="flex w-full items-center gap-[10px] whitespace-nowrap">
         <ActorChip actor={item.proposed_by} />
         <span className="inline-flex items-center gap-[6px] text-[11px] font-semibold uppercase tracking-[0.88px] text-escalation">
           <Shape kind="triangle" size={10} />
           {kind}
         </span>
         <span className="flex-1" />
-        <Button kind="link" onClick={onHold} disabled={busy}>Not sure. Hold this item.</Button>
+        <Button kind="link" className="text-[13px]" onClick={onHold} disabled={busy}>Not sure. Hold this item.</Button>
         <Mono>{position}</Mono>
       </div>
 
@@ -77,44 +78,44 @@ export function FlagCard({
               key={o.id}
               disabled={busy}
               onClick={() => onAnswer(o.id)}
+              title={o.effect}
               className={`flex min-w-0 flex-1 flex-col items-start gap-[6px] self-stretch rounded-[12px] p-[16px] text-left transition-colors duration-150 disabled:opacity-50 ${
                 suggested ? "border-2 border-clear bg-mint-select p-[15px] hover:bg-mint" : "border border-line bg-white hover:bg-mint-select"
               }`}
             >
               <span className="flex w-full items-start gap-[6px] text-forest">
-                <span className="pt-[2px] font-mono text-[12px]">{String.fromCharCode(97 + i)}.</span>
+                <span className="pt-[2px] font-mono text-[12px]">{letter(i)}.</span>
                 <span className="min-w-0 flex-1 text-[14px] font-semibold">{o.label}</span>
-                {/* With a reading, the tag sits beside the figure so a long label keeps the card's width. */}
-                {suggested && o.leverage == null ? <Tag>Suggested</Tag> : null}
+                {suggested ? <Tag>Suggested</Tag> : null}
                 {o.added_by ? <ActorChip actor={o.added_by} /> : null}
               </span>
               {o.leverage != null ? (
                 <>
-                  <span className="flex w-full items-center gap-[8px]">
-                    <span className={`flex-1 text-[30px] font-semibold ${ok ? "text-clear" : "text-denied"}`}>{fmtX(o.leverage)}</span>
-                    {suggested ? <Tag>Suggested</Tag> : null}
-                  </span>
-                  <span className={`inline-flex items-center gap-[4px] text-[13px] font-medium ${ok ? "text-clear" : "text-denied"}`}>
-                    <Shape kind={ok ? "check" : "cross"} size={10} />
-                    {ok ? "OK" : "Over the limit"}
-                  </span>
+                  <span className={`text-[30px] font-semibold ${ok ? "text-clear" : "text-denied"}`}>{fmtX(o.leverage)}</span>
+                  <span className={`text-[13px] font-medium ${ok ? "text-clear" : "text-denied"}`}>{ok ? "OK" : "Over the limit"}</span>
                 </>
               ) : null}
-              <span className="text-[12px] leading-[16px] text-slate">{o.effect}</span>
-              {o.run_id ? <Mono className="text-[11px]">{o.run_id}</Mono> : null}
             </button>
           );
         })}
       </div>
 
-      {flagged.length || item.evidence.length ? (
-        <details className="group rounded-[12px] border border-line bg-fog px-[14px] py-[10px]" open={!covenant}>
-          <summary className="cursor-pointer text-[13px] font-semibold text-forest">
-            Evidence: {flagged.length ? `${flagged.length} line${flagged.length === 1 ? "" : "s"}` : ""}
-            {flagged.length && item.evidence.length ? ", " : ""}
-            {item.evidence.length ? `${item.evidence.length} quote${item.evidence.length === 1 ? "" : "s"} from the filings` : ""}
-          </summary>
+      <details className="group rounded-[12px] border border-line bg-fog px-[14px] py-[10px]">
+        <summary className="cursor-pointer text-[13px] font-semibold text-forest">
+          Evidence: {plural(item.options.length, "effect")}
+          {flagged.length ? `, ${plural(flagged.length, "line")}` : ""}
+          {item.evidence.length ? `, ${plural(item.evidence.length, "quote")} from the filings` : ""}
+        </summary>
           <div className="mt-[10px] flex flex-col gap-[12px]">
+            <div className="flex flex-col gap-[6px] rounded-[8px] border border-line bg-white px-[12px] py-[10px]">
+              {item.options.map((o, i) => (
+                <div key={o.id} className="flex items-baseline gap-[8px] text-[13px]">
+                  <span className="font-mono text-[12px] text-forest">{letter(i)}.</span>
+                  <span className="min-w-0 flex-1 text-body">{o.effect}</span>
+                  {o.run_id ? <Mono>{o.run_id}</Mono> : null}
+                </div>
+              ))}
+            </div>
             {flagged.length ? (
               <div className="flex flex-col gap-[4px] rounded-[8px] border border-line bg-white px-[12px] py-[10px]">
                 {flagged.map((l) => (
@@ -142,7 +143,6 @@ export function FlagCard({
             ) : null}
           </div>
         </details>
-      ) : null}
     </section>
   );
 }
@@ -154,5 +154,24 @@ export function WaitingVerdict({ text, limit }: { text: string; limit: number })
       <span className="min-w-0 flex-1">{text}</span>
       <span className="whitespace-nowrap">- of {fmtX(limit)}</span>
     </div>
+  );
+}
+
+/** The other open flags, folded to one row under the current one. Opening it makes the next flag current. */
+export function MoreFlags({ items, onOpen }: { items: WorkItem[]; onOpen: (id: string) => void }) {
+  if (!items.length) return null;
+  const [heading] = splitQuestion(items[0].question ?? "");
+  return (
+    <button
+      onClick={() => onOpen(items[0].id)}
+      className="flex w-full items-center gap-[12px] rounded-card border border-amber-line bg-white px-[20px] py-[14px] text-left transition-colors duration-150 hover:bg-amber-tint"
+    >
+      <span className="inline-flex items-center gap-[6px] text-[13px] font-semibold whitespace-nowrap text-escalation">
+        <Shape kind="triangle" size={10} />
+        {items.length === 1 ? "1 more question" : `${items.length} more questions`}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[14px] text-body">{heading}</span>
+      <span className="text-[13px] font-semibold whitespace-nowrap text-forest">Open</span>
+    </button>
   );
 }
