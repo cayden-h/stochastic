@@ -45,10 +45,33 @@ def test_policy_scope_defaults_to_company():
     p = Policy(id="p_1", role="agent:mapper", kind="covenant_tag", pattern="term loan", decision="debt", reason="r",
                approved_by=CONTROLLER, learned_from="wi_002", deal_id=DEAL_ID, company="Nu Aire")
     assert p.scope == "company" and p.platform is None
-    remap = p.model_copy(update={"kind": "mapping", "scope": "platform", "platform": "Kewaunee", "company": None})
-    assert Policy.model_validate_json(remap.model_dump_json()).scope == "platform"
     with pytest.raises(ValidationError):
         Policy.model_validate({**p.model_dump(), "scope": "deal"})
+
+
+def _remap_policy(**fields) -> Policy:
+    return Policy(id="p_2", role="agent:mapper", kind="mapping", pattern="short-term investments",
+                  decision="Short-term investments", reason="Not a cash equivalent (over 90 days)",
+                  approved_by=CONTROLLER, learned_from="e_2", deal_id=DEAL_ID, **fields)
+
+
+def test_policy_platform_matches_scope():
+    remap = _remap_policy(scope="platform", platform="Kewaunee")
+    assert Policy.model_validate_json(remap.model_dump_json()) == remap
+    with pytest.raises(ValidationError):
+        _remap_policy(scope="platform")  # no platform
+    with pytest.raises(ValidationError):
+        _remap_policy(scope="platform", platform="")
+    with pytest.raises(ValidationError):
+        _remap_policy(platform="Kewaunee")  # company scope with a platform
+
+
+def test_an_approved_deal_needs_its_brief():
+    body = {**_fixture_deal().model_dump(), "brief": None}
+    with pytest.raises(ValidationError):
+        Deal.model_validate(body)  # brief_status defaults to approved
+    for status in ("draft", "none"):
+        assert Deal.model_validate({**body, "brief_status": status}).brief is None
 
 
 def test_edit_and_learned_adjustment_round_trip():
@@ -114,3 +137,23 @@ def test_edit_kind_allows_its_own_fields():
                 section="income_statement", new_value=1.0).old_value is None
     assert Edit(id="e_2", deal_id=DEAL_ID, kind="remap", company="Nu Aire", line="Net revenues",
                 section="income_statement", new_platform_line="Net sales").old_platform_line is None
+
+
+def test_reason_chip_range_and_reasoned_needs_a_reason():
+    base = dict(id="e_1", deal_id=DEAL_ID, kind="amount", company="Nu Aire", line="Net revenues",
+                section="income_statement", new_value=1.0)
+    for chip in (-1, 3):
+        with pytest.raises(ValidationError):
+            Edit(**base, reason_chip=chip)
+    with pytest.raises(ValidationError):
+        Edit(**base, status="reasoned")
+    with pytest.raises(ValidationError):
+        Edit(**base, status="reasoned", reason_text="")
+    assert Edit(**base, status="reasoned", reason_chip=0).reason_chip == 0
+    assert Edit(**base, status="reasoned", reason_text="typed").reason_text == "typed"
+
+
+def test_learned_adjustment_has_a_time():
+    adj = LearnedAdjustment(id="a_1", deal_id=DEAL_ID, company="Nu Aire", line="Net revenues", amount=1.0,
+                            reason="r", edit_id="e_1")
+    assert adj.at.tzinfo is not None

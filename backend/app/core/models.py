@@ -36,9 +36,6 @@ class State(str, Enum):
 # Work-item types used by the job runner and the gateway.
 ItemType = Literal["map_lines", "flag", "prepare_result", "review_result", "approve_result", "draft_brief"]
 
-# The kind of a flag work item, in its payload. "brief_field" is a Brief Reader field the controller must settle (D20).
-FlagKind = Literal["covenant_tag", "mapping", "brief_field"]
-
 CONTROLLER = "human:controller"
 MAPPER = "agent:mapper"
 PREPARER = "agent:preparer"
@@ -129,6 +126,13 @@ class Deal(BaseModel):
     # "approved" for a Brief sent as JSON (the fixture deal); "draft" while the controller reviews the reader's draft;
     # "none" before the reader ran. Mapping and the covenant tools wait for "approved".
     brief_status: Literal["approved", "draft", "none"] = "approved"
+
+    @model_validator(mode="after")
+    def _approved_needs_brief(self) -> Deal:
+        """An approved deal always has its Brief; a draft or none may have no Brief until the reader runs."""
+        if self.brief_status == "approved" and self.brief is None:
+            raise ValueError("a deal with brief_status approved needs a brief")
+        return self
     # "covenant" (the agreement's EBITDA) unless the controller chose the as-filed whole-line reading on a flag.
     ebitda_basis: Literal["covenant", "as_filed"] = "covenant"
     situation: str = "PE add-on integration"
@@ -225,6 +229,15 @@ class Policy(BaseModel):
     at: datetime = Field(default_factory=now)
     times_applied: int = 0
 
+    @model_validator(mode="after")
+    def _platform_matches_scope(self) -> Policy:
+        """A platform policy names its platform, and a company policy does not."""
+        if self.scope == "platform" and not self.platform:
+            raise ValueError("a platform policy needs platform")
+        if self.scope == "company" and self.platform is not None:
+            raise ValueError("a company policy must not set platform")
+        return self
+
 
 class AgentSession(BaseModel):
     """One agent's running state: its backend session id and a short transcript of what it did.
@@ -278,7 +291,7 @@ class Edit(BaseModel):
     old_platform_line: str | None = None
     new_platform_line: str | None = None
     status: EditStatus = "needs_reason"
-    reason_chip: int | None = None  # the ReasonChip id the controller picked
+    reason_chip: int | None = Field(default=None, ge=0, le=2)  # the ReasonChip id the controller picked
     reason_text: str | None = None  # the chip's label, or what the controller typed
     remember: bool = True
     policy_id: str | None = None  # set by the gateway when a reasoned remap made a policy
@@ -300,6 +313,8 @@ class Edit(BaseModel):
                 raise ValueError("a remap edit needs new_platform_line")
             if self.old_value is not None or self.new_value is not None:
                 raise ValueError("a remap edit must not set old_value or new_value")
+        if self.status == "reasoned" and self.reason_chip is None and not self.reason_text:
+            raise ValueError("a reasoned edit needs reason_chip or reason_text")
         return self
 
 
@@ -317,6 +332,7 @@ class LearnedAdjustment(BaseModel):
     reason: str
     edit_id: str
     status: Literal["applied", "proposed", "retired"] = "applied"
+    at: datetime = Field(default_factory=now)
 
 
 class ReasonChip(BaseModel):
@@ -345,7 +361,7 @@ class BriefCitation(BaseModel):
     """The quote behind one Brief field. The gateway refuses a quote that is not in the agreement."""
 
     field: str  # path in the Brief, such as "limit" or "ebitda_addbacks[1].cap"
-    quote: str  # verbatim, at least four words
+    quote: str  # the model's verbatim quote; the gateway enforces that it is in the agreement and at least four words
     section: str
     confidence: float = Field(ge=0, le=1)
     note: str = ""

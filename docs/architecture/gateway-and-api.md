@@ -171,6 +171,8 @@ Amounts are in USD thousands.
 One change the controller made to the combined books, recorded on top of the agents' run.
 `kind` is `amount` (uses `old_value` and `new_value`) or `remap` (uses `old_platform_line` and `new_platform_line`).
 `status` is `needs_reason`, `reasoned`, or `reverted`.
+A `reasoned` edit has `reason_chip` (0 to 2) or `reason_text`.
+An `amount` edit must have `new_value` and no platform lines; a `remap` edit must have `new_platform_line` and no values.
 Planned (C2): approval will be refused while any edit is `needs_reason`.
 The gateway does not check this yet.
 `policy_id` and `adjustment_id` are set by the gateway when a reasoned edit with `remember` teaches something.
@@ -211,7 +213,8 @@ In the spec this is called `Adjustment`; the code names it `LearnedAdjustment`, 
 ```json
 {
   "id": "a_001", "deal_id": "d_kequ_nuaire", "company": "Nu Aire", "line": "Selling, general and administrative",
-  "amount": 9312.0, "reason": "One-time acquisition cost, an allowed add-back", "edit_id": "e_001", "status": "applied"
+  "amount": 9312.0, "reason": "One-time acquisition cost, an allowed add-back", "edit_id": "e_001", "status": "applied",
+  "at": "2026-10-25T10:45:00Z"
 }
 ```
 
@@ -229,6 +232,7 @@ They are hardcoded per deal for the demo, and the pitch says so.
 ### Policy.scope
 
 `Policy` gains `scope` (`company` by default, or `platform`) and `platform` (the platform name, for `platform` scope).
+A `platform` policy must name its platform, and a `company` policy must leave `platform` null.
 Existing policies read back as `company`, so the D18 rule on `not_debt` tags is unchanged.
 
 ```json
@@ -243,10 +247,11 @@ Existing policies read back as `company`, so the D18 rule on `not_debt` tags is 
 
 ### The Brief Reader types
 
-- The actor `agent:brief_reader` (`BRIEF_READER`), the work item type `draft_brief`, and the flag kind `brief_field` (`FlagKind`).
+- The actor `agent:brief_reader` (`BRIEF_READER`) and the work item type `draft_brief`.
 - `Deal.brief_status` is `approved`, `draft`, or `none`.
   The default is `approved`, so a deal created with a Brief JSON, like the demo deal, is unchanged.
   `Deal.brief` is null only while a deal created from agreement text has no draft yet.
+  A deal with `brief_status` `approved` must have a Brief; the model refuses it otherwise.
 - `AgreementText` holds the agreement apart from `Deal`, because `/case` returns the whole deal: `id`, `deal_id`, `text`, `sha256`, `source`.
 - `BriefCitation` is the quote behind one field: `field` (a path such as `ebitda_addbacks[1].cap`), `quote`, `section`, `confidence` (0 to 1), `note`.
 - `BriefFieldFlag` is a field the controller must settle: `kind` (`brief_field`), `field`, `question`, `evidence`, `proposed` (the reader's value, or null).
