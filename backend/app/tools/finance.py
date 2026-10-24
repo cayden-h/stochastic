@@ -6,6 +6,8 @@ Owner: Tri (backend/app/tools/). Cayden wrote the first version so the agents ha
 """
 from __future__ import annotations
 
+import math
+
 from collections import OrderedDict
 
 from app.core.models import Brief, Mapping, SourceLine
@@ -240,6 +242,8 @@ def covenant_debt(platform_lines: list[SourceLine], target_lines: list[SourceLin
 
 
 def leverage(debt: float, ebitda_value: float) -> dict:
+    if not (math.isfinite(debt) and math.isfinite(ebitda_value)):
+        raise ValueError("debt and ebitda must be finite numbers")
     if ebitda_value <= 0:
         raise ValueError("ebitda must be positive")
     return {"leverage": round(debt / ebitda_value, 3), "debt": round(debt, 3), "ebitda": round(ebitda_value, 3)}

@@ -7,7 +7,7 @@ Swap tasks freely and tell the team when you do.
 
 ## State of the build
 
-The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.79x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 68 tests pass. [verified: `backend/tests/test_trust_rules.py`]
+The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.79x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 99 tests pass. [verified: `backend/tests/test_trust_rules.py`]
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded. Not yet run live: the Anthropic backend (no key in `.env`).
 Not yet done: the console on the new API, the Note 2 answer key, the Devpost text, the recorded model run, the rehearsals.
 

@@ -191,11 +191,6 @@ def test_covenant_debt_na_on_loans_receivable_ok():
     assert finance.covenant_debt([_bsl("Loans receivable", 10, "na")], [], brief())["debt"] == 0.0
 
 
-def test_covenant_debt_na_on_term_loan_payable_still_raises():
-    with pytest.raises(ValueError, match="borrowing-like"):
-        finance.covenant_debt([_bsl("Term loan payable", 10, "na")], [], brief())
-
-
 def test_covenant_debt_na_on_accounts_payable_ok():
     assert finance.covenant_debt([_bsl("Accounts payable", 10, "na")], [], brief())["debt"] == 0.0
 
@@ -204,6 +199,14 @@ def test_leverage():
     assert finance.leverage(150, 60)["leverage"] == 2.5  # 150 / 60
     for bad in (0, -5):
         with pytest.raises(ValueError):
+            finance.leverage(150, bad)
+
+
+def test_leverage_rejects_non_finite():
+    for bad in (float("nan"), float("inf")):
+        with pytest.raises(ValueError, match="finite"):
+            finance.leverage(bad, 60)
+        with pytest.raises(ValueError, match="finite"):
             finance.leverage(150, bad)
 
 

@@ -190,7 +190,7 @@ cp .env.example .env                                        # then add keys; AGE
 cd backend
 uv venv --python 3.12 .venv
 uv pip install -p .venv/bin/python fastapi "uvicorn[standard]" pydantic pytest httpx python-dotenv python-multipart anthropic "droid-sdk[mcp]"
-.venv/bin/python -m pytest -q                               # 93 trust-rule and math tests on the real figures
+.venv/bin/python -m pytest -q                               # 99 trust-rule and math tests on the real figures
 .venv/bin/uvicorn app.main:app --port 8000 --reload
 
 cd frontend
@@ -243,7 +243,7 @@ Every figure is from the filings or computed by the tools. [verified: `backend/t
 3. The credit agreement's Senior Funded Bank Debt excludes the capital lease on that property and excludes subordinated debt. [Ex 10.1]
 4. The Mapper tags the line unclear and raises a flag with three options. The gateway runs the tools for each option and writes the effect on the card.
 5. Whole line: debt $71,955K, leverage 2.61x, over the limit. Agreement's reading: debt $21,633K, leverage 0.79x, OK. Bank debt plus seller notes: 1.61x.
-6. Covenant EBITDA is $27,519K: both companies' net income plus interest, taxes, and D&A, plus the $4,177K noncash pension add-back, less $1,970K of Statesville cash rent (inferred from the 10-K obligations table).
+6. Covenant EBITDA is $27,519K: both companies' net income plus interest expense less interest income, plus taxes, depreciation, and amortization, plus the $4,177K noncash pension add-back, less $1,970K of Statesville cash rent (inferred from the 10-K obligations table).
 7. The controller picks b. The Preparer calls consolidate, ebitda, covenant_debt, and leverage. The Reviewer calls tie_out and limit_test. The controller approves and the gateway posts.
 8. Reset and run again: the Mapper applies the policy and asks nothing.
 

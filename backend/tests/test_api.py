@@ -131,11 +131,12 @@ def platform_csv(income_label="Net income"):
             "Interest expense,income_statement,FY2025,100,USD thousands,p3,false\n"
             "Income tax expense,income_statement,FY2025,200,USD thousands,p4,false\n"
             "Depreciation,cash_flow,FY2025,300,USD thousands,p5,false\n"
-            "Long-term debt,balance_sheet,FY2025,3000,USD thousands,p6,false\n")
+            "Short-term borrowings,balance_sheet,FY2025,3000,USD thousands,p6,false\n")
 
 
 TARGET_CSV = (f"{HDR}\nSales,income_statement,FY2025,5000000,USD,t1,false\n"
               "Net income,income_statement,FY2025,400000,USD,t2,false\n"
+              "Depreciation,cash_flow,FY2025,50000,USD,t4,false\n"
               "Notes payable,balance_sheet,FY2025,1000000,USD,t3,false\n")
 
 
@@ -151,12 +152,19 @@ def test_upload_creates_deal_and_runs():
     r = upload(c)
     assert r.status_code == 201, r.text
     body = r.json()
-    assert body["lines"] == {"platform": 6, "target": 3} and body["stage"] == "new"
+    assert body["lines"] == {"platform": 6, "target": 4} and body["stage"] == "new"
     did = body["deal_id"]
     assert did in [d["id"] for d in c.get("/deals").json()]
     CaseResponse.model_validate(c.get(f"/deals/{did}/case").json())
     run = c.post(f"/deals/{did}/run")
     assert run.status_code == 200 and "stage" in run.json()
+    case = c.get(f"/deals/{did}/case").json()
+    for fid in case["open_flags"]:
+        flag = next(f for f in case["flags"] if f["id"] == fid)
+        assert c.post(f"/work-items/{fid}/answer?auto_advance=false", json={"option_id": flag["default"]}).status_code == 200
+    assert c.post(f"/deals/{did}/run").status_code == 200
+    case = c.get(f"/deals/{did}/case").json()
+    assert case["verdict"] is not None and case["verdict"]["verdict"] in ("ok", "over_limit")
 
 
 def test_upload_does_not_judge_names_but_ebitda_guardrail_reaches_api():
@@ -263,3 +271,20 @@ def test_app_registers_body_limit():
     r = c.post("/deals", content=b"x", headers={"content-length": str(100 * 1024 * 1024), "content-type": "text/plain"})
     assert r.status_code == 413
     assert "larger than" in r.json()["detail"]
+
+
+@pytest.mark.parametrize("path,value", [
+    ("ebitda_addbacks[0].amount", "NaN"), ("ebitda_addbacks[0].amount", "1e400"),
+    ("ebitda_addbacks[0].cap", "NaN"), ("ebitda_addbacks[0].cap", "1e400"),
+])
+def test_upload_rejects_non_finite_brief_figures(path, value):
+    c = TestClient(create_app())
+    field = path.split("[")[0], path.rsplit(".", 1)[1]
+    adj = {"name": "x", "amount": 1.0, "cap": None, "source_ref": "s"}
+    adj[field[1]] = value
+    text = json.dumps({**BRIEF, "ebitda_addbacks": [adj]}).replace(f'"{value}"', value)
+    files = {"platform_csv": ("p.csv", platform_csv(), "text/csv"), "target_csv": ("t.csv", TARGET_CSV, "text/csv")}
+    r = c.post("/deals", files=files, data={"name": "A", "platform": "A", "target": "B", "brief": text})
+    assert r.status_code == 422, r.text
+    assert f"brief: {path} must be finite" in r.json()["detail"]
+    assert c.get("/deals").status_code == 200

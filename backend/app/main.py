@@ -20,9 +20,10 @@ def create_app() -> FastAPI:
     gateway = Gateway(store)
     seed(store, gateway)
     app = FastAPI(title="Stochastic gateway API", version="0.2.0")
+    app.add_middleware(BodyLimitMiddleware, max_bytes=MAX_BODY_BYTES)
+    # CORS is added last so it is outermost and a 413 still carries CORS headers
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins),
                        allow_methods=["*"], allow_headers=["*"])
-    app.add_middleware(BodyLimitMiddleware, max_bytes=MAX_BODY_BYTES)
     app.include_router(build_router(gateway))
 
     @app.post("/dev/reset")

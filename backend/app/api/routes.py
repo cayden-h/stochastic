@@ -51,6 +51,16 @@ def _debt_capacity(store, result) -> tuple[float | None, str | None]:
     return None, None
 
 
+def first_non_finite(brief: Brief) -> str | None:
+    """Path of the first NaN or infinite figure in the brief, or None. A cap may be None."""
+    fields = []  # limit has its own check in the route
+    for group in ("ebitda_addbacks", "ebitda_deductions"):
+        for i, adj in enumerate(getattr(brief, group)):
+            fields += [(f"{group}[{i}].amount", adj.amount), (f"{group}[{i}].cap", adj.cap)]
+    fields += [(f"closing_financing[{i}].amount", f.amount) for i, f in enumerate(brief.closing_financing)]
+    return next((path for path, v in fields if v is not None and not math.isfinite(v)), None)
+
+
 def build_router(gw: Gateway) -> APIRouter:
     r = APIRouter()
     store = gw.store
@@ -221,6 +231,9 @@ def build_router(gw: Gateway) -> APIRouter:
             parsed_brief = Brief.model_validate_json(brief)
         except ValidationError as error:
             raise HTTPException(status_code=422, detail=f"brief: {error.errors()[0]['loc']} {error.errors()[0]['msg']}")
+        bad_path = first_non_finite(parsed_brief)
+        if bad_path:
+            raise HTTPException(status_code=422, detail=f"brief: {bad_path} must be finite")
         if not math.isfinite(parsed_brief.limit) or parsed_brief.limit <= 0:
             raise HTTPException(status_code=422, detail="brief: limit must be a finite number greater than 0")
         deal_id = store.next_id("d")

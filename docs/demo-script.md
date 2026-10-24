@@ -122,9 +122,9 @@ The card shows (all from the API, nothing typed by hand):
 
 | Option | Effect on the card | Verdict |
 | --- | --- | --- |
-| a. Whole line counts (70,885K) | Senior Funded Bank Debt 71,955K. Leverage 2.61x against 2.50x. | Over the limit |
+| a. Whole line counts (70,885K) | Senior Funded Bank Debt 71,955K. Leverage 2.62x against 2.50x. | Over the limit |
 | b. Only the PNC term loan and revolver count | Senior Funded Bank Debt 21,633K. Leverage 0.79x against 2.50x. | OK |
-| c. PNC debt and the seller notes count | Senior Funded Bank Debt 44,173K. Leverage 1.61x against 2.50x. | OK |
+| c. PNC debt and the seller notes count | Senior Funded Bank Debt 44,173K. Leverage 1.60x against 2.50x. | OK |
 
 A second, smaller flag asks where Nu Aire's Certificates of Deposit ($991K) belong. Answer it with the default (cash equivalents) in one click, or raise the Mapper threshold to drop it.
 
@@ -192,7 +192,8 @@ Also say, if time allows: other situations are roadmap, not built. The output is
 
 Before the first rehearsal:
 - [ ] Both input CSVs and the brief are final. Cached filings are in `data/` and stay out of git.
-- [ ] Both leverage figures match the tool runs on screen (0.79x covenant, 2.61x naive). No PLACEHOLDER shows anywhere.
+- [ ] Both leverage figures match the tool runs on screen (0.79x covenant, 2.62x naive in the effect text). No PLACEHOLDER shows anywhere.
+- [ ] The effect text rounds twice (2.6148 shows as 2.62x, 1.6052 as 1.60x); the gateway owner should format from the unrounded ratio.
 - [ ] The flag card effect text matches the computed numbers.
 - [ ] The tests with the real figures pass, including the tie-out test and the naive-versus-covenant test.
 - [ ] The recorded run exists and replays.
