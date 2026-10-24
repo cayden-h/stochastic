@@ -9,14 +9,16 @@ Needs the `droid` CLI on PATH and FACTORY_API_KEY. Any failure raises, and the r
 from __future__ import annotations
 
 import asyncio
+import glob
 import json
 import os
+import re
 import tempfile
 
 from pydantic import BaseModel
 
 from app.agents.roles import Role
-from app.agents.settings import role_model
+from app.agents.settings import role_model, role_reasoning
 from app.tools.finance import TOOL_DESCRIPTIONS
 
 
@@ -74,6 +76,9 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None):
         model = role_model("DROID_MODEL", role.name)
         if model:
             kwargs["model"] = model
+        effort = role_reasoning("DROID", role.name)
+        if effort:
+            kwargs["reasoning_effort"] = effort
         result = await run(prompt, **kwargs)
     if not result.success or result.output is None:
         raise RuntimeError(f"droid run failed: {getattr(result, 'error', None)} "
@@ -86,9 +91,41 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None):
             v = getattr(usage, k, None)
             if v is not None:
                 cost[k] = v
+    served = served_model(result.session_id)
     return result.output, {"session_id": result.session_id, "turns": result.turn_count,
                            "duration": getattr(result, "duration", None), "model_requested": model or "droid default",
-                           "model_confirmed": False, "usage": cost}
+                           "reasoning_effort_requested": effort,
+                           "model_served": served.get("model"), "reasoning_effort_served": served.get("reasoning_effort"),
+                           "model_confirmed": bool(model) and served.get("model") == model, "usage": cost}
+
+
+SESSIONS_DIR = os.getenv("FACTORY_SESSIONS_DIR", os.path.expanduser("~/.factory/sessions"))
+
+
+def served_model(session_id: str | None, sessions_dir: str | None = None) -> dict:
+    """What the droid CLI wrote into its own session record: the model id and reasoning effort on each assistant
+    message. The run result carries neither, so this is how a Droid run confirms its model. The record is local
+    (`~/.factory/sessions/<cwd>/<session id>.jsonl`). Returns {} when the record is missing or names several models."""
+    if not session_id:
+        return {}
+    root = sessions_dir or SESSIONS_DIR
+    paths = glob.glob(os.path.join(root, "*", f"{session_id}.jsonl"))
+    if not paths:
+        return {}
+    try:
+        text = open(paths[0], encoding="utf-8").read()
+    except OSError:
+        return {}
+    models = sorted(set(re.findall(r'"modelId"\s*:\s*"([^"]*)"', text)))
+    efforts = sorted(set(re.findall(r'"reasoningEffort"\s*:\s*"([^"]*)"', text)))
+    out: dict = {"path": paths[0]}
+    if len(models) == 1:
+        out["model"] = models[0]
+    elif models:
+        out["models"] = models
+    if len(efforts) == 1:
+        out["reasoning_effort"] = efforts[0]
+    return out
 
 
 def run_droid(role: Role, inp: BaseModel, call_tool, session_id: str | None = None) -> tuple[BaseModel, dict]:
