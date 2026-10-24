@@ -196,7 +196,6 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
         def option(oid: str, label: str, rule: str) -> FlagOption:
             return FlagOption(id=oid, label=label, tags={l.id: tag_for(l.line, rule) for l in unclear_lines})
 
-        total = sum(l.amount for l in unclear_lines)
         flags.insert(0, FlagProposal(
             kind="covenant_tag", line_ids=unclear_ids,
             question=f"'Financing liability' holds the Statesville sale-leaseback, the new PNC term loan and revolver, "
@@ -204,7 +203,7 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
             evidence=[Evidence(quote=inp.brief.limit_wording, document_id=f"{inp.brief.agreement_ref}, {inp.brief.limit_section}")]
                      + [Evidence(quote=x, document_id=inp.brief.agreement_ref) for x in inp.brief.debt_excludes],
             options=[
-                option("a", f"Whole line counts ({total:,.0f}K)", "all"),
+                option("a", "The whole line counts", "all"),
                 option("b", "Only the PNC term loan and revolver count", "bank_only"),
                 option("c", "PNC debt and the seller notes count", "bank_plus_sellers"),
             ],

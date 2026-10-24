@@ -36,5 +36,6 @@ export const api = {
   hold: (itemId: string) => post<WorkItem>(`/work-items/${itemId}/hold`),
   approve: (itemId: string) => post<WorkItem>(`/work-items/${itemId}/approve`),
   reject: (itemId: string, reason: string) => post<WorkItem>(`/work-items/${itemId}/reject`, { reason }),
-  reset: () => post<{ ok: boolean }>("/dev/reset"),
+  /** keepMemory=false clears the learned policies and sessions, so the next judge sees the flag again. */
+  reset: (keepMemory = true) => post<{ ok: boolean }>(`/dev/reset?keep_memory=${keepMemory}`),
 };

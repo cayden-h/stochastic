@@ -193,6 +193,10 @@ def build_router(gw: Gateway) -> APIRouter:
             advance(gw, deal_id, backend=backend)
         except Exception as error:  # keep the server up; the audit log and LAST_RUNS hold the trace
             agent_runner.LAST_RUNS.append({"role": "runner", "backend": backend, "error": str(error)[:300]})
+            try:
+                gw.note_run_failed(deal_id, f"{type(error).__name__}: {error}")
+            except Exception:  # noqa: BLE001 - the deal may have been reset meanwhile
+                pass
         finally:
             release(deal_id)
 

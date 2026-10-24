@@ -213,7 +213,18 @@ class Gateway:
                         proposed_by=proposed_by, payload=payload or {})
         self.store.items[item.id] = item
         self._log(deal_id, SYSTEM, f"create:{type_}", "ALLOWED", item.id)
+        working = {"map_lines": "mapping", "prepare_result": "preparing"}.get(type_)
+        if working:  # the console shows which agent is working during a 30 to 60 s model run
+            self._deal(deal_id).stage = working
         return item
+
+    @_writes
+    def note_run_failed(self, deal_id: str, error: str) -> None:
+        """A background run stopped on an error. The stage says so, so the console offers Run again instead of
+        showing an agent working forever. The next run picks up where this one stopped."""
+        deal = self._deal(deal_id)
+        deal.stage = "run_failed"
+        self._log(deal_id, SYSTEM, "run:failed", "ALLOWED", deal_id, reason=error[:300])
 
     # ------------------------------------------------------------------ tools
     @_writes
@@ -403,8 +414,14 @@ class Gateway:
         options: list[Option] = []
         for opt in flag.options:
             effect, run_id = self._flag_effect(deal, flag, opt)
+            figures = {}
+            test = self.store.tool_runs.get(run_id) if run_id else None
+            lev = self.store.tool_runs.get(test.inputs.get("leverage_run_id", "")) if test else None
+            if test and lev:
+                figures = dict(leverage=lev.outputs["debt"] / lev.outputs["ebitda"], ok=bool(test.outputs["ok"]),
+                               basis="as_filed" if self._whole_line(flag, opt.tags) else "covenant")
             options.append(Option(id=opt.id, label=opt.label, effect=effect, run_id=run_id,
-                                  added_by=SYSTEM if opt is flag.options[-1] and baseline_added else None))
+                                  added_by=SYSTEM if opt is flag.options[-1] and baseline_added else None, **figures))
         item = WorkItem(id=self.store.next_id("wi"), deal_id=deal.id, type="flag", state=State.NEEDS_INFO,
                         proposed_by=MAPPER, question=flag.question, evidence=flag.evidence, options=options,
                         default=flag.default,

@@ -58,6 +58,10 @@ class Option(BaseModel):
     effect: str  # computed by a tool run, never written by a model
     run_id: str | None = None
     added_by: str | None = None  # "system:gateway" for the baseline reading the gateway adds; None when the Mapper wrote it
+    # For covenant flags, read from the option's limit_test run so the console can show the ratio without parsing text.
+    leverage: float | None = None  # debt over EBITDA from the run chain, unrounded like the effect text
+    ok: bool | None = None
+    basis: Literal["covenant", "as_filed"] | None = None
 
 
 # ---------------------------------------------------------------------------

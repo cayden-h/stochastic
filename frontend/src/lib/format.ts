@@ -24,9 +24,9 @@ export function lineK(amount: number, unit: string): string {
   return fmtK(dollars ? amount / 1000 : amount);
 }
 
-/** USD thousands shown in millions for one headline figure: $49M. */
+/** USD thousands shown in millions for a headline figure: $49.3M. */
 export function fmtM(v: number): string {
-  return `$${Math.round(v / 1000)}M`;
+  return `$${(v / 1000).toFixed(1)}M`;
 }
 
 /** A leverage ratio, two places, formatted from the unrounded value like the gateway does. */
@@ -38,13 +38,20 @@ export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-/** The gateway sets `policy_id` from the policy record; a model's own wording varies, so the reason is only a fallback. */
+/** Learned only when the gateway tied the line to a live policy record. A model's wording ("Policy p_006 ...") can
+ * name a policy that does not exist or no longer applies, so the reason text never counts. */
 export function isLearned(m: Mapping): boolean {
-  return Boolean(m.policy_id) || m.reason.startsWith("Policy");
+  return Boolean(m.policy_id);
 }
 
 export function isLearnedTag(l: SourceLine): boolean {
-  return Boolean(l.covenant_policy_id) || (l.covenant_note ?? "").startsWith("Policy");
+  return Boolean(l.covenant_policy_id);
+}
+
+/** The distinct policies applied to this deal's lines: one controller answer can settle several lines. */
+export function learnedPolicies(mappings: Mapping[], lines: SourceLine[]): Set<string> {
+  const ids = [...mappings.map((m) => m.policy_id), ...lines.map((l) => l.covenant_policy_id)];
+  return new Set(ids.filter((id): id is string => Boolean(id)));
 }
 
 const VERBS: Record<string, string> = {

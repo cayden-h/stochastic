@@ -161,7 +161,10 @@ def test_rows_must_be_the_consolidate_run_rows(world):
 def test_choosing_the_whole_line_reading_is_as_filed_end_to_end(world):
     store, gw = world
     advance(gw, DEAL_ID)
-    effect = next(o.effect for o in financing_flag(gw).options if o.id == "a")
+    options = {o.id: o for o in financing_flag(gw).options}
+    assert options["a"].basis == "as_filed" and options["a"].ok is False and round(options["a"].leverage, 2) == 2.84
+    assert options["b"].basis == "covenant" and options["b"].ok is True and round(options["b"].leverage, 2) == 0.76
+    effect = options["a"].effect
     for flag in gw.open_flags(DEAL_ID):
         gw.answer(CONTROLLER, flag.id, "a" if flag.payload.get("kind") == "covenant_tag" else flag.default)
     assert store.deals[DEAL_ID].ebitda_basis == "as_filed"
