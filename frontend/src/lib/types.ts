@@ -3,7 +3,8 @@
 export type State = "NEW" | "PROPOSED" | "NEEDS_INFO" | "APPROVED" | "REJECTED" | "POSTED" | "REVERSED" | "SUPERSEDED";
 /** The deal stages the gateway and the job runner set (backend/app/gateway, backend/app/agents/jobs.py). */
 export type Stage =
-  | "new" | "mapping" | "awaiting_flag" | "mapped" | "flags_answered" | "preparing"
+  | "new" | "reading_brief" | "awaiting_brief" | "brief_ready"
+  | "mapping" | "awaiting_flag" | "mapped" | "flags_answered" | "preparing"
   | "awaiting_review" | "awaiting_approval" | "needs_attention" | "posted" | "run_failed";
 export type Backend = "scripted" | "anthropic" | "droid" | "replay" | string;
 
@@ -14,14 +15,36 @@ export interface Option {
   leverage?: number | null; ok?: boolean | null; basis?: "covenant" | "as_filed" | null;
 }
 
+/** One EBITDA add-back or deduction the agreement allows. Amounts and caps in USD thousands. */
+export interface BriefAdjustment { name: string; amount: number; cap: number | null; source_ref: string; note: string; inferred: boolean }
+
 export interface Brief {
   lender: string; agreement_ref: string; limit: number; limit_section: string; limit_wording: string;
   debt_term: string; debt_definition: string; debt_excludes: string[]; ebitda_definition: string;
+  ebitda_addbacks?: BriefAdjustment[]; ebitda_deductions?: BriefAdjustment[]; test_period_note?: string;
 }
 
 export interface Deal {
-  id: string; name: string; platform: string; target: string; stage: Stage; brief: Brief;
+  id: string; name: string; platform: string; target: string; stage: Stage;
+  /** Null only while a deal created from agreement text has no draft yet (D20). */
+  brief: Brief | null;
+  /** "approved" for a Brief sent as JSON; "draft" while the controller reviews the reader's draft; "none" before it ran. */
+  brief_status?: "approved" | "draft" | "none";
   ebitda_basis?: "covenant" | "as_filed";
+}
+
+/** The quote behind one Brief field. `field` is a path such as `ebitda_addbacks[1].cap`. */
+export interface BriefCitation { field: string; quote: string; section: string; confidence: number; note: string }
+
+/** The reader's draft while the controller reviews it (D20). */
+export interface BriefDraft {
+  item_id: string; agreement_id: string; sha256: string; brief: Brief; citations: BriefCitation[];
+  /** The brief_field flag work item ids. */
+  flags: string[];
+  /** False: the draft reads the base agreement only. */
+  amendments_supplied: boolean;
+  /** List fields the controller removed, applied at approval. */
+  removed: string[];
 }
 
 export interface SourceLine {
@@ -79,6 +102,8 @@ export interface Case {
   edits?: Edit[];
   /** What reasoned amount edits taught (D19). */
   adjustments?: LearnedAdjustment[];
+  /** The Brief Reader's draft while the controller reviews it (D20, Tri's T4). */
+  brief_draft?: BriefDraft | null;
 }
 
 export type Section = SourceLine["section"];

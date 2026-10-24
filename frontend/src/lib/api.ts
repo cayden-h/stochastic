@@ -1,4 +1,4 @@
-import type { AuditResponse, Case, Deal, DealCreated, Edit, EditBody, EditResponse, Health, ToolRun, WorkItem } from "./types";
+import type { AuditResponse, Brief, Case, Deal, DealCreated, Edit, EditBody, EditResponse, Health, ToolRun, WorkItem } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 /** The human seat. The gateway's default controller actor; every write carries it. */
@@ -29,7 +29,8 @@ async function post<T>(path: string, body?: unknown, method: "POST" | "DELETE" =
   return res.json();
 }
 
-/** Load a new deal from two statement CSVs and a brief (JSON). POST /deals is multipart, so it skips post(). */
+/** Load a new deal from two statement CSVs and either a Brief (JSON, field `brief`) or the credit agreement as text
+ * (file field `agreement_txt`, read by the Brief Reader). POST /deals is multipart, so it skips post(). */
 async function createDeal(form: FormData): Promise<DealCreated> {
   const res = await fetch(`${API_URL}/deals`, { method: "POST", headers: { "X-Actor": ACTOR }, body: form });
   if (!res.ok) throw new Error(await errorText(res));
@@ -56,6 +57,10 @@ export const api = {
   reason: (editId: string, reason: { chip: number } | { text: string }, remember: boolean) =>
     post<Edit>(`/edits/${editId}/reason`, { ...reason, remember }),
   revert: (editId: string) => post<EditResponse>(`/edits/${editId}`, undefined, "DELETE"),
+  // The Brief Reader (D20, Tri's T4): enter an amount from the books with its source, then approve the Brief.
+  briefAmount: (dealId: string, body: { field: string; value: number; source_ref: string; inferred?: boolean; note?: string }) =>
+    post<Brief>(`/deals/${dealId}/brief/amounts`, body),
+  approveBrief: (dealId: string) => post<Deal>(`/deals/${dealId}/brief/approve`),
 };
 
 /** The final files after approval: the workbook (Tri's T3) and the draft certificate. Absolute URLs. */

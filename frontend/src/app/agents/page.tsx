@@ -14,7 +14,7 @@ function storyRows(rows: AuditRow[]): AuditRow[] {
   return rows.filter((r) => {
     if (r.result === "DENIED") return true;
     const verb = r.action.split(":")[0];
-    return ["propose", "ask", "answer", "policy", "approve", "reject", "hold", "post", "reverse"].includes(verb);
+    return ["propose", "ask", "answer", "policy", "approve", "approve_brief", "brief", "reject", "hold", "post", "reverse"].includes(verb);
   });
 }
 
@@ -34,8 +34,9 @@ function Tile({ actor }: { actor: string }) {
 }
 
 /**
- * V3-6: the three agents at work. The office is a still of Josie's three.js scene; the conversation and the
- * timeline over it come from the audit log, so every line is a recorded action.
+ * V3-6: the agents at work: the Brief Reader (on a deal made from agreement text), the Mapper, the Preparer, and the
+ * Reviewer. The office is a still of Josie's three.js scene, which has the three desk agents; the Brief Reader shows in
+ * the conversation and the timeline. Both come from the audit log, so every line is a recorded action.
  */
 export default function Agents() {
   const { audit, kase } = useDeal();
@@ -51,6 +52,7 @@ export default function Agents() {
   // and a failed Mapper attempt opens a new one, so the log's items do not count runs.
   const mapperTurns = (kase.sessions as { role?: string; turns?: number }[]).find((x) => x.role === "mapper")?.turns ?? 0;
   const pending = kase.verdict?.approval_state === "PROPOSED";
+  const briefPending = kase.stage === "awaiting_brief" || kase.stage === "brief_ready";
 
   return (
     <div className="flex h-full min-h-[640px] w-full flex-col gap-[16px] px-[28px] py-[24px]">
@@ -84,7 +86,7 @@ export default function Agents() {
           <span className="h-[14px] shrink-0" />
           {timeline.map((r, i) => {
             const a = actorOf(r.actor);
-            const last = i === timeline.length - 1 && !pending;
+            const last = i === timeline.length - 1 && !pending && !briefPending;
             const text = describe(r, items);
             return (
               <div key={r.id} className="flex w-full gap-[12px]">
@@ -103,7 +105,7 @@ export default function Agents() {
               </div>
             );
           })}
-          {pending ? (
+          {pending || briefPending ? (
             <div className="flex w-full gap-[12px]">
               <div className="flex w-[22px] shrink-0 flex-col items-center"><Tile actor="human:controller" /></div>
               <div className="flex min-w-0 flex-1 flex-col gap-[2px] pb-[14px]">
@@ -112,7 +114,7 @@ export default function Agents() {
                   <span className="flex-1" />
                   <span className="font-mono text-[11px] text-slate">-</span>
                 </div>
-                <p className="text-[13px] text-body">Approve and post</p>
+                <p className="text-[13px] text-body">{briefPending ? "Check and approve the Brief" : "Approve and post"}</p>
               </div>
             </div>
           ) : null}

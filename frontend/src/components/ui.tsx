@@ -24,18 +24,20 @@ export function Shape({ kind, size = 14 }: { kind: ShapeKind; size?: number }) {
   );
 }
 
-export type Role = "mapper" | "preparer" | "reviewer";
+export type Role = "mapper" | "preparer" | "reviewer" | "brief_reader";
 
 /** Each agent's look in v3: its avatar, chip tint, chip text, and its name on the Agents timeline.
  * The frames write the Mapper's chip in clear green and its timeline name in forest. */
-export const ROLES: Record<Role, { src: string; tint: string; ink: string; name: string; blend?: boolean }> = {
+export const ROLES: Record<Role, { src: string | null; tint: string; ink: string; name: string; blend?: boolean }> = {
   mapper: { src: "/v3/agent-mapper.png", tint: "bg-mint", ink: "text-clear", name: "text-forest", blend: true },
   preparer: { src: "/v3/agent-preparer.png", tint: "bg-preparer-tint", ink: "text-preparer", name: "text-preparer" },
   reviewer: { src: "/v3/agent-reviewer.png", tint: "bg-reviewer-tint", ink: "text-reviewer", name: "text-reviewer" },
+  // The fourth agent (D20) has no character art in v3 yet, so it wears the page mark in agent blue.
+  brief_reader: { src: null, tint: "bg-agent-tint", ink: "text-agent", name: "text-agent" },
 };
 
 function isRole(name: string | undefined): name is Role {
-  return name === "mapper" || name === "preparer" || name === "reviewer";
+  return name === "mapper" || name === "preparer" || name === "reviewer" || name === "brief_reader";
 }
 
 export function actorOf(actor: string): { kind: "Agent" | "Human" | "Gateway"; label: string; role?: Role } {
@@ -47,6 +49,16 @@ export function actorOf(actor: string): { kind: "Agent" | "Human" | "Gateway"; l
 
 export function Avatar({ role, size = 20, className = "" }: { role: Role; size?: number; className?: string }) {
   const r = ROLES[role];
+  if (!r.src) {
+    return (
+      <span className={`flex shrink-0 items-center justify-center rounded-[5px] bg-agent text-white ${className}`} style={{ width: size, height: size }} aria-hidden="true">
+        <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 12 12" fill="none">
+          <path d="M3 1.5H7.2L9.5 3.8V10.5H3Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+          <path d="M4.5 6H8M4.5 8H7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+        </svg>
+      </span>
+    );
+  }
   return (
     <Image src={r.src} alt="" width={size} height={size} className={`shrink-0 object-contain ${r.blend ? "mix-blend-multiply" : ""} ${className}`} />
   );

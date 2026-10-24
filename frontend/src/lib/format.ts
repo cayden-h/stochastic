@@ -48,6 +48,11 @@ export function ago(iso: string, now = Date.now()): string {
   return clock(iso);
 }
 
+/** The Brief comes first on a deal made from agreement text (D20): these stages are the Brief Reader's. */
+export function isBriefStage(stage: Stage): boolean {
+  return stage === "reading_brief" || stage === "awaiting_brief" || stage === "brief_ready";
+}
+
 /** A run can start from a new deal or from a run that stopped. */
 export function canStart(stage: Stage): boolean {
   return stage === "new" || stage === "run_failed";
@@ -57,6 +62,8 @@ export function canStart(stage: Stage): boolean {
 export function stageWords(stage: Stage): { text: string; tone: "you" | "work" | "done" | "bad" | "idle" } {
   switch (stage) {
     case "new": return { text: "Not started", tone: "idle" };
+    case "reading_brief": return { text: "Reading the agreement", tone: "work" };
+    case "awaiting_brief": case "brief_ready": return { text: "Brief \u00b7 needs you", tone: "you" };
     case "mapping": return { text: "Mapping", tone: "work" };
     case "awaiting_flag": return { text: "Mapping \u00b7 needs you", tone: "you" };
     case "mapped": case "flags_answered": case "preparing": return { text: "Preparing", tone: "work" };
@@ -91,14 +98,15 @@ export function learnedPolicies(mappings: Mapping[], lines: SourceLine[]): Set<s
 
 const VERBS: Record<string, string> = {
   create: "CREATED", create_deal: "CREATED", propose: "PROPOSED", ask: "ASKED", answer: "ANSWERED",
-  approve: "APPROVED", reject: "REJECTED", post: "POSTED", hold: "HELD", reverse: "REVERSED",
+  approve: "APPROVED", approve_brief: "APPROVED", reject: "REJECTED", post: "POSTED", hold: "HELD", reverse: "REVERSED",
+  brief: "BRIEF", agreement: "LOADED", edit: "EDITED",
   tool: "RAN", policy: "POLICY", session: "SESSION", event: "EVENT", fork: "FORK",
 };
 
 /** What the gateway's `post` row recorded, in words. Only the approval post puts the books on the record. */
 const POSTED: Record<string, string> = {
   map_lines: "Mapping recorded.", prepare_result: "Draft books recorded.", review_result: "Review recorded.",
-  flag: "Answer recorded.", approve_result: "Approved and posted to the record.",
+  flag: "Answer recorded.", approve_result: "Approved and posted to the record.", draft_brief: "Brief approved and locked.",
 };
 
 function isApprovalPost(row: AuditRow, items: WorkItem[]): boolean {
@@ -127,6 +135,9 @@ export function describe(row: AuditRow, items: WorkItem[]): string {
   if (verb === "propose") return `${titleCase(rest ?? "item")} proposed. ${row.reason ?? ""}`.trim();
   if (verb === "create") return `${titleCase(rest ?? "item")} opened.`;
   if (verb === "create_deal") return `Deal created. ${row.reason ?? ""}`.trim();
+  if (verb === "agreement") return `Agreement loaded. ${row.reason ?? ""}`.trim();
+  if (verb === "approve_brief") return `Brief approved and locked. ${row.reason ?? ""}`.trim();
+  if (verb === "brief") return `${rest === "reuse" ? "Brief reused" : "Brief amended"}. ${row.reason ?? ""}`.trim();
   if (verb === "policy") return `${rest === "learn" ? "Policy learned" : "Policy applied"}. ${row.reason ?? ""}`.trim();
   if (verb === "session") return `Agent session turn. ${row.reason ?? ""}`.trim();
   if (verb === "post") {
