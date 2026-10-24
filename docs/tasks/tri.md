@@ -31,8 +31,55 @@ From the risk review (D18 in `decisions.md`); every change has tests, 167 offlin
 - The gateway (Cayden's) now refuses numbers from agents in `leverage` (system only), and checks that `debt_run_id` and `ebitda_run_id` name runs of those tools.
 - Tests touched in `backend/tests/`: `test_api.py`, `test_demo_run.py`, `test_trust_rules.py`, `test_mapper_retry.py`, and new `test_gateway_guards.py` and `test_demo_reset.py`.
 
-## Desktop app and review edits (D19)
+## Build phase 2: D19 and D20 (2026-10-24 night)
 
-Spec: `docs/design/review-companion.md`.
-- [ ] Recompute with an edit applied: the consolidate, EBITDA, covenant debt, and leverage tools take the controller's edits as inputs, with new run ids. Tests: an amount edit moves leverage by the hand-computed amount; a remap moves the line between sections and the tie-out still holds.
-- [ ] `GET /deals/{id}/export.xlsx` (409 before approval): Combined sheet with edited cells filled and noted, an Edits sheet, an Audit sheet (section 8). Add the edits to the certificate.
+The split for everyone is in `../TASKS.md`, "Build phase 2".
+Specs: `design/review-companion.md` (D19) and `architecture/brief-reader.md` (D20).
+Branch: `tri/phase2`, cut from `main` after Cayden's contract (C1) lands.
+
+### T1. Edit-aware tools (about 2 hours, blocks Cayden's C2)
+
+In `backend/app/tools/finance.py`:
+- `consolidate`, `ebitda`, `covenant_debt`, and `tie_out` take an optional `edits` list (the `Edit` model from C1).
+  - An `amount` edit replaces that company's value on that line before the sums.
+  - A `remap` edit moves the target line to its new platform line, which can change its section.
+- Each tool returns the edits it applied, with their ids, so a run shows which edits it used.
+- Reverted edits are ignored.
+Tests in `backend/tests/test_tools_edits.py`, with hand-computed values:
+- An amount edit on a target income-statement line moves covenant EBITDA by exactly the change, and leverage by the hand-computed amount.
+- A remap from cash to other current assets moves the amount between those lines, and the balance sheet still ties out.
+- An edit that breaks the tie-out makes `tie_out` fail, and approval is then refused.
+- Reverting the edit restores every figure exactly.
+
+### T2. Edit routes (about 1.5 hours, with C2)
+
+In `backend/app/api/routes.py` and `schemas.py`, thin over the gateway:
+- `POST /deals/{id}/edits` with `{"kind": "amount", "company", "line", "value"}` or `{"kind": "remap", "company", "line", "platform_line"}`. Returns the edit, the new `verdict` and `result`, and `reasons`.
+- `POST /edits/{id}/reason` with `{"chip": 0}` or `{"text": "..."}`, and `{"remember": true}`.
+- `DELETE /edits/{id}`.
+- `GET /deals/{id}/case` includes `edits` and `adjustments`.
+- Errors: 409 when the result is not `PROPOSED`, and 422 that names the field on a bad value.
+- Add an `edit` stage event to `GET /deals/{id}/stream`, so the console refreshes.
+Tests in `backend/tests/test_api_edits.py`: the demo beat end to end through the routes.
+
+### T3. The final files (about 2 hours)
+
+- `GET /deals/{id}/export.xlsx`, which returns 409 before approval. Use `openpyxl` and add it to `backend/requirements.txt`. Three sheets, from `review-companion.md` section 8:
+  - **Combined**: the final values in platform order. Each edited cell has a light amber fill (`FBEBC8`) and a cell note with who, when, the old value, the reason, and the policy id.
+  - **Edits**: one row per edit, with the line, company, agent value, final value, reason, who, when, and policy id.
+  - **Audit**: the run id behind every number.
+- The certificate (`backend/app/api/certificate.py`) lists each edit and its reason, and uses the edited figures.
+- Tests: refused before approval, every figure in the workbook equals its tool run, and an edited cell has its note.
+
+### T4. Brief Reader routes and tests (about 2 hours, with C3)
+
+- `POST /deals` takes `agreement_txt` (a `.txt` upload) or `brief`, exactly one. Sending a Brief JSON still skips the reader.
+- A route for the controller to enter the adjustment amounts on a draft Brief, with their source: `POST /deals/{id}/brief/amounts`.
+- `POST /deals/{id}/brief/approve`.
+- `GET /deals/{id}/case` includes `brief_draft` and its citations.
+- `db/memory.py`: the `agreement` kind.
+- `backend/tests/test_brief_reader.py`: the ten tests in `architecture/brief-reader.md` section 8. Use the synthetic agreement text from Eric (E3), never the cached filings.
+
+### T5. Keep the tests green
+
+Run the full suite and the Tiger tests on every merge (rule 5 in `tasks/README.md`). The count goes up from 176, so update it in `backend/README.md`.

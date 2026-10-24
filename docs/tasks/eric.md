@@ -167,6 +167,35 @@ The whole-line reading is now computed as filed, debt over reported EBITDA: 2.84
 The scripted Mapper's option a label is now "The whole line counts" (no amount), and it tags operating leases `na`, because the gateway now refuses a `not_debt` tag that no controller answer made.
 Your Anthropic run is credited in the docs: one full run and about 50 Mapper trials, not on the demo laptop.
 
-## Desktop app and review edits (D19)
+## Build phase 2: D19 and D20 (2026-10-24 night)
 
-- [ ] Find one believable one-time cost in the Kewaunee or Nu Aire filing (for example acquisition-related costs) for the demo edit: the line, the amount in USD thousands, and the page. Put it in `docs/design/review-companion.md` section 9.
+The split for everyone is in `../TASKS.md`, "Build phase 2".
+Branch: `eric/phase2`, cut from the latest `main`.
+New folder for this phase: `desktop/` (the Electron shell), which Eric owns.
+
+### E1. The Electron shell (about 3 hours, can start now)
+
+Spec: `design/review-companion.md` section 11.
+- `desktop/package.json`, `desktop/main.ts` (or `main.js`), and `desktop/preload.ts`, on Electron's current stable release.
+- On launch, `main` starts the backend (`backend/.venv/bin/uvicorn app.main:app --port 8000` in `backend/`) and the console (`npm run start` in `frontend/`, after `next build`) as child processes. It waits for `GET /health` and the console to answer, then opens the window. On quit, it stops both.
+  - `STOCHASTIC_DEV=1` loads `http://localhost:3000` from an already running `next dev` instead, and starts nothing.
+  - If the backend or the console does not answer within 30 seconds, show a plain error window that names which one failed.
+- Window: 1440 by 900 by default, 1280 by 800 minimum, `titleBarStyle: "hiddenInset"` with the traffic lights at x 20 and y 20, and `backgroundColor: "#F7F4EC"` so there is no white flash.
+- Preload exposes `window.stochastic` through `contextBridge`, with `contextIsolation` on and `nodeIntegration` off:
+  - `saveFiles([{ url, name }])`: opens `dialog.showOpenDialog` for a folder, downloads each file from the API, writes it, and shows the folder in Finder.
+  - `isDesktop: true`.
+- The app name and menu say "Stochastic". The macOS app icon is a simple mark from Josie.
+- `desktop/README.md`: install, `npm run desktop`, dev mode, and how to quit cleanly.
+Done when: `npm run desktop` on the demo laptop opens the console with no browser chrome, the full demo runs inside it, and quitting leaves no process on ports 8000 or 3000.
+
+### E2. The demo edit figure (about 1 hour)
+
+- Find one believable one-time cost in the Kewaunee or Nu Aire filings (for example acquisition-related costs) for the demo's amount edit.
+- Write the line, the amount in USD thousands, the filing, and the page into `design/review-companion.md` section 9. Tell Cayden, because the hardcoded chips cite it.
+- Pick the remap line for the second deal: a target line that the Mapper maps confidently but wrongly, so that the remap catches what the flags miss. Check it against the Note 2 answer key in `evals/`.
+
+### E3. Brief Reader data (about 2 hours)
+
+- `data/brief/kewaunee_quotes.json`: for each fixture Brief field, the exact quote from Ex 10.1 (under 15 words), its section, and the field path. The scripted reader returns these (Cayden's C3).
+- `backend/tests/fixtures/agreement_synthetic.txt` (ask Tri, it is his folder): a short synthetic agreement with one leverage covenant, two definitions, and one add-back cap. It feeds the tests.
+- `evals/brief_key/`: the hand-written Briefs for PNC and Kewaunee, and Noble Roman's (`architecture/brief-reader.md` section 9), field by field with sections, and a scorer that reports right, wrong, and flagged counts.

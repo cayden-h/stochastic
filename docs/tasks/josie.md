@@ -30,9 +30,21 @@ From the risk review's UI pass; please check the look on your screen and change 
 - `src/components/combined-table.tsx`: opens collapsed; the "Line" header is aligned. `src/components/mappings.tsx`: "in a mapping question" instead of "flagged".
 - `src/lib/api.ts` (`reset(keepMemory)`), `src/lib/types.ts` (new option, deal, and sensitivity fields), `next.config.ts` (`devIndicators: false`).
 
-## Desktop app and review edits (D19, 2026-10-24 evening)
+## Build phase 2: D19 and D20 (2026-10-24 night)
 
-Spec: `docs/design/review-companion.md`. The Figma checklist is in its section 12.
-- [ ] Figma: editable cells, the remap dropdown, the reason bubble, the companion states, the Your edits section, and the Download final files button.
-- [ ] Top bar: 72px left padding for the macOS traffic lights (hidden title bar).
-- [ ] Build the editable table and the Your edits section against `edits` on the case once Cayden's routes land.
+Josie stays on Figma. The current UI is the `Hi-fi - v3` page (links in `design/README.md`).
+Cayden builds the screens in code from the frames (his task C4), and Josie signs off on each one against its frame.
+Tell Cayden when a frame is ready.
+
+In order:
+1. **Finish Hi-fi v3.** Dashboard, upload, Case, Mapping, Log, Agents. Add "Edits" as a third counter in the sidebar's "Always learning from".
+2. **D19 on V3-3 Case** (`review-companion.md` sections 3, 4, 7, 8):
+   - Editable amount cells: default, hover, editing, needs a reason, reason given, and a Combined cell with its change.
+   - The Your edits section and its row hover.
+   - The verdict with Download final files after approval.
+3. **D19 on V3-4 Mapping**: the Platform line dropdown, an edited row, and the Edited filter.
+4. **The reason bubble** (section 5): the amount version, the remap version, the large-change warning, and a selected chip.
+5. **The companion** (section 6): idle, asking with the pulse ring, the learned note, and the waiting dot. Put them in `Components`.
+6. **The Brief card** (D20, `architecture/brief-reader.md` section 7, Frontend): each field with its quote and section, the flagged fields, the amount inputs, and Approve. It sits at the start of a deal, before mapping.
+7. **The macOS app icon**, for Eric's Electron shell (E1), at 1024 px.
+8. **One frame of the demo beat** at 1440 by 900 for the pitch, plus a frame on the `Technologies Used` page if it helps the Figma track.

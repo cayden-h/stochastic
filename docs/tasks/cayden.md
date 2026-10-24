@@ -103,11 +103,74 @@ Items in another person's folder say who to ask.
 - [x] Count "Learned" only from a real `policy_id`, not the reason text. Done 2026-10-24 evening (0e3829f, 3938ca9).
 - [x] Review screenshots: superseded, the issues they showed are fixed in the console (commit 3938ca9) and checked at 1280 and 1920 in a headless browser.
 
-## 6. Desktop app and review edits (D19, start after the demo beat is done)
+## 6. Build phase 2: D19 and D20 (2026-10-24 night)
 
-Spec: `docs/design/review-companion.md`.
-- [ ] Electron shell: loads the built console, hidden title bar, 1280 by 800 minimum, save dialog for Download final files (section 11).
-- [ ] Edit routes in the gateway: `POST /deals/{id}/edits`, `POST /edits/{id}/reason`, `DELETE /edits/{id}`, `edits` on the case. Audit rows as `human:controller`, recompute through the tools, the Reviewer's checks re-run, approval refused while an edit has no reason (section 10).
-- [ ] Learning: a remap reason becomes a platform-scoped `Policy`; an amount reason becomes an adjustment the Preparer proposes next time; Undo retires it.
-- [ ] Companion layer in the console: cursor follow, glide to the cell, bubble, states (sections 5 and 6). Coordinate with Josie on the files.
-- [ ] Hardcoded reason chips for the demo deal.
+The split for everyone is in `../TASKS.md`, "Build phase 2".
+Specs: `design/review-companion.md` (D19) and `architecture/brief-reader.md` (D20).
+Branch: `cayden/phase2`, cut from the latest `main`.
+Folders for this phase: `backend/app/core/`, `backend/app/gateway/`, `backend/app/agents/`, `backend/app/db/postgres.py`, and `frontend/` (Josie stays on Figma and reviews every screen).
+
+### C1. The contract first (about 45 minutes, blocks Tri and Eric)
+
+Merge this alone, before anything else, and tell the team when it is on `main`.
+In `backend/app/core/models.py`:
+- `Edit`: `id`, `deal_id`, `kind` (`amount` or `remap`), `company`, `line`, `section`, `old_value` and `new_value` (USD thousands, for `amount`), `old_platform_line` and `new_platform_line` (for `remap`), `status` (`needs_reason`, `reasoned`, `reverted`), `reason_chip` (int or null), `reason_text` (str or null), `remember` (bool, default true), `policy_id`, `adjustment_id`, `actor` (default `human:controller`), `at`, and `run_ids` (the recompute runs).
+- `Adjustment`: `id`, `deal_id`, `company`, `line`, `amount`, `reason`, `edit_id`, `status` (`applied`, `proposed`, `retired`). This is what an amount edit teaches.
+- `Policy.scope`: `company` or `platform`. Flag-answer policies stay `company`, so the D18 rule on `not_debt` tags is unchanged. Remap edits make `platform` policies, matched on the platform name.
+- `ReasonChip`: `id` (0, 1, 2) and `label`. Hardcoded per deal for the demo.
+- The D20 types from `architecture/brief-reader.md` section 7: the actor `BRIEF_READER`, the item type `draft_brief` and the flag kind `brief_field`, `AgreementText`, `BriefCitation`, `BriefReaderInput`, `BriefReaderOutput`, and `Deal.brief_status` (default `approved`, so the fixture deal is unchanged).
+- `CaseView` gains `edits: list[Edit]`, `adjustments: list[Adjustment]`, and `brief_draft` (the draft and its citations, or null).
+Done when: the models import, the 176 existing tests still pass, and `architecture/gateway-and-api.md` shows the new fields with example JSON.
+
+### C2. Edits in the gateway (about 3 hours)
+
+In `backend/app/gateway/gateway.py`:
+- `apply_edit(deal_id, edit)`: allowed only for `human:controller`, only while the result is `PROPOSED` (after the agents, before approval).
+  - `amount`: store the edit, then run the recompute as `system`: `consolidate`, `ebitda`, `covenant_debt`, `leverage`, `tie_out`, `limit_test`, using Tri's edit-aware tools (T1). Every run gets a new run id.
+  - `remap`: store the human mapping (the existing `store_mapping`, as `human:controller`), then the same recompute.
+  - Write a new result revision and a new approval item in `PROPOSED`. The old approval item becomes `SUPERSEDED` and stays in the log.
+  - Return the edit, the new verdict and result, and the reason chips.
+- `reason_edit(edit_id, chip | text, remember)`: set `reasoned`. If `remember`:
+  - `remap`: write a `Policy(kind="mapping", scope="platform")` with the reason as its text.
+  - `amount`: write an `Adjustment(status="applied")`. On a later deal, the Preparer proposes it as a flag, and it is never applied silently.
+- `revert_edit(edit_id)`: set `reverted`, retire its policy or adjustment (the D18 reversal path), and recompute.
+- `approve`: refused while any edit is `needs_reason`, with a DENIED row that names the edit.
+- Audit rows: `edit:apply`, `edit:reason`, `edit:revert`, and `policy:learn` with `source: edit`.
+- The Mapper reads `platform` policies as well as `company` ones. A line mapped by a platform policy cites it in its reason, so the "Learned" chip shows it on the next deal.
+- Hardcoded chips: `ReasonChip` lists per deal in `backend/app/agents/backends/scripted.py`, with the six labels in `design/review-companion.md` section 5. The pitch says they are hardcoded.
+- Tests (with Tri, in `backend/tests/test_edits.py`):
+  - an edit by an agent is refused
+  - approval is refused while an edit needs a reason
+  - a reasoned remap makes a platform policy that the Mapper applies on the next deal
+  - a revert retires the policy and restores the agents' value
+  - every recompute figure equals its tool run
+Done when: the tests pass, and the demo beat in `design/review-companion.md` section 9 runs through the API with curl.
+
+### C3. The Brief Reader, stage 1 (about 4 hours, after C2)
+
+Build `architecture/brief-reader.md` sections 5 to 7, in the gateway and agent folders:
+- `roles.py`: `BRIEF_READER_ROLE` with the read-only tools `get_section(id)` and `get_definition(term)`.
+- `gateway.py`: `store_brief`, `_check_brief` (the nine checks in section 6), the `brief_field` branch in the flag answer, Brief approval, and the gates in `store_mapping` and `run_tool`.
+- `jobs.py`: the `draft_brief` step before mapping. The runner stops on open `brief_field` flags.
+- `runner.py` and `backends/scripted.py`: the scripted reader. On the Kewaunee Ex 10.1 text (matched by SHA-256), it returns the fixture Brief with Eric's quotes (E3). On any other text, it uses regex, with low confidence and flags.
+- Droid: run the reader live once on Sonnet 5.5 and record it to `backend/recordings/brief_reader.json` with `scripts/record_run.py`. Check whether `DROID_TIMEOUT` is enough.
+- `db/postgres.py`: the `agreement` kind and the new role.
+Done when: Tri's `test_brief_reader.py` passes (section 8), and a deal created from agreement text stops on the Brief, takes the controller's answers, and then maps.
+
+### C4. The console screens (after Josie's frames, with her review)
+
+Build the frames from Hi-fi v3 with the Figma MCP (`design/README.md` has the links), against `GET /deals/{id}/case`:
+- The v3 shell: a 240 px sidebar with the deal, the five pages, the model, and the "Always learning from" counters (Human answers, Policies, Edits). Leave 72 px at the top left for the macOS traffic lights.
+- V3-3 Case with the editable amount cells, the Your edits section, and Download final files (`review-companion.md` sections 3, 4, 7, and 8).
+- V3-4 Mapping with the Platform line dropdown and the Edited filter.
+- The Brief card at the start of a deal (D20 section 7, Frontend), when Josie has the frame.
+- Download final files calls `window.stochastic.saveFiles(...)` when Eric's preload is there, and a normal browser download when it is not.
+Done when: each screen matches its frame at 1440 by 900 (Josie signs off), and the demo beat runs in the app.
+
+### C5. The companion (about 2 hours, after C4)
+
+A React layer in `frontend/src/components/companion.tsx`, from `review-companion.md` sections 5 and 6:
+- The 14 px agent-blue mark, spring follow at about 48 px, parked at the window edge when the cursor leaves, and still when reduced motion is on.
+- Glide to the edited cell, the bubble with chips (keys 1 to 3, Enter, Esc), Later and Save, the learned note, and the waiting dot.
+- Port the follow physics from Squeek's `halo.js` (https://github.com/syedkazmi14/squeek), restyled to our tokens.
+Done when: the demo beat takes 10 seconds or less and looks right on the demo laptop.

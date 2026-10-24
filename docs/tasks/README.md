@@ -6,10 +6,10 @@ The full split and the order of work are in `../TASKS.md`.
 
 | Person | Task file | Branch | Folders they own |
 | --- | --- | --- | --- |
-| Cayden | `cayden.md` | `cayden/agents` | `backend/app/agents/`, `backend/app/gateway/`, `backend/app/core/`, `backend/app/db/postgres.py` |
-| Eric | `eric.md` | `eric/data` | `data/`, `scripts/`, `evals/` |
-| Tri | `tri.md` | `tri/tools` | `backend/app/tools/`, `backend/app/api/`, `backend/app/db/` (not `postgres.py`), `backend/tests/` |
-| Josie | `josie.md` | `josie/design` | `frontend/`, `docs/design/` |
+| Cayden | `cayden.md` | `cayden/agents` (phase 2: `cayden/phase2`) | `backend/app/agents/`, `backend/app/gateway/`, `backend/app/core/`, `backend/app/db/postgres.py`, and `frontend/` code in phase 2 |
+| Eric | `eric.md` | `eric/data` (phase 2: `eric/phase2`) | `data/`, `scripts/`, `evals/`, `desktop/` (phase 2) |
+| Tri | `tri.md` | `tri/tools` (phase 2: `tri/phase2`) | `backend/app/tools/`, `backend/app/api/`, `backend/app/db/` (not `postgres.py`), `backend/tests/` |
+| Josie | `josie.md` | `josie/design` | Figma and `docs/design/`; in phase 2 she reviews the `frontend/` screens Cayden builds from her frames |
 
 ## Rules for working in parallel
 

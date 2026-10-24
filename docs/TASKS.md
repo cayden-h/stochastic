@@ -1,9 +1,39 @@
 # Tasks: who builds what
 
-Last updated: 2026-10-24, 08:15.
+Last updated: 2026-10-24, night (build phase 2: D19 and D20).
 The product and scope are in `STOCHASTIC.md`. This file only splits the work.
 Josie owns UI and UX only. She gets no other task.
 Swap tasks freely and tell the team when you do.
+
+## Build phase 2: D19 and D20 (2026-10-24 night)
+
+Two features are designed and agreed, and now they get built:
+- **D19:** the Mac desktop app, edits in review that the agents learn from, the companion that asks why, and the final files. Spec: `design/review-companion.md`.
+- **D20:** Brief Reader stage 1, which reads the credit agreement, cites every field, and lets the controller approve the Brief. Spec: `architecture/brief-reader.md`.
+
+| Person | Phase 2 tasks | Branch | Folders |
+| --- | --- | --- | --- |
+| Cayden | C1 contract, C2 edits in the gateway, C3 Brief Reader, C4 console screens, C5 companion | `cayden/phase2` | `backend/app/core/`, `backend/app/gateway/`, `backend/app/agents/`, `backend/app/db/postgres.py`, `frontend/` |
+| Tri | T1 edit-aware tools, T2 edit routes, T3 final files, T4 Brief Reader routes and tests, T5 green tests | `tri/phase2` | `backend/app/tools/`, `backend/app/api/`, `backend/app/db/` (not `postgres.py`), `backend/tests/` |
+| Eric | E1 Electron shell, E2 demo edit figure, E3 Brief Reader data | `eric/phase2` | `desktop/` (new), `data/`, `scripts/`, `evals/` |
+| Josie | Figma only: finish Hi-fi v3, then the D19 frames, the Brief card, the app icon | Figma | `docs/design/` |
+
+The details, with "done when" for each task, are in each person's file in `tasks/`.
+
+### Order and what blocks what
+
+1. **Cayden C1 (contract) first.** Tri's T1, T2, and T4 need the `Edit` and Brief types. Merge C1 alone and tell the team.
+2. **In parallel, with no wait:** Eric E1 (Electron) and E2 (demo figure). Josie continues on Figma.
+3. **Tri T1, then Cayden C2 with Tri T2.** The edit loop works end to end through the API.
+4. **Tri T3** (final files) after T1. **Cayden C4** (screens) as Josie's frames land.
+5. **Cayden C5** (companion) after C4.
+6. **Cayden C3 with Tri T4 and Eric E3** (Brief Reader), after the edit loop works. D19 is the demo beat, so it goes first.
+
+If time runs short, cut from the bottom: the Brief Reader becomes a pitch line ("the next agent we are building"), then the companion falls back to a fixed panel. The editable table, the why bubble, and the final files are the minimum.
+
+### The demo beat this phase must deliver
+
+Edit a number in the app, the verdict moves, the companion asks why, pick a chip, approve, and download. The workbook shows the edit and its reason. Then, on deal 2, the Mapper cites the policy (`design/review-companion.md` section 9).
 
 ## State of the build
 
