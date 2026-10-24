@@ -48,17 +48,15 @@ Open (details in `tasks/cayden.md`):
 3. The Anthropic backend: record a run with a key, or remove it from the fallback chain.
 4. Rehearse the 2:00 with a stopwatch, with the forced failure, and log the credit total.
 5. Ask the Hyphenate, Factory, and Tiger mentors the questions in `tasks/cayden.md`.
-6. Sunday 8am: wake the Tiger service and check `GET /health`.
+6. Submit the Devpost first draft by Saturday night, with the four tracks opted in (from Eric).
+7. The honest-limits card and a printed one-page summary (from Eric).
+8. Sunday 8am: wake the Tiger service and check `GET /health`.
 
 ## Eric
 
 Tasks 1 to 6 done 2026-10-24, merged in PR #2. Figures were refreshed to the post-interest-income values the same day.
 
-Open (details in `tasks/eric.md`):
-7. Submit the Devpost first draft on devpost.com by Saturday night, with the four tracks opted in.
-8. The compliance certificate wording from Ex 10.1, for Tri's route.
-9. Check the rent and transaction-cost inputs again.
-10. The honest-limits card and a printed one-page summary.
+No open tasks. On 2026-10-24 at 08:20 his open work moved: the Devpost submission and the one-page summary to Cayden, the certificate wording and the input checks to Tri.
 
 Done:
 
@@ -75,8 +73,8 @@ Tasks 1 to 5 done 2026-10-24, merged in PR #1.
 
 Open (details in `tasks/tri.md`):
 7. Run the Tiger store tests (`TEST_DATABASE_URL`) on every merge.
-8. `GET /deals/{id}/certificate`: the draft compliance certificate, refused until approved.
-9. Sensitivity on the verdict: the add-back and the rent figure that flip the whole-line reading.
+8. `GET /deals/{id}/certificate`: the draft compliance certificate, refused until approved, with its wording from Ex 10.1 (from Eric).
+9. Sensitivity on the verdict: the add-back and the rent figure that flip the whole-line reading, and a recheck of the rent and transaction-cost inputs (from Eric).
 10. `GET /deals/{id}/timeline` on the hypertable, and the store's average write time on `GET /health`.
 
 Done, plus the video:
@@ -111,7 +109,7 @@ Inputs for the design:
 
 | Track | Owner of the proof | What must be true by Saturday night |
 | --- | --- | --- |
-| Hyphenate | Cayden (demo), Eric (Devpost and the real-versus-simulated list) | The real deal runs end to end with the flag on the console. The video opens with the flag moment. The second run shows memory. |
+| Hyphenate | Cayden (demo, Devpost, the real-versus-simulated list) | The real deal runs end to end with the flag on the console. The video opens with the flag moment. The second run shows memory. |
 | Factory | Cayden | Done: all three agents ran on Droid with Claude Sonnet 5.5, recorded. Keep it working through the rehearsals. |
 | Figma | Josie (design) | The console frame exists in Figma and the console follows it. Figma is on screen in the pitch. |
 | Tiger Data | Cayden (store, forks), Tri (timeline, write time) | Done: the store writes through to Postgres on Tiger Cloud, with the audit log as a TimescaleDB hypertable. Still to do: run the demo with `STORE=postgres`, show the restart and the tables once in the pitch, and add forks if the spike allows. Opt in on Devpost. |
@@ -119,8 +117,8 @@ Inputs for the design:
 ## Order of work
 
 1. **Saturday morning (done).** Console on `/case`, figure check and CSVs, tool review and tests, Droid runs, the Tiger store.
-2. **Saturday until 6pm.** Josie: the UI. Cayden: `STORE=postgres`, the restart moment, the fork spike, then forks. Tri: Tiger tests, certificate, sensitivity, timeline. Eric: certificate wording, input checks, the one-page summary. Mentor questions asked.
-3. **Saturday night.** Feature freeze at 8pm. Devpost draft submitted. Full rehearsals with the failure switch and the restart. Demo video.
+2. **Saturday until 6pm.** Josie: the UI. Cayden: `STORE=postgres`, the restart moment, the fork spike, then forks. Tri: Tiger tests, certificate with its wording, sensitivity with the input recheck, timeline. Cayden also: the one-page summary. Mentor questions asked.
+3. **Saturday night.** Feature freeze at 8pm. Devpost draft submitted (Cayden). Full rehearsals with the failure switch and the restart. Demo video.
 4. **Sunday morning.** Fix only blockers. Submit before 9am. Practice the 2 minutes once more before judging at 10:30am.
 
 ## Risks to watch

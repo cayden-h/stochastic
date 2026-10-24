@@ -39,4 +39,9 @@ Done at 08:00 (commit 08b2629): the Tiger Cloud store (`STORE=postgres`, write-t
    - Hyphenate: does PE add-on integration count as a finance team corner, and does a learned policy count as "improves with every correction"?
    - Factory: does the Python Droid SDK count for "Building with the Droid SDK" when the tools call our own gateway?
    - Tiger: the free-tier fork limit, and whether the MLH judges want a measured number.
-7. **Sunday 8am:** wake the Tiger service (free shared services can pause when idle), then check `GET /health` before the table opens.
+7. **Submit the Devpost first draft on devpost.com by Saturday night** (moved from Eric, 2026-10-24). The organizers ask for a draft Saturday night and allow edits until 10am Sunday.
+   - Add all four teammates, and opt in to Hyphenate, Factory, Figma, and Tiger Data (the MLH opt-in field).
+   - Fill in which backend produced the shown run (`docs/devpost/devpost.md`, the line that asks Cayden).
+   - Replace the line about placeholder mockups once Josie's design is in.
+8. **The honest-limits card and a one-page summary**, printable, for the table (moved from Eric): what is real, what is inferred, what is cut (purchase accounting, the five-month fiscal year gap), and the four tracks. Base it on `demo-script.md` section 6 and the real-versus-simulated list in `devpost.md`.
+9. **Sunday 8am:** wake the Tiger service (free shared services can pause when idle), then check `GET /health` before the table opens.
