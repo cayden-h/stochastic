@@ -1,6 +1,6 @@
 # Demo script: the 2:00 pitch
 
-Last updated: 2026-10-24, 02:30. The figures below are computed by the tools on the fixture and tested.
+Last updated: 2026-10-24, 05:00. The figures below are computed by the tools on the fixture and tested. The failure switch was rehearsed (section 5).
 The product and scope are in `STOCHASTIC.md`. This file only says what we show and say.
 Claims are tagged [verified] when a source file shows them and [inferred] when they are our judgment.
 Figures come from the filings loaded in `backend/app/db/fixtures/kewaunee.py` and the tool runs. [verified: `backend/tests/test_trust_rules.py`]
@@ -20,36 +20,43 @@ Order: the problem, then what Stochastic does, then the proof. Do not lead with 
 Who speaks: one presenter talks. A second person drives the keyboard. The rest of the team stands back. [inferred]
 
 ### Words for each part
+These are the words. Say them casual, in your own voice, but keep every number as written. [figures verified: `backend/tests/test_trust_rules.py`]
 
-Part 1, the problem (0:00 - 0:25). Say it casual, in your own words. This is the shape:
+Part 1, the problem (0:00 - 0:25):
 
 ```text
-A PE firm that keeps buying small companies has a gate on every deal.
-The lender sets limits, like a max debt-to-EBITDA, and they test them on the combined company.
-So the next deal waits until someone combines the two sets of books.
-Today that is a spreadsheet and weeks of work.
-And one wrong mapping flows into every number after it.
+A private equity firm that keeps buying small companies has a gate on every deal.
+The lender sets a limit, like debt under two and a half times EBITDA, and tests it on the combined company.
+So the next deal waits until someone merges two sets of books.
+Today that is a controller, a spreadsheet, and weeks.
+And one wrong line flows into every number after it.
 ```
 
 Part 2, what it does (0:25 - 0:55):
 
 ```text
-Stochastic does the repeatable part.
-It maps the new company's lines to the platform's lines, and says how sure it is.
-It only asks a human about the lines it is not sure about.
-Then code combines the books and checks the result against the lender's limit.
-A controller approves, and every step goes in an audit log.
+Stochastic does the repeatable part and keeps what you decide.
+A Mapper agent matches the new company's lines to the platform's lines and says how sure it is.
+It stops only on the lines it should not decide alone, and shows what each answer does to the ratio.
+Code combines the books, ties them out, and tests the lender's own definition of debt and EBITDA.
+A controller approves. Every step is in a log that cannot be edited.
+And the controller's answer becomes a policy, so the agent asks once.
 ```
 
 Part 3, proof and honesty (0:55 - 1:30):
 
 ```text
-We ran it on a real public deal, Kewaunee Scientific buying Nu Aire, closed November 2024.
-The agents are roles on a real team, and they keep what the controller decides: ask once, apply next time.
-They never do math. Code does all of it.
-The gateway is the only thing that writes, and it logs every action.
-Here is what is simulated. [say the honest-limits statement from section 6]
+We ran it on a real deal: Kewaunee Scientific buying Nu Aire, closed November 2024, from the public filings.
+One line, "financing liability", holds a sale-leaseback, the new bank debt, and seller notes.
+Count the whole line and leverage is 2.61x, over the limit. Read the agreement and it is 0.79x.
+That is the difference between a blocked next deal and forty-eight million dollars of room.
+The agents are roles on a real team. They never do math. Code does it, and every number carries a run id.
+The gateway is the only thing that writes. An agent cannot approve its own work, and a number no tool produced is refused.
+Here is what is not real. [the honest-limits statement, section 6]
 ```
+
+Part 4, the live demo (1:30 - 2:00): section 2, beat by beat.
+If a judge gives a second minute, the memory moment: reset, run again, no flag, and the `policy:apply` row in the log.
 
 ## 2. The 30-second live demo, beat by beat
 
@@ -145,23 +152,24 @@ Notes:
 The naive reading stays over 2.50x as long as covenant EBITDA stays below $28,782K. Our figure is $27,519K. An add-back above $1,263K that we have not found would move the naive reading under the limit; the covenant reading would still be far under. Know this before a judge asks.
 
 ## 5. Failure plan
+The agent layer has one function, `run_agent(role, item)`, with four backends. `AGENT_BACKEND` picks one and `AGENT_FALLBACK` (default `anthropic,scripted`) lists the fallbacks. [verified: `backend/app/agents/runner.py`]
+The gateway, math tools, and log are plain code and do not depend on any backend.
 
-The agent layer has one function, `run_agent(role, item)`, with two backends. `AGENT_BACKEND` switches them. A recorded run is the last fallback. [verified: `architecture/gateway-and-api.md`]
-The gateway, math tools, and log are plain code and do not depend on either backend.
+Rehearsed on 2026-10-24, 04:50 [verified]: the API was started with the `droid` CLI missing from PATH. `POST /deals/{id}/run` returned `mapper ran on scripted`, and `GET /health` showed the attempts: droid failed ("Droid executable was not found"), anthropic failed ("ANTHROPIC_API_KEY is not set"), scripted ran. The screen kept working and the backend badge said scripted.
+Also found: Droid accepts an unknown model id without an error, so a wrong `DROID_MODEL` is not a failure, it is a silent default. Keep `DROID_MODEL=claude-haiku-5-5` in `.env` and say "Claude Haiku 5.5 through Droid" only when the probe has listed that model.
 
-| Failure | Sign | Action | What to say |
+| Failure | Sign | What the system does | What to say |
 | --- | --- | --- | --- |
-| Droid fails | The subprocess errors or hangs for more than 5 seconds | Set `AGENT_BACKEND=anthropic` and rerun. Keep the same screen. | "The Droid run dropped. This one runs on the Anthropic API. Same roles, same gateway." |
-| Anthropic backend fails | API error, timeout, or no network | Switch to `droid` if it is up. | "Switching the backend." |
-| Both fail | Both backends error | Play the recorded run. The recorded run feeds the same gateway and tools, or it replays the saved screen. | "Both model backends are down, so this is the recorded run. The data is the same." |
-| Recorded run fails | The replay will not start | Open the saved demo video or screenshots of each beat. | "Here is the run from earlier today." |
-| Console fails | Blank page or API error | Reload once. Then use the video. | "Let me show the recorded video." |
-| Wi-Fi fails | No network | Run locally. The demo makes no live SEC calls, and public data is cached. [verified: `STOCHASTIC.md`, section 10] | None needed. |
+| Droid fails | The run takes more than the timeout, or `GET /health` shows a failed droid attempt | Falls to `anthropic` (if a key is set), then `scripted`. Same screen, same gateway. | "The Droid run dropped. This one ran on the fallback. Same roles, same gateway, same math." |
+| Anthropic fails | API error, timeout, no key | Falls to `scripted` | "Switching the backend." |
+| Both model backends fail | Both attempts failed in `GET /health` | `scripted` runs: deterministic rules, no model, no network | "Both model backends are down, so the agents ran on the scripted rules. The gateway, the math, and the log are the same." |
+| You want no live model call at all | Before the demo | Set `AGENT_BACKEND=replay`: recorded outputs from the Haiku 5.5 run, with the tools re-run | "This is the recorded run from this morning. The tool calls are live." |
+| Console fails | Blank page or API error | Reload once. Then show the API: `GET /deals/{id}/case` in a browser tab is readable. | "Let me show the raw case." |
+| Wi-Fi fails | No network | `scripted` or `replay` need none. The demo makes no live SEC calls. | None needed. |
 
 Rules for failure:
-- Never hide a failure. Say it in one short line and move on.
+- Never hide a failure. Say it in one short line and move on. The backend badge on screen already says what ran.
 - Say "built with the Factory Droid SDK" only about runs that went through the `droid` backend. [verified: `architecture/gateway-and-api.md`]
-- Rehearse the switch at least once, with a real failure. [verified: `TASKS.md`, Cayden task 6]
 - The time limit still applies. If the demo has eaten 30 seconds, stop and take questions.
 
 ## 6. The honest-limits statement
@@ -229,7 +237,7 @@ Answers are short and honest. If we do not know, say so.
 | 4 | Was there a moment? (Q4) | One line, Financing liability, holds two kinds of debt. The model stops and asks. The controller's answer moves the leverage result. [inferred: depends on the computed figures] |
 | 5 | How is this different from VistaAI? | VistaAI, HackMIT 2026 first place (self-reported), ingests messy CSV and XLSX and proposes field mappings with provenance. We work on accounting lines, check the result against a lender's limit, and post through a gateway with maker-checker and an audit log. [verified: `STOCHASTIC.md`, section 16] |
 | 6 | Why not Excel plus a consolidation tool? | Consolidation tools add books after the mapping is done. The mapping is the slow, error-prone part, and it needs a human for the unclear lines. We also test the covenant with its own definitions and log who decided what. Excel has no maker-checker. [inferred] |
-| 7 | What does the model do and what does code do? | The model proposes mappings, with a confidence and a reason, and writes the explanations. Code does all the math: consolidation, EBITDA, leverage, and the limit test. The model never produces a number. [verified: `STOCHASTIC.md`, section 11] |
+| 7 | What does the model do and what does code do? | The model proposes mappings with a confidence and a reason, decides which lines it must not decide alone, and writes the flag question and the readings. Code does all the math and computes the effect of each reading. The gateway refuses a number no tool run produced. [verified: `STOCHASTIC.md`, section 11; `test_model_made_number_is_refused_even_with_real_run_ids`] |
 | 8 | What is simulated? | Agent text is hardcoded or recorded. Account-level detail is synthetic or not claimed. The gateway, the math, and the audit log are real. |
 | 9 | Why is the agent text hardcoded? | The real path is the `run_agent` function with two backends, so a live call can fail on stage. Hardcoded or recorded text keeps the demo steady. The tool calls behind it are real. |
 | 10 | What stops the agent from approving its own work? | The gateway. The preparer of an item cannot approve it, and no agent has the approve permission. A forbidden action is denied and logged. |
@@ -243,7 +251,7 @@ Answers are short and honest. If we do not know, say so.
 | 18 | Is this advice? | No. It produces a mapped, combined set of books and a limit check that a human approves. |
 | 19 | Who is the user? | A portfolio controller or a PE associate who owns the integration, right after an add-on closes. [inferred: no practitioner has checked this] |
 | 20 | How long does it take today without this? | One vendor playbook says about 12 weeks for a full integration (self-reported, Aleph). The compliance certificate is due 45 to 60 days after quarter end in the samples we found. We do not claim a speedup we have not measured. |
-| 21 | Where do the Factory and Droid parts fit? | `run_agent` has a `droid` backend. We say "built with the Factory Droid SDK" only about runs that went through it. Whether Droid can run Claude on our key is still open. [verified: `STOCHASTIC.md`, section 18] |
+| 21 | Where do the Factory and Droid parts fit? | Each agent runs as a Droid session with only our gateway tools allowed, an empty working directory, and a typed result. The recorded run is Claude Haiku 5.5 through Droid. We say "built with the Droid SDK" only about runs that went through it; the backend badge shows it. [verified: `agents.md`, run log] |
 | 22 | Did you use real company data? | We used public SEC filings. We did not use any private or internal data. The demo makes no live SEC calls. |
 
 ## 9. Table-side checklist: judging Sunday 10:30am to 12:30pm

@@ -20,7 +20,7 @@ The second was an investment-bank analysis tool that recommends plans.
 Both are archived in `planning-notes.md` and `research/`.
 They are roadmap ideas only. The product is the integration workflow in this file.
 
-Build status on 2026-10-24, 02:30: the backend runs the whole deal end to end on the real filing figures through the gateway, the tools, and the audit log, on the scripted backend. [verified: `backend/tests/test_trust_rules.py`, 99 tests pass]
+Build status on 2026-10-24, 02:30: the backend runs the whole deal end to end on the real filing figures through the gateway, the tools, and the audit log, on the scripted backend. [verified: `backend/tests/test_trust_rules.py`, 102 tests pass]
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 (recorded in `backend/recordings/`). The Anthropic backend is written and not yet run live (no Anthropic key in `.env`).
 The console still implements the earlier workflow. Josie is rebuilding it against `GET /deals/{id}/case`.
 
@@ -260,7 +260,7 @@ Cut (do not build this weekend):
 - Backend: Python 3.12, FastAPI, Pydantic. The gateway, tools, agents, and tests are in Python. [verified]
 - Agents: `run_agent(role, item)` with backends `anthropic` (Anthropic SDK, tool use), `droid` (Factory Droid Python SDK 0.5.0), `scripted`, and `replay`. [verified: installed in `backend/.venv`]
 - Store: in memory. Postgres on Tiger Cloud is optional.
-- Models: Claude through the Anthropic API (`ANTHROPIC_MODEL`, default `claude-sonnet-5-5`) and through Droid (`DROID_MODEL=claude-sonnet-5-5`; the key lists Claude, GPT, and Gemini models).
+- Models: Claude Haiku 5.5 by default on both backends (`ANTHROPIC_MODEL`, `DROID_MODEL`), with per-role overrides (`DROID_MODEL_MAPPER` and so on). Haiku 5.5 produced the intended flag on the demo deal once the filing notes were on the lines. Details and the run log are in `agents.md`.
 - Keys: `ANTHROPIC_API_KEY` and `FACTORY_API_KEY` live in the repo-root `.env`, which git ignores and the app loads. `.env.example` lists every setting.
 
 ## 15. Tracks and sponsors
@@ -354,6 +354,7 @@ Do not lead the pitch with ingestion.
 All paths are inside `docs/`.
 
 - `TASKS.md`: who builds what. `tasks/` holds one file per person, with branches and owned folders.
+- `agents.md`: the agent layer in detail: roles, rules, flags, memory, backends, settings, the run log.
 - `demo-script.md`: the 2:00 plan, the 30-second demo beat by beat, the failure plan, and judge Q&A prep.
 - `glossary.md`: finance and product terms in plain language.
 - `decisions.md`: the dated decision log and the open decisions.

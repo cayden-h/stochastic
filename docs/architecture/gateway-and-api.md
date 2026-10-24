@@ -40,7 +40,7 @@ A forbidden action returns 403 and writes a DENIED row.
 2. The state change is legal for the work item (409 otherwise).
 3. The proposer of an item cannot approve it (maker-checker). Agents cannot approve at all.
 4. A result cannot be approved while the Reviewer verdict is missing or needs-attention.
-5. Every number in a result carries a run id that exists for this deal, and the EBITDA, debt, and leverage values must equal the output of a tool run in the result's run ids (422 otherwise). A model cannot slip in a number.
+5. Every number in a result carries a run id that exists for this deal, and the EBITDA, debt, and leverage values must equal the output of a tool run in the result's run ids (422 otherwise). A model cannot slip in a number. The named run ids (`consolidate_run_id`, `ebitda_run_id`, `debt_run_id`, `leverage_run_id`) must point at a run of that tool.
 6. The limit must equal the brief's limit.
 7. The payload matches its Pydantic model. The gateway re-validates every agent result.
 8. `consolidate` refuses to run while a flag is open.
@@ -89,7 +89,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 {
   "deal": { "id": "d_kequ_nuaire", "name": "Kewaunee Scientific acquires Nu Aire", "platform": "Kewaunee", "target": "Nu Aire", "stage": "awaiting_flag", "brief": { "limit": 2.5, "debt_term": "Senior Funded Bank Debt", "...": "..." } },
   "stage": "awaiting_flag",
-  "source_lines": [ { "id": "sl_001", "company": "Kewaunee", "line": "Cash and cash equivalents", "section": "balance_sheet", "period": "2024-10-31", "amount": 25963, "unit": "USD thousands", "source_ref": "10-Q ...", "is_total": false, "covenant_tag": "na" } ],
+  "source_lines": [ { "id": "sl_001", "company": "Kewaunee", "line": "Cash and cash equivalents", "section": "balance_sheet", "period": "2024-10-31", "amount": 25963, "unit": "USD thousands", "source_ref": "10-Q ...", "is_total": false, "note": null, "covenant_tag": "na", "covenant_note": null } ],
   "mappings": [ { "id": "m_001", "target_line": "Net Revenues", "platform_line": "Net sales", "confidence": 0.95, "reason": "...", "flagged": false, "approved_by": null } ],
   "flags": [ { "id": "wi_002", "type": "flag", "state": "NEEDS_INFO", "question": "...", "evidence": [ { "quote": "...", "document_id": "8-K Ex 10.1, Section 4.8(a)" } ], "options": [ { "id": "a", "label": "Whole line counts (70,885K)", "effect": "Senior Funded Bank Debt 71,955K. Leverage 2.62x against 2.50x. Over the limit.", "run_id": "run_004" } ], "default": "b", "answer": null } ],
   "open_flags": ["wi_002", "wi_003"],
@@ -117,6 +117,10 @@ After the Preparer and the Reviewer run, `verdict` is filled:
 ```
 
 `debt_capacity` (a float, or null before the Reviewer runs) is the room for the next deal in USD thousands, and `debt_capacity_run_id` is the Reviewer's `limit_test` run (or null).
+`result.run_ids_by_tool` maps `consolidate`, `ebitda`, `covenant_debt`, and `leverage` to their run ids, so the console can link each figure to `GET /runs/{run_id}`.
+`source_lines[].note` is what the filing says about a line (for example the 10-Q note that the financing liability is the Statesville sale-leaseback). Show it on the flag card's evidence.
+A mapping flag may cover several target lines; its options then carry `mappings` (target line id to platform line) in `payload.option_actions`, and the option `effect` text lists each line.
+`GET /health` returns `backend.settings` with the configured backend, the fallback chain, and the model per role on each backend.
 
 `result.rows` is the combined table: `line`, `section`, `platform`, `target`, `combined`, `run_id`, in platform order and in USD thousands.
 The three closing financing lines (term loan, revolver, seller notes) carry `period` "2024-11-01 (closing)".

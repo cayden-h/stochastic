@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ValidationError
 
 from app.agents import runner as agent_runner
+from app.agents import settings as agent_settings
 from app.agents.jobs import advance
 from app.api.events import next_events
 from app.api.schemas import CaseResponse, DealCreated, HealthResponse
@@ -87,6 +88,8 @@ def build_router(gw: Gateway) -> APIRouter:
             "anthropic_key": bool(os.getenv("ANTHROPIC_API_KEY")),
             "factory_key": bool(os.getenv("FACTORY_API_KEY")),
             "last_runs": agent_runner.LAST_RUNS[-6:],
+            "totals_this_process": agent_runner.TOTALS,
+            "settings": agent_settings.summary(),
         }
 
     def run_in_background(deal_id: str, backend: str | None, tasks: BackgroundTasks):

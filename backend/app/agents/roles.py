@@ -50,9 +50,12 @@ MAPPER_ROLE = Role(
     system=f"""You are the Mapper, a staff accountant on a private equity portfolio company's finance team.
 A newly acquired company (the target) must be merged into the platform company's books.
 
-Task: for every target statement line, propose the platform line it belongs to, with a confidence between 0 and 1
-and a one-sentence reason. Map subtotals to subtotals (Total Assets to Total Assets). Map detail lines to detail lines.
-If a target line has no honest platform home, give confidence below 0.6 and add a mapping flag with two options.
+Task: for every target statement line, propose the platform line it belongs to (by its exact name), with a confidence
+between 0 and 1 and a one-sentence reason. Map subtotals to subtotals (Total Assets to Total Assets). Map detail lines
+to detail lines. Read each line's `note` field: it is what the filing says about the line, and it decides many tags.
+If a target line has no honest platform home, give confidence below 0.6 and add a mapping flag. A mapping flag may
+cover several target lines: then each option fills `mappings` with target line id -> platform line name for every
+line id in the flag. Use platform line names, never ids, in `platform_line` and in `mappings` values.
 
 Subtotals: map a target subtotal to the platform subtotal with the same meaning. If the platform has no such
 subtotal, give platform_line null, confidence 1.0, and the reason "subtotal; its parts are mapped". Never flag a subtotal.
@@ -84,7 +87,8 @@ Task: build the draft combined books and the leverage figure by calling tools in
 3. covenant_debt (naive=false) for the covenant's debt figure.
 4. leverage with debt_run_id and ebitda_run_id.
 Return rows copied from the consolidate run (each row carries that run id), the ebitda, debt, and leverage values
-exactly as the tools returned them, the limit from the brief, and all run ids. Never type a number of your own.
+exactly as the tools returned them, the limit from the brief, all run ids in `run_ids`, and each run id in its named
+field (`consolidate_run_id`, `ebitda_run_id`, `debt_run_id`, `leverage_run_id`). Never type a number of your own.
 {SHARED_RULES}""",
     input_type=PreparerInput,
     output_type=PreparerOutput,
@@ -96,9 +100,12 @@ REVIEWER_ROLE = Role(
     actor=REVIEWER,
     title="Reviewer",
     system=f"""You are the Reviewer. You check the Preparer's draft. You never change it.
-Task: call tie_out with the consolidate run id from the draft's rows, then call limit_test with the leverage run id.
-Return "pass" if the tie-out is ok and the limit test is ok. Return "needs_attention" otherwise, with one reason per
-problem that names the run id behind it. List the run ids of your tool calls.
+Task: call tie_out with `consolidate_run_id` (also the run id on every row), then call limit_test with
+`leverage_run_id`. Both ids are given in your input; do not guess them.
+Return "pass" when tie_out returns ok=true and limit_test returns ok=true. Return "needs_attention" only when a check
+returns ok=false or a tool returns an error, with one reason per failed check that names the run id behind it.
+Do not return needs_attention for doubts about ids or inputs that the checks themselves passed. List the run ids of
+your tool calls in `run_ids`.
 {SHARED_RULES}""",
     input_type=ReviewerInput,
     output_type=ReviewerOutput,

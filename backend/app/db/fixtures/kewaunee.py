@@ -136,6 +136,22 @@ NUAIRE_IS = [
 NUAIRE_CF = [("Depreciation and Amortization", 1830395, False)]
 
 
+# What the filings say about particular lines. Loaded onto SourceLine.note so every backend sees it.
+LINE_NOTES = {
+    "Current portion of financing liability": "10-Q: arises from the sale-leaseback of the headquarters and manufacturing facility at 2700 West Front Street, Statesville, accounted for as a financing; carrying value $27,782K at 2024-10-31.",
+    "Long-term portion of financing liability": "10-Q: arises from the sale-leaseback of the headquarters and manufacturing facility at 2700 West Front Street, Statesville, accounted for as a financing; carrying value $27,782K at 2024-10-31.",
+    "Financing liability: PNC Revolving Credit Facility": "Ex 99.2 Note 4(h): drawn at close on the $20M senior secured revolving credit facility with PNC; added to the financing liability line.",
+    "Financing liability: PNC Term Loan": "Ex 99.2 Note 4(h): $15M senior secured term loan from PNC; added to the financing liability line.",
+    "Financing liability: 8% Seller Notes (subordinated)": "Ex 99.2 Note 4(h) and Note 3: 8% subordinated notes issued to the sellers, maturing 2027; added to the financing liability line.",
+    "Short-term borrowings": "10-Q: overdraft protection and short-term loan arrangements at the international subsidiaries.",
+    "Current portion of financing lease liabilities": "10-Q: finance leases of equipment, not the Statesville property.",
+    "Long-term portion of financing lease liabilities": "10-Q: finance leases of equipment, not the Statesville property.",
+    "Certificates of Deposit": "Ex 99.1: short-term investments; maturities are not disclosed in the pages read.",
+    "Noncompete Agreement, Net": "Ex 99.1: an intangible asset being amortized; $20,833 left at 2024-09-30.",
+    "Reserve for Uncertain Tax Positions": "Ex 99.1: nil at 2024-09-30 ($2,336,000 at 2023-09-30).",
+}
+
+
 def build_lines(store: MemoryStore) -> list[SourceLine]:
     lines: list[SourceLine] = []
 
@@ -143,7 +159,7 @@ def build_lines(store: MemoryStore) -> list[SourceLine]:
         for line, amount, is_total in rows:
             lines.append(SourceLine(id=store.next_id("sl"), deal_id=DEAL_ID, company=company, line=line,
                                     section=section, period=period, amount=float(amount), unit=unit,
-                                    source_ref=source_ref, is_total=is_total))
+                                    source_ref=source_ref, is_total=is_total, note=LINE_NOTES.get(line)))
 
     cut = next(i for i, r in enumerate(KEWAUNEE_BS) if r[0] == "Long-term portion of financing liability") + 1
     add(PLATFORM, "balance_sheet", "2024-10-31", "USD thousands", TENQ, KEWAUNEE_BS[:cut])

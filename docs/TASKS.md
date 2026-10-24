@@ -7,7 +7,7 @@ Swap tasks freely and tell the team when you do.
 
 ## State of the build
 
-The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.79x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 99 tests pass. [verified: `backend/tests/test_trust_rules.py`]
+The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.79x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 102 tests pass. [verified: `backend/tests/test_trust_rules.py`]
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded. Not yet run live: the Anthropic backend (no key in `.env`).
 Not yet done: the console on the new API, the Note 2 answer key, the Devpost text, the recorded model run, the rehearsals.
 
@@ -34,11 +34,12 @@ Done on 2026-10-24: the contract, the gateway rewrite (per-role permissions, run
 
 Done at 03:30: the `droid` CLI, the probe (Claude models are on our key), and a full Droid run with Claude Sonnet 5.5, recorded.
 
+Done at 05:10: Haiku 5.5 as the default model with per-role overrides, the failure switch rehearsed, the pitch words written, the Haiku run recorded. See `tasks/cayden.md` and `agents.md`.
+
 Open:
 1. Put an Anthropic key in `.env` and record a model run: `scripts/record_run.py --backend anthropic`. Commit the recordings.
-2. Rehearse the failure switch: start on `droid`, kill the CLI mid-run, show the fallback in `GET /health`.
-3. Write the 1:30 pitch words into `demo-script.md` (the structure is there) and run the rehearsals.
-4. Ask a Hyphenate mentor whether PE add-on integration counts as a corner of a finance team, and whether a learned policy counts as the "improves with every correction" signal.
+2. Rehearse the 2:00 with a stopwatch on the console, and write the credit total from `GET /health` into the run log in `agents.md`.
+3. Ask a Hyphenate mentor whether PE add-on integration counts as a corner of a finance team, and whether a learned policy counts as the "improves with every correction" signal.
 
 ## Eric
 

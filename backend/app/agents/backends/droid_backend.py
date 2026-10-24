@@ -16,6 +16,7 @@ import tempfile
 from pydantic import BaseModel
 
 from app.agents.roles import Role
+from app.agents.settings import role_model
 from app.tools.finance import TOOL_DESCRIPTIONS
 
 
@@ -70,15 +71,24 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None):
     with tempfile.TemporaryDirectory(prefix="stochastic-droid-") as cwd:
         kwargs = dict(cwd=cwd, output=role.output_type, config=config,
                       timeout=float(os.getenv("DROID_TIMEOUT", "240")))
-        model = os.getenv("DROID_MODEL")
+        model = role_model("DROID_MODEL", role.name)
         if model:
             kwargs["model"] = model
         result = await run(prompt, **kwargs)
     if not result.success or result.output is None:
         raise RuntimeError(f"droid run failed: {getattr(result, 'error', None)} "
                            f"{getattr(result, 'structured_output_error', None) or getattr(result, 'output_validation_error', None)}")
+    usage = getattr(result, "usage", None)
+    cost = {}
+    if usage is not None:
+        for k in ("input_tokens", "output_tokens", "cache_creation_tokens", "cache_read_tokens", "thinking_tokens",
+                  "factory_credits"):
+            v = getattr(usage, k, None)
+            if v is not None:
+                cost[k] = v
     return result.output, {"session_id": result.session_id, "turns": result.turn_count,
-                           "duration": getattr(result, "duration", None)}
+                           "duration": getattr(result, "duration", None), "model_requested": model or "droid default",
+                           "model_confirmed": False, "usage": cost}
 
 
 def run_droid(role: Role, inp: BaseModel, call_tool, session_id: str | None = None) -> tuple[BaseModel, dict]:

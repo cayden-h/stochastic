@@ -175,7 +175,7 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
             tags.append(LineTag(line_id=line.id, tag=pol.decision, note=f"Policy {pol.id} from {pol.approved_by}",
                                 policy_id=pol.id))
             continue
-        tag, note = _tag_rule(line.line)
+        tag, note = _tag_rule(line.line, line.note)
         if tag == "unclear":
             unclear_ids.append(line.id)
             unclear_lines.append(line)
@@ -215,7 +215,7 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
                              f"flag below {FLAG_THRESHOLD}; policies applied first")
 
 
-def _tag_rule(line: str) -> tuple[str, str]:
+def _tag_rule(line: str, note: str | None = None) -> tuple[str, str]:
     n = line.lower()
     if "financing liability" in n:
         return "unclear", "One line name holds the sale-leaseback financing and the acquisition financing"
@@ -240,12 +240,14 @@ def scripted_preparer(inp: PreparerInput, call_tool: CallTool) -> PreparerOutput
     return PreparerOutput(rows=rows, ebitda=eb.outputs["ebitda"], debt=debt.outputs["debt"],
                           leverage=lev.outputs["leverage"], limit=inp.brief.limit,
                           run_ids=[cons.run_id, eb.run_id, debt.run_id, lev.run_id],
+                          consolidate_run_id=cons.run_id, ebitda_run_id=eb.run_id, debt_run_id=debt.run_id,
+                          leverage_run_id=lev.run_id,
                           note="scripted backend: consolidate, ebitda, covenant_debt, leverage")
 
 
 def scripted_reviewer(inp: ReviewerInput, call_tool: CallTool) -> ReviewerOutput:
-    cons_run = inp.rows[0].run_id if inp.rows else None
-    lev_run = next((r for r in inp.run_ids if r.startswith("run")), None)
+    cons_run = inp.consolidate_run_id or (inp.rows[0].run_id if inp.rows else None)
+    lev_run = inp.leverage_run_id or inp.run_ids[-1]
     reasons: list[str] = []
     run_ids: list[str] = []
     tie = call_tool("tie_out", {"run_id": cons_run})
@@ -253,7 +255,7 @@ def scripted_reviewer(inp: ReviewerInput, call_tool: CallTool) -> ReviewerOutput
     if not tie.outputs["ok"]:
         reasons.append(f"Tie-out failed ({tie.run_id}): rows {tie.outputs['bad_rows']}, balance {tie.outputs['balance_sheet_balances']}")
     # the leverage run is the last run id the Preparer listed
-    test = call_tool("limit_test", {"leverage_run_id": inp.run_ids[-1]})
+    test = call_tool("limit_test", {"leverage_run_id": lev_run})
     run_ids.append(test.run_id)
     if not test.outputs["ok"]:
         reasons.append(f"Leverage {test.outputs['leverage']:.2f}x is not below the {test.outputs['limit']:.2f}x limit ({test.run_id})")

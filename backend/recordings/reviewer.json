@@ -1,13 +1,16 @@
 {
   "role": "reviewer",
   "backend": "droid",
-  "input_key": "b7da494ce146",
+  "input_key": "61fc1f7bffde",
   "output": {
     "verdict": "pass",
-    "reasons": [],
+    "reasons": [
+      "tie_out on consolidate run run_013 returned ok=true: no bad rows across 54 rows checked, and the combined balance sheet balances (total assets 182456.181 equals total liabilities and equity 182456.181) (tool run run_017).",
+      "limit_test on leverage run run_016 returned ok=true: leverage 0.772 is below the 2.5 limit, with 1.728 turns of headroom (tool run run_018)."
+    ],
     "run_ids": [
-      "run_018",
-      "run_019"
+      "run_017",
+      "run_018"
     ]
   }
 }

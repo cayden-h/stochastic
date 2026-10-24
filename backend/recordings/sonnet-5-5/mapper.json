@@ -1,0 +1,951 @@
+{
+  "role": "mapper",
+  "backend": "droid",
+  "input_key": "6e3c4212beb5",
+  "output": {
+    "mappings": [
+      {
+        "target_line_id": "sl_055",
+        "platform_line": "Cash and cash equivalents",
+        "confidence": 0.95,
+        "reason": "Same caption and meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_056",
+        "platform_line": "Cash and cash equivalents",
+        "confidence": 0.5,
+        "reason": "The platform has no short-term investments line; certificates of deposit may be cash equivalents or other current assets depending on maturity, which the statements do not show.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_057",
+        "platform_line": "Receivables, less allowance",
+        "confidence": 0.95,
+        "reason": "Net trade receivables on both sides.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_058",
+        "platform_line": "Inventories",
+        "confidence": 0.95,
+        "reason": "Net inventories on both sides.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_059",
+        "platform_line": "Prepaid expenses and other current assets",
+        "confidence": 0.92,
+        "reason": "Prepaids belong in the platform's prepaid and other current assets line.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_060",
+        "platform_line": "Prepaid expenses and other current assets",
+        "confidence": 0.8,
+        "reason": "The platform has no separate tax receivable line; other current assets is the closest home.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_061",
+        "platform_line": "Total Current Assets",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_062",
+        "platform_line": "Property, plant and equipment, at cost",
+        "confidence": 0.9,
+        "reason": "Leasehold improvements are a gross PP&E component; the platform reports PP&E at cost as one line.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_063",
+        "platform_line": "Property, plant and equipment, at cost",
+        "confidence": 0.92,
+        "reason": "Machinery is a gross PP&E component; the platform reports PP&E at cost as one line.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_064",
+        "platform_line": "Property, plant and equipment, at cost",
+        "confidence": 0.92,
+        "reason": "Furniture and equipment is a gross PP&E component; the platform reports PP&E at cost as one line.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_065",
+        "platform_line": "Property, plant and equipment, at cost",
+        "confidence": 0.92,
+        "reason": "Vehicles are a gross PP&E component; the platform reports PP&E at cost as one line.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_066",
+        "platform_line": "Property, plant and equipment, at cost",
+        "confidence": 0.8,
+        "reason": "Nu Aire carries software inside property and equipment at cost, and the platform has no intangibles line.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_067",
+        "platform_line": "Property, plant and equipment, at cost",
+        "confidence": 0.9,
+        "reason": "Construction in process is a gross PP&E component; the platform reports PP&E at cost as one line.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_068",
+        "platform_line": null,
+        "confidence": 1.0,
+        "reason": "subtotal; its parts are mapped",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_069",
+        "platform_line": "Accumulated depreciation",
+        "confidence": 0.97,
+        "reason": "Same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_070",
+        "platform_line": "Net Property, Plant and Equipment",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning (PP&E net of depreciation).",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_071",
+        "platform_line": "Other assets",
+        "confidence": 0.75,
+        "reason": "The platform has no intangibles line; a small net noncompete fits other assets.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_072",
+        "platform_line": "Right of use assets",
+        "confidence": 0.95,
+        "reason": "Operating ROU asset maps to the platform's ROU line.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_073",
+        "platform_line": "Deferred income taxes",
+        "confidence": 0.97,
+        "reason": "Noncurrent deferred tax asset; same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_074",
+        "platform_line": "Other assets",
+        "confidence": 0.85,
+        "reason": "Noncurrent deposits are other assets.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_075",
+        "platform_line": null,
+        "confidence": 1.0,
+        "reason": "subtotal; its parts are mapped",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_076",
+        "platform_line": "Total Assets",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_077",
+        "platform_line": "Accounts payable",
+        "confidence": 0.97,
+        "reason": "Same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_078",
+        "platform_line": "Current portion of operating lease liabilities",
+        "confidence": 0.97,
+        "reason": "Same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_079",
+        "platform_line": "Other accrued expenses",
+        "confidence": 0.8,
+        "reason": "The platform has no separate income taxes payable line; other accrued expenses is the closest home.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_080",
+        "platform_line": "Employee compensation and amounts withheld",
+        "confidence": 0.92,
+        "reason": "Accrued compensation matches the platform's employee compensation line.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_081",
+        "platform_line": "Employee compensation and amounts withheld",
+        "confidence": 0.7,
+        "reason": "Commissions are pay-related accruals, but they could also sit in other accrued expenses.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_082",
+        "platform_line": "Other accrued expenses",
+        "confidence": 0.95,
+        "reason": "Same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_083",
+        "platform_line": "Total Current Liabilities",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_084",
+        "platform_line": "Other non-current liabilities",
+        "confidence": 0.75,
+        "reason": "Uncertain tax position reserve is a noncurrent liability with no dedicated platform line; the balance is zero.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_085",
+        "platform_line": "Long-term portion of operating lease liabilities",
+        "confidence": 0.97,
+        "reason": "Same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_086",
+        "platform_line": null,
+        "confidence": 1.0,
+        "reason": "subtotal; its parts are mapped",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_087",
+        "platform_line": "Total Liabilities",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_088",
+        "platform_line": "Common stock",
+        "confidence": 0.97,
+        "reason": "Same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_089",
+        "platform_line": "Additional paid-in-capital",
+        "confidence": 0.97,
+        "reason": "Same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_090",
+        "platform_line": "Retained earnings",
+        "confidence": 0.97,
+        "reason": "Same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_091",
+        "platform_line": "Total Stockholders' Equity",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_092",
+        "platform_line": "Total Liabilities and Stockholders' Equity",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_093",
+        "platform_line": "Net sales",
+        "confidence": 0.97,
+        "reason": "Revenue on both sides.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_094",
+        "platform_line": "Cost of products sold",
+        "confidence": 0.95,
+        "reason": "Cost of sales on both sides.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_095",
+        "platform_line": "Gross profit",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_096",
+        "platform_line": "Operating expenses",
+        "confidence": 0.9,
+        "reason": "The platform reports operating expenses as one line; selling expense is a component.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_097",
+        "platform_line": "Operating expenses",
+        "confidence": 0.9,
+        "reason": "The platform reports operating expenses as one line; G&A is a component.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_098",
+        "platform_line": "Operating expenses",
+        "confidence": 0.9,
+        "reason": "The platform reports operating expenses as one line; R&D is a component.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_099",
+        "platform_line": null,
+        "confidence": 1.0,
+        "reason": "subtotal; its parts are mapped",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_100",
+        "platform_line": "Operating profit",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_101",
+        "platform_line": "Other income, net",
+        "confidence": 0.7,
+        "reason": "Nu Aire's net interest income is income, so it does not fit the platform's interest expense line; other income, net is the closest home.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_102",
+        "platform_line": "Other income, net",
+        "confidence": 0.95,
+        "reason": "Same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_103",
+        "platform_line": null,
+        "confidence": 1.0,
+        "reason": "subtotal; its parts are mapped",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_104",
+        "platform_line": "Profit before income taxes",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_105",
+        "platform_line": "Income tax (benefit) expense",
+        "confidence": 0.97,
+        "reason": "Same meaning.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_106",
+        "platform_line": "Net earnings",
+        "confidence": 1.0,
+        "reason": "Subtotal with the same meaning; Nu Aire has no non-controlling interest.",
+        "policy_id": null
+      },
+      {
+        "target_line_id": "sl_107",
+        "platform_line": "Depreciation",
+        "confidence": 0.75,
+        "reason": "The platform line is depreciation only, while Nu Aire's line also includes amortization of the noncompete.",
+        "policy_id": null
+      }
+    ],
+    "tags": [
+      {
+        "line_id": "sl_001",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_002",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_003",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_004",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_005",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_006",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_007",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_008",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_009",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_010",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_011",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_012",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_013",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_014",
+        "tag": "debt",
+        "note": "Borrowed money.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_015",
+        "tag": "unclear",
+        "note": "Financing liability; the Statesville sale-leaseback exclusion may apply, and the same name covers more than one instrument.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_016",
+        "tag": "debt",
+        "note": "Finance lease liability; the agreement includes finance leases.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_017",
+        "tag": "na",
+        "note": "Operating lease.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_018",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_019",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_020",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_021",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_022",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_023",
+        "tag": "unclear",
+        "note": "Financing liability; the Statesville sale-leaseback exclusion may apply, and the same name covers more than one instrument.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_024",
+        "tag": "debt",
+        "note": "PNC revolver draw; senior secured.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_025",
+        "tag": "debt",
+        "note": "PNC term loan; senior secured.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_026",
+        "tag": "unclear",
+        "note": "Subordinated seller notes; the agreement lists them as an exclusion.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_027",
+        "tag": "debt",
+        "note": "Finance lease liability; the agreement includes finance leases.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_028",
+        "tag": "na",
+        "note": "Operating lease.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_029",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_030",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_031",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_032",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_033",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_034",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_035",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_036",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_037",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_038",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_039",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_040",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_055",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_056",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_057",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_058",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_059",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_060",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_061",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_062",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_063",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_064",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_065",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_066",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_067",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_068",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_069",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_070",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_071",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_072",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_073",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_074",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_075",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_076",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_077",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_078",
+        "tag": "na",
+        "note": "Operating lease.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_079",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_080",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_081",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_082",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_083",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_084",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_085",
+        "tag": "na",
+        "note": "Operating lease.",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_086",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_087",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_088",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_089",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_090",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_091",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      },
+      {
+        "line_id": "sl_092",
+        "tag": "na",
+        "note": "",
+        "policy_id": null
+      }
+    ],
+    "flags": [
+      {
+        "kind": "covenant_tag",
+        "line_ids": [
+          "sl_015",
+          "sl_023",
+          "sl_026"
+        ],
+        "question": "Which Kewaunee liabilities count as Senior Funded Bank Debt? Two exclusions in the agreement may apply: the subordinated 8% seller notes (sl_026) and the capitalized lease obligations on the Statesville property. The financing liability lines (sl_015 current, sl_023 long-term) share one name and the statements do not show whether they hold only the Statesville sale-leaseback or other instruments too. Applying an exclusion is the controller's decision.",
+        "evidence": [
+          {
+            "quote": "ratio of Senior Funded Bank Debt to EBITDA of less than 2.50 to 1.00",
+            "page": null,
+            "document_id": "8-K Ex 10.1, PNC Loan Agreement dated 2024-11-01"
+          },
+          {
+            "quote": "Secured borrowed money, including finance leases and letters of credit.",
+            "page": null,
+            "document_id": "8-K Ex 10.1, PNC Loan Agreement dated 2024-11-01"
+          },
+          {
+            "quote": "Subordinated Debt, which includes the 8% seller notes",
+            "page": null,
+            "document_id": "8-K Ex 10.1, PNC Loan Agreement dated 2024-11-01"
+          },
+          {
+            "quote": "Capitalized lease obligations relating to the real property at 2700 West Front Street (the Statesville sale-leaseback)",
+            "page": null,
+            "document_id": "8-K Ex 10.1, PNC Loan Agreement dated 2024-11-01"
+          },
+          {
+            "quote": "Financing liability: 8% Seller Notes (subordinated)",
+            "page": null,
+            "document_id": "8-K/A Ex 99.2 Note 4(h), closing financing"
+          }
+        ],
+        "options": [
+          {
+            "id": "agreement_reading",
+            "label": "Agreement as written: seller notes and the Statesville financing liability are both excluded",
+            "tags": {
+              "sl_015": "not_debt",
+              "sl_023": "not_debt",
+              "sl_026": "not_debt"
+            },
+            "platform_line": null
+          },
+          {
+            "id": "seller_notes_only",
+            "label": "Only the seller notes are excluded; the financing liability counts as debt (not wholly Statesville, or the exclusion does not apply)",
+            "tags": {
+              "sl_015": "debt",
+              "sl_023": "debt",
+              "sl_026": "not_debt"
+            },
+            "platform_line": null
+          },
+          {
+            "id": "all_counted",
+            "label": "Conservative: count all three lines as debt",
+            "tags": {
+              "sl_015": "debt",
+              "sl_023": "debt",
+              "sl_026": "debt"
+            },
+            "platform_line": null
+          }
+        ],
+        "default": "agreement_reading"
+      },
+      {
+        "kind": "mapping",
+        "line_ids": [
+          "sl_056"
+        ],
+        "question": "Where should Nu Aire's certificates of deposit ($991,082) go? The platform has no short-term investments line, and the CD maturity needed to call them cash equivalents is not in the statements.",
+        "evidence": [
+          {
+            "quote": "Certificates of Deposit",
+            "page": null,
+            "document_id": "8-K/A Ex 99.1, Nu Aire audited statements, year ended 2024-09-30"
+          }
+        ],
+        "options": [
+          {
+            "id": "cash",
+            "label": "Cash and cash equivalents (maturity of 3 months or less)",
+            "tags": {},
+            "platform_line": "Cash and cash equivalents"
+          },
+          {
+            "id": "other_current",
+            "label": "Prepaid expenses and other current assets (maturity over 3 months)",
+            "tags": {},
+            "platform_line": "Prepaid expenses and other current assets"
+          }
+        ],
+        "default": null
+      }
+    ],
+    "note": "Platform amounts are in USD thousands and Nu Aire's in whole USD, so the gateway must convert units. Periods differ: platform balance sheet at 2024-10-31, platform income statement FY April 2024, Nu Aire September 2024. No figures were computed. Sl_101, Nu Aire's net interest income, was mapped to Other income, net at 0.7; the platform's interest expense line stays unmatched and is unaffected."
+  }
+}
