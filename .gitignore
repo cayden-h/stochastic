@@ -31,3 +31,6 @@ docs/diagrams/render.log
 .idea/
 .vscode/
 *.log
+
+# private local notes
+notes/

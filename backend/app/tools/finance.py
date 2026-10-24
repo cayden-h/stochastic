@@ -119,6 +119,7 @@ def _pick(lines: list[SourceLine], names: tuple[str, ...], section: str) -> floa
 
 NET_INCOME = ("net earnings", "net income", "net income (loss)", "net earnings (loss)")
 INTEREST = ("interest expense", "interest expense, net")
+INTEREST_INCOME = ("interest income", "interest income - net", "interest income, net")
 TAXES = ("income tax (benefit) expense", "income tax expense", "provision for income taxes",
          "income tax expense (benefit)", "income taxes")
 DA = ("depreciation and amortization", "depreciation", "amortization")
@@ -127,7 +128,8 @@ DA = ("depreciation and amortization", "depreciation", "amortization")
 def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], brief: Brief) -> dict:
     """Covenant EBITDA, built the way the agreement defines it.
 
-    Base, per company: net income plus interest expense plus income taxes plus depreciation and amortization.
+    Base, per company: net income plus interest expense less interest income plus income taxes plus depreciation
+    and amortization (Ex 10.1 Addendum I).
     Then each add-back from the brief is applied up to its cap, and each deduction is subtracted.
     The brief holds the agreement's own definitions, so this function never guesses them.
     Expense lines are stored as positive amounts; a tax benefit is stored as a negative amount.
@@ -137,11 +139,12 @@ def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], bri
     for company, lines in (("platform", platform_lines), ("target", target_lines)):
         ni = _pick(lines, NET_INCOME, "income_statement")
         it = _pick(lines, INTEREST, "income_statement")
+        ii = _pick(lines, INTEREST_INCOME, "income_statement")
         tx = _pick(lines, TAXES, "income_statement")
         da = _pick(lines, DA, "cash_flow")
-        sub = ni + it + tx + da
+        sub = ni + it - ii + tx + da
         parts.append({"company": company, "net_income": round(ni, 3), "interest_expense": round(it, 3),
-                      "income_taxes": round(tx, 3), "depreciation_amortization": round(da, 3),
+                      "interest_income": round(ii, 3), "income_taxes": round(tx, 3), "depreciation_amortization": round(da, 3),
                       "subtotal": round(sub, 3)})
         base += sub
     addbacks = []

@@ -60,7 +60,7 @@ def test_naive_and_covenant_leverage_differ_on_real_figures(world):
         if "financing liability" in line.line.lower():
             line.covenant_tag = "debt"
     naive = gw.run_tool("system:gateway", DEAL_ID, "covenant_debt", {}).outputs["debt"]
-    assert round(eb, 1) == 28032.6  # 18,043 Kewaunee + 7,782.6 Nu Aire + 4,177 pension - 1,970 rent
+    assert round(eb, 1) == 27518.8  # 18,043 Kewaunee + 7,268.8 Nu Aire + 4,177 pension - 1,970 rent
     assert covenant == 21633.0  # 15,000 + 5,563 + 805 + 109 + 156
     assert naive == 71955.0  # plus 27,782 sale-leaseback and 22,540 seller notes
     assert covenant / eb < 2.5 < naive / eb
@@ -229,3 +229,12 @@ def test_units_and_limit_test():
     assert finance.to_thousands(74850302, "USD") == 74850.302
     assert finance.limit_test(2.499, 2.5)["ok"] and not finance.limit_test(2.5, 2.5)["ok"]
     assert finance.limit_test(0.772, 2.5, ebitda_value=28032.6, debt=21633.0)["debt_capacity"] == pytest.approx(48448.5)
+
+
+def test_ebitda_subtracts_interest_income(world):
+    # Ex 10.1 Addendum I: "net income plus interest expense less interest income plus income tax expense ..."
+    store, gw = world
+    target = next(p for p in gw.run_tool("system:gateway", DEAL_ID, "ebitda", {}).outputs["parts"]
+                  if p["company"] == "target")
+    assert target["interest_income"] == pytest.approx(513.77)  # Nu Aire "Interest Income - Net", Ex 99.1
+    assert target["subtotal"] == pytest.approx(5438.271 + 513.949 + 1830.395 - 513.77)
