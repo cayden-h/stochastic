@@ -88,6 +88,11 @@ def _trial(i: int) -> dict:
         rec["flag_kinds"] = sorted(f["kind"] for f in out["flags"])
         rec["financing_unclear"] = sum(1 for t in out["tags"] if t["tag"] == "unclear"
                                        and "inancing liability" in lines.get(t["line_id"], lines["sl_001"]).line)
+        # What the demo moment depends on: which lines the covenant flag asks about, and how each financing line is tagged.
+        name = lambda lid: lines[lid].line if lid in lines else lid  # noqa: E731
+        rec["covenant_flag_lines"] = [[name(lid) for lid in f["line_ids"]] for f in out["flags"] if f["kind"] == "covenant_tag"]
+        rec["financing_tags"] = {name(t["line_id"]): t["tag"] for t in out["tags"]
+                                 if "inancing liability" in name(t["line_id"])}
     return rec
 
 
