@@ -1,6 +1,6 @@
 # data
 
-Cached public filings and rate data go here.
+Cached public filings go here, such as the Kewaunee and Nu Aire filings, and the two input CSV files built from them.
 The folder contents are git-ignored. Only this file is tracked.
 
 Rules:

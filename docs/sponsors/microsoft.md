@@ -1,4 +1,26 @@
 # Microsoft (Cal Hacks 13.0)
+
+## Status after the 2026-10-23 evening reframe
+
+Stochastic is now a PE add-on integration tool.
+It merges the books of a newly acquired company into the platform company's books, flags the few lines a human must decide, and checks the combined result against the lender's limit.
+Three small stateless agents do the work (Mapper, Preparer, Reviewer), code does all the math, and a controller approves.
+The demo uses a real public deal: Kewaunee Scientific buying Nu Aire. [verified: `../STOCHASTIC.md` section 12]
+
+### How Microsoft fits now
+
+The fit is unchanged.
+It is still a maybe, and it still depends on whether Microsoft products are required. [verified: `../STOCHASTIC.md` section 15]
+Ask that question at kickoff or at the Microsoft workshop.
+Do not add Microsoft tooling to the build just to qualify.
+
+### Which old notes still apply
+
+- The notes on the prize, the Frontier Co. team, and the workshop still apply.
+- Notes that tie the fit to plan search, Monte Carlo, forks for what-if plans, the eight situations, or the clause reader describe the earlier framing.
+
+---
+
 - Prize at Cal Hacks 13.0: 1st "Built for the Real World" $3,800 plus Surface laptops and a tech talk and 1:1 mentorship with the Microsoft Delta / Frontier Co. FDE team; 2nd "Customer Impact Award" no cash
 - Researched: 2026-10-15
 ## What they do

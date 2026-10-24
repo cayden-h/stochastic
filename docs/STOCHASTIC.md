@@ -1,237 +1,242 @@
 # Stochastic: reference for Claude
 
-Last updated: 2026-10-23.
+Last updated: 2026-10-23 (evening, after the reframe to PE add-on integration).
 Read this file first in any session about Stochastic.
 It holds the main features, the architecture, and the scope.
 If this file and a PDF or an older note disagree, this file is correct.
-Claims are tagged [verified] when a source file or a post shows them, and [inferred] when they are our judgment.
+Claims are tagged [verified] when a source file or a filing shows them, and [inferred] when they are our judgment.
 
 ## 1. What Stochastic is
 
-Stochastic is one platform for any special situation in corporate finance.
-A special situation is a one-off, high-stakes move outside the normal course of business.
-Examples are raising money, refinancing, selling part of a company, and a company in trouble.
-A team of AI agents works out what the company is allowed to do, finds what blocks it, builds and tests options, and asks a human reviewer to approve.
-A situation profile tells the same agents what to look for, what to weigh, and when to ask.
-The platform is built to serve all eight situations in section 5.
-The weekend demo runs one situation: raising money.
+Stochastic merges the books of a newly acquired company into the books of the platform company that bought it.
+It flags the few lines that need a human, and then checks the combined result against the lender's limit.
+It is built for private equity buy-and-build firms, which keep buying add-on companies.
+Small agents do the repeatable work, code does all the math, and a human controller approves.
+Every step goes in an audit log.
+
+This replaces two earlier framings.
+The first was an all-in-one platform for any corporate-finance special situation.
+The second was an investment-bank analysis tool that recommends plans.
+Both are archived in `planning-notes.md` and `research/`.
+They are roadmap ideas only. The product is the integration workflow in this file.
 
 ## 2. The pitch rules
 
-- Pitch Stochastic as an all-in-one platform. Do not pitch it as a tool for one deal.
-- Lead with the problem that Stochastic solves. Do not lead with an example or with the demo. [set by Cayden, 2026-10-23]
-- Pitch order: the problem, then what Stochastic does about it, then the proof.
-- Show one real public deal only as proof of the platform.
-- On slides and in the video, say "one real deal". Do not lead with the name of the deal.
-- Do not claim that all eight situations are built or tested. The demo covers one. [inferred rule, set by Cayden's framing on 2026-10-23]
-- Say that the demo is a reconstruction from public filings. It does not show the internal views of any lender.
-- Hyphenate rewards a few roles done deep. Breadth can look like ten shallow workflows, so the proof must be depth on one real deal. [inferred]
+- Lead with the problem. Do not lead with the demo or with the name of the deal. [set by Cayden]
+- Pitch order: the problem, then what Stochastic does, then the proof.
+- Time budget: 1:30 for the pitch and 0:30 for the live demo. [verified: Cayden, 2026-10-23]
+- The agent messages in the demo are hardcoded or recorded. Say so. The gateway, the math, and the audit log are real.
+- Say that the demo uses a real public deal, with statement-line data from public filings. Account-level detail is not public, so it is not in the demo.
+- Do not claim other situations are built. They are roadmap.
+- Do not call the output advice. The output is a mapped, combined set of books and a limit check that a human approves.
+- Hyphenate rewards a few roles done deep. Depth on one workflow is the proof. [inferred]
 
 ## 3. The problem, the user, and the seat
 
-Special situations are hard for three reasons.
-The rules are buried in long agreements.
-The options are many, and the terms keep changing.
-A mistake is costly.
+A PE firm that buys add-on companies repeatedly has a gate on each new deal.
+The lender's agreement sets limits, such as a maximum debt-to-EBITDA ratio, and these limits are tested on the combined company.
+So the next deal depends on how fast and how correctly the team can combine the books.
 
-Today a small team of specialists reads the agreements, finds the limits, designs the options, tests the risk, and asks a senior person to approve.
-When a term changes, the team redoes the work.
-This work is slow and manual.
-Stochastic solves this: it finds what is allowed and what blocks the plan, builds and tests the options, shows the evidence, and asks a human before it commits.
+Today a finance team does this by hand.
+They pull trial balances, map each account of the new company to the platform's chart of accounts in a spreadsheet, build the combined numbers, adjust EBITDA, and prepare the lender's compliance pack.
+One vendor playbook puts a full integration at about 12 weeks. [self-reported, Aleph; see `research/ma-workflow-research.md`]
+The compliance certificate is due 45 to 60 days after quarter end in the samples found. [verified snippets; terms vary per deal]
+Errors in the mapping flow silently into every later number. [inferred]
 
-A common example is a company that wants more money than its existing bank loan allows.
-That example is the demo case. It is not the definition of the problem.
+Stochastic does the repeatable part and asks a human only about the lines that are unclear.
 
-The user is a senior reviewer who has done this work before. [verified: Cayden, 2026-10-23]
-A CFO or treasury lead can also fill the seat.
-The agents act as the analyst team, and the human is the approver.
-This matches the split in the Hyphenate workshop between the proposer and the approver.
+The user is a portfolio controller or a PE associate who owns the integration. [inferred: no practitioner has checked this]
+The human approver is the controller.
+The one-line seat for Hyphenate: "A portfolio controller at a PE-backed company, right after an add-on closes."
+The seat is one add-on deal, from the two data files to the controller's approval.
+There is no after-close monitoring and no ongoing consolidation in the MVP.
 
-The seat is one deal in motion, from the first document to the human approval.
-Events can arrive during the deal. Examples are a rate move, a lender change, a late document, and a reviewer rejection.
-There is no after-close monitoring and no quarterly company model. [verified: decision on 2026-10-23]
+## 4. The workflow
 
-## 4. Main features
+1. **Upload.** The user adds the platform's statement file, the target's statement file, and a short brief that states the lender's limit.
+2. **Map.** The Mapper matches each target line to a platform line, with a confidence and a reason.
+3. **Flag.** Lines the Mapper cannot place with confidence go to the human. The human approves a mapping or changes it.
+4. **Combine and test.** The Preparer calls code tools that add the books, remove intercompany amounts, compute combined EBITDA, and compute leverage. The Reviewer checks that the totals tie and tests leverage against the limit.
+5. **Approve.** The controller approves the result. The gateway posts it and writes the log.
 
-1. **Document intake.** The intake agent turns documents into facts. Each fact keeps its page and exact quote.
-2. **Clause reading.** The clause reader finds baskets, covenants, and defined terms. A code check makes sure that each quote is in the document.
-3. **Option search.** The structuring agent builds financing mixes inside the limits. Code enumerates the mixes and keeps the best trade-offs.
-4. **Risk testing.** A seeded Monte Carlo run tests each shortlisted plan. Every result carries a run id.
-5. **Blocked-plan handling.** When a clause blocks a plan, the gateway logs a DENIED action that cites the clause. The agents then redesign the plan and price the consent or waiver route.
-6. **Early escalation.** An agent stops and asks the human at six points (E1 to E6), not only at the end.
-7. **Memo and approval.** The memo agent writes the recommendation and a side-by-side plan table. The human approves, rejects, or asks for changes.
-8. **Learning from a rejection.** A rejection can become a proposed policy with evidence. A senior human must approve the policy. [inferred: needs seeded past decisions]
-9. **Audit log.** The log records every action and every denied attempt. Each row is chained to the row before it.
-10. **Situation profiles.** One engine serves every situation. The profile changes the agent behavior.
+The user sees one screen with a flag card, a small combined table, and one verdict line.
 
-## 5. Scope: eight situations
+## 5. Main features
 
-The platform is designed for these eight situations.
-The demo runs one of them.
-
-| Situation | Goal | Limits checked first | Demo status |
-| --- | --- | --- | --- |
-| Raising money | New capital at low cost and low dilution | Debt baskets, restricted payments, liens | Live in the demo |
-| Company in trouble | Buy time and avoid default | Covenant breach, cross-default, waiver terms | Second playbook, only if time allows |
-| Refinancing | Replace debt on better terms | Prepayment premiums, call protection, maturity | In the design |
-| Mergers and acquisitions | Fund or structure a deal | Acquisition baskets, lender consent | In the design |
-| Selling part of a company | Raise cash from an asset sale | Asset-sale limits, required prepayment | In the design |
-| Borrowing against assets | Secured loan on receivables or equipment | Lien limits, borrowing base, advance rates | In the design |
-| Ownership changes | Buyout, recap, or new owners | Change of control, consent rights | In the design |
-| Bankruptcy | Spot it early and hand it to experts | Default triggers | Hand to a human (proposed, not confirmed) |
-
-The default profile values come from public sources and from our own inference. [inferred]
-No practitioner has checked them.
-The reviewer can change every value.
-There is no separate agent for each situation. The deal manager picks the profile, and the reviewer can override it.
-
-A profile sets six things:
-- Scope.
-- Information needed.
-- Instruments allowed.
-- Objective weights: cost, risk, dilution, control, and speed or certainty. No source gives these weights, so they are inferred.
-- Impact measures that the reviewer sees.
-- Escalation thresholds.
+1. **Mapping with confidence.** Each target line gets a platform line, a confidence, and a short reason.
+2. **Human flags.** Only unclear lines reach the human, with both options and the effect on the result.
+3. **Combined books.** A combined table of platform, target, and total. Code does the arithmetic.
+4. **Limit check.** Combined leverage next to the lender's limit, with the covenant's own definition of debt and EBITDA.
+5. **Maker-checker.** The agent that prepares a result cannot approve it. A reviewer agent checks it, and a human approves it.
+6. **Audit log.** Every action is logged, and each row is chained to the row before it.
+7. **Replicable agents.** The same stateless agent definition can run once per company, or once per batch of lines.
 
 ## 6. Architecture
 
 The system has four parts.
 
-- **People and sources.** The reviewer console, and the deal documents (uploaded or cached from SEC EDGAR).
-- **AI agents and their tools.** The deal manager, five specialist agents, and read-only code tools.
-- **The gateway.** It is the only writer. It checks permissions, enforces the work-item states, and writes the log.
-- **The database.** Postgres on Tiger Cloud holds the work items, facts, clauses, plans, runs, decisions, policies, and the audit log.
+- **People and files.** The console, the two data files, and the brief.
+- **Agents.** Three small stateless agents and a plain job runner.
+- **The gateway.** It is the only writer. It checks permissions, enforces work-item states, and writes the log.
+- **The store.** The MVP can keep the same tables in memory. Postgres on Tiger Cloud is a later swap.
 
-The code tools are deal math, plan search and trade-off filter, the seeded Monte Carlo, the quote validator, and cached public data.
-Agents do not chat with each other. They pass typed work items through the gateway.
-The reviewer console talks only to the gateway.
+Code tools hold all the math: line matching helpers, consolidation, EBITDA, leverage, and the limit test.
+Agents call tools through the gateway. They do not talk to each other.
+A job runner moves work items from one agent to the next. The runner is code, not a model.
+The console talks only to the gateway.
 
-## 7. The six agents
+The agent layer uses one function, `run_agent(role, item)`, with two backends. [inferred, from `research/agent-framework-options.md`]
+The Anthropic API is the real path and the stage fallback.
+The Factory Droid Python SDK runs the agents that we show as built with Droid.
+An `AGENT_BACKEND` setting switches between them, and a recorded run exists as a last fallback.
 
-| Agent | Job | Asks the human at | Never |
-| --- | --- | --- | --- |
-| Deal manager (master) | Names the situation, loads the profile, makes tasks, marks stale results | Any conflict between results | Does the math or writes a record |
-| Intake | Turns documents into facts with page and quote | E1 missing document, E2 facts to confirm | Guesses a missing number |
-| Clause reader | Finds limits with exact quotes and confidence | E3 unclear clause or term | Keeps a quote that the validator cannot find |
-| Structuring | Builds financing mixes and the shortlist | E4 plan blocked | Invents terms or computes numbers itself |
-| Risk | Chooses scenarios and explains Monte Carlo results | E5 best plan flips after an event | Reports a number without a seed and run id |
-| Memo and approvals | Writes the memo and proposes a policy after a rejection | E6 final decision | Approves its own work |
+## 7. The three agents
 
-## 8. Escalation points
+Each agent is stateless.
+It receives one work item with all its inputs, returns one typed result, and keeps no memory.
+State lives in the store.
 
-- **E1.** A document is missing. The agent requests it and pauses that part.
-- **E2.** The reviewer confirms the facts that drive the plan.
-- **E3.** A clause or a defined term is unclear. The agent asks and does not guess.
-- **E4.** A clause blocks the plan. The agent shows the redesign, the consent route, and the price of the clause.
-- **E5.** An event flips the best plan. The reviewer sees what changed and why.
-- **E6.** The reviewer approves, rejects, or asks for changes.
+| Agent | Real-team role | Gets | Returns | Never |
+| --- | --- | --- | --- | --- |
+| Mapper | Staff accountant | One company's lines, the platform's chart, and the covenant definitions from the brief | A mapping with confidence and reasons, a covenant tag for each line (debt, not debt, or unclear), and a list of flags | Guesses a low-confidence match or an unclear tag |
+| Preparer | Senior accountant | Both mapped books and the approved flags | The draft combined table and the leverage figure, from tool calls | Computes a number itself, or approves its own draft |
+| Reviewer | Reviewer | The draft and the limit | Pass or needs-attention, with reasons | Changes the draft |
+
+The human controller approves flagged lines and the final result.
+
+## 8. Human moments
+
+There are two.
+
+- **Flag.** A line is unclear, and the human chooses how to treat it.
+- **Approval.** The controller approves the combined result before it posts.
+
+If the Reviewer finds a tie-out error or a breach of the limit, the item returns to the human as needs-attention.
+An earlier design had six escalation points (E1 to E6). They are archived. Two are enough for this workflow.
 
 ## 9. Work items and gateway rules
 
 A work item moves through these states: NEW, PROPOSED, NEEDS_INFO, APPROVED, POSTED.
 It can also end as REJECTED or REVERSED.
-A forbidden action is DENIED. The gateway does not apply it and writes it to the log.
+A forbidden action is DENIED. The gateway does not apply it, and it writes a row to the log.
 
 The gateway enforces these rules:
 1. Only the gateway posts to the record.
-2. The proposer of an item cannot approve it.
+2. The preparer of an item cannot approve it (maker-checker).
 3. An agent can call only the tools it was given.
 4. Every number carries a run id from the math code.
 5. A reversal is a new item linked to the original. The system never deletes.
-6. Every action and every denied attempt goes in the log.
+6. Every action goes in the log, and each row is chained to the previous row.
 
-The design follows the Hyphenate workshop blueprint. [verified: `hyphenate-workshop.md`]
+Denied actions stay in the log as proof.
+The demo does not stage an attack. A denied row is shown only if a judge asks to see the log.
 
-## 10. Data and memory
+## 10. Data
 
-Postgres holds exact facts in tables.
-Vectors (pgvector or pgvectorscale) only help find the right passage.
-The rule is: vectors find, tables decide.
+Inputs for the demo:
+- A statement file for the platform (CSV), built from the acquirer's filings.
+- A statement file for the target (CSV), built from the target's audited statements.
+- A short brief: the lender's limit and the covenant's definition of debt and EBITDA.
 
-Proposed table groups:
-- Source: document, document_chunk.
-- Knowledge: fact, clause.
-- Work: work_item, plan, simulation_run.
-- Learning: decision, precedent, policy.
-- Proof: audit_log.
+Tables (a design proposal, and the first prototype keeps them in memory):
+- `deal`, `source_line`, `mapping`, `work_item`, `result`, `audit_log`.
 
-Tiger Cloud forks can hold one copy of the database for each candidate plan. [inferred: free-tier limits are not confirmed]
-Public data sources are SEC EDGAR, the NY Fed SOFR API, FRED, Census, and Damodaran data.
-Cache all of it before the demo. The demo makes no live SEC calls.
-SEC EDGAR needs a User-Agent header with a real contact email. The file still uses a placeholder. [verified: research file 05]
+The rule "vectors find, tables decide" still holds, but the MVP has no vector search.
+Public data is cached before the demo. The demo makes no live SEC calls.
+SEC EDGAR needs a User-Agent header with a real contact email. The file still has a placeholder.
+Whether we may redistribute cached filings is unresolved, so the cached files stay out of git.
 
-## 11. Deal math and risk rules
+## 11. Math rules
 
 - Code does all deal math. The model never produces a number.
-- The math is deterministic and has closed-form tests. [verified: research file 03 lists 14 tests]
-- Monte Carlo is quarterly over five years, with a two-state regime and common random numbers. [verified: research file 03]
-- Monte Carlo inputs are labeled assumptions. No calibrated parameters exist yet. [verified: research file 03]
-- A plan can pass one covenant test and fail another if redeemable preferred counts as debt. [verified: research file 02]
-- Precision comes before recall. If the agent is unsure, it escalates.
+- Consolidation, EBITDA, and leverage are deterministic and have tests.
+- Use the covenant's own definitions, not the generic ones. A naive and a covenant leverage figure can differ a lot.
+- A tie-out check runs on every combined table: the parts must add to the total.
+- Precision before recall. If a mapping is unsure, it becomes a flag.
 
 ## 12. The demo
 
-The demo runs one situation: raising money.
-It uses one real public deal as the proof case.
-A cached backup deal is ready in case a judge brings a different scenario.
+### The real deal
 
-The proof deal is Organogenesis, November 2024. [verified: research file 08]
-Avista put $130M of convertible preferred into the company.
-The company also signed a Third Amendment to its credit agreement, which was led by SVB.
-Research found these blocking items: sections 7.6(e), 7.6(g), and 7.2, and the definitions of Disqualified Stock and Consolidated Total Indebtedness.
-The backup deal is Lifecore, January 2023. [verified: research file 08]
+The proof deal is Kewaunee Scientific buying Nu Aire, closed 2024-11-01, for $55M. [verified: `research/real-deal-candidates.md`]
+Kewaunee is the platform (fiscal year ends April 30). Nu Aire is the target (fiscal year ends September 30).
+Backups, in the agent's ranking: DLH and GRSi, Mama's Creations and Crown I, Shutterstock and Envato.
 
-One open point makes a good demo escalation. [inferred, from research file 09]
-The Disqualified Stock definition only catches redemption by the holder within 91 days after the loan matures on Nov 5, 2026.
-A redemption in 2031 falls outside that window.
-So it is unclear whether the preferred counts as debt, and the agent asks the human.
-If the preferred counts as debt, net leverage is about 4.1x against a 3.00x covenant. This uses an inferred adjusted EBITDA of about $41.6M.
-The plan's cash-pay dividend stays blocked even after the amendment.
+What the filings give us:
+- Nu Aire's audited statements for the year to 2024-09-30 (8-K/A Ex 99.1).
+- Kewaunee's pro forma combined statements, with a "Nu Aire, Inc. Reclassed" column and a Note 2 that maps Nu Aire's lines to Kewaunee's lines (Ex 99.2).
+- The PNC credit agreement (Ex 10.1): leverage covenant in Section 4.8(a), senior funded bank debt to EBITDA below 2.50 to 1.00, and a $5M acquisition basket in Section 5.8(ii).
+- Links are in `research/real-deal-candidates.md`.
 
-Replay rules:
-- Use only documents that existed before the deal.
-- Set cut-off dates, and keep a baseline with no documents to catch leaks.
-- Build an answer key from the real clauses and what happened.
-- The replay tests clause finding and re-planning only. It does not prove that the plan was best.
+Rules for using it:
+- Use Nu Aire's audited September statements as the raw target input.
+- Use Note 2 as the answer key for the shape of the mapping, not to the dollar. The filing says its own reclassification review is preliminary, and the fiscal years differ.
+- Public filings give statement lines, not trial balances. The demo maps statement lines. Account-level detail would be synthetic, so we do not claim it.
+- The demo is a reconstruction from public filings. It does not show the lender's or the company's internal views.
 
-The 3-minute script opens with the moment: the first plan turns red, and the log shows DENIED with the clause quote.
-The script then shows facts with quotes, one escalation, a new priced plan, the human approval, and the audit log.
-Hyphenate wants a video that opens with the moment, plus a live demo.
+### The flag
+
+The one flag is real: Kewaunee's "Financing liability" line.
+It holds a sale-leaseback of the Statesville property ($27,782K carrying value in the 10-Q) and, after the deal, the new acquisition financing. [verified: research report]
+The credit agreement's "Senior Funded Bank Debt" excludes the capital lease on that property and excludes the seller notes.
+The flag belongs to the platform side, not the target side. So it comes from the covenant tag that the Mapper gives each line, and not from the line-to-line match.
+The Mapper cannot tag the line as debt or not debt, so the agent asks the controller which part of the line is covenant debt.
+The answer changes the leverage result. [inferred: not computed yet]
+
+### The output screen
+
+One screen, three parts:
+1. The flag card, with Approve and Change.
+2. A small combined table of about ten rows, with columns platform, target, and combined.
+3. One verdict line: combined leverage against the 2.50x limit, with OK or Over the limit.
+
+The audit log is a small link. There is no other screen in the demo.
+
+### The 30-second run
+
+Two files and a brief go in. The mapping runs. One flag appears, and the controller approves it. The verdict line shows the leverage next to the limit.
+The agent text is hardcoded or recorded. The gateway, tools, and log run for real.
+
+### The 1:30 pitch outline
+
+- 0:00 to 0:25: the problem. A PE firm's next deal is gated by lender limits, and the team combines the books by hand, in weeks.
+- 0:25 to 0:55: what Stochastic does. It maps, flags, combines, tests against the limit, and a controller approves.
+- 0:55 to 1:30: the proof and the honesty. It runs on a real public deal. The agents are small and stateless, like roles on a real team. The math is code. The log is real. Say what is simulated.
 
 ## 13. MVP scope
 
 Must (the demo does not work without these):
-1. One real deal, cached, with an answer key.
-2. Intake agent and clause reader, with the quote validator.
-3. Gateway, work-item states, and audit log with denied actions.
-4. Deal math and plan search, with the blocked plan shown as a DENIED action.
-5. Monte Carlo on the shortlist, with run ids.
-6. Memo agent and reviewer console.
-7. At least four escalations working: E2, E3, E4, E6.
+1. The two input files and the brief for the Kewaunee and Nu Aire deal, built from the filings.
+2. The Mapper, with a typed output, running through `run_agent`.
+3. Consolidation, EBITDA, and leverage tools, with tests that use the real figures.
+4. The gateway with work-item states, maker-checker, and the audit log.
+5. The Preparer and the Reviewer (hardcoded text is fine, but the tool calls are real).
+6. The console screen: flag card, combined table, verdict line.
+7. A recorded run and a backend switch, so the demo survives a failure.
 
 Should (if the schedule holds):
-- A rejection becomes a policy, with a few seeded past decisions.
-- Event injection, such as a rate move that marks results stale and raises E5.
-- Database forks for what-if plans.
-- A catch-rate score against the answer key.
-- Adversarial tests: self-approval, a prompt hidden in the agreement, a swapped plan after approval.
-- E1 with one document held back.
-- A second situation through the same engine.
+- A live Droid-backed agent call in the demo.
+- An answer-key score for the mapping against Note 2.
+- A second flag, such as the seller notes.
+- Tiger Cloud Postgres in place of the memory store, and a fork to compare two answers to the flag.
+- A downloadable draft compliance certificate.
 
 Cut (do not build this weekend):
-- Test cases for the other seven situations.
-- Arbitrary uploads beyond one working path.
-- Accounts, login, mobile, and many deals.
-- Live SEC calls on stage.
-- Learned objective weights.
+- Purchase accounting beyond a "provisional" label.
+- Intercompany schedules and eliminations beyond one seeded example.
+- Other situations, other deals, arbitrary uploads, accounts, login, mobile.
+- Plan search, Monte Carlo, and rejection-to-policy. These belong to the earlier framing.
+- A live SEC call on stage.
+- A staged denied-action demo.
 
 ## 14. Tech stack (proposed)
 
-- Frontend: Next.js, React, TypeScript, Tailwind. This is the reviewer console.
-- Backend: Python, FastAPI, NumPy. It holds the state machine, the gateway, the math, and the Monte Carlo.
-- Data: Postgres on Tiger Cloud, with pgvector or pgvectorscale and forks.
-- Models: Claude through the Anthropic API. Gemini is optional, and only if a real step uses it.
-- Hosting: Vultr, only if it hosts a real part of the system.
+- Frontend: Next.js, React, TypeScript, Tailwind. Josie leads the design.
+- Backend: Python, FastAPI. The gateway, tools, and tests are in Python.
+- Agents: Python, `run_agent(role, item)`. The Anthropic API is the default backend. The Factory Droid Python SDK is the second backend.
+- Store: in memory first. Postgres on Tiger Cloud is optional.
+- Models: Claude through the Anthropic API. Droid model access is unconfirmed.
+- Keys: `FACTORY_API_KEY` and the Anthropic key live in `.env`, which git ignores.
 
 ## 15. Tracks and sponsors
 
@@ -240,17 +245,15 @@ Status as of 2026-10-23. Sponsor research is in `sponsors/`.
 | Track | Status | Note |
 | --- | --- | --- |
 | Hyphenate (main) | Target | $8K, $5K, $3K, plus interviews for the top 5. Select it on Devpost. |
-| Microsoft | Best add-on | Finance is a named domain. Ask whether Microsoft products are required. |
-| Tiger Data (MLH) | Target | Forks hold what-if plans. Ask about free-tier limits. |
+| Factory | Target (build runner) | Cayden has a Factory account on the Plus plan. Droid runs the agents we show. Confirm prize rules and Claude model access at the workshop. |
+| Tiger Data (MLH) | Maybe | Only if the Postgres store gets built. A fork can hold the two answers to the flag. |
+| Microsoft | Maybe | Ask whether Microsoft products are required. |
 | Most Technically Advanced | Maybe | Costs no extra work. |
-| Factory | Maybe | Use only if each sub-agent runs as a droid session in about 3 hours. Else take the credits. |
-| Mana | Maybe, lean skip | Build the console in Mana only if the founders confirm that it counts. |
-| GoDaddy, Vultr, Gemini API (MLH) | Cheap | Count only if the integration is real. Register the domain after kickoff. |
-| CRS, Atlassian | Maybe | Thin fit. |
-| Bright Data, Apify, Spacetime, Convex, Elastic, Coinbase, Fetch.ai, Creao, Figma, Visa, Capital One, Meta, Anthropic Public Benefit | Skip | No honest fit. |
+| Mana | Skip, lean | Needs the founders' confirmation that it counts. |
+| GoDaddy, Vultr, Gemini API (MLH) | Cheap | Count only if the integration is real. |
+| Others | Skip | No honest fit. |
 
-Anthropic gives each hacker $50 of API credits. We claim no Anthropic prize.
-Stacking three or more prizes is rare. Plan for Hyphenate, Microsoft, and Tiger Data. [verified: 22 of 1,324 winners in the scrape]
+Stacking three or more prizes is rare. Plan for Hyphenate and Factory first. [verified: 22 of 1,324 winners in the scrape]
 Cal Hacks has not confirmed that one project can opt into several sponsor tracks. Ask at kickoff.
 
 ## 16. Hyphenate judging
@@ -264,38 +267,50 @@ Hyphenate judges with four questions:
 The workshop calls "would you hire it" the make-or-break question. [verified]
 Strong entries have a real messy corner, an answer key, limits in code, and a moment on stage.
 Weak entries are a chatbot over a spreadsheet, a one-shot extractor, ten shallow workflows, clean happy-path data, and an admin key with "the prompt tells it not to".
-The submission needs a demo video, a live demo, a one-line seat description, and proof of what is real and what is simulated.
+For us: the messy corner is the mapping of two different charts, the answer key is Note 2, and the limit is in code.
+The moment is the flagged line that changes the leverage verdict. [inferred]
 Judging runs Sunday 10:30am to 12:30pm. The whole team stays at the table.
+
+The closest prior winner is VistaAI (HackMIT 2026, first place, self-reported).
+It ingests messy CSV and XLSX from acquired companies, proposes field mappings, and keeps provenance.
+Ours differs in three ways. It works on accounting lines and not operational records. It checks the result against a lender's limit. It posts through a gateway with maker-checker and an audit log.
+Do not lead the pitch with ingestion.
 
 ## 17. Fixed rules
 
-- No project code before Friday Oct 23, about 6pm.
+- No project code before Friday Oct 23, about 6pm. This is satisfied.
 - Devpost is due Sunday 9am, with a table number.
-- The team has four people.
-- Mark every claim verified or inferred. Label sponsor numbers as self-reported.
-- Do not invent prizes.
+- The team has four people: Cayden, Josie (UI and UX), Eric, and Tri. The task split is in `TASKS.md`.
+- Mark every claim verified or inferred. Label sponsor and vendor numbers as self-reported.
+- Do not invent prizes or numbers.
+- Keep keys in `.env`. Never put them in docs or git.
 - Use a plain hyphen and never an em dash.
 
 ## 18. Open questions
 
-- Does deal structuring count as a corner of a finance team? Ask at the Friday 7pm Hyphenate workshop.
-- Does a former-banker reviewer work as the human seat?
-- Does redeemable preferred count as debt under the demo agreement? A practitioner must confirm.
-- Does bankruptcy stop and escalate? Cayden has not confirmed.
-- Does the SEC allow us to redistribute the cached filings? The wording is unresolved.
-- Which past decisions will we seed so the rejection-to-policy loop has evidence?
-- Which Factory models can run in a droid session? Ask at the 6pm workshop.
-- What does "built with Mana" require? Cayden will ask the founders.
+- Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask at the Friday 7pm workshop.
+- Which part of Kewaunee's financing liability counts as covenant debt? A practitioner should confirm. We have not computed the ratio.
+- Kewaunee's D&A and revolver draw were not in the pages the agent read. Tri must get them from the 10-K and 10-Q.
+- Can Droid run Claude models on our key? Run `list_models()`, and ask Factory.
+- Does the Python Droid SDK qualify for "Building with the Droid SDK" when the tools call our own gateway?
+- Does the SEC allow us to redistribute the cached filings?
+- Does a former-banker or controller reviewer count as the human seat?
 
 ## 19. Where to find more
 
 All paths are inside `docs/`.
 
-- `planning-notes.md`: the original planning README with decisions, the research table, and next steps.
-- `research/research.md`: sourced research.
-- `research/raw-notes.md`: the first pasted notes, kept unedited.
-- `research/deep-problems/01` to `09`: agent-written research. No practitioner has checked it.
+- `TASKS.md`: who builds what. `tasks/` holds one file per person, with branches and owned folders.
+- `demo-script.md`: the 2:00 plan, the 30-second demo beat by beat, the failure plan, and judge Q&A prep.
+- `glossary.md`: finance and product terms in plain language.
+- `decisions.md`: the dated decision log and the open decisions.
+- `architecture/`: parts, agents and work items, gateway and API, data model, repo structure.
+- `design/`: Figma links, tokens, and UI rules. The mockups predate the reframe to PE add-on integration. Josie updates them.
+- `research/ma-workflow-research.md`: the three M&A users, pain, time, and existing products.
+- `research/post-close-deliverables.md`: what a PE finance team gets after an add-on closes.
+- `research/real-deal-candidates.md`: the real deal, with EDGAR links.
+- `research/agent-framework-options.md`: Droid, ADK, Anthropic API, and others.
 - `hyphenate-workshop.md`: the workshop blueprint and the gaps.
-- `diagrams/`: four PDFs and their HTML sources. Run `render.sh` to rebuild a PDF. The platform page in `01-big-picture` still says "In the MVP", "Full playbook", and "Recognized". This file replaces that wording.
-- `diagrams/stochastic-workflow.pdf`: the older tech stack and tracks sheet.
-- `sponsors/`: research on Hyphenate, Tiger Data, Microsoft, Factory, and Mana, plus the Slack notes.
+- `sponsors/`: Hyphenate, Tiger Data, Microsoft, Factory, Mana, and the Slack notes.
+- `planning-notes.md`, `research/research.md`, `research/deep-problems/`: archive from earlier framings.
+- `diagrams/`: PDFs from the first framing. They are stale and are not re-rendered.

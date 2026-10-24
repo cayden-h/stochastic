@@ -1,5 +1,33 @@
 # Hyphenate (Cal Hacks 13.0)
 
+## Status after the 2026-10-23 evening reframe
+
+Stochastic is now a PE add-on integration tool.
+It merges the books of a newly acquired company into the platform company's books, flags the few lines a human must decide, and checks the combined result against the lender's limit.
+Three small stateless agents do the work (Mapper, Preparer, Reviewer), code does all the math, and a controller approves.
+The demo uses a real public deal: Kewaunee Scientific buying Nu Aire. [verified: `../STOCHASTIC.md` section 12]
+
+### How Hyphenate fits now
+
+Hyphenate stays the main track. [verified: `../STOCHASTIC.md` section 15]
+The fit is still good, but one thing is open: we do not know if PE add-on integration counts as a corner of a finance team.
+The seat is a portfolio controller at a PE-backed company, right after an add-on closes. [inferred: no practitioner has checked this]
+The seat is one add-on deal, from the two data files to the controller's approval.
+
+Questions to ask at the Friday 7pm workshop:
+1. Is PE add-on integration a valid corner of a finance team?
+2. What separates a hireable demo from one that is not?
+3. What may an agent do alone, and what goes to a human?
+
+### Which old notes still apply
+
+- The official brief, the prize text, and the four judging questions still apply.
+- The judging notes below still apply. "Would you hire it" is still the make-or-break question.
+- Anything that describes plan search, Monte Carlo, forks for what-if plans, the eight situations, or the clause reader is from the earlier framing.
+- The earlier "special situations" idea is now roadmap only.
+
+---
+
 - Prize: "The Hyphenated Enterprise: Autonomous Systems for Finance" - $8,000 / $5,000 / $3,000 for 1st to 3rd, plus an expedited, shortened interview for every member of the top 5 teams.
 - Status: **main track** (team decision 2026-10-15, reconfirmed 2026-10-23). The idea is now Stochastic, special-situations financing, see `../Stochastic/README.md`. Securitization (`../domains/securitization/`) is shelved.
 - Brief read: 2026-10-15, full text pasted by the team from the organizers' document (Cal_Hacks_Hyphenate_Track).

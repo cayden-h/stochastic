@@ -4,8 +4,11 @@ This file gives guidance to Claude Code when it works in this repository.
 
 ## What this is
 
-Stochastic is one platform for any special situation in corporate finance.
-A team of AI agents works out what a company is allowed to do, finds what blocks it, builds and tests the options, and asks a senior human before anything is committed.
+Stochastic merges the books of a newly acquired company into the books of the platform company that bought it.
+It flags the few lines that need a human, and then checks the combined result against the lender's limit.
+It is built for private equity buy-and-build firms.
+Three small stateless agents (Mapper, Preparer, Reviewer) do the repeatable work, code does the math, and a human controller approves.
+The demo deal is Kewaunee Scientific buying Nu Aire.
 It is built for the Hyphenate track at Cal Hacks 13.0 (Oct 23-25, 2026).
 
 ## Read first
@@ -13,27 +16,33 @@ It is built for the Hyphenate track at Cal Hacks 13.0 (Oct 23-25, 2026).
 Read `docs/STOCHASTIC.md` before any work.
 It holds the main features, the architecture, the scope, the demo plan, and the open questions.
 If that file and any other file disagree, `docs/STOCHASTIC.md` is correct.
+`docs/TASKS.md` splits the work between the team.
 
 ## Commands
 
-There is no build, lint, or test setup yet.
-Project code must not start before Friday Oct 23, about 6pm (Cal Hacks rule).
-When code lands, document its commands here.
-To rebuild a diagram PDF, run `docs/diagrams/render.sh <name>` (it needs Google Chrome and `pdftoppm`).
+Backend and console commands are in `README.md`, section "Getting started".
+The current backend and frontend code implement an earlier workflow on invented data.
+They are being updated per `docs/TASKS.md`.
+Project code could not start before Friday Oct 23, about 6pm (Cal Hacks rule).
+To rebuild a diagram PDF, run `docs/diagrams/render.sh <name>`. The diagrams are stale, so do this only if asked.
 
 ## Structure
 
-- `docs/` holds the reference, research, diagrams, and sponsor notes.
-- `backend/`, `frontend/`, `evals/`, `data/`, and `scripts/` are planned folders. Each has a README that says what goes there.
+- `docs/` holds the reference, tasks, research, design notes, and sponsor notes.
+- `backend/`, `frontend/`, `evals/`, `data/`, and `scripts/` each have a README that says what goes there.
 
 ## Rules
 
-- Pitch Stochastic as an all-in-one platform, and lead with the problem it solves. Do not lead with the demo example.
-- Do not claim that all eight situations are built or tested. The demo runs one.
+- Lead the pitch with the problem, then what Stochastic does, then the proof. Do not lead with the demo deal.
+- The product is the add-on integration workflow. The earlier all-in-one platform idea is roadmap only. Do not claim other situations are built.
 - Code does all deal math. A model never produces a number.
-- Only the gateway writes to the record. An agent cannot approve its own work.
-- Mark every claim as verified or inferred. Label sponsor numbers as self-reported.
-- Do not invent prizes or sponsor facts.
+- Only the gateway writes to the record. The agent that prepares a result cannot approve it.
+- Agents are stateless. They call tools through the gateway and do not talk to each other.
+- Use the covenant's own definitions of debt and EBITDA, and run a tie-out check on every combined table.
+- Do not call the output advice. It is a mapped, combined set of books and a limit check that a human approves.
+- Say that the agent messages in the demo are hardcoded or recorded, and that the gateway, the math, and the audit log are real.
+- Mark every claim as verified or inferred. Label sponsor and vendor numbers as self-reported.
+- Do not invent prizes, sponsor facts, or numbers.
 - Never commit secrets. Keep keys in `.env`, which is git-ignored.
 - Never use the em dash. Use a plain hyphen.
 - Never use Markdown blockquotes.

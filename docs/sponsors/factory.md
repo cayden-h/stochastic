@@ -269,3 +269,30 @@ Do not start project code before Friday about 6pm.
 4. How do the $200 credits attach to keys, do they cover SDK runs on remote machines, when do they expire, and what are the rate limits for four teammates running sessions at once?
 5. Which SDK version and `droid` CLI version should we pin, and what is changing in the overhaul?
 6. How many concurrent sessions can one key run, and is there a supported way to run the SDK on a remote machine for a demo?
+
+## Update 2026-10-23 (evening): account, plan, and the build decision
+
+Facts from Cayden (verified by the user's own statement, not by me):
+- Cayden created a Factory account and has the Plus plan.
+- The CLI install command from Factory is `curl -fsSL https://app.factory.ai/cli | sh`.
+- Cayden will build the agent layer with the Droid SDK. The agent text in the Hyphenate demo will mostly be hardcoded.
+
+What this changes:
+- The Droid SDK needs the `droid` CLI on `PATH`. The SDK starts it as a subprocess, so the CLI install is a hard requirement for the build machine. [verified: https://github.com/Factory-AI/droid-sdk-typescript]
+- The SDK reads `FACTORY_API_KEY`. Keep the key in `.env`, which is git-ignored. Never put it in git, the frontend, or a URL.
+- The install command pipes a remote script into the shell. Read the script before you run it on a shared or demo machine. [inferred: general safe practice]
+- The Plus plan limits are not in our notes. Whether the hackathon credits ($200 per member, self-reported) add to Plus or replace it is unknown. Ask at the workshop.
+
+Open build choices (the agent-framework comparison is in `../research/agent-framework-options.md`):
+- Use the Droid SDK only as the agent runner. Keep the gateway, the deal math, and the audit log in Python.
+- Factory also ships a Python Droid SDK, so the whole backend can stay in one language. It has `run(prompt, output=PydanticModel)`, in-process `@tool` tools that can call our REST gateway, and a real allowlist (`restrict_tools`). The TypeScript SDK has no allowlist. [verified: https://docs.factory.com/sdk/python.md]
+- Prefer the Python SDK over the TypeScript one. This replaces the earlier idea of a TypeScript runner that calls the Python gateway. [inferred]
+- Write one `run_agent(role, item)` function with two backends, switched by `AGENT_BACKEND`. The Anthropic API is the real path and the stage fallback. The Droid SDK handles the agents that run through it. Claim "built with Droid" only for runs that went through it. [inferred, from the framework report]
+- Run each agent as a fresh `run()` call per work item, so the agents stay stateless and replicable. Do not reuse a multi-turn session. [inferred]
+- Skip A2A. Agents pass work items through the gateway, and A2A adds a second path. [inferred]
+- Keep a recorded output and a config flag that routes the same work item to a plain model call, in case the CLI fails live.
+
+Still unconfirmed, ask at the 6pm Friday workshop:
+1. Which models the key lists through `listModels()`, and whether Claude models are available.
+2. Whether use beside our own stack qualifies for the Factory prize, and what the rubric is.
+3. How the hackathon credits attach to a Plus account, when they expire, and what the rate limits are for four people.

@@ -1,4 +1,26 @@
 # Mana (Cal Hacks 13.0)
+
+## Status after the 2026-10-23 evening reframe
+
+Stochastic is now a PE add-on integration tool.
+It merges the books of a newly acquired company into the platform company's books, flags the few lines a human must decide, and checks the combined result against the lender's limit.
+Three small stateless agents do the work (Mapper, Preparer, Reviewer), code does all the math, and a controller approves.
+The demo uses a real public deal: Kewaunee Scientific buying Nu Aire. [verified: `../STOCHASTIC.md` section 12]
+
+### How Mana fits now
+
+The advice is to skip it.
+Stochastic is not built inside Mana, and the prize wording is "built with Mana".
+The fit needs the founders' confirmation that it counts. [verified: `../STOCHASTIC.md` section 15]
+Do not spend build time on it.
+
+### Which old notes still apply
+
+- The notes on what Mana is, the credits, and the prize wording still apply.
+- Notes that tie the fit to plan search, Monte Carlo, forks for what-if plans, the eight situations, or the clause reader describe the earlier framing.
+
+---
+
 - Prize at Cal Hacks 13.0: best project wins $5,000, and every team using Mana gets 3 months of Pro, described as equivalent to Claude Max (source: pre-event email #3, 2026-10-22)
 - Researched: 2026-10-22, from the email text only, no web research yet
 ## What they do

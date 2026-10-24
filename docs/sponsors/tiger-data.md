@@ -1,4 +1,27 @@
 # Tiger Data (Cal Hacks 13.0)
+
+## Status after the 2026-10-23 evening reframe
+
+Stochastic is now a PE add-on integration tool.
+It merges the books of a newly acquired company into the platform company's books, flags the few lines a human must decide, and checks the combined result against the lender's limit.
+Three small stateless agents do the work (Mapper, Preparer, Reviewer), code does all the math, and a controller approves.
+The demo uses a real public deal: Kewaunee Scientific buying Nu Aire. [verified: `../STOCHASTIC.md` section 12]
+
+### How Tiger Data fits now
+
+The fit got weaker.
+The MVP can keep its tables in memory, so Postgres on Tiger Cloud is a later swap. [verified: `../STOCHASTIC.md` section 6]
+Forks now hold the two answers to the flag (which part of the financing liability counts as covenant debt).
+This is only a Should item, and only if the Postgres store is built.
+Do not plan the demo around it.
+
+### Which old notes still apply
+
+- The notes on what Tiger Data sells, the free plan, the opt-in mechanics, and the prize text still apply.
+- Notes that tie forks or vector search to plan search, Monte Carlo, what-if plans, or the clause reader describe the earlier framing.
+
+---
+
 - Prize at Cal Hacks 13.0: MLH prize "Best Use of Tiger Data", Stream Deck Mini
 - Researched: 2026-10-15
 ## What they do

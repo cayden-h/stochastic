@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/* Tokens from docs/design/README.md (Paper and ink). Contrast is checked in docs/design/ui-ux-research.md. */
+@theme {
+  --color-paper: #F7F4EC;
+  --color-card: #FFFFFF;
+  --color-ink: #1B1F24;
+  --color-muted: #5A6068;
+  --color-rule: #8C8676;
+  --color-hairline: #D9D3C4;
+  --color-agent: #274C77;
+  --color-agent-tint: #E3EAF3;
+  --color-code: #4A5560;
+  --color-escalation: #8A5300;
+  --color-escalation-tint: #FBEBC8;
+  --color-escalation-bar: #C77700;
+  --color-denied: #B3261E;
+  --color-denied-tint: #FBE4E1;
+  --color-clear: #1E6B52;
+  --color-clear-tint: #E1F0EA;
+
+  --font-sans: var(--font-public-sans), system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), Georgia, serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-chip: 4px;
+  --radius-card: 8px;
+}
+
+html, body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 28px;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
