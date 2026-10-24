@@ -12,6 +12,7 @@ import re
 from typing import Callable
 
 from app.core.models import (
+    AdjustmentProposal,
     Evidence,
     FlagOption,
     FlagProposal,
@@ -276,12 +277,31 @@ def scripted_preparer(inp: PreparerInput, call_tool: CallTool) -> PreparerOutput
     lev = call_tool("leverage", {"debt_run_id": debt.run_id, "ebitda_run_id": eb.run_id})
     rows = [ResultRow(line=r["line"], section=r["section"], platform=r["platform"], target=r["target"],
                       combined=r["combined"], run_id=cons.run_id) for r in cons.outputs["rows"]]
-    return PreparerOutput(rows=rows, ebitda=eb.outputs["ebitda"], debt=debt.outputs["debt"],
+    return PreparerOutput(adjustment_flags=_offer_adjustments(inp),rows=rows, ebitda=eb.outputs["ebitda"], debt=debt.outputs["debt"],
                           leverage=lev.outputs["leverage"], limit=inp.brief.limit,
                           run_ids=[cons.run_id, eb.run_id, debt.run_id, lev.run_id],
                           consolidate_run_id=cons.run_id, ebitda_run_id=eb.run_id, debt_run_id=debt.run_id,
                           leverage_run_id=lev.run_id,
                           note="scripted backend: consolidate, ebitda, covenant_debt, leverage")
+
+
+def _offer_adjustments(inp: PreparerInput) -> list[AdjustmentProposal]:
+    """Offer each learned adjustment on the line it covers: the same company's line of that name first, else the
+    target's. The Preparer only asks; the controller decides, and the gateway applies nothing until then."""
+    offers = []
+    for adj in inp.adjustments:
+        key = adj.line.strip().lower()
+        named = [l for l in list(inp.platform_lines) + list(inp.target_lines)
+                 if l.line.strip().lower() == key and not l.is_total]
+        line = next((l for l in named if l.company == adj.company), None)
+        line = line or next((l for l in inp.target_lines if l in named), None)
+        if line is None:
+            continue
+        offers.append(AdjustmentProposal(
+            adjustment_id=adj.id, line_id=line.id,
+            question=f"On an earlier deal the controller changed {adj.company}'s {adj.line} to {adj.amount:,.0f}K "
+                     f"('{adj.reason}'). Make the same change to {line.company}'s {line.line} on this deal?"))
+    return offers
 
 
 def scripted_reviewer(inp: ReviewerInput, call_tool: CallTool) -> ReviewerOutput:

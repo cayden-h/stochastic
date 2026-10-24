@@ -100,6 +100,10 @@ Task: build the draft combined books and the leverage figure by calling tools in
 Return rows copied from the consolidate run (each row carries that run id), the ebitda, debt, and leverage values
 exactly as the tools returned them, the limit from the brief, all run ids in `run_ids`, and each run id in its named
 field (`consolidate_run_id`, `ebitda_run_id`, `debt_run_id`, `leverage_run_id`). Never type a number of your own.
+Your input may list `adjustments`: amount changes the controller made on earlier deals, with their reasons.
+Never apply one yourself. For each one that covers a line of this deal (the same line name at the same company, or at
+the target), add an entry to `adjustment_flags` with its `adjustment_id`, that line's id as `line_id`, and a `question`
+read aloud to the controller that names the line and the earlier change by name, never by id. The controller decides.
 {SHARED_RULES}""",
     input_type=PreparerInput,
     output_type=PreparerOutput,

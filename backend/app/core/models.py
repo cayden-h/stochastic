@@ -300,6 +300,7 @@ class Edit(BaseModel):
     remember: bool = True
     policy_id: str | None = None  # set by the gateway when a reasoned remap made a policy
     adjustment_id: str | None = None  # set by the gateway when a reasoned amount edit made an adjustment
+    from_adjustment_id: str | None = None  # set when the controller applied a learned adjustment the Preparer offered
     actor: str = CONTROLLER
     at: datetime = Field(default_factory=now)
     run_ids: list[str] = Field(default_factory=list)  # the recompute runs, all new run ids
@@ -331,10 +332,12 @@ class LearnedAdjustment(BaseModel):
     id: str
     deal_id: str  # the deal it was learned on
     company: str
+    platform: str | None = None  # the deal's platform company, so a later add-on of that platform is offered it
     line: str
     amount: float  # the edited value, in USD thousands
     reason: str
     edit_id: str
+    # "applied": learned and live. "proposed": offered on a later deal's open flag. "retired": its edit was reverted.
     status: Literal["applied", "proposed", "retired"] = "applied"
     at: datetime = Field(default_factory=now)
 
@@ -491,6 +494,14 @@ class MapperOutput(BaseModel):
     note: str = ""
 
 
+class AdjustmentProposal(BaseModel):
+    """The Preparer offers a learned adjustment on a later deal. The gateway opens it as a flag; never applied silently."""
+
+    adjustment_id: str
+    line_id: str  # the statement line of this deal it would change
+    question: str
+
+
 class PreparerInput(BaseModel):
     deal_id: str
     item_id: str
@@ -498,6 +509,7 @@ class PreparerInput(BaseModel):
     target_lines: list[SourceLine]
     mappings: list[Mapping]
     brief: Brief
+    adjustments: list[LearnedAdjustment] = Field(default_factory=list)  # learned on earlier deals; offer, never apply
     session: AgentSession | None = None
 
 
@@ -512,6 +524,7 @@ class PreparerOutput(BaseModel):
     ebitda_run_id: str | None = None
     debt_run_id: str | None = None
     leverage_run_id: str | None = None
+    adjustment_flags: list[AdjustmentProposal] = Field(default_factory=list)
     note: str = ""
 
 

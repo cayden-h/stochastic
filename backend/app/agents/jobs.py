@@ -111,7 +111,8 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
             inp = PreparerInput(deal_id=deal_id, item_id=item.id, platform_lines=store.lines(deal_id, deal.platform),
                                 target_lines=store.lines(deal_id, deal.target),
                                 mappings=[m for m in store.deal_mappings(deal_id) if not m.flagged or m.approved_by],
-                                brief=deal.brief, session=store.sessions.get(PREPARER_ROLE.name))
+                                brief=deal.brief, adjustments=gw.adjustments_for(deal_id),
+                                session=store.sessions.get(PREPARER_ROLE.name))
             run, result = _store_or_fall_back(
                 gw, PREPARER_ROLE, inp, deal_id, item.id, backend,
                 lambda r: gw.store_result(PREPARER_ROLE.actor, item.id, r.output, backend=r.backend), log)

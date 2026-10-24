@@ -205,7 +205,14 @@ class Gateway:
         return [m for m in self.store.deal_mappings(deal_id) if not m.flagged or m.approved_by]
 
     def open_flags(self, deal_id: str) -> list[WorkItem]:
-        return [i for i in self.store.deal_items(deal_id, "flag") if i.state == State.NEEDS_INFO]
+        """The flags that block the books: covenant and mapping questions. An adjustment flag does not block the
+        Preparer or the Reviewer, because it is decided on the finished books; it blocks approval instead."""
+        return [i for i in self.store.deal_items(deal_id, "flag")
+                if i.state == State.NEEDS_INFO and i.payload.get("kind") != "adjustment"]
+
+    def open_adjustment_flags(self, deal_id: str) -> list[WorkItem]:
+        return [i for i in self.store.deal_items(deal_id, "flag")
+                if i.state == State.NEEDS_INFO and i.payload.get("kind") == "adjustment"]
 
     # ------------------------------------------------------------------ deals and items
     @_writes
@@ -560,6 +567,8 @@ class Gateway:
                        item.deal_id, actor, "answer", item.id)
         if option_id not in {o.id for o in item.options}:
             self._deny(IllegalTransition(f"unknown option '{option_id}'"), item.deal_id, actor, "answer", item.id)
+        if item.type == "flag" and item.payload.get("kind") == "adjustment":
+            return self._answer_adjustment(actor, item, option_id)
         item.answer = option_id
         if item.type == "flag":
             self._apply_flag_answer(actor, item, option_id)
@@ -723,6 +732,10 @@ class Gateway:
             if result is None or result.review is None or result.review.verdict != "pass":
                 self._deny(Denied("a result cannot be approved until the Reviewer verdict is pass"),
                            item.deal_id, actor, "approve", item.id)
+            offered = self.open_adjustment_flags(item.deal_id)
+            if offered:
+                self._deny(Denied(f"flag {offered[0].id} offers a learned adjustment; apply it or skip it before the "
+                                  f"result can be approved"), item.deal_id, actor, "approve", item.id)
             waiting = [e for e in self.store.deal_edits(item.deal_id) if e.status == "needs_reason"]
             if waiting:
                 e = waiting[0]
@@ -810,6 +823,7 @@ class Gateway:
                     by_tool[tool] = rid
         try:
             self._check_provenance(deal, actor, out, by_tool)
+            offers = self._check_adjustment_flags(deal, out)
         except Invalid as error:
             self._deny(error, deal.id, actor, "propose:prepare_result", item.id)
         result = Result(id=self.store.next_id("r"), deal_id=deal.id, work_item_id=item.id, rows=out.rows,
@@ -821,6 +835,8 @@ class Gateway:
         item.state = State.PROPOSED
         self._log(deal.id, actor, "propose:prepare_result", "ALLOWED", item.id,
                   reason=f"result {result.id}: leverage {out.leverage:.2f}x against {out.limit:.2f}x")
+        for proposal, adj, line in offers:
+            self._open_adjustment_flag(deal, item, proposal, adj, line)
         deal.stage = "awaiting_review"
         return result
 
@@ -1139,8 +1155,9 @@ class Gateway:
         if remember and edit.kind == "remap":
             edit.policy_id = self._learn_from_edit(actor, deal, edit).id
         elif remember and edit.kind == "amount":
-            adj = LearnedAdjustment(id=self.store.next_id("a"), deal_id=deal.id, company=edit.company, line=edit.line,
-                                    amount=edit.new_value, reason=label, edit_id=edit.id, status="applied")
+            adj = LearnedAdjustment(id=self.store.next_id("a"), deal_id=deal.id, company=edit.company,
+                                    platform=deal.platform, line=edit.line, amount=edit.new_value, reason=label,
+                                    edit_id=edit.id, status="applied")
             self.store.adjustments[adj.id] = adj
             edit.adjustment_id = adj.id
             self._log(deal.id, SYSTEM, "policy:learn", "ALLOWED", adj.id,
@@ -1196,3 +1213,92 @@ class Gateway:
             self._log(deal.id, SYSTEM, "policy:retire", "ALLOWED", adj.id, reason=f"edit {edit.id} reverted")
         result, new_approval = self._revise(deal, approval, runs, edit, edit_ids)
         return self._edit_response(edit, result, new_approval, self.reason_chips(deal.id, edit.kind))
+
+    # ------------------------------------------------------------------ learned adjustments on a later deal (D19)
+    def _adjustment_matches(self, adj: LearnedAdjustment, line: SourceLine, deal: Deal) -> bool:
+        """A learned adjustment covers a line of this deal with the same name, at the same company, or at the target
+        of a deal on the platform it was learned under. A subtotal is never offered."""
+        if line.deal_id != deal.id or line.is_total or line.line.strip().lower() != adj.line.strip().lower():
+            return False
+        return line.company == adj.company or (adj.platform == deal.platform and line.company == deal.target)
+
+    def adjustments_for(self, deal_id: str) -> list[LearnedAdjustment]:
+        """The live learned adjustments the Preparer may offer on this deal: not retired, not learned on this deal's
+        own edits, not already on an open flag, and covering one of its lines."""
+        deal = self._deal(deal_id)
+        offered = {i.payload.get("adjustment_id") for i in self.store.deal_items(deal_id, "flag")
+                   if i.payload.get("kind") == "adjustment" and i.state in (State.NEEDS_INFO, State.POSTED)}
+        lines = self.store.lines(deal_id)
+        out = []
+        for adj in self.store.adjustments.values():
+            own = self.store.edits.get(adj.edit_id)
+            if adj.status == "retired" or adj.id in offered or (own is not None and own.deal_id == deal_id):
+                continue
+            if any(self._adjustment_matches(adj, line, deal) for line in lines):
+                out.append(adj)
+        return out
+
+    def _check_adjustment_flags(self, deal: Deal, out: PreparerOutput) -> list[tuple]:
+        """Every adjustment the Preparer offers must be one the gateway would offer, on a line it covers, once."""
+        allowed = {a.id: a for a in self.adjustments_for(deal.id)}
+        seen: set[str] = set()
+        checked = []
+        for proposal in out.adjustment_flags:
+            adj = allowed.get(proposal.adjustment_id)
+            if adj is None:
+                raise Invalid(f"adjustment {proposal.adjustment_id} is not a live learned adjustment for this deal")
+            if adj.id in seen:
+                raise Invalid(f"adjustment {adj.id} is offered twice")
+            line = self.store.source_lines.get(proposal.line_id)
+            if line is None or not self._adjustment_matches(adj, line, deal):
+                raise Invalid(f"adjustment {adj.id} ({adj.line}) does not cover line {proposal.line_id}")
+            seen.add(adj.id)
+            checked.append((proposal, adj, line))
+        return checked
+
+    def _open_adjustment_flag(self, deal: Deal, parent: WorkItem, proposal, adj: LearnedAdjustment,
+                              line: SourceLine) -> WorkItem:
+        current = finance.to_thousands(line.amount, line.unit)
+        options = [
+            Option(id="apply", label=f"Apply it: {line.company}, {line.line} to {_fmt(adj.amount)}K",
+                   effect=f"{line.line} goes from {_fmt(current)}K to {_fmt(adj.amount)}K as your edit, with the reason "
+                          f"'{adj.reason}'. Every figure is recomputed by the tools with new run ids."),
+            Option(id="skip", label="Skip it on this deal",
+                   effect="The books stay as the agents made them. The adjustment is kept for later deals."),
+        ]
+        item = WorkItem(id=self.store.next_id("wi"), deal_id=deal.id, type="flag", state=State.NEEDS_INFO,
+                        proposed_by=PREPARER, question=proposal.question, options=options, default="skip",
+                        evidence=[Evidence(quote=adj.reason, document_id=f"edit {adj.edit_id} on {adj.deal_id}")],
+                        payload={"kind": "adjustment", "adjustment_id": adj.id, "line_ids": [line.id],
+                                 "parent": parent.id})
+        self.store.items[item.id] = item
+        adj.status = "proposed"
+        self._log(deal.id, PREPARER, "ask:flag", "ALLOWED", item.id, reason=proposal.question, evidence=item.evidence)
+        self._log(deal.id, SYSTEM, "adjustment:propose", "ALLOWED", adj.id, reason=f"offered on flag {item.id}")
+        return item
+
+    def _answer_adjustment(self, actor: str, item: WorkItem, option_id: str) -> WorkItem:
+        """Apply: the adjustment becomes the controller's amount edit, through apply_edit and its recompute, reasoned
+        with the adjustment's reason, so it shows in Your edits. Skip: the books stay as the agents made them."""
+        adj = self.store.adjustments[item.payload["adjustment_id"]]
+        line = self.store.source_lines[item.payload["line_ids"][0]]
+        detail = "books left as the agents made them"
+        if option_id == "apply" and adj.status == "retired":
+            self._deny(IllegalTransition(f"adjustment {adj.id} was retired; skip it"), item.deal_id, actor, "answer",
+                       item.id)
+        if option_id == "apply":
+            edit = self.apply_edit(actor, item.deal_id, "amount", line.company, line.line, value=adj.amount,
+                                   section=line.section)["edit"]
+            edit.from_adjustment_id = adj.id
+            self.reason_edit(actor, edit.id, text=adj.reason, remember=False)
+            item.payload = {**item.payload, "edit_id": edit.id}
+            detail = f"applied as edit {edit.id}"
+        item.answer = option_id
+        item.state = State.APPROVED
+        if adj.status == "proposed":
+            adj.status = "applied"  # live again for later deals, whichever way this deal went
+        self._log(item.deal_id, actor, "answer", "ALLOWED", item.id, reason=f"option {option_id}: {detail}")
+        self._log(item.deal_id, SYSTEM, f"adjustment:{option_id}", "ALLOWED", adj.id,
+                  reason=f"flag {item.id}: {detail}")
+        self._post(item)
+        return item
