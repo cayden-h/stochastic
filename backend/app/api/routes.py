@@ -8,15 +8,16 @@ import asyncio
 import json
 import os
 
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.agents import runner as agent_runner
 from app.agents.jobs import advance
 from app.api.events import next_events
-from app.api.schemas import CaseResponse, HealthResponse
-from app.core.models import CONTROLLER, State
+from app.api.schemas import CaseResponse, DealCreated, HealthResponse
+from app.core.models import CONTROLLER, Brief, Deal, State
+from app.db.loader import MAX_BYTES, LoaderError, parse_statement_csv
 from app.gateway.gateway import Gateway, GatewayError
 
 
@@ -185,6 +186,55 @@ def build_router(gw: Gateway) -> APIRouter:
                 "sessions": [dump(s) for s in store.sessions.values()], "backend": backend_status()}
 
     # ------------------------------------------------------------------ writes (human)
+    async def read_upload(field: str, upload: UploadFile) -> str:
+        """Read one CSV upload with a hard size cap. Never trusts content-length."""
+        if not (upload.filename or "").lower().endswith(".csv"):
+            raise HTTPException(status_code=422, detail=f"{field}: file name must end in .csv")
+        raw = await upload.read(MAX_BYTES + 1)
+        if len(raw) > MAX_BYTES:
+            raise HTTPException(status_code=422, detail=f"{field}: file is larger than {MAX_BYTES // (1024 * 1024)} MB")
+        try:
+            return raw.decode("utf-8", errors="strict")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=422, detail=f"{field}: file is not valid UTF-8")
+
+    @r.post("/deals", status_code=201, response_model=DealCreated)
+    async def create_deal(name: str = Form(..., min_length=1, max_length=200),
+                          platform: str = Form(..., min_length=1, max_length=100),
+                          target: str = Form(..., min_length=1, max_length=100),
+                          brief: str = Form(...),
+                          platform_csv: UploadFile = File(...), target_csv: UploadFile = File(...),
+                          x_actor: str = Header(default=CONTROLLER)):
+        """Load an unseen deal from two statement CSVs and a brief (JSON). Does not run the deal.
+
+        The console calls POST /deals/{id}/run next. /dev/reset reseeds only the demo deal, so uploaded deals
+        are lost on reset, which is fine for the demo.
+        """
+        if not gw._allowed(x_actor, "create_deal"):
+            raise HTTPException(status_code=403, detail=f"{x_actor} may not create_deal")
+        platform, target = platform.strip(), target.strip()
+        if not platform or not target or platform.lower() == target.lower():
+            raise HTTPException(status_code=422, detail="platform and target must be two different company names")
+        platform_text = await read_upload("platform_csv", platform_csv)
+        target_text = await read_upload("target_csv", target_csv)
+        try:
+            parsed_brief = Brief.model_validate_json(brief)
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail=f"brief: {error.errors()[0]['loc']} {error.errors()[0]['msg']}")
+        if not parsed_brief.limit > 0:
+            raise HTTPException(status_code=422, detail="brief: limit must be greater than 0")
+        deal_id = store.next_id("d")
+        loaded = {}
+        for field, company, text in (("platform_csv", platform, platform_text), ("target_csv", target, target_text)):
+            try:
+                loaded[field] = parse_statement_csv(text, company, deal_id, store.next_id)
+            except (LoaderError, ValueError, ValidationError) as error:
+                raise HTTPException(status_code=422, detail=f"{field}: {error}")
+        deal = Deal(id=deal_id, name=name.strip(), platform=platform, target=target, brief=parsed_brief)
+        guard(lambda: gw.create_deal(x_actor, deal, loaded["platform_csv"] + loaded["target_csv"]))
+        return {"deal_id": deal_id, "stage": deal.stage,
+                "lines": {"platform": len(loaded["platform_csv"]), "target": len(loaded["target_csv"])}}
+
     @r.post("/deals/{deal_id}/run")
     def run_deal(deal_id: str, body: RunBody | None = None, tasks: BackgroundTasks = None,
                  x_actor: str = Header(default=CONTROLLER)):

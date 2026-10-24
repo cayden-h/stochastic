@@ -67,3 +67,10 @@ class HealthResponse(BaseModel):
     ok: bool
     chain_valid: bool
     backend: BackendStatus
+
+
+class DealCreated(BaseModel):
+    """Result of POST /deals: the new deal id, its stage, and how many lines each company loaded."""
+    deal_id: str
+    stage: str
+    lines: dict[str, int]
