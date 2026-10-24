@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Request, UploadFile
@@ -210,19 +211,18 @@ def build_router(gw: Gateway) -> APIRouter:
         The console calls POST /deals/{id}/run next. /dev/reset reseeds only the demo deal, so uploaded deals
         are lost on reset, which is fine for the demo.
         """
-        if not gw._allowed(x_actor, "create_deal"):
-            raise HTTPException(status_code=403, detail=f"{x_actor} may not create_deal")
-        platform, target = platform.strip(), target.strip()
-        if not platform or not target or platform.lower() == target.lower():
-            raise HTTPException(status_code=422, detail="platform and target must be two different company names")
+        guard(lambda: gw._require(x_actor, "create_deal", deal_id="-"))  # a denial is audited, before any file is parsed
+        name, platform, target = name.strip(), platform.strip(), target.strip()
+        if not name or not platform or not target or platform.lower() == target.lower():
+            raise HTTPException(status_code=422, detail="name, platform and target are required, and platform and target must differ")
         platform_text = await read_upload("platform_csv", platform_csv)
         target_text = await read_upload("target_csv", target_csv)
         try:
             parsed_brief = Brief.model_validate_json(brief)
         except ValidationError as error:
             raise HTTPException(status_code=422, detail=f"brief: {error.errors()[0]['loc']} {error.errors()[0]['msg']}")
-        if not parsed_brief.limit > 0:
-            raise HTTPException(status_code=422, detail="brief: limit must be greater than 0")
+        if not math.isfinite(parsed_brief.limit) or parsed_brief.limit <= 0:
+            raise HTTPException(status_code=422, detail="brief: limit must be a finite number greater than 0")
         deal_id = store.next_id("d")
         loaded = {}
         for field, company, text in (("platform_csv", platform, platform_text), ("target_csv", target, target_text)):
@@ -230,7 +230,7 @@ def build_router(gw: Gateway) -> APIRouter:
                 loaded[field] = parse_statement_csv(text, company, deal_id, store.next_id)
             except (LoaderError, ValueError, ValidationError) as error:
                 raise HTTPException(status_code=422, detail=f"{field}: {error}")
-        deal = Deal(id=deal_id, name=name.strip(), platform=platform, target=target, brief=parsed_brief)
+        deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=parsed_brief)
         guard(lambda: gw.create_deal(x_actor, deal, loaded["platform_csv"] + loaded["target_csv"]))
         return {"deal_id": deal_id, "stage": deal.stage,
                 "lines": {"platform": len(loaded["platform_csv"]), "target": len(loaded["target_csv"])}}

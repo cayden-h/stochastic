@@ -7,6 +7,7 @@ from __future__ import annotations
 import csv
 import io
 import math
+import re
 from typing import Callable
 
 from app.core.models import SourceLine
@@ -21,6 +22,9 @@ TAGS = ("debt", "not_debt", "unclear", "na")
 BOOLS = {"true": True, "1": True, "yes": True, "false": False, "0": False, "no": False, "": False}
 
 
+_NUMBER = re.compile(r"[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?", re.ASCII)  # ASCII digits only; ".5" is not accepted
+
+
 class LoaderError(ValueError):
     pass
 
@@ -30,7 +34,11 @@ def _parse_amount(raw: str) -> float:
     negative = s.startswith("(") and s.endswith(")")
     if negative:
         s = s[1:-1].strip()
-    value = float(s)  # ValueError on junk
+    if negative and s[:1] in "+-":
+        raise ValueError("sign inside parentheses")
+    if not _NUMBER.fullmatch(s):
+        raise ValueError("not a plain number")
+    value = float(s)
     if not math.isfinite(value):
         raise ValueError("not finite")
     return -value if negative else value
@@ -46,6 +54,8 @@ def parse_statement_csv(text: str, company: str, deal_id: str, next_id: Callable
         raise LoaderError("row 1: file is empty, header required")
     header = [h.strip().lstrip("﻿").lower() for h in header]
     for col in REQUIRED:
+        if header.count(col) > 1:
+            raise LoaderError(f"row 1, column {col}: duplicate column")
         if col not in header:
             raise LoaderError(f"row 1, column {col}: required column is missing")
     idx = {name: header.index(name) for name in REQUIRED + ["covenant_tag"] if name in header}

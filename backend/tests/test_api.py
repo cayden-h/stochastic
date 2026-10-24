@@ -197,3 +197,69 @@ def test_upload_rejects_non_utf8_and_nonpositive_limit():
     assert c.post("/deals", files=files, data=data).status_code == 422
     data["brief"] = "{not json"
     assert c.post("/deals", files=files, data=data).status_code == 422
+
+
+def test_denied_create_is_audited():
+    from fastapi import FastAPI
+    from app.api.routes import build_router
+    from app.db.memory import MemoryStore
+    from app.gateway.gateway import Gateway
+    store = MemoryStore()
+    gw = Gateway(store)
+    app = FastAPI()
+    app.include_router(build_router(gw))
+    c = TestClient(app)
+    assert upload(c, headers={"X-Actor": "agent:mapper"}).status_code == 403
+    rows = [a for a in store.audit if a.action == "create_deal" and a.result == "DENIED"]
+    assert len(rows) == 1 and rows[0].actor == "agent:mapper" and rows[0].deal_id == "-"
+    assert c.get("/health").json()["chain_valid"] is True
+    assert not store.deals
+
+
+@pytest.mark.parametrize("limit", ["1e400", "-1e400", "0", "-1"])
+def test_upload_rejects_infinite_or_nonpositive_limit(limit):
+    c = TestClient(create_app())
+    brief = json.dumps(BRIEF).replace('"limit": 2.5', f'"limit": {limit}')
+    files = {"platform_csv": ("p.csv", platform_csv(), "text/csv"), "target_csv": ("t.csv", TARGET_CSV, "text/csv")}
+    r = c.post("/deals", files=files, data={"name": "A", "platform": "A", "target": "B", "brief": brief})
+    assert r.status_code == 422, r.text
+    assert "limit must be a finite number greater than 0" in r.json()["detail"]
+
+
+def test_upload_spaces_only_name_rejected():
+    c = TestClient(create_app())
+    assert upload(c, name="   ").status_code == 422
+
+
+def test_body_limit_middleware_rejects_big_content_length():
+    import asyncio
+    from app.api.body_limit import BodyLimitMiddleware
+    called = []
+
+    async def downstream(scope, receive, send):
+        called.append(1)
+
+    sent = []
+
+    async def send(msg):
+        sent.append(msg)
+
+    async def receive():
+        raise AssertionError("body must not be read")
+
+    mw = BodyLimitMiddleware(downstream, max_bytes=1000)
+    scope = {"type": "http", "method": "POST", "path": "/deals", "headers": [(b"content-length", str(100 * 1024 * 1024).encode())]}
+    asyncio.run(mw(scope, receive, send))
+    assert not called
+    assert sent[0]["status"] == 413
+    assert b"request body is larger than" in sent[1]["body"]
+    small = {"type": "http", "method": "POST", "path": "/deals", "headers": [(b"content-length", b"10")]}
+    asyncio.run(mw(small, receive, send))
+    assert called == [1]
+
+
+def test_app_registers_body_limit():
+    c = TestClient(create_app())
+    r = c.post("/deals", content=b"x", headers={"content-length": str(100 * 1024 * 1024), "content-type": "text/plain"})
+    assert r.status_code == 413
+    assert "larger than" in r.json()["detail"]

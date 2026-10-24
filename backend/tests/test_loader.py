@@ -101,3 +101,31 @@ def test_extra_columns_ignored_and_short_row_raises():
     assert len(load(f"{HEADER},notes\na,income_statement,FY,1,USD,,,hello\n")) == 1
     with pytest.raises(LoaderError, match="row 2"):
         load(f"{HEADER}\na,income_statement\n")
+
+
+def test_sign_inside_parentheses_rejected():
+    for bad in ("(-5)", "(+5)"):
+        with pytest.raises(LoaderError, match=r"row 2.*amount"):
+            load(f'{HEADER}\na,income_statement,FY,"{bad}",USD,,\n')
+
+
+@pytest.mark.parametrize("bad", ["١٢٣", "1_000", "1e5x", "0x10", "infinity", "1.2.3", "12abc", "1e"])
+def test_non_ascii_or_odd_amount_rejected(bad):
+    with pytest.raises(LoaderError, match=r"row 2.*amount"):
+        load(f"{HEADER}\na,income_statement,FY,{bad},USD,,\n")
+
+
+@pytest.mark.parametrize("good,value", [("1,234.5", 1234.5), ("-7", -7.0), ("+3", 3.0), ("1e3", 1000.0), ("2.5E-1", 0.25), ("(1,000.50)", -1000.5)])
+def test_ascii_amount_forms_accepted(good, value):
+    assert load(f'{HEADER}\na,income_statement,FY,"{good}",USD,,\n')[0].amount == value
+
+
+def test_leading_dot_amount_rejected():
+    # Choice: ".5" is not accepted; amounts must start with a digit.
+    with pytest.raises(LoaderError, match=r"row 2.*amount"):
+        load(f"{HEADER}\na,income_statement,FY,.5,USD,,\n")
+
+
+def test_duplicate_required_column_rejected():
+    with pytest.raises(LoaderError, match="amount.*duplicate|duplicate.*amount"):
+        load(f"{HEADER},amount\na,income_statement,FY,1,USD,,false,2\n")
