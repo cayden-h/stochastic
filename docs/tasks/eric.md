@@ -166,3 +166,7 @@ The whole-line reading is now computed as filed, debt over reported EBITDA: 2.84
 `evals/fixture_check.md` has a note at the top saying its earlier whole-line figures used covenant EBITDA.
 The scripted Mapper's option a label is now "The whole line counts" (no amount), and it tags operating leases `na`, because the gateway now refuses a `not_debt` tag that no controller answer made.
 Your Anthropic run is credited in the docs: one full run and about 50 Mapper trials, not on the demo laptop.
+
+## Desktop app and review edits (D19)
+
+- [ ] Find one believable one-time cost in the Kewaunee or Nu Aire filing (for example acquisition-related costs) for the demo edit: the line, the amount in USD thousands, and the page. Put it in `docs/design/review-companion.md` section 9.

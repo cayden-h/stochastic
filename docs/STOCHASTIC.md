@@ -1,6 +1,6 @@
 # Stochastic: reference for Claude
 
-Last updated: 2026-10-24, 02:30 (backend built end to end on the scripted backend; agents made stateful).
+Last updated: 2026-10-24, evening (D19: Mac desktop app, edits in review that teach the agents).
 Read this file first in any session about Stochastic.
 It holds the main features, the architecture, and the scope.
 If this file and a PDF or an older note disagree, this file is correct.
@@ -62,9 +62,10 @@ There is no after-close monitoring and no ongoing consolidation in the MVP.
 2. **Map.** The Mapper matches each target line to a platform line, with a confidence and a reason.
 3. **Flag.** Lines the Mapper cannot place with confidence go to the human. The human approves a mapping or changes it.
 4. **Combine and test.** The Preparer calls code tools that add the books, remove intercompany amounts, compute combined EBITDA, and compute leverage. The Reviewer checks that the totals tie and tests leverage against the limit.
-5. **Approve.** The controller approves the result. The gateway posts it and writes the log.
+5. **Review and edit.** The controller can remap a line or change an amount in the combined table. Code recomputes at once. A companion asks why, and the reason teaches the agents for the next add-on (D19).
+6. **Approve and download.** The controller approves the result, which is refused while an edit has no reason. The gateway posts it and writes the log. The controller downloads the final workbook and certificate, with every edit and reason in them.
 
-The user sees one screen with a flag card, a small combined table, and one verdict line.
+The user sees one screen with a flag card, an editable combined table, and one verdict line, in a Mac desktop app.
 
 ## 5. Main features
 1. **Mapping with confidence.** Each target line gets a platform line, a confidence, and a short reason.
@@ -74,7 +75,9 @@ The user sees one screen with a flag card, a small combined table, and one verdi
 5. **Maker-checker.** The agent that prepares a result cannot approve it. A reviewer agent checks it, and a human approves it. The gateway refuses approval until the review passes.
 6. **Audit log.** Every action is logged, allowed or denied, and each row is chained to the row before it.
 7. **Stateful agents that learn.** The controller's answer to a flag becomes a policy. The Mapper applies it next time with the policy as evidence instead of asking again. Each agent keeps a session across work items.
-8. **Replicable agents.** The same role definition runs on four backends (Anthropic, Droid, scripted, replay), once per work item, and the result says which backend produced it.
+8. **Edits that teach.** Every edit in review is explained once through the companion's "Why did you change this?" bubble. A remap becomes a policy for every add-on on the platform, and an amount becomes an adjustment the Preparer proposes next time. Design: `design/review-companion.md`.
+9. **Final files.** After approval, the workbook and the draft certificate download with the edits marked and explained.
+10. **Replicable agents.** The same role definition runs on four backends (Anthropic, Droid, scripted, replay), once per work item, and the result says which backend produced it.
 
 ## 6. Architecture
 The system has four parts.
@@ -250,6 +253,7 @@ Should (if the schedule holds):
 - An answer-key score for the mapping against Note 2 (Eric).
 - The second-run memory moment on stage.
 - A downloadable draft compliance certificate.
+- The Mac desktop app (Electron), the editable review table, the companion, and Download final files (D19). The demo beat is in `design/review-companion.md` section 9.
 - Tiger Cloud Postgres in place of the memory store. Built on 2026-10-24 as a write-through store (`backend/app/db/postgres.py`).
 
 Cut (do not build this weekend):
@@ -261,7 +265,7 @@ Cut (do not build this weekend):
 - A staged denied-action demo.
 
 ## 14. Tech stack (proposed)
-- Frontend: Next.js, React, TypeScript, Tailwind. Josie leads the design.
+- Frontend: Next.js, React, TypeScript, Tailwind, inside an Electron window as a Mac desktop app (D19). Josie leads the design.
 - Backend: Python 3.12, FastAPI, Pydantic. The gateway, tools, agents, and tests are in Python. [verified]
 - Agents: `run_agent(role, item)` with backends `anthropic` (Anthropic SDK, tool use), `droid` (Factory Droid Python SDK 0.5.0), `scripted`, and `replay`. [verified: installed in `backend/.venv`]
 - Store: in memory, written through to Postgres on Tiger Cloud (TimescaleDB 2.31, PostgreSQL 18.6) with `STORE=postgres`. [verified]

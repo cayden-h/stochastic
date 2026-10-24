@@ -433,3 +433,27 @@ Why: "the gateway, not the prompt, enforces it" is the pitch, and each of these 
 Not changed: the test period. Each company's latest fiscal year stands in for the agreement's trailing twelve months to the closing quarter; that rebuild is the next step, said out loud.
 
 Evidence: `backend/tests/test_gateway_guards.py` (one test per attack), `backend/tests/test_demo_reset.py`, `backend/tests/test_mapper_retry.py`, `test_the_demo_run_beat_by_beat`; commits 0e3829f and 3938ca9.
+
+## D19. A Mac desktop app, with edits in review that the agents learn from
+
+Date: 2026-10-24, evening. Proposed by Cayden, agreed by the team.
+
+Decision:
+1. Stochastic ships as a Mac desktop app only: the Next console inside an Electron window. There is no separate web product.
+2. After the agents finish, the combined table is editable in the app: a target line can be remapped, and a platform or target amount can be changed. Combined values and totals stay computed.
+3. Each edit asks "Why did you change this?" through a companion that follows the cursor in the app and moves to the edited cell. The reasons are chips plus optional text; the demo chips are hardcoded and the pitch says so.
+4. A remap with a reason becomes a mapping policy for every add-on on the same platform (the D12 path). An amount edit becomes a logged adjustment that the Preparer proposes on a later deal for approval. It is never applied silently.
+5. Edits are recorded on top of the agents' run, not over it. Code recomputes with new run ids, the Reviewer's checks re-run, and approval is refused while an edit has no reason.
+6. After approval, "Download final files" saves the workbook (edited cells marked, with notes and an Edits sheet) and the draft certificate.
+
+Why:
+- Flags catch lines the Mapper knows it is unsure about. Review edits catch the lines it was sure about and got wrong, which a next deal would repeat silently. [inferred]
+- "Improves with every correction" is a strong signal in the Hyphenate workshop notes, and an edit is a correction. [verified: `hyphenate-workshop.md`]
+- Controllers finish in Excel, so the download keeps the edits and their reasons instead of losing them. [inferred]
+
+Rejected:
+- A guard that watches exported files or other apps for changed numbers. With editing in the app, it is a roadmap line.
+- A full spreadsheet in the app. It would always be a worse Excel, and formulas would break traceability.
+- Tauri. The stack is Node, Squeek's companion is a working Electron reference, and Chromium renders the same as the browser the console was designed in.
+
+Design: `design/review-companion.md`.

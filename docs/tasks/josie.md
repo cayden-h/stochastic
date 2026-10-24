@@ -29,3 +29,10 @@ From the risk review's UI pass; please check the look on your screen and change 
 - `src/components/gate.tsx`: a "Reconnecting to the gateway" bar when the API drops after the first load.
 - `src/components/combined-table.tsx`: opens collapsed; the "Line" header is aligned. `src/components/mappings.tsx`: "in a mapping question" instead of "flagged".
 - `src/lib/api.ts` (`reset(keepMemory)`), `src/lib/types.ts` (new option, deal, and sensitivity fields), `next.config.ts` (`devIndicators: false`).
+
+## Desktop app and review edits (D19, 2026-10-24 evening)
+
+Spec: `docs/design/review-companion.md`. The Figma checklist is in its section 12.
+- [ ] Figma: editable cells, the remap dropdown, the reason bubble, the companion states, the Your edits section, and the Download final files button.
+- [ ] Top bar: 72px left padding for the macOS traffic lights (hidden title bar).
+- [ ] Build the editable table and the Your edits section against `edits` on the case once Cayden's routes land.
