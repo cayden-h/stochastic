@@ -1,0 +1,279 @@
+{
+  "role": "brief_reader",
+  "backend": "droid",
+  "input_key": "8780012082f2",
+  "output": {
+    "brief": {
+      "lender": "PNC BANK, NATIONAL ASSOCIATION",
+      "agreement_ref": "Loan Agreement dated as of November 1, 2024 between Kewaunee Scientific Corporation and PNC Bank, National Association",
+      "limit": 2.5,
+      "limit_section": "4.8",
+      "limit_wording": "a ratio of Senior Funded Bank Debt to EBITDA of less than 2.50 to 1.00",
+      "debt_term": "Senior Funded Bank Debt",
+      "debt_definition": "all secured indebtedness for borrowed money, including but not limited to capital or finance lease obligations, reimbursement obligations in respect of letters of credit, and guarantees of any such indebtedness",
+      "debt_excludes": [
+        "Subordinated Debt",
+        "any capitalized lease obligations relating to the real property located at 2700 West Front Street, Statesville, North Carolina 28677"
+      ],
+      "ebitda_definition": "net income plus interest expense less interest income plus income tax expense plus depreciation plus amortization, plus the listed add-backs, less extraordinary gains and cash rental expense",
+      "ebitda_addbacks": [
+        {
+          "name": "noncash pension termination expense",
+          "amount": 0.0,
+          "cap": null,
+          "source_ref": "Addendum I",
+          "note": "Limited to expense completed during the fiscal year ending April 30, 2024.",
+          "inferred": true
+        },
+        {
+          "name": "transaction costs related to the Closing Date Acquisition",
+          "amount": 0.0,
+          "cap": 4000.0,
+          "source_ref": "Addendum I",
+          "note": "",
+          "inferred": true
+        },
+        {
+          "name": "integration costs relating to the Closing Date Acquisition",
+          "amount": 0.0,
+          "cap": 1000.0,
+          "source_ref": "Addendum I",
+          "note": "Incurred within 18 months of the Closing Date Acquisition.",
+          "inferred": true
+        },
+        {
+          "name": "any stock-based compensation",
+          "amount": 0.0,
+          "cap": null,
+          "source_ref": "Addendum I",
+          "note": "",
+          "inferred": true
+        },
+        {
+          "name": "EBITDA of Nu Aire on a pro forma basis",
+          "amount": 0.0,
+          "cap": null,
+          "source_ref": "Addendum I",
+          "note": "Only to the extent included in the tested period; four quarters from Nov 1, 2023 to Oct 31, 2024.",
+          "inferred": true
+        }
+      ],
+      "ebitda_deductions": [
+        {
+          "name": "extraordinary gains",
+          "amount": 0.0,
+          "cap": null,
+          "source_ref": "Addendum I",
+          "note": "",
+          "inferred": true
+        },
+        {
+          "name": "cash rental expense relating to the real property located at 2700 West Front Street",
+          "amount": 0.0,
+          "cap": null,
+          "source_ref": "Addendum I",
+          "note": "",
+          "inferred": true
+        }
+      ],
+      "closing_financing": [],
+      "test_period_note": "Measured as of the end of each fiscal quarter, on a consolidated basis."
+    },
+    "citations": [
+      {
+        "field": "lender",
+        "quote": "PNC BANK, NATIONAL ASSOCIATION (the \" Bank \")",
+        "section": "preamble",
+        "confidence": 0.95,
+        "note": ""
+      },
+      {
+        "field": "limit",
+        "quote": "of less than 2.50 to 1.00, measured as of the end",
+        "section": "4.8",
+        "confidence": 0.95,
+        "note": ""
+      },
+      {
+        "field": "limit_section",
+        "quote": "Senior Funded Bank Debt to EBITDA",
+        "section": "4.8",
+        "confidence": 0.9,
+        "note": ""
+      },
+      {
+        "field": "limit_wording",
+        "quote": "a ratio of Senior Funded Bank Debt to EBITDA of less than 2.50 to 1.00",
+        "section": "4.8",
+        "confidence": 0.95,
+        "note": ""
+      },
+      {
+        "field": "debt_term",
+        "quote": "\" Senior Funded Bank Debt \" means all secured indebtedness",
+        "section": "Addendum I",
+        "confidence": 0.9,
+        "note": ""
+      },
+      {
+        "field": "debt_definition",
+        "quote": "all secured indebtedness for borrowed money, including but not limited to capital or finance lease obligations",
+        "section": "Addendum I",
+        "confidence": 0.9,
+        "note": ""
+      },
+      {
+        "field": "debt_excludes[0]",
+        "quote": "but excluding (i) Subordinated Debt and (ii)",
+        "section": "Addendum I",
+        "confidence": 0.85,
+        "note": ""
+      },
+      {
+        "field": "debt_excludes[1]",
+        "quote": "any capitalized lease obligations relating to the real property",
+        "section": "Addendum I",
+        "confidence": 0.85,
+        "note": ""
+      },
+      {
+        "field": "ebitda_definition",
+        "quote": "means net income plus interest expense less interest income plus income tax expense",
+        "section": "Addendum I",
+        "confidence": 0.9,
+        "note": ""
+      },
+      {
+        "field": "ebitda_addbacks[0].name",
+        "quote": "noncash pension termination expense completed during the fiscal year",
+        "section": "Addendum I",
+        "confidence": 0.9,
+        "note": ""
+      },
+      {
+        "field": "ebitda_addbacks[1].name",
+        "quote": "transaction costs related to the Closing Date Acquisition",
+        "section": "Addendum I",
+        "confidence": 0.9,
+        "note": ""
+      },
+      {
+        "field": "ebitda_addbacks[1].cap",
+        "quote": "but not exceeding $4,000,000 in the aggregate",
+        "section": "Addendum I",
+        "confidence": 0.9,
+        "note": ""
+      },
+      {
+        "field": "ebitda_addbacks[2].name",
+        "quote": "integration costs relating to the Closing Date Acquisition",
+        "section": "Addendum I",
+        "confidence": 0.9,
+        "note": ""
+      },
+      {
+        "field": "ebitda_addbacks[2].cap",
+        "quote": "but not exceeding $1,000,000 in the aggregate",
+        "section": "Addendum I",
+        "confidence": 0.9,
+        "note": ""
+      },
+      {
+        "field": "ebitda_addbacks[3].name",
+        "quote": "plus (without duplication) any stock-based compensation",
+        "section": "Addendum I",
+        "confidence": 0.85,
+        "note": ""
+      },
+      {
+        "field": "ebitda_addbacks[4].name",
+        "quote": "the EBITDA of Nu Aire calculated on a pro forma basis",
+        "section": "Addendum I",
+        "confidence": 0.85,
+        "note": ""
+      },
+      {
+        "field": "ebitda_deductions[0].name",
+        "quote": "less extraordinary gains less cash rental expense",
+        "section": "Addendum I",
+        "confidence": 0.85,
+        "note": ""
+      },
+      {
+        "field": "ebitda_deductions[1].name",
+        "quote": "cash rental expense relating to the real property located at 2700 West Front Street",
+        "section": "Addendum I",
+        "confidence": 0.85,
+        "note": ""
+      }
+    ],
+    "flags": [
+      {
+        "kind": "brief_field",
+        "field": "ebitda_addbacks",
+        "question": "Add-back amounts are not in the agreement. Please provide them from the books for each add-back.",
+        "evidence": [
+          {
+            "quote": "plus (without duplication) any stock-based compensation",
+            "page": null,
+            "document_id": null
+          }
+        ],
+        "proposed": null
+      },
+      {
+        "kind": "brief_field",
+        "field": "ebitda_deductions",
+        "question": "Deduction amounts are not in the agreement. Please provide them from the books for each deduction.",
+        "evidence": [
+          {
+            "quote": "less extraordinary gains less cash rental expense",
+            "page": null,
+            "document_id": null
+          }
+        ],
+        "proposed": null
+      },
+      {
+        "kind": "brief_field",
+        "field": "fixed_charge_coverage_ratio",
+        "question": "A second financial covenant, a Fixed Charge Coverage Ratio of at least 1.20 to 1, is in Section 4.8(b). The Brief cannot hold it. How should it be tracked?",
+        "evidence": [
+          {
+            "quote": "a Fixed Charge Coverage Ratio of at least 1.20 to 1",
+            "page": null,
+            "document_id": null
+          }
+        ],
+        "proposed": null
+      },
+      {
+        "kind": "brief_field",
+        "field": "limit",
+        "question": "Section 5.10(a) requires a ratio below 2.00 to 1.00 for prepayments of the Subordinated Seller Notes. The Brief cannot hold this lower threshold. Should it be tracked separately?",
+        "evidence": [
+          {
+            "quote": "is less than 2.00 to 1.00",
+            "page": null,
+            "document_id": null
+          }
+        ],
+        "proposed": null
+      },
+      {
+        "kind": "brief_field",
+        "field": "ebitda_addbacks[4]",
+        "question": "The Nu Aire pro forma add-back applies only to the extent included in the tested period, and it covers a fixed four-quarter window. Please confirm how it should be applied.",
+        "evidence": [
+          {
+            "quote": "solely to the extent included in the tested period",
+            "page": null,
+            "document_id": null
+          }
+        ],
+        "proposed": null
+      }
+    ],
+    "note": "Fixes the refused stock-based compensation quote by extending it to four words. All adjustment amounts are 0 and inferred, pending the controller. closing_financing is left empty because the sections I read give no amounts."
+  }
+}
