@@ -6,7 +6,6 @@ os.environ["AGENT_FALLBACK"] = ""
 
 from datetime import datetime, timezone  # noqa: E402
 from io import BytesIO  # noqa: E402
-from types import SimpleNamespace  # noqa: E402
 
 import openpyxl  # noqa: E402
 import pytest  # noqa: E402
@@ -14,6 +13,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.api import certificate as cert_doc  # noqa: E402
 from app.api.export import AMBER, build_workbook, export_filename, workbook_bytes  # noqa: E402
+from app.core.models import Edit  # noqa: E402
 from app.db.fixtures.kewaunee import DEAL_ID, PLATFORM, TARGET  # noqa: E402
 from app.main import create_app  # noqa: E402
 
@@ -65,7 +65,7 @@ def edit(**kw):
                 adjustment_id=None, actor="human:controller",
                 at=datetime(2026, 10, 25, 10, 42, tzinfo=timezone.utc), run_ids=[])
     base.update(kw)
-    return SimpleNamespace(**base)
+    return Edit(**base)
 
 
 def posted_parts(app, client):
@@ -232,14 +232,12 @@ def test_reverted_edit_marks_nothing(app, client):
 
 def test_edits_default_reads_the_store(app, client):
     store, deal, result, items, chain = posted_parts(app, client)
-    store.edits = {"ed_1": edit(), "ed_2": edit(id="ed_2", deal_id="other_deal"), "ed_3": edit(id="ed_3", status="reverted")}
-    try:
-        wb = load(workbook_bytes(build_workbook(store, deal, result, items, chain)))
-        assert len(sheet_rows(wb["Edits"])) == 2
-        cert = cert_doc.build_certificate(store, deal, result, items, chain)
-        assert [x["id"] for x in cert["edits"]] == ["ed_1"]
-    finally:
-        del store.edits
+    for e in (edit(), edit(id="ed_2", deal_id="other_deal"), edit(id="ed_3", status="reverted")):
+        store.edits[e.id] = e
+    wb = load(workbook_bytes(build_workbook(store, deal, result, items, chain)))
+    assert len(sheet_rows(wb["Edits"])) == 2
+    cert = cert_doc.build_certificate(store, deal, result, items, chain)
+    assert [x["id"] for x in cert["edits"]] == ["ed_1"]
 
 
 def test_certificate_lists_each_edit_and_its_reason(app, client):

@@ -1,7 +1,7 @@
 """Controller edits applied to the inputs of the math tools. Pure functions, no side effects, no model.
 
-An edit is read by attribute (getattr), so a Pydantic model, a dataclass, or a SimpleNamespace all work.
-The Edit model lands with Cayden's C1 (docs/tasks/cayden.md); until then the shape is the EditLike protocol below.
+Edits are the Edit model from app.core.models (Cayden's C1). They are read by attribute (getattr), so a
+SimpleNamespace with the same fields also works in tests that need a shape the model refuses.
 An amount edit replaces one line's amount with new_value (USD thousands).
 A remap edit moves one target line onto another platform line.
 A reverted edit is ignored everywhere. An edit that matches nothing is refused, never guessed.
@@ -9,56 +9,34 @@ Owner: Tri (backend/app/tools/).
 """
 from __future__ import annotations
 
-from typing import Any, Iterable, Protocol
+from typing import Iterable
 
-from app.core.models import Mapping, SourceLine
+from app.core.models import Edit, Mapping, SourceLine
 
 THOUSANDS = "USD thousands"
-
-
-class EditLike(Protocol):
-    id: str
-    deal_id: str
-    kind: str  # "amount" or "remap"
-    company: str
-    line: str
-    section: str | None
-    old_value: float | None
-    new_value: float | None  # USD thousands, for an amount edit
-    old_platform_line: str | None
-    new_platform_line: str | None  # for a remap edit
-    status: str  # "needs_reason", "reasoned", "reverted"
-    reason_chip: Any
-    reason_text: str | None
-    remember: bool
-    policy_id: str | None
-    adjustment_id: str | None
-    actor: str
-    at: Any
-    run_ids: list[str]
 
 
 def _norm(text: str | None) -> str:
     return (text or "").strip().lower()
 
 
-def active(edits: Iterable[EditLike | None] | None) -> list[EditLike]:
+def active(edits: Iterable[Edit | None] | None) -> list[Edit]:
     """The edits that count: not None and not reverted, in the order given."""
     return [e for e in (edits or []) if e is not None and getattr(e, "status", None) != "reverted"]
 
 
-def _of_kind(edits, kind: str) -> list[EditLike]:
+def _of_kind(edits: Iterable[Edit] | None, kind: str) -> list[Edit]:
     return [e for e in active(edits) if getattr(e, "kind", None) == kind]
 
 
-def _line_matches(line: SourceLine, edit: EditLike) -> bool:
+def _line_matches(line: SourceLine, edit: Edit) -> bool:
     section = getattr(edit, "section", None)
     return (_norm(line.company) == _norm(getattr(edit, "company", None))
             and _norm(line.line) == _norm(getattr(edit, "line", None))
             and (not section or line.section == section))
 
 
-def apply_amount_edits(lines: list[SourceLine], edits) -> tuple[list[SourceLine], list[str]]:
+def apply_amount_edits(lines: list[SourceLine], edits: Iterable[Edit] | None) -> tuple[list[SourceLine], list[str]]:
     """Copies of the lines with each active amount edit's new_value as the amount, in USD thousands.
 
     Returns the new lines and the applied edit ids in edit order. The input lines are never changed.
@@ -83,7 +61,7 @@ def apply_amount_edits(lines: list[SourceLine], edits) -> tuple[list[SourceLine]
 
 
 def apply_remap_edits(mappings: list[Mapping], target_lines: list[SourceLine], platform_lines: list[SourceLine],
-                      edits) -> tuple[list[Mapping], list[str]]:
+                      edits: Iterable[Edit] | None) -> tuple[list[Mapping], list[str]]:
     """Copies of the mappings with each active remap edit's new_platform_line in place.
 
     The mapping is found through its target line (company and line name). platform_line_id is set to the id of the

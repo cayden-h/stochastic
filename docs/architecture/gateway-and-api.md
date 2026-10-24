@@ -117,10 +117,11 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 }
 ```
 
-`edits`, `adjustments`, and `brief_draft` are the phase 2 additions (planned, shapes in the next section).
-They are empty lists and null on the demo deal until an edit is made or a deal is created from agreement text.
-They are not on `CaseResponse` yet.
-Tri adds them to `CaseResponse` in `backend/app/api/schemas.py` (T2 and T4), with `Field` imported from pydantic:
+`edits`, `adjustments`, and `brief_draft` are the phase 2 additions (shapes in the next section).
+They are on `/case` and `CaseResponse` now (verified by `backend/tests/test_case_phase2.py`).
+The gateway's edit routes fill `edits` and `adjustments` when those routes land, and the Brief Reader routes fill `brief_draft`; until then they are empty lists and null.
+`edits` lists the deal's edits in order, reverted ones included; `adjustments` lists every learned adjustment, as `policies` does.
+They are declared in `CaseResponse` in `backend/app/api/schemas.py`:
 
 ```python
 edits: list[Edit] = Field(default_factory=list)

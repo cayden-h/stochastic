@@ -252,6 +252,9 @@ def build_router(gw: Gateway) -> APIRouter:
             "audit": {"rows": len([a for a in store.audit if a.deal_id == deal_id]), "chain_valid": gw.verify_chain(),
                       "denied": len([a for a in store.audit if a.deal_id == deal_id and a.result == "DENIED"])},
             "backend": backend_status(),
+            "edits": [dump(e) for e in store.deal_edits(deal_id)],
+            "adjustments": [dump(a) for a in store.adjustments.values()],
+            "brief_draft": None,  # the Brief Reader routes fill this later
         }
 
     def need_posted(deal_id: str, what: str):

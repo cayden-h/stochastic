@@ -9,6 +9,7 @@ from __future__ import annotations
 import html
 from datetime import datetime, timezone
 
+from app.core.models import Edit
 from app.tools.edits import active
 
 
@@ -41,31 +42,22 @@ def approval_item(items, result):
                  if i.type == "approve_result" and i.payload.get("result_id") == result.id), None)
 
 
-def deal_edits(store, deal_id: str, edits=None) -> list:
-    """The deal's active edits: the given list, else the store's edits for the deal. Reverted edits are dropped.
-
-    Edits are read by attribute (the EditLike shape in app/tools/edits.py), so any object with those fields works.
-    """
+def deal_edits(store, deal_id: str, edits: list[Edit] | None = None) -> list[Edit]:
+    """The deal's active edits: the given list, else `store.active_edits(deal_id)`. Reverted edits are dropped."""
     if edits is None:
-        found = getattr(store, "edits", None) or {}
-        found = found.values() if isinstance(found, dict) else found
-        edits = [e for e in found if getattr(e, "deal_id", None) == deal_id]
+        return store.active_edits(deal_id)
     return active(edits)
 
 
-def edit_reason(edit) -> str:
-    """The controller's reason: the text, else the chip's label, else "chip {n}"."""
+def edit_reason(edit: Edit) -> str:
+    """The controller's reason: the typed text (or the chip's label the gateway copied there), else "chip {n}".
+
+    Chip labels are per deal and live with the gateway (Cayden), not in the store, so only the number is known here."""
     text = getattr(edit, "reason_text", None)
     if text:
         return text
     chip = getattr(edit, "reason_chip", None)
-    if chip is None:
-        return "not given yet"
-    label = chip.get("label") if isinstance(chip, dict) else getattr(chip, "label", None)
-    if label:
-        return label
-    n = chip.get("id") if isinstance(chip, dict) else getattr(chip, "id", chip)
-    return f"chip {n}"
+    return "not given yet" if chip is None else f"chip {chip}"
 
 
 def edit_values(edit) -> tuple:

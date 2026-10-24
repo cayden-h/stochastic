@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, model_serializer
+from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
-from app.core.models import AgentSession, Deal, Mapping, Policy, Result, Review, SourceLine, WorkItem
+from app.core.models import (AgentSession, BriefDraft, Deal, Edit, LearnedAdjustment, Mapping, Policy, Result, Review,
+                             SourceLine, WorkItem)
 
 
 class BackendStatus(BaseModel):
@@ -77,6 +78,9 @@ class CaseResponse(BaseModel):
     sessions: list[AgentSession]
     audit: AuditSummary
     backend: BackendStatus
+    edits: list[Edit] = Field(default_factory=list)  # the deal's edits in order, reverted ones included
+    adjustments: list[LearnedAdjustment] = Field(default_factory=list)  # learned memory, all deals, like policies
+    brief_draft: BriefDraft | None = None  # filled by the Brief Reader routes when they land
 
 
 class StoreStatus(BaseModel):
