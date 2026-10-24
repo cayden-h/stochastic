@@ -7,7 +7,7 @@ Owner: Tri (backend/app/api/).
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 
 from openpyxl import Workbook
@@ -15,6 +15,7 @@ from openpyxl.comments import Comment
 from openpyxl.styles import Font, PatternFill
 
 from app.api import certificate as cert_doc
+from app.tools.edits import _line_matches, apply_remap_edits
 
 AMBER = "FBEBC8"
 XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -22,13 +23,19 @@ EDITS_HEADER = ["Line", "Company", "Agent value", "Final value", "Reason", "Who"
 AUDIT_HEADER = ["Figure", "Value", "Run id", "Tool"]
 
 
+TARGET_EDIT_NOTE = ("A target edit is marked on the platform row its source line maps onto, after any remap; "
+                    "the note gives the source line's own value, not the row total.")
+
+
 def _norm(text) -> str:
     return (text or "").strip().lower()
 
 
 def _when(at) -> str | None:
+    """The time in UTC, labelled, so Excel does not read it as local time. A naive time is taken as UTC."""
     if isinstance(at, datetime):
-        return f"{at:%Y-%m-%d %H:%M}"
+        utc = at.astimezone(timezone.utc) if at.tzinfo else at
+        return f"{utc:%Y-%m-%d %H:%M} UTC"
     return str(at) if at is not None else None
 
 
@@ -39,43 +46,62 @@ def export_filename(platform: str, target: str) -> str:
 
 
 def edit_note(edit) -> str:
-    """The Excel note on an edited cell."""
+    """The Excel note on an edited cell. For an amount edit the old figure is the edited line's value."""
     old, _ = cert_doc.edit_values(edit)
-    was = cert_doc.fmt(old) if isinstance(old, (int, float)) and not isinstance(old, bool) else (old or "n/a")
+    if getattr(edit, "kind", None) == "remap":
+        was = f"Line was mapped to {old or 'n/a'}"
+    else:
+        num = cert_doc.fmt(old) if isinstance(old, (int, float)) and not isinstance(old, bool) else (old or "n/a")
+        was = f"Line was {num}"
     text = (f"Edited by {getattr(edit, 'actor', None) or 'unknown'}, {_when(getattr(edit, 'at', None))}. "
-            f"Was {was}. Reason: {cert_doc.edit_reason(edit)}.")
+            f"{was}. Reason: {cert_doc.edit_reason(edit)}.")
     policy = getattr(edit, "policy_id", None)
     return text + (f" Policy {policy}." if policy else "")
+
+
+def _platform_row_of(platform_lines, mapping, target_line):
+    """(name, section) of the platform row a mapping lands on: by id, else by name in the target line's section
+    first and then any section (the gateway's order)."""
+    by_id = {p.id: p for p in platform_lines}
+    p = by_id.get(mapping.platform_line_id) if mapping.platform_line_id else None
+    if p is None and mapping.platform_line:
+        key = _norm(mapping.platform_line)
+        named = [x for x in platform_lines if _norm(x.line) == key]
+        p = next((x for x in named if x.section == target_line.section), named[0] if named else None)
+    return (_norm(p.line), p.section) if p else None
 
 
 def _edited_cells(store, deal, rows, edits) -> dict[tuple[int, int], object]:
     """(row index into rows, column 3 platform or 4 target) -> the edit that marks that cell. The last edit wins.
 
-    A platform edit marks the row of the same line name. A target edit marks the row its target line maps onto
-    (a remap: the new platform line), since the Combined sheet has the platform's line names.
+    A platform edit marks the row of the same line name (and section, when the edit gives one). A target edit marks
+    the row its source line maps onto after the active remaps are applied (apply_remap_edits), in the platform
+    line's own section, since the Combined sheet has the platform's line names.
     """
     platform, target = _norm(deal.platform), _norm(deal.target)
-    target_lines = {l.id: l for l in store.lines(deal.id, deal.target)}
-    mappings = store.deal_mappings(deal.id)
+    platform_lines = store.lines(deal.id, deal.platform)
+    target_lines = store.lines(deal.id, deal.target)
+    usable = [m for m in store.deal_mappings(deal.id) if not m.flagged or m.approved_by]
+    mappings, _ = apply_remap_edits(usable, target_lines, platform_lines, edits)
+    by_target = {m.target_line_id: m for m in mappings}
     out: dict[tuple[int, int], object] = {}
     for e in edits:
-        company, line, section = _norm(getattr(e, "company", None)), _norm(getattr(e, "line", None)), getattr(e, "section", None)
+        company, section = _norm(getattr(e, "company", None)), getattr(e, "section", None)
         if company == platform:
-            col, names = 3, {line}
+            col = 3
+            keys = {(_norm(getattr(e, "line", None)), r.section) for r in rows if not section or r.section == section}
         elif company == target:
-            col = 4
-            if getattr(e, "kind", None) == "remap":
-                names = {_norm(getattr(e, "new_platform_line", None))}
-            else:
-                names = set()
-                for m in mappings:
-                    t = target_lines.get(m.target_line_id)
-                    if t and _norm(t.line) == line and (not section or t.section == section) and m.platform_line:
-                        names.add(_norm(m.platform_line))
+            col, keys = 4, set()
+            for t in target_lines:
+                m = by_target.get(t.id)
+                if m is not None and _line_matches(t, e):
+                    key = _platform_row_of(platform_lines, m, t)
+                    if key:
+                        keys.add(key)
         else:
             continue
         for i, r in enumerate(rows):
-            if _norm(r.line) in names and (company != platform or not section or r.section == section):
+            if (_norm(r.line), r.section) in keys:
                 out[(i, col)] = e
     return out
 
@@ -96,6 +122,7 @@ def build_workbook(store, deal, result, items, chain_valid: bool, edits=None) ->
     ws.append(["Line", "Section", deal.platform, deal.target, "Combined", "Run id"])
     for r in result.rows:
         ws.append([r.line, r.section, r.platform, r.target, r.combined, r.run_id])
+    ws.cell(row=1, column=4).comment = Comment(TARGET_EDIT_NOTE, "Stochastic")
     fill = PatternFill("solid", fgColor=AMBER)
     for (i, col), e in _edited_cells(store, deal, result.rows, edits).items():
         cell = ws.cell(row=i + 2, column=col)
@@ -122,7 +149,7 @@ def build_workbook(store, deal, result, items, chain_valid: bool, edits=None) ->
         if block:
             wa.append([name, block.get(key), block.get("run_id"), tool_of(block.get("run_id"))])
         else:
-            wa.append([name, None, None, None])
+            wa.append([name, None, "no run", None])
 
     fig("EBITDA", cert["ebitda"], "ebitda")
     fig("Debt", cert["debt"], "debt")

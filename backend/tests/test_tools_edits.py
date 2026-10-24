@@ -12,7 +12,7 @@ os.environ["AGENT_BACKEND"] = "scripted"
 os.environ["AGENT_FALLBACK"] = "scripted"
 
 from app.agents.jobs import advance  # noqa: E402
-from app.core.models import CONTROLLER  # noqa: E402
+from app.core.models import CONTROLLER, SourceLine  # noqa: E402
 from app.db.fixtures.kewaunee import DEAL_ID, seed  # noqa: E402
 from app.db.memory import MemoryStore  # noqa: E402
 from app.gateway.gateway import Gateway  # noqa: E402
@@ -128,9 +128,22 @@ def test_remap_lands_on_the_platform_lines_own_section(inputs):
     moved = next(x for x in new_m if x.target_line == "Certificates of Deposit")
     assert moved.platform_line_id == next(x.id for x in p if x.line == "Net sales")
     assert applied == ["ed_x"]
-    ghost = edit("ed_y", kind="remap", company="Nu Aire", line="Certificates of Deposit", new_platform_line="Nowhere")
-    new_m, _ = edit_tools.apply_remap_edits(m, t, p, [ghost])
-    assert next(x for x in new_m if x.target_line == "Certificates of Deposit").platform_line_id is None
+
+
+def test_remap_onto_a_platform_total_or_a_missing_line_is_refused(inputs):
+    p, t, m, brief = inputs
+    onto_total = edit("ed_y1", kind="remap", company="Nu Aire", line="Deposits", new_platform_line="Total Current Assets")
+    with pytest.raises(ValueError, match="remap edit ed_y1: Total Current Assets is a platform total"):
+        edit_tools.apply_remap_edits(m, t, p, [onto_total])
+    with pytest.raises(ValueError, match="platform total"):
+        finance.consolidate(p, t, m, edits=[onto_total])
+    ghost = edit("ed_y2", kind="remap", company="Nu Aire", line="Deposits", new_platform_line="Nowhere")
+    with pytest.raises(ValueError, match="remap edit ed_y2: the platform has no line Nowhere"):
+        edit_tools.apply_remap_edits(m, t, p, [ghost])
+    stale = edit("ed_y3", kind="remap", company="Nu Aire", line="Certificates of Deposit",
+                 old_platform_line="Restricted cash", new_platform_line="Prepaid expenses and other current assets")
+    with pytest.raises(ValueError, match="remap edit ed_y3 is stale: it expects Restricted cash"):
+        edit_tools.apply_remap_edits(m, t, p, [stale])
 
 
 def test_amount_edit_on_kewaunee_total_assets_breaks_the_tie_out(inputs):
@@ -176,3 +189,48 @@ def test_amount_edit_section_is_optional_and_case_is_ignored(inputs):
     hit = [x for x in lines if x.line == "Net Income"]
     assert hit and all(x.amount == 6438.271 and x.unit == "USD thousands" for x in hit)
     assert applied == ["ed_7"]
+
+
+ROLLUP = "the roll-up for that section is not defined, so code cannot recompute the totals"
+
+
+def test_amount_edit_on_a_detail_line_under_totals_is_refused(inputs):
+    p, t, m, brief = inputs
+    # General and Administrative: 6,162,806 dollars = 6,162.806; +1,000 would not reach Total Operating Expense
+    # or Net Income, so EBITDA would not move. Refused until a roll-up map exists.
+    ga = edit("ed_8", company="Nu Aire", line="General and Administrative", section="income_statement",
+              old_value=6162.806, new_value=7162.806)
+    msg = r"amount edit ed_8 on General and Administrative \(Nu Aire, income_statement\) is refused: " + ROLLUP
+    for call in (lambda: finance.ebitda(p, t, brief, edits=[ga]),
+                 lambda: finance.covenant_debt(p, t, brief, edits=[ga]),
+                 lambda: finance.consolidate(p, t, m, edits=[ga])):
+        with pytest.raises(ValueError, match=msg):
+            call()
+    # Cash and Cash Equivalents: 13,455.974 + 500 would not reach Total Assets, and the tie-out would still pass.
+    cash = edit("ed_9", company="Nu Aire", line="Cash and Cash Equivalents", section="balance_sheet",
+                old_value=13455.974, new_value=13955.974)
+    with pytest.raises(ValueError, match=r"amount edit ed_9 on Cash and Cash Equivalents .*" + ROLLUP):
+        finance.consolidate(p, t, m, edits=[cash])
+    with pytest.raises(ValueError, match="ed_9"):
+        finance.covenant_debt(p, t, brief, edits=[cash])
+
+
+def _synthetic(lid, section, amount):
+    return SourceLine(id=lid, deal_id="d_x", company="Nu Aire", line="Other", section=section, period="FY",
+                      amount=amount, source_ref="test")
+
+
+def test_amount_edit_matching_two_lines_is_refused():
+    lines = [_synthetic("sl_a", "cash_flow", 100.0), _synthetic("sl_b", "cash_flow", 200.0)]
+    e = edit("ed_10", company="Nu Aire", line="Other", section="cash_flow", new_value=300.0)
+    with pytest.raises(ValueError, match=r"amount edit ed_10 matches 2 lines: sl_a Other \(cash_flow\); "
+                                         r"sl_b Other \(cash_flow\)"):
+        edit_tools.apply_amount_edits(lines, [e])
+    # no section given and the name is on two statements: also refused
+    lines = [_synthetic("sl_a", "cash_flow", 100.0), _synthetic("sl_c", "income_statement", 200.0)]
+    with pytest.raises(ValueError, match="matches 2 lines"):
+        edit_tools.apply_amount_edits(lines, [edit("ed_11", company="Nu Aire", line="Other", new_value=1.0)])
+    # with the section it applies to the one line
+    out, applied = edit_tools.apply_amount_edits(lines, [edit("ed_12", company="Nu Aire", line="Other",
+                                                              section="cash_flow", new_value=1.0)])
+    assert [x.amount for x in out] == [1.0, 200.0] and applied == ["ed_12"]

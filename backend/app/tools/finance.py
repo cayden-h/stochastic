@@ -336,22 +336,28 @@ TOOLS = {
     "limit_test": limit_test,
 }
 
+EDIT_RULE = ("An amount edit on a detail line is refused when that company has a total in the same section: the "
+             "roll-up for that section is not defined, so code cannot recompute the totals. Edits on total lines "
+             "apply. An edit that matches no line or several lines, or a remap onto a platform total or a line "
+             "the platform does not have, is refused.")
+
 TOOL_DESCRIPTIONS = {
     "consolidate": "Add the target's statement lines onto the platform's lines using the approved mappings. "
                    "No arguments. Applies the deal's active edits (amount and remap) first. "
-                   "Returns rows with platform, target, combined, edits_applied, and the run id.",
+                   "Returns rows with platform, target, combined, edits_applied, and the run id. " + EDIT_RULE,
     "tie_out": "Check that every row's parts add to its combined figure and that the combined balance sheet balances. "
                "Arguments: run_id (the consolidate run to check). The rows already carry the deal's active edits; "
                "edits_applied lists them.",
     "ebitda": "Compute covenant EBITDA from the statement lines and the brief's add-backs and deductions. "
-              "No arguments. Applies the deal's active amount edits first; edits_applied lists them.",
+              "No arguments. Applies the deal's active amount edits first; edits_applied lists them. " + EDIT_RULE,
     "covenant_debt": "Compute the covenant's debt figure from the covenant tags on balance sheet lines. "
                      "Arguments: naive (bool, default false) counts unclear lines as debt. "
-                     "Applies the deal's active amount edits first; edits_applied lists them.",
+                     "Applies the deal's active amount edits first; edits_applied lists them. " + EDIT_RULE,
     "leverage": "Divide debt by EBITDA. Arguments: debt_run_id and ebitda_run_id (the run ids of your covenant_debt and "
-                "ebitda runs). Numbers are not accepted.",
+                "ebitda runs). Numbers are not accepted. No edits_applied: the edits are on the input runs.",
     "limit_test": "Test leverage against the lender's limit from the brief. Arguments: leverage_run_id or leverage. "
                   "Optional sensitivity: naive_debt_run_id (a covenant_debt run with the whole-line reading) and "
                   "naive_ebitda_run_id (an as-filed ebitda run) add naive_leverage, naive_ok, and naive_flip_addback "
-                  "(the EBITDA at which the as-filed reading reaches the limit).",
+                  "(the EBITDA at which the as-filed reading reaches the limit). "
+                  "No edits_applied: the edits are on the input runs.",
 }

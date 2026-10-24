@@ -12,7 +12,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.api import certificate as cert_doc  # noqa: E402
-from app.api.export import AMBER, build_workbook, export_filename, workbook_bytes  # noqa: E402
+from app.api.export import AMBER, TARGET_EDIT_NOTE, build_workbook, export_filename, workbook_bytes  # noqa: E402
 from app.core.models import Edit  # noqa: E402
 from app.db.fixtures.kewaunee import DEAL_ID, PLATFORM, TARGET  # noqa: E402
 from app.main import create_app  # noqa: E402
@@ -55,6 +55,15 @@ def sheet_rows(ws):
 
 def load(content: bytes):
     return openpyxl.load_workbook(BytesIO(content))
+
+
+def marked(ws):
+    """(row, column) of every filled cell on the sheet."""
+    return [(c.row, c.column) for row in ws.iter_rows() for c in row if c.fill.fill_type is not None]
+
+
+def row_of(ws, name):
+    return next(i for i, row in enumerate(ws.iter_rows(values_only=True), start=1) if row[0] == name)
 
 
 def edit(**kw):
@@ -196,16 +205,16 @@ def test_reasoned_edit_marks_the_cell_and_lists_the_edit(app, client):
     cell = ws.cell(row=r, column=4)
     assert cell.fill.fill_type == "solid" and cell.fill.fgColor.rgb.endswith(AMBER)
     text = cell.comment.text
-    assert text == ("Edited by human:controller, 2026-10-25 10:42. Was 5,438.271. "
+    assert text == ("Edited by human:controller, 2026-10-25 10:42 UTC. Line was 5,438.271. "
                     "Reason: One-time acquisition cost, an allowed add-back. Policy p_12.")
     assert ws.cell(row=r, column=3).comment is None  # the platform cell is not edited
-    unedited = ws.cell(row=r + 1, column=4)
-    assert unedited.comment is None and unedited.fill.fill_type is None
+    assert marked(ws) == [(r, 4)]  # exactly one cell on the whole sheet
+    assert ws.cell(row=1, column=4).comment.text == TARGET_EDIT_NOTE
 
     rows = sheet_rows(wb["Edits"])
     assert len(rows) == 2
     assert rows[1] == ["Net Income", TARGET, 5438.271, 6438.271, "One-time acquisition cost, an allowed add-back",
-                       "human:controller", "2026-10-25 10:42", "p_12"]
+                       "human:controller", "2026-10-25 10:42 UTC", "p_12"]
 
 
 def test_platform_edit_with_chip_and_no_policy(app, client):
@@ -216,15 +225,16 @@ def test_platform_edit_with_chip_and_no_policy(app, client):
     r = next(i for i, row in enumerate(ws.iter_rows(values_only=True), start=1) if row[0] == "Net earnings")
     cell = ws.cell(row=r, column=3)
     assert cell.fill.fill_type == "solid"
-    assert cell.comment.text == "Edited by human:controller, 2026-10-25 10:42. Was 19,057.000. Reason: chip 1."
+    assert cell.comment.text == "Edited by human:controller, 2026-10-25 10:42 UTC. Line was 19,057.000. Reason: chip 1."
     assert ws.cell(row=r, column=4).comment is None
+    assert marked(ws) == [(r, 3)]
 
 
 def test_reverted_edit_marks_nothing(app, client):
     store, deal, result, items, chain = posted_parts(app, client)
     wb = load(workbook_bytes(build_workbook(store, deal, result, items, chain, edits=[edit(status="reverted")])))
     ws = wb["Combined"]
-    for row in ws.iter_rows():
+    for row in ws.iter_rows(min_row=2):  # the header keeps its explanatory note
         for cell in row:
             assert cell.comment is None and cell.fill.fill_type is None
     assert len(sheet_rows(wb["Edits"])) == 1
@@ -265,4 +275,22 @@ def test_certificate_lists_each_edit_and_its_reason(app, client):
     ws = load(workbook_bytes(build_workbook(store, deal, result, items, chain, edits=[remap])))["Combined"]
     r = next(i for i, row in enumerate(ws.iter_rows(values_only=True), start=1)
              if row[0] == "Prepaid expenses and other current assets")
-    assert "Was Cash and cash equivalents." in ws.cell(row=r, column=4).comment.text
+    assert "Line was mapped to Cash and cash equivalents." in ws.cell(row=r, column=4).comment.text
+    assert marked(ws) == [(r, 4)]
+
+
+def test_target_edit_follows_its_remap_and_its_section(app, client):
+    store, deal, result, items, chain = posted_parts(app, client)
+    remap = edit(id="ed_2", kind="remap", line="Certificates of Deposit", section="balance_sheet", old_value=None,
+                 new_value=None, old_platform_line="Cash and cash equivalents",
+                 new_platform_line="Prepaid expenses and other current assets", policy_id=None)
+    # a total-line amount edit together with the remap of another line: each marks its own row
+    wb = load(workbook_bytes(build_workbook(store, deal, result, items, chain, edits=[edit(), remap])))
+    ws = wb["Combined"]
+    assert sorted(marked(ws)) == sorted([(row_of(ws, "Net earnings"), 4),
+                                         (row_of(ws, "Prepaid expenses and other current assets"), 4)])
+    assert ws.cell(row=row_of(ws, "Cash and cash equivalents"), column=4).comment is None
+    # an edit whose section does not hold the line marks nothing
+    wrong = edit(section="balance_sheet")
+    ws = load(workbook_bytes(build_workbook(store, deal, result, items, chain, edits=[wrong])))["Combined"]
+    assert marked(ws) == []

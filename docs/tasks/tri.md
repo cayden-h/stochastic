@@ -83,3 +83,21 @@ Tests in `backend/tests/test_api_edits.py`: the demo beat end to end through the
 ### T5. Keep the tests green
 
 Run the full suite and the Tiger tests on every merge (rule 5 in `tasks/README.md`). The count goes up from 176, so update it in `backend/README.md`.
+
+## Notes for Cayden (phase 2, from tri/tool/new)
+
+These come from the review of `tri/tool/new` (findings C-1, I-1, I-4, I-6, M-1, M-4, M-6) and need changes in files Tri does not own.
+- `backend/app/db/postgres.py` needs three `KINDS` entries, or edits, learned adjustments, and agreements are lost on a Tiger restart: `"edit": ("edits", Edit, False)`, `"adjustment": ("adjustments", LearnedAdjustment, True)`, `"agreement": ("agreements", AgreementText, False)`.
+- A Tiger round-trip test of one `Edit` and one `LearnedAdjustment` across `reset_deals(keep_memory=True)` would prove those entries.
+- `gateway.run_tool` must pass `edits=store.active_edits(deal_id)` to `consolidate`, `tie_out`, `ebitda`, and `covenant_debt`, and record the edit ids in the run inputs.
+- `Edit.line` must be the source line name (`SourceLine.line`) of the company named, not the row name the Combined table shows (I-1).
+- A table cell that holds several target lines is edited one source line at a time; the console has `row.target_lines` for that.
+- The comment on `Edit.line` in `models.py` and the e_001 example in `docs/architecture/gateway-and-api.md` should say this, since "Selling, general and administrative" is not a Nu Aire line.
+- The remap path must replace the stored mapping's `platform_line` rather than add a second `Mapping`, or `consolidate` raises "mapped twice" (I-4).
+- The simpler path is to store only the `Edit` and pass it as `edits=`, since `apply_remap_edits` already moves the line; revert is then just status "reverted".
+- C-1 roll-up decision: the tools now refuse an amount edit on a detail line when that company has a total in the same section, because code cannot recompute the filed totals.
+- Before C2 builds on detail-line edits, the team needs a `rolls_into` list with a sign on each fixture line, or an agreed rule, so code can carry a detail edit into its totals and the net income line.
+- Until then the demo beat should edit a total line (for example Nu Aire "Net Income") or an add-back amount, whose effect is defined.
+- `tie_out` lists the edits passed to it; the gateway should take `edits_applied` from the consolidate run it checks (M-1).
+- Each result revision C2 writes should carry the Reviewer's run ids (`limit_test` with `debt_capacity`, `tie_out`), or the Audit sheet shows "no run" (M-4).
+- C2 should copy the chip label into `reason_text`, or the final files say "Reason: chip 1." (M-6).
