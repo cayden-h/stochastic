@@ -50,10 +50,16 @@ def run_anthropic(role: Role, inp: BaseModel, call_tool, transcript: list[dict] 
     tools = _tool_defs(role)
     usage = {"input_tokens": 0, "output_tokens": 0, "turns": 0, "model_requested": model, "model_confirmed": True}
     for _ in range(12):
-        resp = client.messages.create(model=model, max_tokens=16000, system=role.system, tools=tools, messages=messages)
+        # The Mapper's typed result (every line's mapping and covenant tag) passed 16K output tokens on Haiku 5.5
+        # and came back truncated. Streaming lets the cap go to 64K without an HTTP timeout.
+        with client.messages.stream(model=model, max_tokens=64000, system=role.system, tools=tools,
+                                    messages=messages) as stream:
+            resp = stream.get_final_message()
         usage["input_tokens"] += resp.usage.input_tokens
         usage["output_tokens"] += resp.usage.output_tokens
         usage["turns"] += 1
+        if resp.stop_reason == "max_tokens":
+            raise RuntimeError(f"anthropic output hit max_tokens after {resp.usage.output_tokens} tokens; the result was cut off")
         messages.append({"role": "assistant", "content": resp.content})
         tool_uses = [b for b in resp.content if b.type == "tool_use"]
         if not tool_uses:

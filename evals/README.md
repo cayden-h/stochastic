@@ -51,6 +51,13 @@ Both recorded Droid runs were scored without a key, by replaying the Mapper's re
 | `backend/recordings/` (the default replay; a copy is in `sonnet-5-5/`) | Claude Sonnet 5.5 | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/haiku-5-5/` | Claude Haiku 5.5 (04:30) | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/haiku-5-5-run2/` | Claude Haiku 5.5 (evening, after the settle-every-line rule) | 23 of 23 | 10 of 10 | 33 of 33 |
+| `backend/recordings/anthropic-haiku-5-5/` | Claude Haiku 5.5 on the Anthropic backend (the first Anthropic run) | 22 of 23 | 10 of 10 | 32 of 33 |
+
+The Anthropic run is the first on that backend. [verified]
+Its one disagreement: it puts Accrued Commissions in Other accrued expenses, where Note 2 puts it in Employee compensation and amounts withheld. [verified]
+It flagged three groups (the financing liability readings, five Nu Aire lines with no direct home, and interest income), passed review at 0.76x, and used 128,242 input and 23,346 output tokens, about $0.02 at $0.10 and $0.50 per million. [verified: run log, 2026-10-24]
+Two earlier attempts failed: the first two stopped at the old 16,000-token output cap, and one after the cap was raised was refused by the gateway because the Mapper named a Kewaunee line as a target line. [verified]
+Scored with `RECORDINGS_DIR=$PWD/backend/recordings/anthropic-haiku-5-5 backend/.venv/bin/python evals/score_mapper.py --backend replay`.
 
 The Sonnet run was scored with `backend/.venv/bin/python evals/score_mapper.py --backend replay`; it is the default recording since 2026-10-24. [verified]
 The Haiku run was scored straight from `backend/recordings/haiku-5-5/mapper.json`, because the gateway rejects that Mapper output (see below). [verified]
