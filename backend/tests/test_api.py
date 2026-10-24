@@ -36,7 +36,7 @@ def test_debt_capacity_from_limit_test_run():
     body = full_run(c)
     CaseResponse.model_validate(body)
     v = body["verdict"]
-    assert v["debt_capacity"] == pytest.approx(47164.113, abs=0.01)
+    assert v["debt_capacity"] == pytest.approx(49314.113, abs=0.01)
     run = c.get(f"/runs/{v['debt_capacity_run_id']}").json()
     assert run["tool"] == "limit_test"
     assert run["outputs"]["debt_capacity"] == v["debt_capacity"]

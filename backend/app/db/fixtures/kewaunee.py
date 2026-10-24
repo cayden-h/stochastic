@@ -41,7 +41,14 @@ BRIEF = Brief(
     ebitda_definition="Net income plus interest, taxes, depreciation, and amortization, plus the add-backs below, "
                       "less cash rent on the Statesville property.",
     ebitda_addbacks=[
-        Adjustment(name="Noncash pension termination expense", amount=4177.0, source_ref=f"{EX992_IS}: Pension expense (4,177); add-back named in {EX101}"),
+        Adjustment(name="Noncash pension termination expense", amount=4019.0,
+                   source_ref=f"{TENK}, MD&A: one-time pension termination expense $4,019K; add-back named in {EX101}",
+                   note="The income statement line is Pension expense 4,177. The agreement adds back only the termination expense, "
+                        "which the 10-K puts at $4,019K; the other $158K is ordinary pension expense. Decided 2026-10-24."),
+        Adjustment(name="Stock-based compensation", amount=1018.0,
+                   source_ref=f"{TENK}, stock plan note: stock-based compensation expense $1,018K; add-back named in {EX101}",
+                   note="The agreement adds back any stock-based compensation. Kewaunee's fiscal 2024 figure, the same period as its "
+                        "other inputs. Nu Aire's statements show none. Decided 2026-10-24."),
         Adjustment(name="Transaction costs (capped)", amount=0.0, cap=4000.0, source_ref=EX101,
                    note="Not quantified separately in the filings read, so 0 is applied. Cap is $4,000K.", inferred=True),
         Adjustment(name="Integration costs (capped)", amount=0.0, cap=1000.0, source_ref=EX101,

@@ -23,9 +23,9 @@ It adds back the noncash pension termination expense, stock-based compensation, 
 It includes Nu Aire's EBITDA for the four quarters from November 1, 2023, and it deducts extraordinary gains and the cash rent on the Statesville property. [verified: Ex 10.1, definitions]
 
 The brief puts these terms in front of the tools, so the debt figure and the EBITDA figure follow the agreement and not a generic formula. [verified: `backend/app/db/fixtures/kewaunee.py`, `BRIEF`]
-That is why one balance sheet line can read as 2.61x or 0.79x: the face of the statements and the agreement disagree about what counts. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
-Today's covenant EBITDA is $27,519K, after interest income is subtracted as the definition says. [verified: same test]
-It is not final: two items in how we apply the EBITDA definition are still open with the team, and the filings do not give every input for the tested period. [verified: `evals/fixture_check.md`]
+That is why one balance sheet line can read as 2.54x or 0.76x: the face of the statements and the agreement disagree about what counts. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
+Today's covenant EBITDA is $28,379K, built as the definition says: interest income subtracted, the pension termination expense and stock-based compensation added back, cash rent deducted. [verified: same test]
+It is not final: the filings do not give every input for the tested period, so the rent and transaction-cost figures are our estimates. [verified: `evals/fixture_check.md`]
 
 ## Slide text
 

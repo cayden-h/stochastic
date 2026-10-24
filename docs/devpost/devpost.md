@@ -50,17 +50,17 @@ The Mapper flags the line, and the gateway computes each reading with the tools:
 
 | Reading | Senior Funded Bank Debt | Leverage | Verdict |
 | --- | --- | --- | --- |
-| Whole line counts | $71,955K | 2.61x | Over the 2.50x limit |
-| PNC debt only (the agreement's reading, the default) | $21,633K | 0.79x | OK |
-| PNC debt plus the seller notes | $44,173K | 1.61x | OK |
+| Whole line counts | $71,955K | 2.54x | Over the 2.50x limit |
+| PNC debt only (the agreement's reading, the default) | $21,633K | 0.76x | OK |
+| PNC debt plus the seller notes | $44,173K | 1.56x | OK |
 
-The same books read two ways are 1.82x apart: a blocked next deal, or about $47M of debt room under the limit. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`; room is arithmetic]
+The same books read two ways are 1.78x apart: a blocked next deal, or about $49M of debt room under the limit. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`; room is arithmetic]
 The table is the flag the scripted backend raises. [verified: scripted run of the fixture]
 The recorded model runs raised the same flag with a different middle reading: 1.76x on Sonnet 5.5, and 0.74x on Haiku 5.5, as computed at the time, before interest income was subtracted. [verified: `docs/agents.md`, run log]
 
 These figures are preliminary.
-Covenant EBITDA is $27,519K, and two items in how we apply the agreement's EBITDA definition are still under review. [verified: `evals/fixture_check.md`]
-The first reading stays over the limit only while covenant EBITDA is below $28,782K, a margin of $1,263K. [verified: arithmetic]
+Covenant EBITDA is $28,379K, built the way the agreement defines it: interest income subtracted, the pension termination expense and stock-based compensation added back, Statesville cash rent deducted. [verified: `evals/fixture_check.md`]
+The first reading stays over the limit only while covenant EBITDA is below $28,782K, a margin of $403K. [verified: arithmetic]
 If add-backs that large turn out to belong, the whole-line reading drops under 2.50x, while the agreement's reading stays far under. [verified: arithmetic]
 
 Mapping score against Note 2: 33 of 33 scored Nu Aire lines go to the same Kewaunee line as the filed table, on both recorded model runs (Claude Sonnet 5.5 and Claude Haiku 5.5, requested through Factory Droid, 2026-10-24). [verified: `evals/README.md`]
@@ -95,7 +95,7 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 
 - The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 105 tests pass]
 - The flag is real. It comes from a real line in a real filing, and the answer moves the leverage verdict. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
-- The whole deal ran through Factory Droid with our gateway tools, once with Claude Sonnet 5.5 and once with Claude Haiku 5.5 requested, and both passed review at 0.77x as computed then; the Sonnet recording replays at 0.79x today, after the interest-income fix. [verified: `docs/agents.md`, run log]
+- The whole deal ran through Factory Droid with our gateway tools, once with Claude Sonnet 5.5 and once with Claude Haiku 5.5 requested, and both passed review at 0.77x as computed then; the Sonnet recording replays at 0.76x today, after the EBITDA definition items were applied. [verified: `docs/agents.md`, run log]
 - After a reset, the same deal runs with no flag, because the Mapper applies the controller's policy, and the log shows `policy:apply`. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
 
 ## What we learned
@@ -137,7 +137,7 @@ Real:
 Not real, or not claimed:
 - The statement lines come from public filings, not from the companies' internal books.
 - Account-level detail is not public, so we do not claim it. The demo maps statement lines, not trial balances.
-- The demo loads the deal from a fixture. `POST /deals` accepts two statement CSVs and a brief, so a judge can try an unseen input through the API; there is no upload screen. [verified: `backend/app/api/routes.py`, `test_upload_creates_deal_and_runs`]
+- The demo loads the deal from a fixture. `POST /deals` accepts two statement CSVs and a brief, so a judge can try an unseen input through the API; the console has no upload screen. [verified: `backend/app/api/routes.py`, `test_upload_creates_deal_and_runs`]
 - As an extra, the loader script reads a QuickBooks Online trial balance export with its Account List, so a private company with no filings could be an input. It is not used in the demo. [verified: `scripts/README.md`]
   It was checked against real exports from the QuickBooks Online test-drive demo company, and the loaded totals match that company's own Balance Sheet report. [verified: `scripts/test_load_lines.py`, `scripts/samples/qbo/`]
 - On the scripted backend the Mapper knows only the demo deal's line names, so a new company's lines arrive as flags. [verified: the QuickBooks demo company raised 40 flags on the scripted backend, reproduced 2026-10-24]
@@ -151,7 +151,7 @@ Not real, or not claimed:
 - The combined table is historical plus target. No purchase accounting is applied.
 - Two inputs are our estimates: the Statesville cash rent we deduct ($1,970K, the 10-K's next-year obligation), and transaction and integration costs, which we set to zero. [inferred]
   The filing estimates $698K of transaction costs after the close, and we have not decided whether they fall in the tested period. [verified: Ex 99.2, Note 5(b); timing inferred]
-- Two items in how we apply the EBITDA definition are still under review, so the leverage figures are preliminary. [verified: `evals/fixture_check.md`]
+- The leverage figures are preliminary: the rent and transaction-cost inputs are our estimates, and Nu Aire's period is one month off the agreement's. [verified: `evals/fixture_check.md`]
 - The filing calls its own reclassification table, Note 2, preliminary. We use it as an answer key for which line goes where, not for amounts. [verified: Ex 99.2, Note 2]
 - The scripted Mapper's synonym table was written with Note 2 at hand, so its 33 of 33 is not independent evidence. The model runs are the score that matters. [verified: `evals/README.md`]
 - The agreement's reading of the financing liability is our reading. No controller or lender has checked it. [inferred]
@@ -171,8 +171,8 @@ Claim nothing unconfirmed.
 
 ## Open before submission
 
-- Josie: is the one-screen console (flag card, combined table, verdict line, log link) built against `GET /deals/{id}/case`, and does it show the backend badge? Until then, say the API names the backend, not the screen.
+- Done 2026-10-24: the one-screen console (flag card, verdict line, combined table, mapping, log link) is built against `GET /deals/{id}/case` and shows the backend badge from `GET /health`. [verified: `frontend/README.md`]
 - Josie: what was done in Figma and through the Figma MCP (`use_figma`), and is there a frame for the new one-screen console? `docs/decisions.md` D11 says the design system was built through `use_figma`, but `docs/design/README.md` does not say so.
 - Cayden, on the day: which backend produced the run in the video and at the table (droid, anthropic, scripted, or replay). Write it into the list above.
-- Cayden and Tri: decide the two remaining EBITDA items in `evals/fixture_check.md` (stock compensation, pension) and the $698K of transaction costs. Then update every leverage figure in this file, `flag-card.md`, and `brief.md`.
+- Done 2026-10-24: the EBITDA items are decided (stock compensation and the $4,019K pension figure applied, transaction costs kept at zero), and every leverage figure in this file, `flag-card.md`, and `brief.md` was updated.
 - Anyone, with a Cal Hacks organizer: can one project enter several sponsor tracks?

@@ -91,7 +91,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
   "stage": "awaiting_flag",
   "source_lines": [ { "id": "sl_001", "company": "Kewaunee", "line": "Cash and cash equivalents", "section": "balance_sheet", "period": "2024-10-31", "amount": 25963, "unit": "USD thousands", "source_ref": "10-Q ...", "is_total": false, "note": null, "covenant_tag": "na", "covenant_note": null } ],
   "mappings": [ { "id": "m_001", "target_line": "Net Revenues", "platform_line": "Net sales", "confidence": 0.95, "reason": "...", "flagged": false, "approved_by": null } ],
-  "flags": [ { "id": "wi_002", "type": "flag", "state": "NEEDS_INFO", "question": "...", "evidence": [ { "quote": "...", "document_id": "8-K Ex 10.1, Section 4.8(a)" } ], "options": [ { "id": "a", "label": "Whole line counts (70,885K)", "effect": "Senior Funded Bank Debt 71,955K. Leverage 2.61x against 2.50x. Over the limit.", "run_id": "run_004" } ], "default": "b", "answer": null } ],
+  "flags": [ { "id": "wi_002", "type": "flag", "state": "NEEDS_INFO", "question": "...", "evidence": [ { "quote": "...", "document_id": "8-K Ex 10.1, Section 4.8(a)" } ], "options": [ { "id": "a", "label": "Whole line counts (70,885K)", "effect": "Senior Funded Bank Debt 71,955K. Leverage 2.54x against 2.50x. Over the limit.", "run_id": "run_004" } ], "default": "b", "answer": null } ],
   "open_flags": ["wi_002", "wi_003"],
   "result": null,
   "verdict": null,
@@ -107,11 +107,11 @@ After the Preparer and the Reviewer run, `verdict` is filled:
 
 ```json
 {
-  "leverage": 0.786, "limit": 2.5, "verdict": "ok", "headroom_turns": 1.714,
+  "leverage": 0.762, "limit": 2.5, "verdict": "ok", "headroom_turns": 1.738,
   "ebitda": 27518.845, "debt": 21633.0, "debt_term": "Senior Funded Bank Debt",
   "review": { "verdict": "pass", "reasons": [], "run_ids": ["run_017", "run_018"] },
   "tie_out_ok": true, "backend": "scripted",
-  "debt_capacity": 47164.113, "debt_capacity_run_id": "run_018",
+  "debt_capacity": 49314.113, "debt_capacity_run_id": "run_018",
   "approval_item": "wi_006", "approval_state": "PROPOSED", "posted": false
 }
 ```

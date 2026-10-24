@@ -1,7 +1,8 @@
-import type { AuditResponse, Clause, Deal, Fact, Plan, WorkItem } from "./types";
+import type { AuditResponse, Case, Deal, Health, ToolRun, WorkItem } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const ACTOR = "human:reviewer";
+/** The human seat. The gateway's default controller actor; every write carries it. */
+export const ACTOR = "human:controller";
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { cache: "no-store" });
@@ -17,18 +18,20 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(detail.detail ?? res.statusText);
+    const d = detail.detail;
+    throw new Error(typeof d === "string" ? d : d?.message ?? d?.error ?? res.statusText);
   }
   return res.json();
 }
 
+/** One read for the screen, three writes. Everything else is a link to the record. */
 export const api = {
   deals: () => get<Deal[]>("/deals"),
-  items: (id: string) => get<WorkItem[]>(`/deals/${id}/work-items`),
-  plans: (id: string) => get<Plan[]>(`/deals/${id}/plans`),
-  facts: (id: string) => get<Fact[]>(`/deals/${id}/facts`),
-  clauses: (id: string) => get<Clause[]>(`/deals/${id}/clauses`),
+  case: (id: string) => get<Case>(`/deals/${id}/case`),
+  health: () => get<Health>("/health"),
   audit: (id: string) => get<AuditResponse>(`/deals/${id}/audit`),
+  run: (runId: string) => get<ToolRun>(`/runs/${runId}`),
+  start: (id: string) => post<{ ok: boolean; log: string[]; stage: string }>(`/deals/${id}/run`, {}),
   answer: (itemId: string, optionId: string) => post<WorkItem>(`/work-items/${itemId}/answer`, { option_id: optionId }),
   hold: (itemId: string) => post<WorkItem>(`/work-items/${itemId}/hold`),
   approve: (itemId: string) => post<WorkItem>(`/work-items/${itemId}/approve`),

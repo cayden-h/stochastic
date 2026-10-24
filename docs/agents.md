@@ -46,7 +46,7 @@ Two kinds:
 - `covenant_tag`: lines whose treatment under the covenant is the controller's call. The prompt says exclusions are never decided by the model: a line that one of the brief's exclusions may apply to, or a family of lines that holds more than one instrument, must be tagged `unclear` and put into one flag with two or three readings, the agreement's reading as the default.
 - `mapping`: a target line with no honest platform home.
 
-For every option the gateway runs the tools as a what-if (`covenant_debt` naive, `ebitda`, `leverage`, `limit_test`) and writes the effect on the option with a run id. The card never says "goes up"; it says "Senior Funded Bank Debt 71,955K. Leverage 2.61x against 2.50x. Over the limit." [verified]
+For every option the gateway runs the tools as a what-if (`covenant_debt` naive, `ebitda`, `leverage`, `limit_test`) and writes the effect on the option with a run id. The card never says "goes up"; it says "Senior Funded Bank Debt 71,955K. Leverage 2.54x against 2.50x. Over the limit." [verified]
 
 On the demo deal the intended result is one covenant flag with three readings and one small mapping flag (certificates of deposit). The scripted backend produces that every time. [verified] Model backends are judged against it in section 9.
 
@@ -129,7 +129,7 @@ Haiku 5.5 is the default for that reason. A full deal on Haiku 5.5 is three Droi
 | 2026-10-24 04:00 | droid, claude-haiku-5-5, before line notes | 1 covenant flag but the default reading counted the financing liability as debt (did not know it was Statesville); 2 bundled mapping flags using line ids | Preparer ran; Reviewer returned needs-attention over an unnamed leverage run id | 1.76x, review needs-attention |
 | 2026-10-24 04:30 | droid, claude-haiku-5-5, with line notes, named run ids, and the tightened prompts | 1 covenant flag with 3 readings (agreement 0.77x, short-term borrowings excluded 0.74x, all counted 2.57x over), 2 mapping flags of three lines each, by name | ran, pass, with reasons citing the run ids | 0.77x OK, recorded in `recordings/haiku-5-5/`; no longer the default replay, see section 7 |
 
-Figures in the log are as computed at the time. Since Tri's interest-income fix on 2026-10-24, the same recordings replay at 0.79x covenant and 2.61x whole-line.
+Figures in the log are as computed at the time. Since Tri's interest-income fix on 2026-10-24, the same recordings replay at 0.76x covenant and 2.54x whole-line.
 
 Lessons written into the code after these runs:
 - The filing's note on a line is data the Mapper needs; it is now on every `SourceLine.note`.

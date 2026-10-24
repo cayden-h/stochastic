@@ -2,21 +2,31 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { EscalationCard } from "@/components/escalation-card";
-import { Button, Shape } from "@/components/ui";
+import { CombinedTable } from "@/components/combined-table";
+import { FlagCard } from "@/components/flag-card";
+import { Mappings } from "@/components/mappings";
+import { Button, Mono, Shape } from "@/components/ui";
+import { VerdictLine } from "@/components/verdict-line";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
+import { fmtX, isLearned, plural } from "@/lib/format";
 
-/** Desk: the one question that needs the reviewer now. */
-export default function Desk() {
-  const { items, refresh } = useDeal();
+/**
+ * The case: one screen from one read, GET /deals/{id}/case.
+ * Run, answer the flags, read the verdict, approve. The log is a link.
+ */
+export default function CaseScreen() {
+  const { kase, refresh } = useDeal();
   const [busy, setBusy] = useState(false);
-  const [showAnswered, setShowAnswered] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
-  const open = items.find((i) => i.state === "NEEDS_INFO" && !i.payload.held);
-  const answered = items.filter((i) => i.answer);
-  const pendingRecommendation = items.find((i) => i.type === "recommend" && i.state === "PROPOSED");
+  if (!kase) return null;
+  const { deal, stage, flags, open_flags, verdict, result, mappings, source_lines, policies, audit } = kase;
+  const open = flags.filter((f) => open_flags.includes(f.id));
+  const answered = flags.filter((f) => f.answer);
+  const runIds = result?.run_ids_by_tool ?? {};
+  const learned = mappings.filter(isLearned).length + source_lines.filter((l) => (l.covenant_note ?? "").startsWith("Policy")).length;
+  const noFlagThisTime = Boolean(verdict) && answered.length === 0 && learned > 0;
 
   async function act(fn: () => Promise<unknown>) {
     setBusy(true); setNote(null);
@@ -24,59 +34,89 @@ export default function Desk() {
     finally { setBusy(false); }
   }
 
+  const headline =
+    stage === "new" ? (policies.length ? "Run again. The Mapper now applies what you decided." : "Two sets of books. One lender's limit.")
+    : open.length ? `${open.length === 1 ? "One line needs" : `${open.length} lines need`} your answer.`
+    : verdict ? `${verdict.verdict === "ok" ? "Under" : "Over"} the limit at ${fmtX(verdict.leverage)}.${noFlagThisTime ? " No flag this time." : ""}`
+    : "The agents are working.";
+
+  const sub =
+    stage === "new" ? `${deal.platform} acquires ${deal.target}. The limit is ${deal.brief.debt_term} below ${fmtX(deal.brief.limit)}, ${deal.brief.limit_section} of the ${deal.brief.lender} agreement.`
+    : open.length ? "The Mapper stopped on what it must not decide alone. Each option shows its effect, computed by the tools."
+    : verdict?.posted ? "Approved and posted. The answer you gave is now a policy the Mapper applies next time."
+    : noFlagThisTime ? `The Mapper applied ${learned} ${learned === 1 ? "policy" : "policies"} from your earlier answers and asked nothing. Code combined the books and tested the limit again.`
+    : verdict ? "Code combined the books and tested the limit. The Reviewer re-ran the checks. Your approval posts it."
+    : "Mapping, combining, and testing the limit. The screen updates on its own.";
+
   return (
-    <div className="mx-auto flex max-w-[960px] flex-col gap-6 pt-6 pb-12">
+    <div className="mx-auto flex max-w-[1120px] flex-col gap-6 px-4 pt-6 pb-12">
       <header className="flex flex-col gap-2">
-        <h1 className="font-serif text-[40px] leading-[48px] font-medium">
-          {open ? "One question needs you." : "Nothing needs you right now."}
-        </h1>
-        <p className="flex items-center gap-2 text-muted">
-          <span className="text-agent"><Shape kind="circle" size={10} /></span>
-          {open ? "The agents wait on your answer for this branch." : "The agents have no open questions."}
-        </p>
+        <h1 className="font-serif text-[40px] leading-[48px] font-medium">{headline}</h1>
+        <p className="text-muted">{sub}</p>
       </header>
 
       {note ? <p role="alert" className="rounded-chip bg-denied-tint px-4 py-3 font-semibold text-denied">{note}</p> : null}
 
-      {open ? (
-        <EscalationCard
-          item={open}
-          busy={busy}
-          onAnswer={(id) => act(() => api.answer(open.id, id))}
-          onHold={() => act(() => api.hold(open.id))}
-        />
-      ) : pendingRecommendation ? (
-        <div>
-          <Link href="/plans" className="inline-flex min-h-11 items-center rounded-chip bg-ink px-6 py-3 font-semibold text-paper hover:bg-code">
-            Review the plans
-          </Link>
+      {stage === "new" ? (
+        <div className="flex items-center gap-4">
+          <Button kind="primary" disabled={busy} onClick={() => act(() => api.start(deal.id))}>
+            {policies.length ? "Run again" : "Run the deal"}
+          </Button>
+          <span className="text-muted">
+            {plural(source_lines.filter((l) => l.company === deal.platform).length, `${deal.platform} line`)}, {plural(source_lines.filter((l) => l.company === deal.target).length, `${deal.target} line`)}, from public filings.
+          </span>
         </div>
       ) : null}
 
-      {answered.length > 0 ? (
+      {open.map((f) => (
+        <FlagCard
+          key={f.id}
+          item={f}
+          lines={source_lines}
+          busy={busy}
+          onAnswer={(id) => act(() => api.answer(f.id, id))}
+          onHold={() => act(() => api.hold(f.id))}
+        />
+      ))}
+
+      {verdict ? (
+        <VerdictLine
+          verdict={verdict}
+          runIds={runIds}
+          busy={busy}
+          onApprove={() => act(() => api.approve(verdict.approval_item!))}
+          onReject={() => act(() => api.reject(verdict.approval_item!, "Rejected by the controller."))}
+        />
+      ) : null}
+
+      {result ? <CombinedTable result={result} platform={deal.platform} target={deal.target} /> : null}
+
+      {mappings.length ? <Mappings mappings={mappings} lines={source_lines} /> : null}
+
+      {answered.length ? (
         <section className="flex flex-col gap-2">
           <span className="text-[14px] leading-5 font-semibold uppercase tracking-[0.04em] text-muted">Answered ({answered.length})</span>
-          <div className="flex items-center gap-3 rounded-chip border border-hairline bg-card px-4 py-2">
-            <span className="text-clear"><Shape kind="check" /></span>
-            <span className="flex-1">
-              {showAnswered
-                ? null
-                : `${answered[answered.length - 1].escalation ?? "Item"}: ${
-                    answered[answered.length - 1].options.find((o) => o.id === answered[answered.length - 1].answer)?.label ?? "answered"
-                  }.`}
-            </span>
-            <Button kind="link" onClick={() => setShowAnswered((v) => !v)}>{showAnswered ? "Hide" : "Show"}</Button>
-          </div>
-          {showAnswered
-            ? answered.map((i) => (
-                <div key={i.id} className="flex items-center gap-3 rounded-chip border border-hairline bg-card px-4 py-2">
-                  <span className="text-clear"><Shape kind="check" /></span>
-                  <span>{i.escalation}: {i.question} <strong>{i.options.find((o) => o.id === i.answer)?.label}</strong></span>
-                </div>
-              ))
-            : null}
+          {answered.map((f) => (
+            <div key={f.id} className="flex items-center gap-3 rounded-chip border border-hairline bg-card px-4 py-2">
+              <span className="text-clear"><Shape kind="check" /></span>
+              <span className="flex-1 truncate" title={f.question ?? ""}>{f.question}</span>
+              <strong className="whitespace-nowrap">{f.options.find((o) => o.id === f.answer)?.label}</strong>
+              <Mono>{f.id}</Mono>
+            </div>
+          ))}
         </section>
       ) : null}
+
+      <footer className="flex items-center gap-4 border-t border-hairline pt-4">
+        <Link href="/log" className="font-semibold underline underline-offset-4 hover:text-code">
+          Log: {plural(audit.rows, "row")}, {audit.denied} denied, chain {audit.chain_valid ? "intact" : "broken"}
+        </Link>
+        <span className="flex-1" />
+        {verdict?.posted ? (
+          <Button kind="link" disabled={busy} onClick={() => act(() => api.reset())}>Reset the deal, keep what was learned</Button>
+        ) : null}
+        <Mono>Figures from public SEC filings. Code does the math; a human approves. Not advice.</Mono>
+      </footer>
     </div>
   );
 }

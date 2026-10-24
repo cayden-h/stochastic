@@ -11,8 +11,8 @@ const newsreader = Newsreader({ subsets: ["latin"], variable: "--font-newsreader
 const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400"], variable: "--font-plex-mono" });
 
 export const metadata: Metadata = {
-  title: "Stochastic - reviewer console",
-  description: "AI agents work a special-situation deal. A senior human decides.",
+  title: "Stochastic - controller console",
+  description: "Merge an add-on company into the platform, flag the lines a human must decide, and test the lender limit.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

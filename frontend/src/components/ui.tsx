@@ -24,7 +24,7 @@ export function Shape({ kind, size = 14 }: { kind: ShapeKind; size?: number }) {
 
 export function actorOf(actor: string): { kind: "Agent" | "Human" | "Gateway"; label: string } {
   const [kind, name] = actor.split(":");
-  if (kind === "human") return { kind: "Human", label: "Reviewer" };
+  if (kind === "human") return { kind: "Human", label: titleCase(name ?? "controller") };
   if (kind === "system") return { kind: "Gateway", label: "Gateway" };
   return { kind: "Agent", label: titleCase(name ?? "agent") };
 }
@@ -43,23 +43,29 @@ export function ActorChip({ actor }: { actor: string }) {
   );
 }
 
-export function Verdict({ status }: { status: "ok" | "blocked" | "needs_consent" }) {
+type VerdictKind = "ok" | "over_limit" | "pass" | "needs_attention" | "waiting";
+
+/** The verdict word with its color and shape. The word comes from the API; this only dresses it. */
+export function Verdict({ kind, word }: { kind: VerdictKind; word?: string }) {
   const map = {
-    blocked: { word: "Blocked", tone: "bg-denied-tint text-denied", shape: "cross" as const },
-    needs_consent: { word: "Needs consent", tone: "bg-escalation-tint text-escalation", shape: "triangle" as const },
-    ok: { word: "Clear", tone: "bg-clear-tint text-clear", shape: "check" as const },
-  }[status];
+    ok: { word: "OK", tone: "bg-clear-tint text-clear", shape: "check" as const },
+    pass: { word: "Reviewer pass", tone: "bg-clear-tint text-clear", shape: "check" as const },
+    over_limit: { word: "Over the limit", tone: "bg-denied-tint text-denied", shape: "cross" as const },
+    needs_attention: { word: "Reviewer needs attention", tone: "bg-escalation-tint text-escalation", shape: "triangle" as const },
+    waiting: { word: "Waiting", tone: "bg-paper text-muted border border-hairline", shape: "circle" as const },
+  }[kind];
   return (
-    <span className={`inline-flex items-center gap-2 rounded-chip px-3 py-1 font-semibold ${map.tone}`}>
+    <span className={`inline-flex items-center gap-2 whitespace-nowrap rounded-chip px-3 py-1 font-semibold ${map.tone}`}>
       <Shape kind={map.shape} />
-      {map.word}
+      {word ?? map.word}
     </span>
   );
 }
 
-export function Tag({ children }: { children: ReactNode }) {
+export function Tag({ children, tone = "ink" }: { children: ReactNode; tone?: "ink" | "agent" }) {
+  const cls = tone === "agent" ? "bg-agent-tint text-agent" : "bg-ink text-paper";
   return (
-    <span className="inline-block rounded-chip bg-ink px-2 py-1 text-[14px] leading-5 font-semibold uppercase tracking-[0.04em] text-paper">
+    <span className={`inline-block whitespace-nowrap rounded-chip px-2 py-1 text-[14px] leading-5 font-semibold uppercase tracking-[0.04em] ${cls}`}>
       {children}
     </span>
   );
@@ -67,6 +73,10 @@ export function Tag({ children }: { children: ReactNode }) {
 
 export function Label({ children }: { children: ReactNode }) {
   return <span className="text-[14px] leading-5 font-semibold uppercase tracking-[0.04em] text-muted">{children}</span>;
+}
+
+export function Mono({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <span className={`font-mono text-[14px] leading-5 text-muted ${className}`}>{children}</span>;
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { kind?: "primary" | "secondary" | "link" };

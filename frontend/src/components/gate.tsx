@@ -5,9 +5,9 @@ import { API_URL } from "@/lib/api";
 
 /** Shows a plain note when the gateway API is not running. */
 export function Gate({ children }: { children: React.ReactNode }) {
-  const { error, deal, loading } = useDeal();
+  const { error, kase, loading } = useDeal();
   if (loading) return <div className="mx-auto max-w-[960px] py-12 text-muted">Loading the deal.</div>;
-  if (error && !deal) {
+  if (error && !kase) {
     return (
       <div className="mx-auto max-w-[960px] py-12">
         <h1 className="font-serif text-[40px] leading-[48px] font-medium">The gateway is not running.</h1>

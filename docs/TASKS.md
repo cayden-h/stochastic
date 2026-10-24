@@ -7,10 +7,11 @@ Swap tasks freely and tell the team when you do.
 
 ## State of the build
 
-The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.79x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 105 tests pass. [verified: `backend/tests/`]
+The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.76x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 105 tests pass. [verified: `backend/tests/`]
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded. Not yet run live: the Anthropic backend (no key in `.env`).
 Done 2026-10-24 and merged to `main`: the Note 2 answer key and Mapper score (Eric), the Devpost text (Eric), the recorded model runs (Sonnet 5.5 is the default replay), the tool guardrails, typed case, stage events, and CSV upload (Tri).
-Not yet done: the console on the new API, the Anthropic run, the rehearsals, the two open EBITDA items (stock compensation, pension).
+Done 2026-10-24, evening: the console on `GET /deals/{id}/case` (flag card, verdict line, combined table, mapping, log, backend badge, second-run moment), and the EBITDA items (stock compensation and the $4,019K pension figure applied, transaction costs kept at zero).
+Not yet done: the Anthropic run, the rehearsals, the demo video.
 
 ## The four seats
 
@@ -67,7 +68,7 @@ Tasks 1 to 5 done 2026-10-24, merged in PR #1. Task 6 waits on the team.
 ## Josie (UI and UX only)
 
 Josie works on the design only. She has no other task.
-The console must move from the old routes (`/plans`, `/facts`, `/clauses`) to `GET /deals/{id}/case`; the old routes are gone.
+Done 2026-10-24: the console is on `GET /deals/{id}/case` and the three write routes (`frontend/README.md`). Josie owns its look from here.
 Inputs for the design:
 - The case shape, the flag shape, and the verdict shape are in `architecture/gateway-and-api.md`.
 - The flag card shows the question, the evidence quotes, and the options with their computed effects; the default option is marked.
@@ -100,6 +101,6 @@ Inputs for the design:
 ## Risks to watch
 
 - The naive-versus-covenant gap rests on the inferred rent deduction and zero transaction costs. If Tri or Eric change them, re-read the flag effects before the pitch. The code recomputes; the words must follow.
-- The interest-income subtraction moved EBITDA to 27,519 and leverage to 0.79x; the pitch words and the Devpost were updated 2026-10-24. The stock compensation add-back and the pension figure are still open; applying stock compensation plus the $698K transaction costs would put the whole-line reading under the limit (`evals/fixture_check.md`).
+- The EBITDA definition items moved EBITDA to 28,379 and leverage to 0.76x on 2026-10-24; the pitch words, the Devpost, and the tests use the new figures. The whole-line reading is 2.54x with $403K of EBITDA to spare. The $698K of expected transaction costs stays at zero; applying it would put the whole-line reading under the limit (`evals/fixture_check.md`).
 - The Droid subprocess can fail live. The switch, the fallback chain, and the recording are the answer. Rehearse it.
-- The console is the only part not yet on the new API. Everything else waits on it for the live demo.
+- The console is on the new API as of 2026-10-24. Rehearse the 2:00 on it with the stopwatch.

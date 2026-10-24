@@ -36,23 +36,21 @@ Three items differ from the fixture.
 
 ## Effect on leverage
 
-Covenant EBITDA today is $27,519K, with interest income subtracted (item 1, done 2026-10-24). The option debt figures are unchanged.
+Covenant EBITDA today is $28,379K. All three items were applied on 2026-10-24: interest income is subtracted, the pension add-back is the $4,019K termination expense, and stock-based compensation of $1,018K is added back. The option debt figures are unchanged.
 
 | Case | EBITDA | a. Whole line | b. PNC only | c. PNC plus seller notes |
 | --- | --- | --- | --- | --- |
-| Before the interest income fix | $28,033K | 2.57x | 0.77x | 1.58x |
-| Today (interest income subtracted) | $27,519K | 2.61x | 0.79x | 1.61x |
-| Today plus stock compensation and pension (all three) | $28,379K | 2.54x | 0.76x | 1.56x |
-| Today plus stock compensation | $28,537K | 2.52x | 0.76x | 1.55x |
-| Today plus stock compensation and $698K transaction costs | $29,235K | 2.46x | 0.74x | 1.51x |
-| Today plus pension | $27,361K | 2.63x | 0.79x | 1.61x |
+| Before any change | $28,033K | 2.57x | 0.77x | 1.58x |
+| Interest income subtracted only (2026-10-24, morning) | $27,519K | 2.61x | 0.79x | 1.61x |
+| Today (all three applied) | $28,379K | 2.54x | 0.76x | 1.56x |
+| Today plus the $698K of expected transaction costs | $29,077K | 2.47x | 0.74x | 1.52x |
 
 Option a stays over the 2.50x limit only while covenant EBITDA is below $28,782K. [verified: arithmetic]
-With all three changes, option a is still over the limit, with about $400K of EBITDA to spare. [inferred: depends on the readings above]
-Stock compensation alone leaves option a over the limit at 2.52x. Stock compensation plus the $698K of transaction costs would put it under, and the verdict would no longer change with the controller's answer. [verified: arithmetic]
+With all three changes, option a is still over the limit, with $403K of EBITDA to spare. [verified: arithmetic]
+Adding the $698K of expected transaction costs would put option a under the limit, and the verdict would no longer change with the controller's answer. We keep them at zero because Ex 99.2 Note 5(b) describes costs expected after 2024-10-31, outside the period of the statements in the fixture. [verified: Ex 99.2, Note 5(b); timing inferred]
 
 ## Asks
 
-- Cayden and Tri: decide the stock compensation add-back, the pension figure, and the $698K of transaction costs. Stock compensation plus the transaction costs breaks the moment.
+- Decided 2026-10-24 by Cayden: apply the stock compensation add-back and the $4,019K pension figure; keep transaction costs at zero. The brief in `backend/app/db/fixtures/kewaunee.py` carries both with their sources.
 - Done 2026-10-24: the EBITDA tool subtracts interest income (`test_ebitda_subtracts_interest_income`).
 - Everyone: the moment now rests on a thinner margin. Say the inferred inputs out loud, as `demo-script.md` already plans.

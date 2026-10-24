@@ -196,11 +196,11 @@ The Mapper tags the line "unclear" and asks which parts count. The gateway compu
 
 | Option | Senior Funded Bank Debt | Leverage | Verdict |
 | --- | --- | --- | --- |
-| a. Whole line counts | $71,955K | 2.61x | Over the 2.50x limit |
-| b. Only the PNC term loan and revolver count (the agreement's reading, the default) | $21,633K | 0.79x | OK, 1.71x of room, about $47M of debt capacity |
-| c. PNC debt plus the seller notes | $44,173K | 1.61x | OK |
+| a. Whole line counts | $71,955K | 2.54x | Over the 2.50x limit |
+| b. Only the PNC term loan and revolver count (the agreement's reading, the default) | $21,633K | 0.76x | OK, 1.74x of room, about $49M of debt capacity |
+| c. PNC debt plus the seller notes | $44,173K | 1.56x | OK |
 
-Covenant EBITDA is $27,519K: Kewaunee $18,043K (net earnings 19,057, plus interest 1,799, less the tax benefit 5,938, plus depreciation 3,125), Nu Aire $7,269K (net income 5,438, plus taxes 514, plus D&A 1,830, less interest income 514), plus the noncash pension termination $4,177K, less Statesville cash rent $1,970K. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
+Covenant EBITDA is $28,379K: Kewaunee $18,043K (net earnings 19,057, plus interest 1,799, less the tax benefit 5,938, plus depreciation 3,125), Nu Aire $7,269K (net income 5,438, plus taxes 514, plus D&A 1,830, less interest income 514), plus the noncash pension termination $4,019K and stock-based compensation $1,018K, less Statesville cash rent $1,970K. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
 Covenant EBITDA subtracts interest income, as Addendum I of Ex 10.1 requires; Nu Aire's $514K of interest income is taken out. [verified: `test_ebitda_subtracts_interest_income`]
 Two inputs are inferred and must be said out loud: the rent deduction uses the 10-K's next-year obligation, and transaction and integration costs are applied as 0 because the filings do not quantify them.
 The verdict changes with the controller's answer, so the moment holds. [verified]
@@ -219,7 +219,7 @@ The whole screen comes from `GET /deals/{id}/case`. [verified: `architecture/gat
 
 ### The 30-second run
 
-Press Run. The Mapper maps 54 lines and stops on one flag. The controller picks the covenant reading. Code combines the books and tests the limit. The verdict line shows 0.79x against 2.50x, Reviewer pass. The controller approves and the gateway posts.
+Press Run. The Mapper maps 54 lines and stops on one flag. The controller picks the covenant reading. Code combines the books and tests the limit. The verdict line shows 0.76x against 2.50x, Reviewer pass. The controller approves and the gateway posts.
 If time allows, reset and run again: no flag, because the Mapper learned.
 The agent text is hardcoded, recorded, or scripted, and we say which. The gateway, tools, and log run for real.
 
@@ -236,7 +236,7 @@ Must (the demo does not work without these). Status on 2026-10-24, 02:30:
 3. Consolidation, EBITDA, and leverage tools, with tests that use the real figures. Done. Tri reviews and extends.
 4. The gateway with work-item states, maker-checker, run-id checks, the audit log, and agent memory. Done.
 5. The Preparer and the Reviewer, with real tool calls. Done on the scripted backend.
-6. The console screen: flag card, combined table, verdict line, built from the Figma frame. Josie, in progress, against `GET /deals/{id}/case`.
+6. The console screen: flag card, verdict line, combined table, mapping, log link, on `GET /deals/{id}/case`. Done 2026-10-24, with the backend badge and the second-run moment.
 7. A recorded run and a backend switch, so the demo survives a failure. Done (`backend/recordings/`, `AGENT_BACKEND=replay`). The default recording is the Sonnet 5.5 Droid run of 2026-10-24.
 8. Track proofs: at least one agent runs with `AGENT_BACKEND=droid` (Factory): done, all three ran. The Figma file on screen in the pitch (Figma): open.
 

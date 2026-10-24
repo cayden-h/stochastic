@@ -24,7 +24,7 @@ If that file and any other file disagree, `docs/STOCHASTIC.md` is correct.
 Backend and console commands are in `README.md`, section "Getting started".
 Backend tests: `cd backend && .venv/bin/python -m pytest -q` (105 tests on the real Kewaunee figures).
 Run the whole deal from the command line: `backend/.venv/bin/python scripts/record_run.py --backend scripted`.
-The backend runs the deal end to end as of 2026-10-24. The console still implements the earlier workflow and is being rebuilt against `GET /deals/{id}/case`.
+The backend runs the deal end to end as of 2026-10-24, and the console runs on `GET /deals/{id}/case`. Console checks: `cd frontend && npx eslint src && npx next build`.
 Project code could not start before Friday Oct 23, about 6pm (Cal Hacks rule).
 To rebuild a diagram PDF, run `docs/diagrams/render.sh <name>`. The diagrams are stale, so do this only if asked.
 

@@ -15,10 +15,10 @@ from app.db.fixtures.kewaunee import DEAL_ID, TARGET  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 LIMIT = 2.5
-EBITDA = 27518.845  # 18,043 Kewaunee + 7,268.845 Nu Aire + 4,177 pension - 1,970 rent
+EBITDA = 28378.845  # 18,043 Kewaunee + 7,268.845 Nu Aire + 4,019 pension termination + 1,018 stock compensation - 1,970 rent
 DEBT = 21633.0  # 15,000 + 5,563 + 805 + 109 + 156 (the agreement's reading)
-LEVERAGE = 0.786  # 21,633 / 27,518.845
-DEBT_CAPACITY = 47164.113  # 2.5 * 27,518.845 - 21,633
+LEVERAGE = 0.762  # 21,633 / 28,378.845
+DEBT_CAPACITY = 49314.113  # 2.5 * 28,378.845 - 21,633
 TOTAL_ASSETS = 182456.181  # 134,478 + 47,978.181
 
 
@@ -42,9 +42,9 @@ def test_the_demo_run_beat_by_beat():
     fin = next(f for f in body["flags"] if "Financing liability" in f["question"])
     effects = {o["id"]: o["effect"] for o in fin["options"]}
     assert fin["default"] == "b"
-    assert effects["a"] == "Senior Funded Bank Debt 71,955K. Leverage 2.61x against 2.50x. Over the limit."
-    assert effects["b"] == "Senior Funded Bank Debt 21,633K. Leverage 0.79x against 2.50x. OK."
-    assert effects["c"] == "Senior Funded Bank Debt 44,173K. Leverage 1.61x against 2.50x. OK."
+    assert effects["a"] == "Senior Funded Bank Debt 71,955K. Leverage 2.54x against 2.50x. Over the limit."
+    assert effects["b"] == "Senior Funded Bank Debt 21,633K. Leverage 0.76x against 2.50x. OK."
+    assert effects["c"] == "Senior Funded Bank Debt 44,173K. Leverage 1.56x against 2.50x. OK."
     assert all(o["run_id"] for o in fin["options"])  # every effect traces to a limit_test run
     for o in fin["options"]:
         assert c.get(f"/runs/{o['run_id']}").json()["tool"] == "limit_test"

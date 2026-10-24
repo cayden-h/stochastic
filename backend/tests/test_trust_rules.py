@@ -44,8 +44,8 @@ def test_mapper_flags_the_financing_liability_and_effects_are_computed(world):
     flags = gw.open_flags(DEAL_ID)
     fin = next(f for f in flags if "Financing liability" in (f.question or ""))
     effects = {o.id: o.effect for o in fin.options}
-    assert "Over the limit" in effects["a"]  # whole line counted: 2.61x
-    assert "OK" in effects["b"]  # covenant reading: 0.79x
+    assert "Over the limit" in effects["a"]  # whole line counted: 2.54x
+    assert "OK" in effects["b"]  # covenant reading: 0.76x
     assert all(o.run_id for o in fin.options)  # every effect traces to a limit_test run
 
 
@@ -60,7 +60,7 @@ def test_naive_and_covenant_leverage_differ_on_real_figures(world):
         if "financing liability" in line.line.lower():
             line.covenant_tag = "debt"
     naive = gw.run_tool("system:gateway", DEAL_ID, "covenant_debt", {}).outputs["debt"]
-    assert round(eb, 1) == 27518.8  # 18,043 Kewaunee + 7,268.8 Nu Aire + 4,177 pension - 1,970 rent
+    assert round(eb, 1) == 28378.8  # 18,043 Kewaunee + 7,268.8 Nu Aire + 4,019 pension termination + 1,018 stock compensation - 1,970 rent
     assert covenant == 21633.0  # 15,000 + 5,563 + 805 + 109 + 156
     assert naive == 71955.0  # plus 27,782 sale-leaseback and 22,540 seller notes
     assert covenant / eb < 2.5 < naive / eb
@@ -228,7 +228,7 @@ def test_api_flow():
 def test_units_and_limit_test():
     assert finance.to_thousands(74850302, "USD") == 74850.302
     assert finance.limit_test(2.499, 2.5)["ok"] and not finance.limit_test(2.5, 2.5)["ok"]
-    assert finance.limit_test(0.786, 2.5, ebitda_value=27518.845, debt=21633.0)["debt_capacity"] == pytest.approx(47164.113, abs=0.01)
+    assert finance.limit_test(0.762, 2.5, ebitda_value=28378.845, debt=21633.0)["debt_capacity"] == pytest.approx(49314.113, abs=0.01)
 
 
 def test_ebitda_subtracts_interest_income(world):
@@ -312,13 +312,13 @@ def test_flag_option_that_leaves_a_line_unclear_is_refused(world):
 
 
 def test_flag_effect_text_matches_the_verdict_rounding(world):
-    # 71,955 / 27,518.8 = 2.6148: the card must say 2.61x, the same as the verdict line, not 2.62x.
+    # 71,955 / 28,378.8 = 2.5355: the card must say 2.54x, the same as the verdict line. (Before the add-backs, 2.6148 showed as 2.62x.)
     store, gw = world
     advance(gw, DEAL_ID)
     fin = next(f for f in gw.open_flags(DEAL_ID) if "Financing liability" in (f.question or ""))
     effects = {o.id: o.effect for o in fin.options}
-    assert "Leverage 2.61x" in effects["a"]
-    assert "Leverage 1.61x" in effects["c"]  # 44,173 / 27,518.8 = 1.6052
+    assert "Leverage 2.54x" in effects["a"]
+    assert "Leverage 1.56x" in effects["c"]  # 44,173 / 28,378.8 = 1.5566
     from app.core.models import FlagOption, FlagProposal
     for o in fin.options:
         assert "unclear" not in gw.store.items[fin.id].payload["option_actions"][o.id]["tags"].values()
