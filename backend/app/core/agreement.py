@@ -39,7 +39,11 @@ def quote_in(quote: str, text: str) -> bool:
 
 # ---------------------------------------------------------------------------- sections and definitions
 
-_NUMBERED = re.compile(r"^(\d+(?:\.\d+)*)\.\s+(\S.*)$")
+_NUMBERED = re.compile(r"^(\d+(?:\.\d+)*)\.\s+(\S.*)$")  # "4.8. Financial Covenants ."
+# "Section 7.1 Leverage Ratio" or "SECTION 7.1.": the number ends the line, takes a dot, or is followed by a capital.
+# A wrapped cross-reference ("Section 5.8 ." or "Section 6 of this Agreement") is not a heading.
+_SECTION = re.compile(r"^(?i:section)\s+(\d+(?:\.\d+)*)(?:\.|\s+([A-Z][A-Za-z].*))?$")
+_DOTTED = re.compile(r"^(\d+\.\d+(?:\.\d+)*)\s+([A-Z][A-Za-z].*)$")  # "7.1 Leverage Ratio": a dotted number, a title
 _LETTERED = re.compile(r"^\(([a-z])\)\s*(.*)$")
 _ANNEX = re.compile(r"^(ADDENDUM|ANNEX|EXHIBIT|SCHEDULE)\s+([A-Z]|[IVX]+|\d+)$", re.I)  # alone on its line
 _DEFINED = re.compile(r'"\s*([^"]{1,80}?)\s*"\s+(?:shall\s+)?means?\b')
@@ -62,9 +66,9 @@ def sections(text: str) -> list[tuple[str, str, int, int]]:
             sid = f"{m.group(1).title()} {m.group(2)}"
             marks.append((sid, sid, i, 0))
             current = None
-        elif m := _NUMBERED.match(row):
+        elif m := (_SECTION.match(row) or _NUMBERED.match(row) or _DOTTED.match(row)):
             current = m.group(1)
-            marks.append((current, _heading(m.group(2)), i, 1))
+            marks.append((current, _heading(m.group(2) or "") or f"Section {current}", i, 1))
         elif current and (m := _LETTERED.match(row)):
             marks.append((f"{current}({m.group(1)})", _heading(m.group(2)) or f"({m.group(1)})", i, 2))
     out: list[tuple[str, str, int, int]] = []
