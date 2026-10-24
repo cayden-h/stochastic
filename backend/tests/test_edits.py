@@ -193,6 +193,9 @@ def test_tool_runs_take_edits_from_the_gateway_only(world):
         gw.run_tool(PREPARER, DEAL_ID, "consolidate", {"edit_ids": []})
     with pytest.raises(Invalid, match="takes no edits"):
         gw.run_tool(SYSTEM, DEAL_ID, "leverage", {"edit_ids": [], "debt": 1.0, "ebitda": 2.0})
+    cons = gw.run_tool(SYSTEM, DEAL_ID, "consolidate", {})
+    with pytest.raises(Invalid, match="takes no edits"):  # its rows already carry the edits
+        gw.run_tool(SYSTEM, DEAL_ID, "tie_out", {"edit_ids": [], "run_id": cons.run_id})
     if not T1_READY:
         with pytest.raises(Invalid, match=r"T1"):
             gw.run_tool(SYSTEM, DEAL_ID, "consolidate", {"edit_ids": []})
@@ -211,7 +214,7 @@ def test_approval_is_refused_while_an_edit_needs_a_reason(flow):
     assert edit.status == "needs_reason" and edit.old_value == 6162.806 and edit.new_value == 5662.806
     assert old.state == State.SUPERSEDED and old.id in store.items  # stays in the log
     assert new.state == State.PROPOSED and new.payload["edit_id"] == edit.id and new.payload["supersedes"] == old.id
-    assert new.proposed_by == PREPARER
+    assert new.proposed_by == SYSTEM  # the gateway's recompute proposes it; the controller approves it below
     with pytest.raises(Denied) as error:
         gw.approve(CONTROLLER, new.id)
     assert edit.id in error.value.message
@@ -415,11 +418,16 @@ def test_every_recompute_figure_equals_its_tool_run(world):
     out = amount_edit(gw)
     edit, result = out["edit"], out["result"]
     runs = {t: store.tool_runs[rid] for t, rid in result.run_ids_by_tool.items()}
-    assert set(runs) == {"consolidate", "ebitda", "covenant_debt", "leverage", "tie_out", "limit_test"}
+    assert set(runs) == {"consolidate", "ebitda", "covenant_debt", "leverage", "tie_out", "limit_test",
+                         "naive_covenant_debt", "naive_ebitda", "naive_leverage"}
     assert not before & set(result.run_ids) and edit.run_ids == result.run_ids  # every run is new
     assert all(r.actor == SYSTEM for r in runs.values())
     for tool in EDIT_TOOLS:
         assert runs[tool].inputs["edit_ids"] == [edit.id]
+    assert "edit_ids" not in runs["tie_out"].inputs  # the edited rows, not the edits again
+    assert runs["consolidate"].outputs["edits_applied"] == [edit.id]
+    assert runs["ebitda"].outputs["edits_applied"] == [edit.id]
+    assert set(runs["covenant_debt"].outputs["edits_applied"]) <= {edit.id}
     assert result.ebitda == runs["ebitda"].outputs["ebitda"]
     assert result.debt == runs["covenant_debt"].outputs["debt"]
     assert result.leverage == runs["leverage"].outputs["leverage"]
@@ -436,8 +444,23 @@ def test_every_recompute_figure_equals_its_tool_run(world):
         assert (row.line, row.section, row.platform, row.target, row.combined, row.run_id) == (
             e["line"], e["section"], e["platform"], e["target"], e["combined"], runs["consolidate"].run_id)
     assert result.supersedes == old.id and result.edit_ids == [edit.id]
-    assert result.ebitda != old.ebitda  # an income statement edit moves EBITDA
+    # (500) of G&A is 500 less cost: EBITDA rises by exactly 500, debt does not move.
+    assert math.isclose(result.ebitda - old.ebitda, 500.0, abs_tol=1e-3)
+    assert result.debt == old.debt
+    assert math.isclose(result.leverage, result.debt / result.ebitda, abs_tol=5e-4)
     assert out["verdict"]["leverage"] == result.leverage
+    # The whole-line what-if is run again on the edited books, and the flag's tags are restored afterwards.
+    naive_debt, naive_eb = runs["naive_covenant_debt"], runs["naive_ebitda"]
+    assert naive_debt.inputs["naive"] and naive_eb.inputs["as_filed"] and naive_debt.inputs["edit_ids"] == [edit.id]
+    assert runs["naive_leverage"].inputs["debt_run_id"] == naive_debt.run_id
+    flag = next(i for i in store.deal_items(DEAL_ID, "flag") if i.payload.get("kind") == "covenant_tag")
+    whole = next(o for o in flag.options if o.basis == "as_filed")
+    flag_lev = store.tool_runs[store.tool_runs[whole.run_id].inputs["leverage_run_id"]]
+    assert naive_debt.outputs["debt"] == store.tool_runs[flag_lev.inputs["debt_run_id"]].outputs["debt"]
+    assert math.isclose(naive_eb.outputs["ebitda"] - flag_lev.outputs["ebitda"], 500.0, abs_tol=1e-3)
+    assert all(store.source_lines[lid].covenant_tag != "unclear" for lid in flag.payload["line_ids"])
+    assert [store.source_lines[lid].covenant_tag for lid in flag.payload["line_ids"]] == [
+        flag.payload["option_actions"][flag.answer]["tags"][lid] for lid in flag.payload["line_ids"]]
 
 
 @needs_t1
@@ -449,6 +472,19 @@ def test_a_revert_restores_the_agents_value(world):
     restored = gw.revert_edit(CONTROLLER, edit.id)["result"]
     assert (restored.ebitda, restored.debt, restored.leverage, restored.verdict) == (
         agents.ebitda, agents.debt, agents.leverage, agents.verdict)
+    assert [r.model_dump(exclude={"run_id"}) for r in restored.rows] == [
+        r.model_dump(exclude={"run_id"}) for r in agents.rows]
+
+
+@needs_t1
+def test_a_remap_revert_restores_every_figure_exactly(world):
+    store, gw = world
+    approval = run_to_approval(gw)
+    agents = store.results[approval.payload["result_id"]]
+    edit = remap_edit(gw)["edit"]
+    restored = gw.revert_edit(CONTROLLER, edit.id)["result"]
+    for field in ("ebitda", "debt", "leverage", "verdict", "headroom_turns", "tie_out_ok"):
+        assert getattr(restored, field) == getattr(agents, field), field
     assert [r.model_dump(exclude={"run_id"}) for r in restored.rows] == [
         r.model_dump(exclude={"run_id"}) for r in agents.rows]
 
@@ -659,3 +695,74 @@ def test_an_applied_offer_moves_the_figures_through_its_tool_runs(world):
     assert edit.from_adjustment_id == adj.id
     assert result.ebitda == store.tool_runs[result.run_ids_by_tool["ebitda"]].outputs["ebitda"] != old.ebitda
     assert result.leverage == store.tool_runs[result.run_ids_by_tool["leverage"]].outputs["leverage"]
+
+
+# ---- the T1 output contract, newest-wins policies, and names ---------------------------------------------------
+
+def _edit_aware(tool, applied):
+    """A stand-in edit-aware tool that ignores the edits and reports `applied(edits)` as edits_applied."""
+    def fn(*args, edits=None, **kwargs):
+        out = tool(*args, **kwargs)
+        out["edits_applied"] = applied(edits or [])
+        return out
+    return fn
+
+
+@pytest.mark.parametrize("tool, applied, words", [
+    ("consolidate", lambda edits: [], "did not apply"),
+    ("ebitda", lambda edits: ["e_999"], "not given"),
+    ("covenant_debt", lambda edits: None, "did not return edits_applied"),
+])
+def test_a_recompute_is_refused_when_a_tool_misreports_its_edits(world, monkeypatch, tool, applied, words):
+    store, gw = world
+    approval = run_to_approval(gw)
+    for name in EDIT_TOOLS:
+        right = (lambda edits: [e.id for e in edits])
+        monkeypatch.setitem(finance.TOOLS, name, _edit_aware(finance.TOOLS[name], applied if name == tool else right))
+    with pytest.raises(Invalid, match=words):
+        amount_edit(gw)
+    assert not store.edits and approval.state == State.PROPOSED
+    denied = rows(store, "edit:apply", "DENIED")[-1]
+    assert "edit not applied" in denied.reason and words in denied.reason
+
+
+def test_the_newest_platform_policy_wins_and_a_revert_brings_the_older_back(flow):
+    store, gw = flow
+    run_to_approval(gw)
+    first = remap_edit(gw)["edit"]
+    gw.reason_edit(CONTROLLER, first.id, chip=0)
+    gw.approve(CONTROLLER, store.deal_items(DEAL_ID, "approve_result")[-1].id)
+    older = store.policies[first.policy_id]
+    second = next_deal(store, gw)
+    run_to_approval(gw, second.id)
+    assert mapping_of(store, second.id, REMAP_LINE).policy_id == older.id
+    later = gw.apply_edit(CONTROLLER, second.id, "remap", "Acme Labs", REMAP_LINE, platform_line="Other assets")["edit"]
+    gw.reason_edit(CONTROLLER, later.id, chip=1)
+    newer = store.policies[later.policy_id]
+    assert newer.id != older.id and older.retired_by is None and older.decision == REMAP_TO  # not updated in place
+    assert not rows(store, "policy:update")
+    third = next_deal(store, gw, deal_id="d_third", target="Beta Labs")
+    line = next(sl for sl in store.lines(third.id, "Beta Labs") if sl.line == REMAP_LINE)
+    assert gw._cited_policy(older.id, "mapping", REMAP_TO, line) is None  # a replaced answer cannot be cited
+    assert gw._cited_policy(newer.id, "mapping", "Other assets", line) == newer.id
+    gw.revert_edit(CONTROLLER, later.id)
+    assert newer.retired_by == later.id and older.retired_by is None
+    assert gw._cited_policy(older.id, "mapping", REMAP_TO, line) == older.id
+    advance(gw, third.id)
+    m = mapping_of(store, third.id, REMAP_LINE)
+    assert (m.platform_line, m.policy_id) == (REMAP_TO, older.id)
+
+
+def test_platform_and_company_names_match_casefolded(flow):
+    from app.core.policies import policy_applies
+    store, gw = flow
+    p = Policy(id="p_x", role=MAPPER, kind="mapping", pattern="x", decision="y", reason="r", approved_by=CONTROLLER,
+               learned_from="e_x", deal_id=DEAL_ID, scope="platform", platform=" kewaunee ")
+    assert policy_applies(p, "ACME LABS", "Kewaunee", "Acme Labs")
+    assert not policy_applies(p, "Kewaunee", "Kewaunee", "Acme Labs")  # the platform's own lines
+    c = Policy(id="p_y", role=MAPPER, kind="mapping", pattern="x", decision="y", reason="r", approved_by=CONTROLLER,
+               learned_from="wi_x", deal_id=DEAL_ID, company="nu aire")
+    assert policy_applies(c, "Nu Aire ", "Kewaunee", "Nu Aire") and not policy_applies(c, "Nu", "Kewaunee", "Nu Aire")
+    adj = learn_adjustment(gw)
+    shouty = next_deal(store, gw, deal_id="d_shouty", target="Acme Labs", platform="KEWAUNEE")
+    assert adj in gw.adjustments_for(shouty.id)
