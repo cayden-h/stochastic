@@ -13,9 +13,12 @@ Done on 2026-10-24 (02:30):
 
 Done at 03:30: the `droid` CLI is installed, the probe shows Claude models on our key, and the whole deal ran on Droid with Claude Sonnet 5.5 (recorded).
 
-Open:
-1. Record an Anthropic run once a key is in `.env`: `backend/.venv/bin/python scripts/record_run.py --backend anthropic`.
-2. Set `AGENT_BACKEND=droid` and `DROID_MODEL=claude-sonnet-5-5` in `.env` for the demo laptop, and rehearse the failure switch once with a real failure (kill the droid process mid-run; the fallback chain should land on scripted and `GET /health` should show it).
-3. Read the Droid Mapper's flags before each rehearsal. The prompt now keeps exclusions for the controller; if a run still decides them itself, say so and show the scripted run instead.
-4. Write the pitch words in `demo-script.md` and run the rehearsals.
-5. Ask a Hyphenate mentor the two questions in `TASKS.md`.
+Done at 05:10 (the three areas, each documented before the next):
+1. Agents and settings: Haiku 5.5 is the default on both backends with per-role overrides, filing notes are on the lines, mapping flags cover several lines, run ids are named, usage and credits are captured per run. Haiku 5.5 on Droid produces the intended moment and is the current recording. `docs/agents.md` is the reference.
+2. The application: the gateway API serves `GET /deals/{id}/case` with the new fields and `GET /health` with per-role models, attempts, and credit totals; the failure switch was rehearsed (droid missing, anthropic no key, scripted ran). `docs/architecture/gateway-and-api.md` matches the code.
+3. The demo run: pitch words with the computed figures are in `demo-script.md` section 1, the verified failure plan in section 5, the Haiku 5.5 run recorded in `backend/recordings/`, the Sonnet 5.5 run kept in `recordings/sonnet-5-5/`.
+
+Open, needs a human:
+1. An Anthropic key in `.env`, then `backend/.venv/bin/python scripts/record_run.py --backend anthropic`.
+2. Rehearse the 2:00 with a stopwatch, on the console once Josie's screen reads `/case`. Write the credit total from `GET /health` into the run log in `docs/agents.md` after each rehearsal.
+3. Ask a Hyphenate mentor the two questions in `TASKS.md`.

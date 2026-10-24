@@ -48,7 +48,7 @@ def run_anthropic(role: Role, inp: BaseModel, call_tool, transcript: list[dict] 
             f"- {t.get('item')}: {t.get('summary')}" for t in transcript[-10:])
     messages: list[dict[str, Any]] = [{"role": "user", "content": f"Work item input (JSON):\n{inp.model_dump_json()}{memory}"}]
     tools = _tool_defs(role)
-    usage = {"input_tokens": 0, "output_tokens": 0, "turns": 0}
+    usage = {"input_tokens": 0, "output_tokens": 0, "turns": 0, "model_requested": model, "model_confirmed": True}
     for _ in range(12):
         resp = client.messages.create(model=model, max_tokens=16000, system=role.system, tools=tools, messages=messages)
         usage["input_tokens"] += resp.usage.input_tokens

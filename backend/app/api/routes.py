@@ -63,6 +63,7 @@ def build_router(gw: Gateway) -> APIRouter:
             "anthropic_key": bool(os.getenv("ANTHROPIC_API_KEY")),
             "factory_key": bool(os.getenv("FACTORY_API_KEY")),
             "last_runs": agent_runner.LAST_RUNS[-6:],
+            "totals_this_process": agent_runner.TOTALS,
             "settings": agent_settings.summary(),
         }
 

@@ -78,8 +78,17 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None):
     if not result.success or result.output is None:
         raise RuntimeError(f"droid run failed: {getattr(result, 'error', None)} "
                            f"{getattr(result, 'structured_output_error', None) or getattr(result, 'output_validation_error', None)}")
+    usage = getattr(result, "usage", None)
+    cost = {}
+    if usage is not None:
+        for k in ("input_tokens", "output_tokens", "cache_creation_tokens", "cache_read_tokens", "thinking_tokens",
+                  "factory_credits"):
+            v = getattr(usage, k, None)
+            if v is not None:
+                cost[k] = v
     return result.output, {"session_id": result.session_id, "turns": result.turn_count,
-                           "duration": getattr(result, "duration", None)}
+                           "duration": getattr(result, "duration", None), "model_requested": model or "droid default",
+                           "model_confirmed": False, "usage": cost}
 
 
 def run_droid(role: Role, inp: BaseModel, call_tool, session_id: str | None = None) -> tuple[BaseModel, dict]:

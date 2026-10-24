@@ -1,6 +1,6 @@
 # The agents: roles, settings, memory, backends, and how to run them
 
-Last updated: 2026-10-24, 04:30.
+Last updated: 2026-10-24, 05:10.
 This is the reference for the agent layer in `backend/app/agents/`.
 `STOCHASTIC.md` holds the product; `architecture/agents-and-work-items.md` holds the contracts; this file holds how the agents are set up, run, read, and debugged.
 Claims are tagged [verified] when a test or a run shows them, and [inferred] when they are judgment.
@@ -108,7 +108,16 @@ Reading a run:
 - The audit log shows `propose:map_lines`, `ask:flag`, `tool:<name>`, `answer`, `policy:learn`, `policy:apply`, `session:turn`, `approve`, `post`, and any `DENIED` row with the reason.
 - `backend/recordings/<role>.json` holds the last recorded output per role and the backend that made it. `backend/recordings/sonnet-5-5/` keeps the Sonnet 5.5 run of 2026-10-24, 03:30.
 
-Failure switch, rehearsed by killing the `droid` process mid-run or pointing `DROID_MODEL` at a model the key cannot run: the runner records the failed attempt and falls to the next backend; `GET /health` shows the attempts. [inferred until rehearsed; see section 9]
+Failure switch, rehearsed on 2026-10-24, 04:50 [verified]: the API was started with the `droid` CLI missing from PATH. The run returned `mapper ran on scripted`; `GET /health` listed the attempts: droid failed ("Droid executable was not found"), anthropic failed ("ANTHROPIC_API_KEY is not set"), scripted ran. The same chain runs if the droid process dies mid-run or the timeout fires.
+
+Two findings about Droid and models [verified by a probe on 2026-10-24, 05:00]:
+- Droid does not report which model ran. The result's messages carry no model id, so `model_confirmed` is false on every Droid run and the health view shows `model_requested` only. The Anthropic backend confirms its model.
+- An unknown model id does not fail. `DROID_MODEL=not-a-real-model` ran and returned a result, at about 2.7 times the credits of the same prompt on Haiku 5.5, so Droid fell back to a default model silently. Keep `DROID_MODEL` set to an id the probe listed, and never claim a model name for a Droid run beyond "requested".
+
+## 8a. Cost
+
+Every Droid run returns `usage` with tokens and `factory_credits`; the runner keeps a per-process total, shown in `GET /health` under `backend.totals_this_process`, and each entry of `last_runs` shows its own usage. [verified: probe output `Usage(... factory_credits=206.0)` for a one-line Haiku 5.5 prompt]
+Haiku 5.5 is the default for that reason. A full deal on Haiku 5.5 is three Droid runs (the flag what-ifs are code, not model calls). Read the total after each rehearsal and write it into the run log below, so the credits last the weekend.
 
 ## 9. Run log on the demo deal
 
@@ -129,5 +138,6 @@ Lessons written into the code after these runs:
 
 - The Anthropic backend has not run live; no key was available on 2026-10-24.
 - Droid sessions are not resumed (section 6), so "stateful" means memory in the store, not a long-lived model context.
+- Droid runs cannot prove which model served them (section 8). Say "Claude Haiku 5.5 requested through Droid".
 - The scripted backend knows this deal's line names; on a new deal it would flag more and map less. That is the point of the model backends.
 - The Mapper's flag quality depends on the model. The run log above is the evidence; say which run is on screen.

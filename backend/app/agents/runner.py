@@ -19,6 +19,7 @@ from app.agents.roles import Role
 from app.core.models import MapperInput, PreparerInput, ReviewerInput
 
 LAST_RUNS: list[dict] = []  # what the console shows as "backend status"
+TOTALS: dict[str, float] = {"runs": 0, "factory_credits": 0.0, "input_tokens": 0, "output_tokens": 0}  # this process
 
 
 @dataclass
@@ -84,6 +85,11 @@ def run_agent(role: Role, inp: BaseModel, call_tool, session=None, backend: str 
             run = AgentRun(output=out, backend=b, attempts=attempts, seconds=round(time.time() - start, 2))
             LAST_RUNS.append({"role": role.name, "backend": b, "attempts": attempts, "meta": meta,
                               "at": time.strftime("%H:%M:%S")})
+            TOTALS["runs"] += 1
+            usage = meta.get("usage", meta) if isinstance(meta, dict) else {}
+            for k in ("factory_credits", "input_tokens", "output_tokens"):
+                if isinstance(usage.get(k), (int, float)):
+                    TOTALS[k] += usage[k]
             del LAST_RUNS[:-30]
             return run
         except Exception as error:  # fall back and keep the reason

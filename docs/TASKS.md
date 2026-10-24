@@ -34,11 +34,12 @@ Done on 2026-10-24: the contract, the gateway rewrite (per-role permissions, run
 
 Done at 03:30: the `droid` CLI, the probe (Claude models are on our key), and a full Droid run with Claude Sonnet 5.5, recorded.
 
+Done at 05:10: Haiku 5.5 as the default model with per-role overrides, the failure switch rehearsed, the pitch words written, the Haiku run recorded. See `tasks/cayden.md` and `agents.md`.
+
 Open:
 1. Put an Anthropic key in `.env` and record a model run: `scripts/record_run.py --backend anthropic`. Commit the recordings.
-2. Rehearse the failure switch: start on `droid`, kill the CLI mid-run, show the fallback in `GET /health`.
-3. Write the 1:30 pitch words into `demo-script.md` (the structure is there) and run the rehearsals.
-4. Ask a Hyphenate mentor whether PE add-on integration counts as a corner of a finance team, and whether a learned policy counts as the "improves with every correction" signal.
+2. Rehearse the 2:00 with a stopwatch on the console, and write the credit total from `GET /health` into the run log in `agents.md`.
+3. Ask a Hyphenate mentor whether PE add-on integration counts as a corner of a finance team, and whether a learned policy counts as the "improves with every correction" signal.
 
 ## Eric
 
