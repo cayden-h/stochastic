@@ -65,8 +65,10 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /deals/{id}/source-lines?company=` | any | Statement lines, both companies or one |
 | `GET /deals/{id}/mappings` | any | Mappings with confidence, reason, flagged, approved_by |
 | `GET /deals/{id}/result` | any | The latest result (404 before the Preparer ran) |
+| `GET /deals/{id}/certificate?format=md\|html\|json` | any | Draft compliance certificate from the approved, posted result (default `md`). Every figure is followed by the id of the tool run that produced it. 409 until the approve_result item is POSTED and the deal stage is `posted`. The `json` dict has `header`, `test_period`, `ebitda`, `debt`, `leverage`, `limit_test`, `tie_out`, `decisions`, `approval`, `mappings`; each figure block carries `run_id`, and its keys are the tool's own output keys. It is a draft, not signed. |
 | `GET /deals/{id}/work-items?state=&type=` | any | Work items |
 | `GET /deals/{id}/audit` | any | Audit rows for the deal and `chain_valid` |
+| `GET /deals/{id}/timeline?bucket=60` | any | Audit rows counted per time bucket, actor, and action family (the action before the colon). Returns `{"deal_id", "bucket_seconds", "source", "buckets": [{"start", "actor", "kind", "rows", "denied"}]}`, sorted by start, actor, kind. `bucket` is whole seconds, 1 to 86400 (422 otherwise); 404 for an unknown deal. On the Postgres store `source` is `time_bucket` (TimescaleDB `time_bucket` on the written audit log of the current ledger); on the memory store, or after a database error (with the fixed `error` text "timeline query failed; see the server log", the detail only in the server log), it is `memory`. Both floor to the TimescaleDB origin 2000-01-03 00:00 UTC, so they give the same buckets. Counts only, no deal figures. |
 | `GET /deals/{id}/runs` | any | Every tool run for the deal |
 | `GET /runs/{run_id}` | any | One tool run: tool, inputs, outputs |
 | `GET /agents/memory` | any | Policies and sessions |
@@ -108,19 +110,31 @@ After the Preparer and the Reviewer run, `verdict` is filled:
 ```json
 {
   "leverage": 0.762, "limit": 2.5, "verdict": "ok", "headroom_turns": 1.738,
-  "ebitda": 27518.845, "debt": 21633.0, "debt_term": "Senior Funded Bank Debt",
+  "ebitda": 28378.845, "debt": 21633.0, "debt_term": "Senior Funded Bank Debt",
   "review": { "verdict": "pass", "reasons": [], "run_ids": ["run_017", "run_018"] },
   "tie_out_ok": true, "backend": "scripted",
   "debt_capacity": 49314.113, "debt_capacity_run_id": "run_018",
+  "naive_debt": 71955.0, "naive_leverage": 2.536, "naive_flip_addback": 403.155, "naive_flip_rent": 1566.845,
+  "sensitivity_run_id": "run_019",
   "approval_item": "wi_006", "approval_state": "PROPOSED", "posted": false
 }
 ```
 
 `debt_capacity` (a float, or null before the Reviewer runs) is the room for the next deal in USD thousands, and `debt_capacity_run_id` is the Reviewer's `limit_test` run (or null).
+The sensitivity keys (`naive_debt`, `naive_leverage`, `naive_flip_addback`, `naive_flip_rent`, `sensitivity_run_id`) are present only after the Reviewer passes the result and a covenant flag opened on the deal; otherwise they are absent.
+They come from a separate `limit_test` run the gateway makes as `system:gateway` with `"sensitivity": true` in its inputs, on the first `/case` read after the pass; later reads reuse it.
+`naive_debt` is the whole-line reading of debt, read from the `covenant_debt` run behind the covenant flag option that counts every flagged line as debt (option a on the demo deal).
+When no covenant flag opened (for example the second demo run, where a policy settles the financing lines), there is no such run, so the keys are absent and no run is made.
+If the gateway refuses the sensitivity run, the keys are absent and `/case` still answers; the refusal is audited once and not retried.
+`naive_flip_addback` is the EBITDA add-back at which that reading reaches the limit (debt / limit - EBITDA): positive means that much more EBITDA is needed, zero or negative means it already passes.
+`naive_flip_rent` is the rent deduction at which that reading reaches the limit (rent deduction - `naive_flip_addback`), or null when the brief has no rent deduction or when that figure would be below zero (no rent change can flip the verdict).
+The rent deduction is the sum of the EBITDA deductions whose name has the word rent or rental.
 `result.run_ids_by_tool` maps `consolidate`, `ebitda`, `covenant_debt`, and `leverage` to their run ids, so the console can link each figure to `GET /runs/{run_id}`.
 `source_lines[].note` is what the filing says about a line (for example the 10-Q note that the financing liability is the Statesville sale-leaseback). Show it on the flag card's evidence.
 A mapping flag may cover several target lines; its options then carry `mappings` (target line id to platform line) in `payload.option_actions`, and the option `effect` text lists each line.
 `GET /health` returns `backend.settings` with the configured backend, the fallback chain, and the model per role on each backend.
+On the Postgres store, `GET /health` `store` also has `writes` (batches written), `avg_write_ms`, and `last_write_ms`: the time from queueing a batch to its commit on Tiger Cloud, rounded to 0.1 ms.
+The memory store has no such keys.
 
 `result.rows` is the combined table: `line`, `section`, `platform`, `target`, `combined`, `run_id`, in platform order and in USD thousands.
 The three closing financing lines (term loan, revolver, seller notes) carry `period` "2024-11-01 (closing)".

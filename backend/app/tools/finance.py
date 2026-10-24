@@ -250,14 +250,40 @@ def leverage(debt: float, ebitda_value: float) -> dict:
 
 
 def limit_test(leverage_value: float, limit: float, wording: str = "less than", ebitda_value: float | None = None,
-               debt: float | None = None) -> dict:
+               debt: float | None = None, naive_debt: float | None = None,
+               rent_deduction: float | None = None) -> dict:
     """Test the ratio against the covenant. 'less than' means the ratio must be strictly below the limit.
-    Debt capacity (room for the next deal) is reported when EBITDA and debt are given."""
-    ok = leverage_value < limit if wording == "less than" else leverage_value <= limit
+    Debt capacity (room for the next deal) is reported when EBITDA and debt are given.
+
+    Sensitivity, when naive_debt (the whole-line reading of debt) and EBITDA are given: the naive ratio, and
+    naive_flip_addback, the EBITDA add-back at which the naive reading reaches the limit (positive means that much
+    more EBITDA is needed; zero or negative means it already passes). With rent_deduction also given,
+    naive_flip_rent is the rent deduction at which the naive reading reaches the limit; it is left out when it would
+    be below zero, since no rent change can then flip the verdict. naive_ok is tested on the unrounded naive ratio,
+    while ok is tested on the leverage as given (rounded to 3 places by the leverage tool), so the two can disagree
+    for a ratio within 0.0005 of the limit."""
+    given = [leverage_value, limit] + [v for v in (ebitda_value, debt, naive_debt, rent_deduction) if v is not None]
+    if not all(math.isfinite(v) for v in given):
+        raise ValueError("limit_test inputs must be finite numbers")
+
+    def passes(ratio: float) -> bool:
+        return ratio < limit if wording == "less than" else ratio <= limit
+
+    ok = passes(leverage_value)
     out = {"ok": ok, "verdict": "ok" if ok else "over_limit", "leverage": round(leverage_value, 3), "limit": limit,
            "headroom_turns": round(limit - leverage_value, 3), "wording": wording}
     if ebitda_value is not None and debt is not None:
         out["debt_capacity"] = round(limit * ebitda_value - debt, 3)
+    if naive_debt is not None and ebitda_value is not None:
+        if ebitda_value <= 0:
+            raise ValueError("ebitda must be positive")
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        flip = round(naive_debt / limit - ebitda_value, 3)
+        out.update({"naive_debt": round(naive_debt, 3), "naive_leverage": round(naive_debt / ebitda_value, 3),
+                    "naive_ok": passes(naive_debt / ebitda_value), "naive_flip_addback": flip})
+        if rent_deduction is not None and round(rent_deduction - flip, 3) >= 0:
+            out["naive_flip_rent"] = round(rent_deduction - flip, 3)
     return out
 
 
@@ -279,5 +305,8 @@ TOOL_DESCRIPTIONS = {
     "covenant_debt": "Compute the covenant's debt figure from the covenant tags on balance sheet lines. "
                      "Arguments: naive (bool, default false) counts unclear lines as debt.",
     "leverage": "Divide debt by EBITDA. Arguments: debt_run_id and ebitda_run_id (preferred) or debt and ebitda values.",
-    "limit_test": "Test leverage against the lender's limit from the brief. Arguments: leverage_run_id or leverage.",
+    "limit_test": "Test leverage against the lender's limit from the brief. Arguments: leverage_run_id or leverage. "
+                  "Optional sensitivity: naive_debt_run_id (a covenant_debt run with the whole-line reading) and "
+                  "ebitda_run_id (its rent deduction) add naive_leverage, naive_ok, naive_flip_addback (the EBITDA "
+                  "add-back at which the whole-line reading reaches the limit), and naive_flip_rent.",
 }

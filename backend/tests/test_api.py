@@ -290,6 +290,126 @@ def test_upload_rejects_non_finite_brief_figures(path, value):
     assert c.get("/deals").status_code == 200
 
 
+def test_verdict_sensitivity_from_limit_test_run():
+    # Whole-line debt 71,955 (flag option a) / 28,378.845 = 2.536. Flip add-back 71,955 / 2.5 - 28,378.845 = 403.155.
+    # Flip rent 1,970 - 403.155 = 1,566.845.
+    c = TestClient(create_app())
+    body = full_run(c)
+    CaseResponse.model_validate(body)
+    v = body["verdict"]
+    assert v["naive_debt"] == pytest.approx(71955.0, abs=0.001)
+    assert v["naive_leverage"] == pytest.approx(2.536, abs=0.0005)
+    assert v["naive_flip_addback"] == pytest.approx(403.155, abs=0.001)
+    assert v["naive_flip_rent"] == pytest.approx(1566.845, abs=0.001)
+    run = c.get(f"/runs/{v['sensitivity_run_id']}").json()
+    assert run["tool"] == "limit_test" and run["inputs"]["sensitivity"] is True
+    assert run["inputs"]["leverage_run_id"] == body["result"]["run_ids_by_tool"]["leverage"]
+    assert run["outputs"]["naive_flip_addback"] == v["naive_flip_addback"]
+    debt_run = c.get(f"/runs/{run['inputs']['naive_debt_run_id']}").json()
+    assert debt_run["tool"] == "covenant_debt" and debt_run["outputs"]["debt"] == v["naive_debt"]
+    assert v["debt_capacity_run_id"] != v["sensitivity_run_id"]  # the Reviewer's run is untouched
+    # A second read reuses the run.
+    before = len(c.get(f"/deals/{DEAL_ID}/runs").json())
+    again = c.get(f"/deals/{DEAL_ID}/case").json()["verdict"]
+    assert again["sensitivity_run_id"] == v["sensitivity_run_id"]
+    assert len(c.get(f"/deals/{DEAL_ID}/runs").json()) == before
+
+
+def test_timeline_counts_match_the_audit_log():
+    c = TestClient(create_app())
+    full_run(c)
+    audit = c.get(f"/deals/{DEAL_ID}/audit").json()["rows"]
+    body = c.get(f"/deals/{DEAL_ID}/timeline").json()
+    assert body["deal_id"] == DEAL_ID and body["bucket_seconds"] == 60 and body["source"] == "memory"
+    buckets = body["buckets"]
+    assert buckets and set(buckets[0]) == {"start", "actor", "kind", "rows", "denied"}
+    assert sum(b["rows"] for b in buckets) == len(audit)
+    assert sum(b["denied"] for b in buckets) == len([a for a in audit if a["result"] == "DENIED"])
+    assert {b["kind"] for b in buckets} == {a["action"].split(":")[0] for a in audit}
+    keys = [(b["start"], b["actor"], b["kind"]) for b in buckets]
+    assert keys == sorted(keys) and len(keys) == len(set(keys))
+    hourly = c.get(f"/deals/{DEAL_ID}/timeline?bucket=3600").json()
+    assert hourly["bucket_seconds"] == 3600 and sum(b["rows"] for b in hourly["buckets"]) == len(audit)
+
+
+def test_timeline_bucket_bounds_and_unknown_deal():
+    c = TestClient(create_app())
+    for bad in (0, -5, 86401, "x"):
+        assert c.get(f"/deals/{DEAL_ID}/timeline?bucket={bad}").status_code == 422
+    for ok in (1, 86400):
+        assert c.get(f"/deals/{DEAL_ID}/timeline?bucket={ok}").status_code == 200
+    assert c.get("/deals/nope/timeline").status_code == 404
+
+
+def test_timeline_buckets_floor_to_the_time_bucket_origin():
+    # Hand-made rows. 18:00:05 and 18:00:59 share the 18:00:00 minute; 18:01:00 starts the next one.
+    # With 7 s buckets from the TimescaleDB origin 2000-01-03 00:00 UTC: 2026-10-24 18:00:05 is
+    # 9,791 days + 64,805 s after the origin = 846,007,205 s; 846,007,205 // 7 * 7 = 846,007,204, so 18:00:04.
+    from datetime import datetime, timezone
+    from app.core.models import AuditRow
+    from app.db.memory import MemoryStore
+    store = MemoryStore()
+    t = lambda s: datetime(2026, 10, 24, 18, 0, 0, tzinfo=timezone.utc).replace(minute=s // 60, second=s % 60)
+    rows = [(5, "agent:mapper", "propose:map_lines", "ALLOWED"), (59, "agent:mapper", "tool:consolidate", "DENIED"),
+            (59, "agent:mapper", "propose:map_lines", "ALLOWED"), (60, "human:controller", "answer", "ALLOWED")]
+    for i, (s, actor, action, result) in enumerate(rows):
+        store.audit.append(AuditRow(id=i + 1, at=t(s), deal_id="d1", actor=actor, action=action, result=result,
+                                    prev_hash="x", hash="y"))
+    store.audit.append(AuditRow(id=9, at=t(5), deal_id="other", actor="a", action="b", result="ALLOWED",
+                                prev_hash="x", hash="y"))
+    out = store.timeline("d1", 60)
+    assert out["source"] == "memory" and out["bucket_seconds"] == 60
+    assert out["buckets"] == [
+        {"start": "2026-10-24T18:00:00+00:00", "actor": "agent:mapper", "kind": "propose", "rows": 2, "denied": 0},
+        {"start": "2026-10-24T18:00:00+00:00", "actor": "agent:mapper", "kind": "tool", "rows": 1, "denied": 1},
+        {"start": "2026-10-24T18:01:00+00:00", "actor": "human:controller", "kind": "answer", "rows": 1, "denied": 0},
+    ]
+    assert store.timeline("d1", 7)["buckets"][0]["start"] == "2026-10-24T18:00:04+00:00"
+
+
+def test_no_sensitivity_on_second_run_without_a_covenant_flag():
+    # After /dev/reset with memory kept, the policy settles the financing lines and no covenant flag opens, so
+    # there is no whole-line covenant_debt run to read. The five keys are left out and no extra run is made.
+    c = TestClient(create_app())
+    first = full_run(c)
+    assert c.post(f"/work-items/{first['verdict']['approval_item']}/approve").json()["state"] == "POSTED"
+    assert c.post("/dev/reset").json()["ok"]
+    body = full_run(c)
+    assert body["open_flags"] == [] and body["verdict"]["review"]["verdict"] == "pass"
+    v = body["verdict"]
+    for key in ("naive_debt", "naive_leverage", "naive_flip_addback", "naive_flip_rent", "sensitivity_run_id"):
+        assert key not in v
+    runs = c.get(f"/deals/{DEAL_ID}/runs").json()
+    assert not any(r["tool"] == "limit_test" and r["inputs"].get("sensitivity") for r in runs)
+    assert not any(r["tool"] == "covenant_debt" and r["inputs"].get("sensitivity") for r in runs)
+    assert len(c.get(f"/deals/{DEAL_ID}/runs").json()) == len(runs)  # reading again adds nothing
+
+
+def test_sensitivity_failure_does_not_fail_case(monkeypatch):
+    # A gateway error in the optional sensitivity run returns the verdict without the keys, and is not retried.
+    from app.api import routes
+    from app.gateway.gateway import Gateway
+    monkeypatch.setattr(routes, "_SENSITIVITY_FAILED", set())
+    real = Gateway.run_tool
+
+    def failing(self, actor, deal_id, name, inputs=None):
+        if name == "limit_test" and (inputs or {}).get("sensitivity"):  # a leverage run is not a covenant_debt run
+            inputs = {**inputs, "naive_debt_run_id": inputs["leverage_run_id"]}
+        return real(self, actor, deal_id, name, inputs)
+
+    monkeypatch.setattr(Gateway, "run_tool", failing)
+    c = TestClient(create_app())
+    body = full_run(c)
+    assert body["verdict"]["leverage"] == pytest.approx(0.762, abs=0.0005) and "naive_debt" not in body["verdict"]
+    audit = c.get(f"/deals/{DEAL_ID}/audit").json()["rows"]
+    errors = [a for a in audit if a["action"] == "tool:limit_test" and "covenant_debt run" in (a.get("reason") or "")]
+    assert len(errors) == 1  # the failure happened once and was audited
+    rows = len(audit)
+    again = c.get(f"/deals/{DEAL_ID}/case")
+    assert again.status_code == 200 and "naive_debt" not in again.json()["verdict"]
+    assert len(c.get(f"/deals/{DEAL_ID}/audit").json()["rows"]) == rows
+
+
 def test_second_run_while_one_is_in_progress_is_refused(monkeypatch):
     """Answering the last flag starts the job runner; a Run click at the same moment must get 409, not a second Preparer."""
     import threading

@@ -10,16 +10,19 @@ import math
 import os
 import threading
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from typing import Literal
+
+from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Query, Request, UploadFile
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
 from app.agents import runner as agent_runner
 from app.agents import settings as agent_settings
 from app.agents.jobs import advance
+from app.api import certificate as cert_doc
 from app.api.events import next_events
 from app.api.schemas import CaseResponse, DealCreated, HealthResponse
-from app.core.models import CONTROLLER, Brief, Deal, State
+from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, State
 from app.db.loader import MAX_BYTES, LoaderError, parse_statement_csv
 from app.gateway.gateway import Gateway, GatewayError
 
@@ -51,6 +54,73 @@ def _debt_capacity(store, result) -> tuple[float | None, str | None]:
         if value is not None:
             return value, t.run_id
     return None, None
+
+
+SENSITIVITY_KEYS = ("naive_debt", "naive_leverage", "naive_flip_addback", "naive_flip_rent")
+
+
+def _whole_line_debt_run(store, deal_id: str) -> str | None:
+    """The covenant_debt run behind the covenant flag option that counts every flagged line as debt.
+
+    After the controller answers, the flagged lines carry their settled tags, so a fresh naive covenant_debt run
+    no longer gives the whole-line figure. The option's what-if run, made by the gateway when the flag opened, does.
+    The chain is option limit_test run -> its leverage run -> its covenant_debt run. Run ids only, no numbers."""
+    for item in reversed(store.deal_items(deal_id)):
+        if item.type != "flag" or item.payload.get("kind") != "covenant_tag":
+            continue
+        actions = item.payload.get("option_actions", {})
+        for opt in item.options:
+            tags = actions.get(opt.id, {}).get("tags", {})
+            if not opt.run_id or not tags or any(t != "debt" for t in tags.values()):
+                continue
+            test = store.tool_runs.get(opt.run_id)
+            lev = store.tool_runs.get(test.inputs.get("leverage_run_id", "")) if test else None
+            debt = store.tool_runs.get(lev.inputs.get("debt_run_id", "")) if lev else None
+            if debt and debt.tool == "covenant_debt":
+                return debt.run_id
+    return None
+
+
+# Leverage runs whose sensitivity run failed, keyed by (deal id, run id, run time) because /dev/reset restarts the
+# run ids. Not retried on later reads, so a failure adds one audit row, not one per read.
+_SENSITIVITY_FAILED: set[tuple[str, str, str]] = set()
+
+
+def _sensitivity(gw: Gateway, deal: Deal, result) -> dict | None:
+    """How far the whole-line reading of debt is from the limit, from a limit_test run made by the gateway.
+
+    Only for a result the Reviewer passed, and only when a covenant flag option gives the whole-line covenant_debt
+    run. With no such flag (for example a second run where a policy settled the lines) nothing runs and the keys
+    are left out: a fresh naive run would read the settled tags, not the whole-line reading.
+    A run already made for this result's leverage run is reused, so reading /case twice does not add runs.
+    A gateway error returns None and is remembered per leverage run, so an optional figure never fails /case."""
+    if not result or not result.review or result.review.verdict != "pass":
+        return None
+    lev_id = result.run_ids_by_tool.get("leverage")
+    lev = gw.store.tool_runs.get(lev_id) if lev_id else None
+    if lev is None:
+        return None
+    failed_key = (deal.id, lev.run_id, lev.at.isoformat())
+    if failed_key in _SENSITIVITY_FAILED:
+        return None
+    with gw.lock:  # find-or-create in one step, so two reads cannot both create a run
+        run = next((t for t in reversed(list(gw.store.tool_runs.values()))
+                    if t.deal_id == deal.id and t.tool == "limit_test" and t.inputs.get("sensitivity") is True
+                    and t.inputs.get("leverage_run_id") == lev_id), None)
+        if run is None:
+            naive_id = _whole_line_debt_run(gw.store, deal.id)
+            if naive_id is None:
+                return None
+            try:
+                run = gw.run_tool(SYSTEM, deal.id, "limit_test",
+                                  {"leverage_run_id": lev_id, "naive_debt_run_id": naive_id,
+                                   "ebitda_run_id": result.run_ids_by_tool.get("ebitda"), "sensitivity": True})
+            except GatewayError:
+                _SENSITIVITY_FAILED.add(failed_key)
+                return None
+    out = {k: run.outputs.get(k) for k in SENSITIVITY_KEYS}
+    out["sensitivity_run_id"] = run.run_id
+    return out
 
 
 def first_non_finite(brief: Brief) -> str | None:
@@ -158,6 +228,7 @@ def build_router(gw: Gateway) -> APIRouter:
                        "approval_item": approval.id if approval else None,
                        "approval_state": approval.state.value if approval else None,
                        "posted": d.stage == "posted"}
+            verdict.update(_sensitivity(gw, d, result) or {})
         return {
             "deal": dump(d),
             "stage": d.stage,
@@ -174,6 +245,23 @@ def build_router(gw: Gateway) -> APIRouter:
                       "denied": len([a for a in store.audit if a.deal_id == deal_id and a.result == "DENIED"])},
             "backend": backend_status(),
         }
+
+    @r.get("/deals/{deal_id}/certificate")
+    def certificate(deal_id: str, format: Literal["md", "html", "json"] = "md"):
+        """Draft compliance certificate from the approved, posted result. Every figure carries its run id."""
+        d = need_deal(deal_id)
+        items = store.deal_items(deal_id)
+        result = store.latest_result(deal_id)
+        approval = cert_doc.approval_item(items, result) if result else None
+        if (not result or not approval or approval.payload.get("result_id") != result.id
+                or approval.state != State.POSTED or d.stage != "posted"):
+            raise HTTPException(status_code=409, detail="certificate is available after the controller approves the result")
+        doc = cert_doc.build_certificate(store, d, result, items, chain_valid=gw.verify_chain())
+        if format == "json":
+            return doc
+        if format == "html":
+            return HTMLResponse(cert_doc.render_html(doc))
+        return Response(cert_doc.render_markdown(doc), media_type="text/markdown; charset=utf-8")
 
     @r.get("/deals/{deal_id}/source-lines")
     def source_lines(deal_id: str, company: str | None = None):
@@ -205,6 +293,12 @@ def build_router(gw: Gateway) -> APIRouter:
     def audit(deal_id: str):
         need_deal(deal_id)
         return {"chain_valid": gw.verify_chain(), "rows": [dump(a) for a in store.audit if a.deal_id == deal_id]}
+
+    @r.get("/deals/{deal_id}/timeline")
+    def timeline(deal_id: str, bucket: int = Query(60, ge=1, le=86400)):
+        """Audit rows per time bucket, actor, and action family. On Postgres it runs TimescaleDB time_bucket."""
+        need_deal(deal_id)
+        return store.timeline(deal_id, bucket)
 
     @r.get("/deals/{deal_id}/runs")
     def runs(deal_id: str):

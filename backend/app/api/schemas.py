@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_serializer
 
 from app.core.models import AgentSession, Deal, Mapping, Policy, Result, Review, SourceLine, WorkItem
 
@@ -35,12 +35,28 @@ class Verdict(BaseModel):
     debt_term: str
     debt_capacity: float | None = None  # read from the Reviewer's limit_test run, never computed in the route
     debt_capacity_run_id: str | None = None
+    # Sensitivity, from a limit_test run the gateway makes for a passed result: the whole-line reading of debt,
+    # its ratio, and the EBITDA add-back and rent deduction at which it reaches the limit. Never computed in the route.
+    naive_debt: float | None = None
+    naive_leverage: float | None = None
+    naive_flip_addback: float | None = None
+    naive_flip_rent: float | None = None
+    sensitivity_run_id: str | None = None
     review: Review | None = None
     tie_out_ok: bool | None = None
     backend: str
     approval_item: str | None = None
     approval_state: str | None = None
     posted: bool
+
+    @model_serializer(mode="wrap")
+    def _drop_unset_sensitivity(self, handler):
+        """With no sensitivity run (no covenant flag to read the whole-line debt from), the five keys are absent."""
+        out = handler(self)
+        for key in ("naive_debt", "naive_leverage", "naive_flip_addback", "naive_flip_rent", "sensitivity_run_id"):
+            if key not in self.model_fields_set:
+                out.pop(key, None)
+        return out
 
 
 class CaseResponse(BaseModel):
@@ -67,6 +83,18 @@ class StoreStatus(BaseModel):
     model_config = ConfigDict(extra="allow")
     kind: Literal["memory", "postgres"]
     fallback_reason: str | None = None
+    writes: int | None = None  # Postgres only: batches written, and queue-to-commit time per batch
+    avg_write_ms: float | None = None
+    last_write_ms: float | None = None
+
+    @model_serializer(mode="wrap")
+    def _drop_unset_timing(self, handler):
+        """The memory store reports no write timing, so its status keeps only its own keys."""
+        out = handler(self)
+        for key in ("writes", "avg_write_ms", "last_write_ms"):
+            if key not in self.model_fields_set:
+                out.pop(key, None)
+        return out
 
 
 class HealthResponse(BaseModel):

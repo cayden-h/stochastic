@@ -30,6 +30,8 @@ from app.core.models import AgentSession, AuditRow, Deal, Mapping, Policy, Resul
 from app.db.memory import MemoryStore
 
 log = logging.getLogger("stochastic.store")
+TIMELINE_CONNECT_TIMEOUT_S = 2
+TIMELINE_ERROR = "timeline query failed; see the server log"
 
 MEMORY_LEDGER = 0
 
@@ -106,6 +108,12 @@ INSERT_AUDIT = """
 INSERT INTO audit_log (ledger, id, at, deal_id, actor, action, target, result, reason, evidence, prev_hash, hash)
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
 """
+TIMELINE = """
+SELECT time_bucket(make_interval(secs => %s), at) AS start, actor, split_part(action, ':', 1) AS kind,
+       count(*) AS rows, count(*) FILTER (WHERE result = 'DENIED') AS denied
+FROM {schema}.audit_log WHERE ledger = %s AND deal_id = %s
+GROUP BY 1, 2, 3 ORDER BY 1, 2, 3
+"""
 UPSERT_COUNTER = """
 INSERT INTO id_counter (ledger, prefix, value) VALUES (%s, %s, %s)
 ON CONFLICT (ledger, prefix) DO UPDATE SET value = EXCLUDED.value
@@ -123,6 +131,7 @@ class Batch:
     upserts: list[tuple] = field(default_factory=list)
     audit: list[tuple] = field(default_factory=list)
     counters: list[tuple] = field(default_factory=list)
+    queued_at: float = field(default_factory=time.monotonic)
 
     def empty(self) -> bool:
         return not (self.new_ledger or self.deletes or self.upserts or self.audit or self.counters)
@@ -145,6 +154,7 @@ class PostgresStore(MemoryStore):
         self._new_ledger: tuple[int, str] | None = None
         self._queue: queue.Queue[Batch | None] = queue.Queue()
         self._info: dict[str, Any] = {"written_batches": 0, "last_error": None, "last_write_at": None}
+        self._writes, self._write_total_s, self._last_write_s = 0, 0.0, None  # queue-to-commit time per batch
         self._conn = self._connect()
         self._migrate()
         self.ledger = self._load()
@@ -293,6 +303,11 @@ class PostgresStore(MemoryStore):
                     if self._conn.closed:
                         self._conn = self._connect()
                     self._apply(batches)
+                    done = time.monotonic()
+                    for b in batches:
+                        self._last_write_s = done - b.queued_at
+                        self._write_total_s += self._last_write_s
+                        self._writes += 1
                     self._info.update(written_batches=self._info["written_batches"] + len(batches),
                                       last_write_at=now().isoformat(), last_error=None)
                     break
@@ -327,5 +342,29 @@ class PostgresStore(MemoryStore):
 
     def status(self) -> dict:
         host = re.sub(r"^.*@", "", self._dsn).split("/")[0].split(":")[0]  # never the password
+        writes, total, last = self._writes, self._write_total_s, self._last_write_s
         return {"kind": self.kind, "host": host, "schema": self.schema, "ledger": self.ledger,
-                "pending": self._queue.unfinished_tasks, **self._info}
+                "pending": self._queue.unfinished_tasks, **self._info, "writes": writes,
+                "avg_write_ms": round(total / writes * 1000, 1) if writes else None,
+                "last_write_ms": round(last * 1000, 1) if last is not None else None}
+
+    # ------------------------------------------------------------------ reads that run in the database
+    def timeline(self, deal_id: str, bucket_seconds: int = 60) -> dict:
+        """The memory timeline, computed by TimescaleDB time_bucket on the written audit log of this ledger.
+
+        It runs on its own short-lived connection, because the writer thread owns `self._conn`. Rows still in the
+        write queue are not counted yet. On a database error it falls back to the memory computation."""
+        try:
+            with psycopg.connect(self._dsn, connect_timeout=TIMELINE_CONNECT_TIMEOUT_S, autocommit=True,
+                                 options="-c TimeZone=UTC") as conn:  # short timeout: a read must not hold a worker
+                rows = conn.execute(TIMELINE.format(schema=self.schema),
+                                    (bucket_seconds, self.ledger, deal_id)).fetchall()
+        except psycopg.Error as error:
+            log.warning("timeline query failed, using the memory timeline: %s: %s", type(error).__name__, error)
+            out = super().timeline(deal_id, bucket_seconds)
+            out["error"] = TIMELINE_ERROR  # fixed text: the detail can name the host and user, so it stays in the log
+            return out
+        buckets = sorted(({"start": start.isoformat(), "actor": actor, "kind": kind, "rows": n, "denied": d}
+                          for start, actor, kind, n, d in rows),
+                         key=lambda b: (b["start"], b["actor"], b["kind"]))  # Python order, as the memory store
+        return {"deal_id": deal_id, "bucket_seconds": bucket_seconds, "source": "time_bucket", "buckets": buckets}
