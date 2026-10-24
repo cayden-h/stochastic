@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from app.agents import runner as agent_runner
 from app.agents.jobs import advance
+from app.api.schemas import CaseResponse, HealthResponse
 from app.core.models import CONTROLLER, State
 from app.gateway.gateway import Gateway, GatewayError
 
@@ -34,6 +35,17 @@ class ToolBody(BaseModel):
 class RunBody(BaseModel):
     backend: str | None = None  # anthropic, droid, scripted, replay; default from AGENT_BACKEND
     sync: bool = True
+
+
+def _debt_capacity(store, result) -> tuple[float | None, str | None]:
+    """Room for the next deal. The number comes from the Reviewer's limit_test tool run, never from the route."""
+    ids = result.review.run_ids if result and result.review else []
+    runs = [t for t in store.tool_runs.values() if t.tool == "limit_test" and t.run_id in ids]
+    for t in reversed(runs):
+        value = t.outputs.get("debt_capacity")
+        if value is not None:
+            return value, t.run_id
+    return None, None
 
 
 def build_router(gw: Gateway) -> APIRouter:
@@ -74,7 +86,7 @@ def build_router(gw: Gateway) -> APIRouter:
             agent_runner.LAST_RUNS.append({"role": "runner", "backend": backend, "error": str(error)[:300]})
 
     # ------------------------------------------------------------------ reads
-    @r.get("/health")
+    @r.get("/health", response_model=HealthResponse)
     def health():
         return {"ok": True, "chain_valid": gw.verify_chain(), "backend": backend_status()}
 
@@ -86,7 +98,7 @@ def build_router(gw: Gateway) -> APIRouter:
     def deal(deal_id: str):
         return dump(need_deal(deal_id))
 
-    @r.get("/deals/{deal_id}/case")
+    @r.get("/deals/{deal_id}/case", response_model=CaseResponse)
     def case(deal_id: str):
         """The whole screen in one read: lines, mappings, flags, result, verdict, log summary."""
         d = need_deal(deal_id)
@@ -97,9 +109,11 @@ def build_router(gw: Gateway) -> APIRouter:
                          and i.state not in (State.REJECTED, State.REVERSED)), None)
         verdict = None
         if result:
+            capacity, capacity_run = _debt_capacity(store, result)
             verdict = {"leverage": result.leverage, "limit": result.limit, "verdict": result.verdict,
                        "headroom_turns": result.headroom_turns, "ebitda": result.ebitda, "debt": result.debt,
-                       "debt_term": d.brief.debt_term, "review": dump(result.review) if result.review else None,
+                       "debt_term": d.brief.debt_term, "debt_capacity": capacity,
+                       "debt_capacity_run_id": capacity_run, "review": dump(result.review) if result.review else None,
                        "tie_out_ok": result.tie_out_ok, "backend": result.backend,
                        "approval_item": approval.id if approval else None,
                        "approval_state": approval.state.value if approval else None,

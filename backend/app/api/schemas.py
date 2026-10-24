@@ -1,0 +1,69 @@
+"""Response models for the console. /docs and /openapi.json show these shapes."""
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict
+
+from app.core.models import AgentSession, Deal, Mapping, Policy, Result, Review, SourceLine, WorkItem
+
+
+class BackendStatus(BaseModel):
+    """Which agent backend is configured and what ran last; the console shows it on screen."""
+    configured: str
+    fallback: str
+    anthropic_key: bool
+    factory_key: bool
+    last_runs: list[dict]
+
+
+class AuditSummary(BaseModel):
+    """Counts for the audit badge: rows for this deal, hash chain check, denied attempts."""
+    rows: int
+    chain_valid: bool
+    denied: int
+
+
+class Verdict(BaseModel):
+    """The limit check against the covenant, with the approval state and room for the next deal."""
+    leverage: float
+    limit: float
+    verdict: Literal["ok", "over_limit"]
+    headroom_turns: float
+    ebitda: float
+    debt: float
+    debt_term: str
+    debt_capacity: float | None = None  # read from the Reviewer's limit_test run, never computed in the route
+    debt_capacity_run_id: str | None = None
+    review: Review | None = None
+    tie_out_ok: bool | None = None
+    backend: str
+    approval_item: str | None = None
+    approval_state: str | None = None
+    posted: bool
+
+
+class CaseResponse(BaseModel):
+    """The whole screen in one read: lines, mappings, flags, result, verdict, work items, memory, log summary."""
+    model_config = ConfigDict(extra="allow")
+
+    deal: Deal
+    stage: str
+    source_lines: list[SourceLine]
+    mappings: list[Mapping]
+    flags: list[WorkItem]
+    open_flags: list[str]
+    result: Result | None = None
+    verdict: Verdict | None = None
+    work_items: list[WorkItem]
+    policies: list[Policy]
+    sessions: list[AgentSession]
+    audit: AuditSummary
+    backend: BackendStatus
+
+
+class HealthResponse(BaseModel):
+    """Liveness plus the audit chain check and backend status."""
+    ok: bool
+    chain_valid: bool
+    backend: BackendStatus
