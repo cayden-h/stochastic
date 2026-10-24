@@ -83,7 +83,7 @@ Done, plus the video:
 
 1. Review `backend/app/tools/finance.py` and own it. Check the EBITDA build (net income plus interest, taxes, D&A; add-backs; rent deduction) against Ex 10.1's definition. Add any add-back the agreement names that we left at zero, with its source. Done 2026-10-24. Reviewed against Ex 10.1; covenant EBITDA now subtracts interest income as Addendum I requires.
 2. Add tests: a test per tool with hand-computed expected values from the fixture, a test that `consolidate` refuses an unapproved flagged mapping, and a test for `limit_test` at exactly 2.50x. Done 2026-10-24. Per-tool tests with hand-computed values, the unapproved-flag refusal, and `limit_test` at exactly 2.50x.
-3. Add `debt_capacity` to the verdict in `GET /deals/{id}/case` (it is already in the `limit_test` output) so the console can show "room for the next deal". Done 2026-10-24. `debt_capacity` and `debt_capacity_run_id` are on the verdict.
+3. Add `debt_capacity` to the verdict in `GET /deals/{id}/case` (it is already in the `limit_test` output) so the console can show the covenant headroom. Done 2026-10-24. `debt_capacity` and `debt_capacity_run_id` are on the verdict.
 4. Make `POST /deals` accept two CSV uploads and a brief, using Eric's loader, so a judge can try an unseen input. Keep the route thin. Done 2026-10-24. `POST /deals` takes two CSVs and a brief; 422 names the file, row, and column.
 5. Make the SSE stream also emit stage changes, so the console can refresh the case without polling. Done 2026-10-24. `GET /deals/{id}/stream` sends `stage` events as well as audit rows.
 6. Cut the demo video if the team agrees on one. Hyphenate wants a video that opens with the moment. [verified: `hyphenate-workshop.md`]
@@ -126,7 +126,7 @@ Inputs for the design:
 ## Risks to watch
 
 - The naive-versus-covenant gap rests on the inferred rent deduction and zero transaction costs. If Tri or Eric change them, re-read the flag effects before the pitch. The code recomputes; the words must follow.
-- The EBITDA definition items moved EBITDA to 28,379 and leverage to 0.76x on 2026-10-24; the pitch words, the Devpost, and the tests use the new figures. The whole-line reading is 2.54x with $403K of EBITDA to spare. The $698K of expected transaction costs stays at zero; applying it would put the whole-line reading under the limit (`evals/fixture_check.md`).
+- The EBITDA definition items moved EBITDA to 28,379 and leverage to 0.76x on 2026-10-24; the pitch words, the Devpost, and the tests use the new figures. Since 2026-10-24 evening the whole-line reading is computed as filed, 2.84x, with $3,470K of EBITDA to spare, so the inferred rent and the transaction costs no longer move it (D18).
 - The Droid subprocess can fail live. The switch, the fallback chain, and the recording are the answer. Rehearse it.
 - The console is on the new API as of 2026-10-24. Rehearse the 2:00 on it with the stopwatch.
 - The Tiger service is on the free shared tier and can pause when idle. If it cannot be reached, the API starts in memory and `/health` says why; wake it before judging.

@@ -17,3 +17,15 @@ Inputs for the design (2026-10-24):
 - The audit log link: `GET /deals/{id}/audit`, with `chain_valid`, and DENIED rows in red if any.
 - Coming from the backend on 2026-10-24 (each owner tells you when it lands): a Download certificate button for `GET /deals/{id}/certificate` (Tri), a fork id and state on each flag option (Cayden), the store badge from `GET /health` `store.kind` (`memory` or `postgres`), and a sensitivity line on the verdict (Tri).
 - The design rules are in `design/README.md`. The Figma file is https://www.figma.com/design/KDbPUruO6f5oPLyzyLgUZh. The Figma track needs the frame on screen in the pitch.
+
+## Changed in your folder on 2026-10-24 evening (Cayden's agent, commit 3938ca9 on `cayden/risk-fixes`)
+
+From the risk review's UI pass; please check the look on your screen and change anything you would design differently.
+- `src/components/flag-card.tsx`: each covenant option shows its ratio large with the Over the limit or OK chip, read from new option fields `leverage`, `ok`, `basis` (no text parsing). The evidence is folded into a `details` block under the options (open by default on mapping flags). The kind label says "Lender definition question" or "Mapping question". The empty spacer above the label is gone.
+- `src/components/verdict-line.tsx`: a line under the ratio keeps the comparison after the answer: "Read as filed, counting the whole financing line: 2.84x, over the limit." Labels are "Room (turns of EBITDA)" and "Covenant headroom" ($49.3M of debt).
+- `src/app/page.tsx`: a progress row names the working agent and its seconds, from new stages `mapping` and `preparing`; a `run_failed` stage offers Run again; the footer has "Fresh deal, clear memory" (reset between judges) and "Run it again with what was learned"; the memory subline counts answers and lines from policy ids.
+- `src/lib/format.ts`: "Learned" counts only `policy_id`, never the reason text; `fmtM` shows one decimal ($49.3M).
+- `src/components/top-bar.tsx`: the backend badge says plain words ("Agents: live Claude via Droid", "Agents: scripted rules, no model"), and names a fallback backend if one ran; the deal name is removed so the bar fits on one row at 1280.
+- `src/components/gate.tsx`: a "Reconnecting to the gateway" bar when the API drops after the first load.
+- `src/components/combined-table.tsx`: opens collapsed; the "Line" header is aligned. `src/components/mappings.tsx`: "in a mapping question" instead of "flagged".
+- `src/lib/api.ts` (`reset(keepMemory)`), `src/lib/types.ts` (new option, deal, and sensitivity fields), `next.config.ts` (`devIndicators: false`).

@@ -55,50 +55,50 @@ Items in another person's folder say who to ask.
 
 ### 1. The moment must show up on stage (tonight, about 1 hour)
 
-- [ ] Pin a first-run recording for replay. `backend/recordings/mapper.json` is a copy of `droid-console-0751` (a memory run, no covenant flag). Copy `recordings/sonnet-5-5/*.json` to the top level, and add a test that the pinned replay raises a covenant flag.
-- [ ] Reset with memory cleared between judges. `/dev/reset` keeps memory by default (`backend/app/main.py:61`). Use `POST /dev/reset?keep_memory=false`, fix `demo-script.md` section 9, and ask Josie for a "Fresh deal (clear memory)" button.
-- [ ] Set `DROID_TIMEOUT=75` in `.env`. It is not set, so a hung Droid waits 240 s per role.
-- [ ] Fall back to scripted when the gateway refuses the Mapper twice, instead of failing the run (`backend/app/agents/runner.py`, `jobs.py`).
-- [ ] Clear the fork slot and the running-job set on reset (`whatif.py`; the route part is Tri's).
+- [x] Pin a first-run recording for replay. `backend/recordings/mapper.json` is a copy of `droid-console-0751` (a memory run, no covenant flag). Copy `recordings/sonnet-5-5/*.json` to the top level, and add a test that the pinned replay raises a covenant flag. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Reset with memory cleared between judges. `/dev/reset` keeps memory by default (`backend/app/main.py:61`). Use `POST /dev/reset?keep_memory=false`, fix `demo-script.md` section 9, and ask Josie for a "Fresh deal (clear memory)" button. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Set `DROID_TIMEOUT=75` in `.env`. It is not set, so a hung Droid waits 240 s per role. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Fall back to scripted when the gateway refuses the Mapper twice, instead of failing the run (`backend/app/agents/runner.py`, `jobs.py`). Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Clear the fork slot and the running-job set on reset (`whatif.py`; the route part is Tri's). Done 2026-10-24 evening (0e3829f, 3938ca9).
 - [x] Run the `ANALYTICS_SQL` in its own try block after the migration, run the tests with `TEST_DATABASE_URL`, then commit it. Done in `cayden/tiger-sql`: a failure sets `store.analytics_error` on `GET /health`, and the store stays on Postgres.
-- [ ] Fix the stage words in `demo-script.md`: line 52 "forty-eight million" becomes "about forty-nine million"; lines 237 and 246 and Q&A 8, 9 and 21 say live Droid with the backend on the badge, not "recorded or scripted"; Q&A 17 drops the Postgres store; Q&A 4 says three debts; Q&A 12 matches the hypertable refusal.
-- [ ] Fix the "Anthropic never ran" claims: Eric ran it on his key (one full run, 32 of 33, and 50 Mapper trials). Update `agents.md` lines 74 and 163, the `runner.py:22` comment, the README, and the Devpost Built with line.
-- [ ] One test count everywhere (150 offline, 159 with Tiger, as of the cayden/tiger-sql merge): README says 103, the one-pager says 125. Re-render the PDF.
-- [ ] Refresh the README status: Postgres is built, intercompany removal is cut.
-- [ ] Prepare shell aliases: reset with memory cleared, run on scripted, run on replay.
+- [x] Fix the stage words in `demo-script.md`: line 52 "forty-eight million" becomes "about forty-nine million"; lines 237 and 246 and Q&A 8, 9 and 21 say live Droid with the backend on the badge, not "recorded or scripted"; Q&A 17 drops the Postgres store; Q&A 4 says three debts; Q&A 12 matches the hypertable refusal. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Fix the "Anthropic never ran" claims: Eric ran it on his key (one full run, 32 of 33, and 50 Mapper trials). Docs and the `runner.py` comment done 2026-10-24 evening.
+- [x] One test count everywhere (167 offline, 176 with Tiger, after the risk fixes): README says 103, the one-pager says 125. Re-render the PDF. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Refresh the README status: Postgres is built, intercompany removal is cut. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Prepare shell aliases: `source scripts/demo.sh`, then `demo_fresh`, `demo_again`, `demo_scripted`, `demo_replay`, `demo_run droid`, `demo_health`.
 
 ### 2. Close the gateway holes (about 3 hours, `backend/app/gateway/`)
 
 "The gateway, not the prompt, enforces it" is the pitch line, and today a model can get around it in three ways.
 
-- [ ] The gateway refuses a `not_debt` tag from any model. Only a controller answer or a matching policy shown as a flag may set it. A learned `not_debt` policy shows as a flag with the answer pre-selected, not applied silently. This also closes the prompt-injection path through line names.
-- [ ] The final result must cite the Preparer's own debt run (naive=false, made after the last answer), and the leverage run must cite those run ids. Remove the raw value inputs from `leverage` (ask Tri, `backend/app/tools/`).
-- [ ] The gateway works out the Reviewer pass itself from the tie_out and limit_test runs on this result, and refuses a pass with no run ids or with runs from another deal.
-- [ ] A reversal retires the policy it created and writes an audit row.
-- [ ] Optional: the gateway opens a covenant flag for any debt-like line with a covenant note that no policy settles, so a cold run cannot lose the moment.
+- [x] The gateway refuses a `not_debt` tag from any model unless it cites a live policy learned on that company's line. Policies are scoped to the company instead of shown as a pre-selected flag, so the second-run moment stays. This also closes the prompt-injection path through line names. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] The final result must cite the Preparer's own debt run (naive=false, made after the last answer), and the leverage run must cite those run ids. Remove the raw value inputs from `leverage` (ask Tri, `backend/app/tools/`). Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] The gateway works out the Reviewer pass itself from the tie_out and limit_test runs on this result, and refuses a pass with no run ids or with runs from another deal. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] A reversal retires the policy it created and writes an audit row. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [ ] Optional, not done: the gateway opens a covenant flag for any debt-like line with a covenant note that no policy settles. The not_debt rule and the first-run replay cover most of it: a model can no longer exclude the line itself.
 
 ### 3. Option a, before the video (ask Tri for `finance.py`, Eric for the fixture)
 
-- [ ] Redefine the naive reading as balance-sheet debt over reported EBITDA (about 2.84x, about $3.5M of EBITDA margin). Today option a counts the Statesville lease as debt and still deducts its rent, which is 2.37x if made consistent.
-- [ ] Update the tests, `flag-card.md`, `demo-script.md`, the one-pager, and the Devpost text with the new figures, and record a new replay.
-- [ ] Say "covenant headroom of about $49M" with the $5M acquisition basket and the undrawn revolver, not "room for the next deal".
-- [ ] Label the check as the pro forma test in the acquisition compliance certificate, not "at close".
-- [ ] Do not rebuild Kewaunee to LTM 2024-10-31 tonight. Put it on the honest-limits card and rehearse the one-line answer.
+- [x] Redefine the naive reading as balance-sheet debt over reported EBITDA (2.84x, $3,470K of EBITDA margin). Today option a counts the Statesville lease as debt and still deducts its rent, which is 2.37x if made consistent. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Update the tests, `flag-card.md`, `demo-script.md`, the one-pager, and the Devpost text with the new figures, and record a new replay. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Say "covenant headroom of about $49M" with the $5M acquisition basket and the undrawn revolver, not "room for the next deal". Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Label the check as the pro forma test in the acquisition compliance certificate, not "at close". Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Do not rebuild Kewaunee to LTM 2024-10-31 tonight. Put it on the honest-limits card and rehearse the one-line answer. Done 2026-10-24 evening (0e3829f, 3938ca9).
 
 ### 4. Submission
 
 - [ ] Record a 60 to 90 s video that opens on the flag card, after section 3. Upload it unlisted and add the link to Devpost.
 - [ ] Make `cayden-h/stochastic` public before 9am Sunday. It is private now. The secret scan was clean.
-- [ ] Run Droid once on a second sample deal and keep the result, for a judge who asks for their own scenario.
-- [ ] Fix `ideation/tracks.md` in the CalHacks repo, which says Tiger is both a target and not targeted.
-- [ ] Add one Tiger benchmark line (BM25 query time or the continuous aggregate against a raw scan).
-- [ ] Learn the one-line competitor answer: "They read the agreement or combine the books; this does both, and stops on the ambiguous line."
+- [x] Run Droid once on a second sample deal and keep the result: the QuickBooks sample company raised 2 questions (scripted: 40) and ended at 1.03x, Reviewer pass (`evals/unseen-input-quickbooks.md`). A judge's own trial balance runs with `scripts/run_unseen_deal.py`.
+- [x] Fix `ideation/tracks.md` in the CalHacks repo: Tiger Data is a target in both places now.
+- [x] Add one Tiger benchmark line: BM25 top 10 in 0.09 ms against 3.9 ms for an ILIKE scan; the continuous aggregate in 0.14 ms against 0.38 ms from the raw log (`scripts/tiger_bench.py`, in the Devpost and `sponsors/tiger-data.md`).
+- [ ] Learn the one-line competitor answer: "They read the agreement or combine the books; this does both, and stops on the ambiguous line." It is written into `demo-script.md` Q&A 6a.
 
 ### 5. Hand to Josie
 
-- [ ] Put the option ratios directly under the flag question, as large numbers, with "Over the limit" in red. The evidence goes in a collapsed block.
-- [ ] Keep "Counting the whole line: 2.54x, over" next to the final verdict.
-- [ ] A progress row during the runs ("Mapper... 23 s").
-- [ ] Turn off the Next.js dev indicator, or demo from `next build && next start`.
-- [ ] Count "Learned" only from a real `policy_id`, not the reason text.
-- [ ] Copy the review screenshots for Josie from `/private/tmp/claude-501/-Users-cayden-Documents-GitHub-hackathons-CalHacks/638ddb83-fd49-4d4e-9651-1aa85c442963/scratchpad/ui/` (temporary folder) before they are cleared.
+- [x] Put the option ratios directly under the flag question, as large numbers, with "Over the limit" in red. The evidence goes in a collapsed block. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Keep "read as filed, counting the whole financing line: 2.84x, over the limit" next to the final verdict. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] A progress row during the runs ("Mapper... 23 s"). Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Turn off the Next.js dev indicator, or demo from `next build && next start`. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Count "Learned" only from a real `policy_id`, not the reason text. Done 2026-10-24 evening (0e3829f, 3938ca9).
+- [x] Review screenshots: superseded, the issues they showed are fixed in the console (commit 3938ca9) and checked at 1280 and 1920 in a headless browser.

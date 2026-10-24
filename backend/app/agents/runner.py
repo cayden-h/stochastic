@@ -19,8 +19,8 @@ from app.agents.backends.scripted import scripted_mapper, scripted_preparer, scr
 from app.agents.roles import Role
 from app.core.models import MapperInput, PreparerInput, ReviewerInput
 
-# No Anthropic key is on the team, so the default fallback is the deterministic rules. Add `anthropic` back in
-# AGENT_FALLBACK when a key is in .env.
+# The Anthropic backend has run on a teammate's key (recordings/anthropic-haiku-5-5), but the demo laptop has no
+# key, so the default fallback is the deterministic rules. Add `anthropic` to AGENT_FALLBACK when a key is in .env.
 DEFAULT_FALLBACK = "scripted"
 
 LAST_RUNS: list[dict] = []  # what the console shows as "backend status"

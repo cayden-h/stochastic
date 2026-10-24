@@ -40,7 +40,11 @@ A forbidden action returns 403 and writes a DENIED row.
 2. The state change is legal for the work item (409 otherwise).
 3. The proposer of an item cannot approve it (maker-checker). Agents cannot approve at all.
 4. A result cannot be approved while the Reviewer verdict is missing or needs-attention.
-5. Every number in a result carries a run id that exists for this deal, and the EBITDA, debt, and leverage values must equal the output of a tool run in the result's run ids (422 otherwise). A model cannot slip in a number. The named run ids (`consolidate_run_id`, `ebitda_run_id`, `debt_run_id`, `leverage_run_id`) must point at a run of that tool.
+5. Every number in a result carries a run id that exists for this deal (422 otherwise). The named run ids (`consolidate_run_id`, `ebitda_run_id`, `debt_run_id`, `leverage_run_id`, filled from `run_ids` when not named) must point at a run of that tool, made by the Preparer itself, not a what-if, and after the last flag answer. The debt run is not naive, the EBITDA run is on the deal's basis (`Deal.ebitda_basis`), the leverage run divides exactly those two runs, the EBITDA, debt, and leverage values equal those runs' outputs, and the rows equal the consolidate run's rows. A model cannot slip in a number or borrow another run's. Agents call `leverage` with run ids only; numbers are refused.
+5a. A Mapper `not_debt` tag is refused unless it cites a live policy learned on that company's line. Exclusions are the controller's call.
+5b. A Reviewer `pass` must cite a `tie_out` run on the result's consolidate run and a `limit_test` run on its leverage run, both for this deal and both ok. The gateway reads the pass from those runs.
+5c. A covenant flag option that counts every flagged line as debt is computed as filed (reported EBITDA, `ebitda` with `as_filed`); choosing it puts the deal on the as-filed basis, so the result matches the card. Each covenant option carries `leverage`, `ok`, and `basis` from its run chain.
+5d. Policies apply only to the company whose line they were learned on; reversing a flag retires the policies it taught (`policy:retire` rows).
 6. The limit must equal the brief's limit.
 7. The payload matches its Pydantic model. The gateway re-validates every agent result.
 8. `consolidate` refuses to run while a flag is open.
@@ -81,7 +85,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `POST /work-items/{id}/hold` | human | Keep a flag open and log the hold |
 | `POST /work-items/{id}/reverse` | human | `{"reason": "..."}`. A new item linked to the original. Nothing is deleted. |
 | `POST /tools/{name}` | agent | `{"deal_id": "...", "inputs": {}}`. Runs a math tool and returns the run. |
-| `POST /dev/reset?keep_memory=true` | dev | Reseed the deal. Agent memory is kept by default. |
+| `POST /dev/reset?keep_memory=true` | dev | Reseed the deal. Agent memory is kept by default; `keep_memory=false` clears it (use it between judges). 409 while a run is in flight; frees the what-if fork slot. |
 
 ## The case shape
 
@@ -93,7 +97,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
   "stage": "awaiting_flag",
   "source_lines": [ { "id": "sl_001", "company": "Kewaunee", "line": "Cash and cash equivalents", "section": "balance_sheet", "period": "2024-10-31", "amount": 25963, "unit": "USD thousands", "source_ref": "10-Q ...", "is_total": false, "note": null, "covenant_tag": "na", "covenant_note": null, "covenant_policy_id": null } ],
   "mappings": [ { "id": "m_001", "target_line": "Net Revenues", "platform_line": "Net sales", "confidence": 0.95, "reason": "...", "flagged": false, "approved_by": null, "policy_id": null } ],
-  "flags": [ { "id": "wi_002", "type": "flag", "state": "NEEDS_INFO", "question": "...", "evidence": [ { "quote": "...", "document_id": "8-K Ex 10.1, Section 4.8(a)" } ], "options": [ { "id": "a", "label": "Whole line counts (70,885K)", "effect": "Senior Funded Bank Debt 71,955K. Leverage 2.54x against 2.50x. Over the limit.", "run_id": "run_004", "added_by": null } ], "default": "b", "answer": null } ],
+  "flags": [ { "id": "wi_002", "type": "flag", "state": "NEEDS_INFO", "question": "...", "evidence": [ { "quote": "...", "document_id": "8-K Ex 10.1, Section 4.8(a)" } ], "options": [ { "id": "a", "label": "The whole line counts", "effect": "As filed: debt 71,955K over reported EBITDA 25,312K. Leverage 2.84x against 2.50x. Over the limit.", "run_id": "run_004", "added_by": null, "leverage": 2.8427, "ok": false, "basis": "as_filed" } ], "default": "b", "answer": null } ],
   "open_flags": ["wi_002", "wi_003"],
   "result": null,
   "verdict": null,
@@ -114,21 +118,20 @@ After the Preparer and the Reviewer run, `verdict` is filled:
   "review": { "verdict": "pass", "reasons": [], "run_ids": ["run_017", "run_018"] },
   "tie_out_ok": true, "backend": "scripted",
   "debt_capacity": 49314.113, "debt_capacity_run_id": "run_018",
-  "naive_debt": 71955.0, "naive_leverage": 2.536, "naive_flip_addback": 403.155, "naive_flip_rent": 1566.845,
+  "naive_debt": 71955.0, "naive_ebitda": 25311.845, "naive_leverage": 2.843, "naive_flip_addback": 3470.155,
   "sensitivity_run_id": "run_019",
   "approval_item": "wi_006", "approval_state": "PROPOSED", "posted": false
 }
 ```
 
-`debt_capacity` (a float, or null before the Reviewer runs) is the room for the next deal in USD thousands, and `debt_capacity_run_id` is the Reviewer's `limit_test` run (or null).
-The sensitivity keys (`naive_debt`, `naive_leverage`, `naive_flip_addback`, `naive_flip_rent`, `sensitivity_run_id`) are present only after the Reviewer passes the result and a covenant flag opened on the deal; otherwise they are absent.
+`debt_capacity` (a float, or null before the Reviewer runs) is the covenant headroom in USD thousands (the debt that would reach the limit; the next add-on is still capped by the acquisition basket and the revolver), and `debt_capacity_run_id` is the Reviewer's `limit_test` run (or null).
+The sensitivity keys (`naive_debt`, `naive_ebitda`, `naive_leverage`, `naive_flip_addback`, `sensitivity_run_id`) are present only after the Reviewer passes the result and a covenant flag opened on the deal; otherwise they are absent.
 They come from a separate `limit_test` run the gateway makes as `system:gateway` with `"sensitivity": true` in its inputs, on the first `/case` read after the pass; later reads reuse it.
-`naive_debt` is the whole-line reading of debt, read from the `covenant_debt` run behind the covenant flag option that counts every flagged line as debt (option a on the demo deal).
+`naive_debt` and `naive_ebitda` are the whole-line reading as filed, read from the `covenant_debt` and as-filed `ebitda` runs behind the covenant flag option that counts every flagged line as debt (option a on the demo deal).
 When no covenant flag opened (for example the second demo run, where a policy settles the financing lines), there is no such run, so the keys are absent and no run is made.
 If the gateway refuses the sensitivity run, the keys are absent and `/case` still answers; the refusal is audited once and not retried.
-`naive_flip_addback` is the EBITDA add-back at which that reading reaches the limit (debt / limit - EBITDA): positive means that much more EBITDA is needed, zero or negative means it already passes.
-`naive_flip_rent` is the rent deduction at which that reading reaches the limit (rent deduction - `naive_flip_addback`), or null when the brief has no rent deduction or when that figure would be below zero (no rent change can flip the verdict).
-The rent deduction is the sum of the EBITDA deductions whose name has the word rent or rental.
+`naive_flip_addback` is the EBITDA increase at which that reading reaches the limit (debt / limit - reported EBITDA): positive means that much more EBITDA is needed, zero or negative means it already passes. On the demo deal it is $3,470K.
+`naive_flip_rent` is no longer returned on `/case`: the as-filed reading has no rent deduction. The `limit_test` tool still computes it when given `ebitda_run_id`.
 `result.run_ids_by_tool` maps `consolidate`, `ebitda`, `covenant_debt`, and `leverage` to their run ids, so the console can link each figure to `GET /runs/{run_id}`.
 `source_lines[].note` is what the filing says about a line (for example the 10-Q note that the financing liability is the Statesville sale-leaseback). Show it on the flag card's evidence.
 A mapping flag may cover several target lines; its options then carry `mappings` (target line id to platform line) in `payload.option_actions`, and the option `effect` text lists each line.

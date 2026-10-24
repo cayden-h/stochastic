@@ -36,7 +36,7 @@ Errors in the mapping flow silently into every later number. [inferred]
 
 1. **Maps** each line of the target company to a line of the platform's chart, with a confidence and a short reason.
 2. **Flags** only the unclear lines for a human, with both options and the effect on the result.
-3. **Combines** the books in code: platform, target, and total, with intercompany amounts removed and EBITDA adjusted.
+3. **Combines** the books in code: platform, target, and total, with EBITDA adjusted the way the agreement defines it. (Intercompany eliminations are cut for the weekend.)
 4. **Tests** combined leverage against the lender's limit, using the covenant's own definitions of debt and EBITDA.
 5. **Checks** the work with a reviewer agent, and a human controller approves. The agent that prepares a result cannot approve it, and the gateway refuses a number that no tool run produced.
 6. **Logs** every action in an audit log, and each row is chained to the row before it.
@@ -67,7 +67,7 @@ flowchart TB
         RE["Reviewer"]
     end
     TL["Code tools: matching helpers, consolidation, EBITDA, leverage, limit test"]
-    ST[("Store: in memory first, Postgres later")]
+    ST[("Store: Postgres on Tiger Cloud, or in memory")]
 
     CON <--> GW
     AG <--> GW
@@ -95,7 +95,7 @@ The agent layer uses one function, `run_agent(role, item)`, with four backends: 
 
 Each agent is stateful.
 It receives one work item with all its inputs, plus its session and the policies it learned, and returns one typed result.
-The state lives in the store, written only by the gateway, so it survives a restart and carries to the next deal.
+The state lives in the store, written only by the gateway, so it survives a restart. Today only a re-run of the same deal shows the memory; a second deal is not built.
 
 | Agent | Real-team role | Gets | Returns | Never |
 | --- | --- | --- | --- | --- |
@@ -116,7 +116,7 @@ Public filings give statement lines, not trial balances, so the demo maps statem
 It holds the Statesville sale-leaseback ($27,782K), the new PNC term loan and revolver ($20,563K), and the 8% seller notes ($22,540K). [verified]
 The credit agreement's Senior Funded Bank Debt excludes the capital lease on that property and subordinated debt.
 So the agent asks the controller which parts count, and each option shows the leverage it gives, computed by the tools.
-Counting the whole line gives 2.54x, over the 2.50x limit. The agreement's reading gives 0.76x. [verified: `backend/tests/test_trust_rules.py`]
+Read as filed, counting the whole line over reported EBITDA gives 2.84x, over the 2.50x limit. The agreement's reading gives 0.76x. [verified: `backend/tests/test_demo_run.py`]
 
 **The one screen** has the flag card with its options and effects, a combined table (the combined balance sheet balances at $182,456K of total assets), and one verdict line that shows combined leverage against the 2.50x limit with the room left.
 The audit log is a small link.
@@ -130,8 +130,8 @@ Run the deal again after a reset and the Mapper asks nothing: the controller's a
 
 Status on 2026-10-24 is in `docs/STOCHASTIC.md`, section 13.
 Done: the input data from the filings, the three agents through `run_agent`, the tools with tests on the real figures, the gateway with maker-checker, run-id checks, the audit log, and agent memory, the recorded run and the backend switch.
-Open: the console on the new API, a live model run (Anthropic or Droid), the Note 2 answer-key score.
-Cut for the weekend: purchase accounting, intercompany eliminations, other deals, login, Postgres, a live SEC call, a staged denial.
+Also done: the console on the case API, live model runs on Droid (and on the Anthropic API with a teammate's key), the Note 2 answer-key score, the Postgres store on Tiger Cloud with what-if forks, and gateway guards against model-made exclusions, borrowed run ids, and unbacked review passes.
+Cut for the weekend: purchase accounting, intercompany eliminations, other deals, login, the trailing-twelve-month test period, a live SEC call, a staged denial.
 
 ## Tracks
 
@@ -191,7 +191,7 @@ cp .env.example .env                                        # then add keys; AGE
 cd backend
 uv venv --python 3.12 .venv
 uv pip install -p .venv/bin/python fastapi "uvicorn[standard]" pydantic pytest httpx python-dotenv python-multipart anthropic "droid-sdk[mcp]" "psycopg[binary]"
-.venv/bin/python -m pytest -q                               # 115 trust-rule and math tests on the real figures; the 5 Tiger store tests skip without TEST_DATABASE_URL
+.venv/bin/python -m pytest -q                               # 167 tests on the real figures; the Tiger store tests skip without TEST_DATABASE_URL (176 with it)
 .venv/bin/uvicorn app.main:app --port 8000 --reload
 
 cd frontend
@@ -244,10 +244,10 @@ Every figure is from the filings or computed by the tools. [verified: `backend/t
 2. At close the pro forma adds $43,103K to the same line: the $15,000K term loan, the $5,563K revolver draw, and the $22,540K seller notes. [Ex 99.2 Note 4(h)]
 3. The credit agreement's Senior Funded Bank Debt excludes the capital lease on that property and excludes subordinated debt. [Ex 10.1]
 4. The Mapper tags the line unclear and raises a flag with three options. The gateway runs the tools for each option and writes the effect on the card.
-5. Whole line: debt $71,955K, leverage 2.54x, over the limit. Agreement's reading: debt $21,633K, leverage 0.76x, OK. Bank debt plus seller notes: 1.56x.
+5. Whole line, read as filed: debt $71,955K over reported EBITDA $25,312K, leverage 2.84x, over the limit. Agreement's reading: debt $21,633K, leverage 0.76x, OK. Bank debt plus seller notes: 1.56x.
 6. Covenant EBITDA is $28,379K: both companies' net income plus interest expense less interest income, plus taxes, depreciation, and amortization, plus the $4,019K noncash pension termination add-back and $1,018K of stock-based compensation, less $1,970K of Statesville cash rent (inferred from the 10-K obligations table).
 7. The controller picks b. The Preparer calls consolidate, ebitda, covenant_debt, and leverage. The Reviewer calls tie_out and limit_test. The controller approves and the gateway posts.
-8. Reset and run again: the Mapper applies the policy and asks nothing.
+8. Reset and run again with memory kept: the Mapper applies the policy and asks nothing. Between judges, reset with memory cleared so the flag comes back.
 
 ## Team and branches
 
@@ -265,8 +265,8 @@ Cayden owns the shared data contract in `backend/app/core/models.py`.
 
 - Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask a Hyphenate mentor on Saturday.
 - Which reading of Kewaunee's financing liability is right? All three are computed; a practitioner should confirm the default.
-- Can Droid run Claude models on our key? Run `scripts/droid_probe.py` once the `droid` CLI is installed.
-- Is there an Anthropic key for the team? None is in `.env` yet.
+- Droid runs Claude Sonnet 5.5 and Haiku 5.5 on our key (answered 2026-10-24).
+- The Anthropic API backend ran on Eric's key; the demo laptop has none, so it is not in the stage fallback chain.
 
 The full list is in section 18 of `docs/STOCHASTIC.md`.
 
