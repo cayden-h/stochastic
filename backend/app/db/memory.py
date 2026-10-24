@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from app.core.models import AgentSession, AuditRow, Deal, Mapping, Policy, Result, SourceLine, ToolRun, WorkItem
+from app.core.models import (AgentSession, AuditRow, Deal, Edit, LearnedAdjustment, Mapping, Policy, Result, SourceLine,
+                             ToolRun, WorkItem)
 
 
 # TimescaleDB's default time_bucket origin for timestamptz, so both stores floor a row to the same bucket.
@@ -39,16 +40,19 @@ class MemoryStore:
         self.tool_runs: dict[str, ToolRun] = {}
         self.policies: dict[str, Policy] = {}  # agent memory: survives a deal reset
         self.sessions: dict[str, AgentSession] = {}  # keyed by role
+        self.edits: dict[str, Edit] = {}  # the controller's review edits (D19), part of the deal record
+        self.adjustments: dict[str, LearnedAdjustment] = {}  # agent memory from amount edits: survives a reset
         self.audit: list[AuditRow] = []  # append only, in order
         self._seq: dict[str, int] = {}
 
     def reset_deals(self, keep_memory: bool = True) -> None:
         """Clear the record. Agent memory (policies and sessions) is kept unless asked otherwise."""
-        policies, sessions, seq = self.policies, self.sessions, dict(self._seq)
+        policies, sessions, adjustments, seq = self.policies, self.sessions, self.adjustments, dict(self._seq)
         self._clear()
         if keep_memory:
-            self.policies, self.sessions = policies, sessions
+            self.policies, self.sessions, self.adjustments = policies, sessions, adjustments
             self._seq["p"] = seq.get("p", 0)
+            self._seq["a"] = seq.get("a", 0)
 
     def commit(self) -> None:
         """Called by the gateway after every write. Nothing to do in memory."""
@@ -78,6 +82,9 @@ class MemoryStore:
 
     def deal_results(self, deal_id: str) -> list[Result]:
         return [r for r in self.results.values() if r.deal_id == deal_id]
+
+    def deal_edits(self, deal_id: str) -> list[Edit]:
+        return [e for e in self.edits.values() if e.deal_id == deal_id]
 
     def role_policies(self, role: str) -> list[Policy]:
         return [p for p in self.policies.values() if p.role == role and not p.retired_by]

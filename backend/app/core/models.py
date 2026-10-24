@@ -31,6 +31,7 @@ class State(str, Enum):
     REJECTED = "REJECTED"
     POSTED = "POSTED"
     REVERSED = "REVERSED"
+    SUPERSEDED = "SUPERSEDED"  # an approval item replaced by a newer one after a review edit; it stays in the log
 
 
 # Work-item types used by the job runner and the gateway.
@@ -202,6 +203,9 @@ class Result(BaseModel):
     run_ids: list[str]
     run_ids_by_tool: dict[str, str] = Field(default_factory=dict)
     backend: str = "scripted"  # which agent backend produced it: anthropic, droid, scripted, replay
+    # A revision after a review edit (D19): the result it replaces, and the live edits its runs applied.
+    supersedes: str | None = None
+    edit_ids: list[str] = Field(default_factory=list)
 
 
 class Policy(BaseModel):
