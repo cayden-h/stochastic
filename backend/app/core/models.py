@@ -388,6 +388,19 @@ class BriefFieldFlag(BaseModel):
     proposed: str | None = None  # the reader's value, if it has one
 
 
+class ApprovedBrief(BaseModel):
+    """An approved Brief, kept by its agreement's hash as memory: a later deal under the same agreement reuses it,
+    also after a demo reset. An amendment is new text, so it has a new hash and is read again."""
+
+    id: str  # the agreement's normalized SHA-256
+    sha256: str
+    deal_id: str  # the deal it was approved on
+    source: str
+    brief: Brief
+    approved_by: str
+    at: datetime = Field(default_factory=now)
+
+
 class BriefDraft(BaseModel):
     """The draft Brief with its citations and flags, as /case shows it while the controller reviews it."""
 

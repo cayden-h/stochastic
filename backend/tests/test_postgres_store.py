@@ -39,7 +39,7 @@ def open_store(schema):
 def snapshot(store):
     return {attr: {k: v.model_dump(mode="json") for k, v in getattr(store, attr).items()}
             for attr in ("deals", "source_lines", "mappings", "items", "results", "tool_runs", "policies", "sessions",
-                         "edits", "adjustments", "agreements")}
+                         "edits", "adjustments", "agreements", "approved_briefs")}
 
 
 def run_to_posted(gw):
@@ -135,8 +135,18 @@ def test_an_agreement_and_its_draft_brief_survive_a_restart(schema):
     store.close()
     again = open_store(schema)
     assert snapshot(again) == before and len(again.agreements) == 1
-    assert Gateway(again).brief_draft(DEAL_ID).citations
+    gw = Gateway(again)
+    assert gw.brief_draft(DEAL_ID).citations
+    from tests.test_brief_reader_gateway import answer_kewaunee
+    answer_kewaunee(gw)
+    gw.approve_brief(CONTROLLER, DEAL_ID)
+    with gw.lock:
+        again.reset_deals(keep_memory=True)  # an approved Brief is memory: kept by its agreement hash
+    assert again.flush()
     again.close()
+    third = open_store(schema)
+    assert len(third.approved_briefs) == 1 and not third.agreements
+    third.close()
 
 
 def test_the_audit_log_refuses_update_and_delete(schema):

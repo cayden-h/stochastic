@@ -23,7 +23,9 @@ from app.core.models import (
     PREPARER,
     REVIEWER,
     SYSTEM,
+    AdjustmentProposal,
     AgreementText,
+    ApprovedBrief,
     AuditRow,
     Brief,
     BriefDraft,
@@ -380,9 +382,15 @@ class Gateway:
                 raise ValueError(f"no argument binding for {name}")
             if ekw:
                 self._check_edits_applied(name, outputs, [e.id for e in ekw["edits"]])
+        except GatewayError:
+            raise
         except ValueError as error:
             self._log(deal_id, actor, f"tool:{name}", "ALLOWED", None, reason=f"error: {error}")
             raise Invalid(str(error))
+        except Exception as error:  # a tool bug (KeyError, TypeError, ...) is refused and audited, never a 500
+            self._log(deal_id, actor, f"tool:{name}", "ALLOWED", None,
+                      reason=f"error: {type(error).__name__}: {error}"[:300])
+            raise Invalid(f"{name} failed: {type(error).__name__}: {error}")
         run = ToolRun(run_id=self.store.next_id("run"), deal_id=deal_id, tool=name, actor=actor, inputs=inputs,
                       outputs=outputs)
         self.store.tool_runs[run.run_id] = run
@@ -900,12 +908,13 @@ class Gateway:
                         verdict=test["verdict"], headroom_turns=test["headroom_turns"], run_ids=out.run_ids,
                         run_ids_by_tool=by_tool, backend=backend)
         self.store.results[result.id] = result
-        item.payload = {"result_id": result.id, "note": out.note}
+        # Learned adjustments the Preparer offered open as flags once the approval item is PROPOSED: applying one
+        # is an edit, and an edit needs that item (opened earlier, Apply answered 409 during the Reviewer's run).
+        item.payload = {"result_id": result.id, "note": out.note,
+                        "adjustment_offers": [p.model_dump() for p, _, _ in offers]}
         item.state = State.PROPOSED
         self._log(deal.id, actor, "propose:prepare_result", "ALLOWED", item.id,
                   reason=f"result {result.id}: leverage {out.leverage:.2f}x against {out.limit:.2f}x")
-        for proposal, adj, line in offers:
-            self._open_adjustment_flag(deal, item, proposal, adj, line)
         deal.stage = "awaiting_review"
         return result
 
@@ -1007,11 +1016,31 @@ class Gateway:
         self._log(deal.id, SYSTEM, "create:approve_result", "ALLOWED", approval.id,
                   reason="ready for the controller" if out.verdict == "pass" else "needs attention")
         deal.stage = "awaiting_approval" if out.verdict == "pass" else "needs_attention"
+        if approval.state == State.PROPOSED:
+            self._open_adjustment_offers(deal, self.store.items.get(result.work_item_id))
         return approval
 
+    def _open_adjustment_offers(self, deal: Deal, prep: WorkItem | None) -> None:
+        """Open the Preparer's learned-adjustment offers, checked again now; approval waits until each is answered."""
+        if prep is None:
+            return
+        offers = [AdjustmentProposal.model_validate(o) for o in prep.payload.get("adjustment_offers", [])]
+        allowed = {a.id: a for a in self.adjustments_for(deal.id)}
+        for proposal in offers:
+            adj = allowed.get(proposal.adjustment_id)
+            line = self.store.source_lines.get(proposal.line_id)
+            if adj is None or line is None or not self._adjustment_matches(adj, line, deal):
+                self._log(deal.id, SYSTEM, "adjustment:skip", "ALLOWED", proposal.adjustment_id,
+                          reason="no longer offered: retired or already offered before the approval item opened")
+                continue
+            self._open_adjustment_flag(deal, prep, proposal, adj, line)
+
     # ------------------------------------------------------------------ review edits (D19)
-    def reason_chips(self, deal_id: str, kind: str) -> list[ReasonChip]:
-        """The reasons the bubble offers for an edit of this kind. Hardcoded per deal for the demo."""
+    def reason_chips(self, deal_id: str, kind: str | None = None) -> list[ReasonChip] | dict[str, list[ReasonChip]]:
+        """The reasons the bubble offers for an edit of this kind, hardcoded per deal for the demo. With no kind,
+        both lists by kind ({"amount": [...], "remap": [...]}), which is what /case returns as `reason_chips`."""
+        if kind is None:
+            return {k: reason_chips(deal_id, k) for k in ("amount", "remap")}
         return reason_chips(deal_id, kind)
 
     def _edit(self, edit_id: str) -> Edit:
@@ -1034,9 +1063,10 @@ class Gateway:
         return None
 
     def _require_controller(self, actor: str, deal_id: str, action: str, target: str | None) -> None:
-        """Only the controller edits the books. An agent, the system, or another human is refused and logged."""
+        """Only the controller edits the books and amends or approves the Brief. An agent, the system, or another
+        human is refused and logged."""
         if actor != CONTROLLER:
-            self._deny(Denied(f"{actor} may not {action}: only {CONTROLLER} edits the combined books"),
+            self._deny(Denied(f"{actor} may not {action}: only {CONTROLLER} may"),
                        deal_id, actor, action, target)
 
     def _approval_for_edit(self, deal_id: str, actor: str, action: str, target: str | None) -> WorkItem:
@@ -1066,6 +1096,13 @@ class Gateway:
                 "limit_test": test}
         runs.update(self._naive_with_edits(deal_id, with_edits))
         return runs
+
+    @staticmethod
+    def _recompute_error(error: Exception, what: str) -> GatewayError:
+        """A refused recompute keeps its own status (503 before T1); anything else is a 422 that names the error."""
+        if isinstance(error, GatewayError):
+            return type(error)(f"{what}: {error.message}")
+        return Invalid(f"{what}: the recompute failed ({type(error).__name__}: {error})")
 
     def _whole_line_tags(self, deal_id: str) -> dict[str, str] | None:
         """The tags of the covenant flag option that counts every flagged line as debt (the as-filed reading)."""
@@ -1218,9 +1255,9 @@ class Gateway:
         edit_ids = [e.id for e in self._live_edits(deal_id)]
         try:
             runs = self._recompute(deal_id, edit_ids)
-        except GatewayError as error:  # nothing is kept but the audit rows of the runs that were made
+        except Exception as error:  # nothing is kept but the audit rows of the runs that were made
             del self.store.edits[edit.id]
-            self._deny(type(error)(f"edit not applied: {error.message}"), deal_id, actor, action, edit.id)
+            self._deny(self._recompute_error(error, "edit not applied"), deal_id, actor, action, edit.id)
         edit.run_ids = [r.run_id for r in runs.values()]
         before = self.store.results[approval.payload["result_id"]].leverage
         result, new_approval = self._revise(deal, approval, runs, edit, edit_ids)
@@ -1297,8 +1334,8 @@ class Gateway:
         edit_ids = [e.id for e in self._live_edits(deal.id, without=edit.id)]
         try:
             runs = self._recompute(deal.id, edit_ids)
-        except GatewayError as error:
-            self._deny(type(error)(f"edit not reverted: {error.message}"), deal.id, actor, action, edit.id)
+        except Exception as error:  # the edit stays live, as it was
+            self._deny(self._recompute_error(error, "edit not reverted"), deal.id, actor, action, edit.id)
         edit.status = "reverted"
         self._log(deal.id, actor, action, "ALLOWED", edit.id, reason=f"{edit.kind} {edit.company}, {edit.line} undone")
         p = self.store.policies.get(edit.policy_id) if edit.policy_id else None
@@ -1417,9 +1454,8 @@ class Gateway:
         if not text.strip():
             raise Invalid("the agreement text is empty")
         sha = agr.agreement_sha256(text)
-        reuse = next((self.store.deals[a.deal_id].brief for a in self.store.agreements.values()
-                      if a.sha256 == sha and a.deal_id in self.store.deals
-                      and self.store.deals[a.deal_id].brief_status == "approved"), None)
+        kept = self.store.approved_briefs.get(sha)
+        reuse = kept.brief if kept else None
         deal = deal.model_copy(update={"brief": reuse.model_copy(deep=True) if reuse else None,
                                        "brief_status": "approved" if reuse else "none"})
         self.create_deal(actor, deal, lines)
@@ -1483,6 +1519,17 @@ class Gateway:
         return paths
 
     @staticmethod
+    def _empty_or_shown(path: str, value: Any, flag, text: str) -> bool:
+        """A flagged field with no verified quote holds no value: empty text, a limit of 0, a cap of 0 or none. A cap
+        may hold a value only if one of the flag's evidence quotes is in the agreement and shows it."""
+        if path.endswith(".cap"):
+            return value in (None, 0) or any(agr.quote_in(e.quote, text) and agr.thousands_in(e.quote, value)
+                                             for e in flag.evidence)
+        if path == "limit":
+            return value == 0
+        return value in ("", None)
+
+    @staticmethod
     def _section_id(ref: str) -> str:
         return re.sub(r"^(section|sec\.|§)\s*", "", ref.strip(), flags=re.I)
 
@@ -1519,9 +1566,15 @@ class Gateway:
                 raise Invalid(f"{path} has no verified quote and no flag")
             if value in ("", None) and "not found in" not in (flagged.get(path).question if path in flagged else ""):
                 raise Invalid(f"{path} is empty: say where you looked, in a flag that says 'not found in sections ...'")
+            if path not in verified and not self._empty_or_shown(path, value, flagged[path], text):
+                # A flag is a question, not a quote: it never carries a value the gateway could not check.
+                raise Invalid(f"{path} has no verified quote, so it must stay empty (0 for a number) while its flag "
+                              f"is open, not {value!r}")
         bad = _brief_number_problem(brief, limit_may_be_missing="limit" in flagged)  # check 5
         if bad:
             raise Invalid(bad)
+        if brief.limit_wording and not agr.ratio_in(brief.limit_wording, brief.limit):
+            raise Invalid(f"limit {brief.limit} is not in limit_wording '{brief.limit_wording[:100]}'")
         if brief.limit_wording:
             sid = self._section_id(brief.limit_section)
             if sid not in index or not agr.quote_in(brief.limit_wording, agr.section_text(text, sid) or ""):
@@ -1534,8 +1587,12 @@ class Gateway:
                 if a.amount != 0 and not (a.inferred and path in flagged):
                     raise Invalid(f"{path} is {a.amount}: an amount comes from the books, so give 0 with "
                                   f"inferred=true, or flag it")
-        flags = [dict(field=f.field, question=f.question, evidence=f.evidence, proposed=f.proposed,
-                      proposed_by=BRIEF_READER) for f in out.flags]
+        # A reader flag's evidence is the reader's words until the gateway finds them in the agreement: only found
+        # quotes stay evidence; the others are kept apart, so the console can label them as unverified.
+        flags = [dict(field=f.field, question=f.question, proposed=f.proposed, proposed_by=BRIEF_READER,
+                      evidence=[e for e in f.evidence if agr.quote_in(e.quote, text)],
+                      unverified=[e.model_dump() for e in f.evidence if not agr.quote_in(e.quote, text)])
+                 for f in out.flags]
         for path in required:  # check 7, confidence is a hint
             if path in flagged:
                 continue
@@ -1570,7 +1627,7 @@ class Gateway:
                         proposed_by=f["proposed_by"], question=f["question"], evidence=f["evidence"],
                         options=options, default="confirm",
                         payload={"kind": "brief_field", "field": f["field"], "proposed": f["proposed"],
-                                 "parent": parent.id})
+                                 "parent": parent.id, "unverified_evidence": f.get("unverified", [])})
         self.store.items[item.id] = item
         self._log(deal.id, f["proposed_by"], "ask:flag", "ALLOWED", item.id, reason=f["question"],
                   evidence=f["evidence"])
@@ -1614,6 +1671,7 @@ class Gateway:
         draft = BriefDraft(item_id=item.id, agreement_id=ag.id, sha256=ag.sha256, brief=brief,
                            citations=out.citations, flags=[i.id for i in opened], amendments_supplied=False)
         item.state = State.PROPOSED
+        item.proposed_by = actor  # the reader is the maker, so maker-checker applies to the Brief's approval
         item.payload = {"draft": draft.model_dump(mode="json"), "note": out.note}
         self._log(deal.id, actor, "propose:draft_brief", "ALLOWED", item.id,
                   reason=f"{_count(len(out.citations), 'citation')}, {_count(len(opened), 'flag')}; base agreement "
@@ -1652,6 +1710,7 @@ class Gateway:
         action = "amend_brief"
         deal = self._deal(deal_id)
         self._require(actor, action, deal_id, deal_id)
+        self._require_controller(actor, deal_id, action, deal_id)
         if deal.brief_status == "approved":
             self._deny(IllegalTransition("the Brief is approved and locked"), deal_id, actor, action, field)
         if deal.brief_status != "draft" or deal.brief is None:
@@ -1729,6 +1788,7 @@ class Gateway:
         action = "approve_brief"
         deal = self._deal(deal_id)
         self._require(actor, action, deal_id, deal_id)
+        self._require_controller(actor, deal_id, action, deal_id)
         item = self._draft_item(deal_id)
         if deal.brief_status != "draft" or item is None:
             self._deny(IllegalTransition(f"there is no draft Brief to approve (the Brief is {deal.brief_status})"),
@@ -1751,6 +1811,9 @@ class Gateway:
             self._deny(Invalid(bad or f"{', '.join(empty)} still empty"), deal_id, actor, action, item.id)
         deal.brief, deal.brief_status = brief, "approved"
         ag = self.agreement(deal_id)
+        if ag:
+            self.store.approved_briefs[ag.sha256] = ApprovedBrief(id=ag.sha256, sha256=ag.sha256, deal_id=deal_id,
+                                                                  source=ag.source, brief=brief, approved_by=actor)
         self._sync_draft(deal)
         item.state = State.APPROVED
         self._log(deal_id, actor, action, "ALLOWED", item.id,
