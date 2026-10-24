@@ -155,7 +155,8 @@ Done when: the tests pass, and the demo beat in `design/review-companion.md` sec
 
 Status (2026-10-24 night, branch `cayden/edits`): the gateway side is built, and `backend/tests/test_edits.py` passes.
 Four figure tests skip with "needs T1 edit-aware tools" and run by themselves when Tri's T1 lands; until then an edit is refused with 503.
-Open: the curl run of the demo beat waits on T2, and the Preparer proposing a learned adjustment on a later deal is not built.
+The Preparer offers a learned adjustment on a later deal as a flag (apply or skip); applying it is an amount edit through the same recompute.
+Open: the curl run of the demo beat waits on T2.
 
 ### C3. The Brief Reader, stage 1 (about 4 hours, after C2)
 

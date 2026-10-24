@@ -318,8 +318,20 @@ Audit rows of an edit:
 | `edit:revert` | `human:controller` | edit id | The edit is undone. |
 | `policy:retire` | `system:gateway` | policy or adjustment id | Its edit was reverted. |
 
-Not built yet: on a later deal, the Preparer proposing a `LearnedAdjustment` as a flag.
-Until then an adjustment is recorded and shown, and never applied.
+### Learned adjustments on a later deal
+
+The Preparer offers each live learned adjustment that covers a line of the deal, and the gateway opens it as a flag; it is never applied silently.
+An adjustment covers a line with the same name at the same company, or at the target of a deal whose platform is `LearnedAdjustment.platform`.
+`Gateway.adjustments_for(deal_id)` lists the ones the Preparer may offer: not retired, not learned on this deal's own edits, and not already offered on this deal.
+The job runner passes them as `PreparerInput.adjustments`, and the Preparer returns `PreparerOutput.adjustment_flags` (`adjustment_id`, `line_id`, `question`).
+`store_result` refuses an offer the gateway would not make: an unknown or retired adjustment, a line it does not cover, or the same adjustment twice.
+The flag is a `flag` work item with `payload.kind` `adjustment`, proposed by the Preparer, with options `apply` and `skip` (default `skip`).
+While it is open, the adjustment's status is `proposed`.
+An adjustment flag does not block the Preparer, the Reviewer, or `consolidate` (`open_flags` leaves it out; `open_adjustment_flags` lists it), but approval is refused while one is open.
+Answering `apply` calls `apply_edit` with the adjustment's amount on that line, then `reason_edit` with the adjustment's reason and `remember=False`, so it shows in Your edits with `Edit.from_adjustment_id`.
+Answering `skip` leaves the books as the agents made them.
+Either way the adjustment goes back to `applied`, live for later deals.
+Audit rows: `ask:flag` (the Preparer) and `adjustment:propose` when it opens, `answer` and `adjustment:apply` or `adjustment:skip` when it is answered.
 
 ## The stream
 
