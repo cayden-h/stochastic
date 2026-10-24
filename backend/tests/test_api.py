@@ -91,6 +91,26 @@ def test_next_events_stage_and_audit():
     assert events == [] and seen3 == seen2 and last2 == last
 
 
+def test_next_events_audit_cursor_after_reset():
+    from app.agents.jobs import advance
+    from app.api.events import next_events
+    from app.db.fixtures.kewaunee import seed
+    from app.db.memory import MemoryStore
+    from app.gateway.gateway import Gateway
+
+    store = MemoryStore()
+    gw = Gateway(store)
+    seed(store, gw)
+    advance(gw, DEAL_ID)
+    rows = [a for a in store.audit if a.deal_id == DEAL_ID]
+    assert rows
+
+    events, seen, _ = next_events(store, DEAL_ID, len(rows) + 50, "new")
+    audits = [d for k, d in _parse(events) if k == "audit"]
+    assert len(audits) == len(rows)
+    assert seen == len(rows)
+
+
 def test_next_events_missing_deal():
     from app.api.events import next_events
     from app.db.memory import MemoryStore

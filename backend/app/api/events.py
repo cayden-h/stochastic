@@ -30,9 +30,11 @@ def next_events(store, deal_id: str, seen_audit: int, last_stage: str | None) ->
         out.append(stage_event())
         last_stage = deal.stage
     rows = [a for a in store.audit if a.deal_id == deal_id]
+    if len(rows) < seen_audit:
+        seen_audit = 0  # the audit list is replaced on /dev/reset, so replay from the start
     for row in rows[seen_audit:]:
         out.append(_sse("audit", row.model_dump(mode="json")))
-    seen_audit = max(seen_audit, len(rows))
+    seen_audit = len(rows)
     if deal.stage != last_stage:
         out.append(stage_event())
         last_stage = deal.stage
