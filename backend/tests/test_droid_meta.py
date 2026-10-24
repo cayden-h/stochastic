@@ -3,9 +3,11 @@ import json
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.agents.backends.droid_backend import served_model  # noqa: E402
+from app.agents.backends.droid_backend import reasoning_enum, served_model  # noqa: E402
 from app.agents.settings import role_reasoning  # noqa: E402
 
 
@@ -43,3 +45,10 @@ def test_reasoning_effort_is_explicit_per_role(monkeypatch):
     assert role_reasoning("DROID", "mapper") == "medium"
     monkeypatch.setenv("DROID_REASONING_EFFORT_MAPPER", "xhigh")
     assert role_reasoning("DROID", "mapper") == "xhigh" and role_reasoning("DROID", "reviewer") == "medium"
+
+
+def test_reasoning_effort_becomes_the_sdk_enum():
+    pytest.importorskip("droid_sdk")
+    assert reasoning_enum("medium").value == "medium"
+    with pytest.raises(ValueError, match="not one of"):
+        reasoning_enum("turbo")

@@ -119,7 +119,7 @@ Two findings about Droid and models [verified by a probe on 2026-10-24, 05:00]:
 ## 8a. Cost
 
 Every Droid run returns `usage` with tokens and `factory_credits`; the runner keeps a per-process total, shown in `GET /health` under `backend.totals_this_process`, and each entry of `last_runs` shows its own usage. [verified: probe output `Usage(... factory_credits=206.0)` for a one-line Haiku 5.5 prompt]
-Haiku 5.5 is the default for that reason. A full deal on Haiku 5.5 is three Droid runs (the flag what-ifs are code, not model calls). Read the total after each rehearsal and write it into the run log below, so the credits last the weekend.
+Haiku 5.5 is the default for that reason. A full deal on Haiku 5.5 is three Droid runs (the flag what-ifs are code, not model calls). A full deal on Haiku 5.5 at medium effort cost 11,942 credits on 2026-10-24 (see the run log). Read the total after each rehearsal and write it into the run log below, so the credits last the weekend.
 
 ## 9. Run log on the demo deal
 
@@ -131,6 +131,7 @@ Haiku 5.5 is the default for that reason. A full deal on Haiku 5.5 is three Droi
 | 2026-10-24 04:00 | droid, claude-haiku-5-5, before line notes | 1 covenant flag but the default reading counted the financing liability as debt (did not know it was Statesville); 2 bundled mapping flags using line ids | Preparer ran; Reviewer returned needs-attention over an unnamed leverage run id | 1.76x, review needs-attention |
 | 2026-10-24 04:30 | droid, claude-haiku-5-5, with line notes, named run ids, and the tightened prompts | 1 covenant flag with 3 readings (agreement 0.77x, short-term borrowings excluded 0.74x, all counted 2.57x over), 2 mapping flags of three lines each, by name | ran, pass, with reasons citing the run ids | 0.77x OK, recorded in `recordings/haiku-5-5/`; no longer the default replay, see section 7 |
 | 2026-10-24 evening | droid, claude-haiku-5-5, after the settle-every-line rule, the add-backs, and the console rebuild | 1 covenant flag over six lines with 3 readings, every option settling every line (agreement 0.76x, none excluded 2.54x, short-term arrangements unsecured 0.73x); 1 mapping flag over six lines | ran, pass, reasons cite the tie-out and limit_test run ids | 0.76x OK, recorded in `recordings/haiku-5-5-run2/`; Mapper scored 33 of 33 against Note 2 |
+| 2026-10-24 late | droid, claude-haiku-5-5 at medium effort, model confirmed from the session record | same flags | ran, pass | 0.76x OK, not recorded. Credits: Mapper 5,845, Preparer 5,045, Reviewer 1,052, so 11,942 for the whole deal on Haiku 5.5 |
 
 Figures in the log are as computed at the time. Since Tri's interest-income fix on 2026-10-24, the same recordings replay at 0.76x covenant and 2.54x whole-line.
 

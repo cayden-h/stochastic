@@ -78,7 +78,7 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None):
             kwargs["model"] = model
         effort = role_reasoning("DROID", role.name)
         if effort:
-            kwargs["reasoning_effort"] = effort
+            kwargs["reasoning_effort"] = reasoning_enum(effort)
         result = await run(prompt, **kwargs)
     if not result.success or result.output is None:
         raise RuntimeError(f"droid run failed: {getattr(result, 'error', None)} "
@@ -97,6 +97,15 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None):
                            "reasoning_effort_requested": effort,
                            "model_served": served.get("model"), "reasoning_effort_served": served.get("reasoning_effort"),
                            "model_confirmed": bool(model) and served.get("model") == model, "usage": cost}
+
+
+def reasoning_enum(effort: str):
+    """The SDK takes its ReasoningEffort enum, not a string; a bad value raises here, before any session is opened."""
+    from droid_sdk import ReasoningEffort
+    try:
+        return ReasoningEffort(effort)
+    except ValueError as error:
+        raise ValueError(f"DROID_REASONING_EFFORT {effort!r} is not one of {[e.value for e in ReasoningEffort]}") from error
 
 
 SESSIONS_DIR = os.getenv("FACTORY_SESSIONS_DIR", os.path.expanduser("~/.factory/sessions"))
