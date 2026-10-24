@@ -94,7 +94,9 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /runs/{run_id}` | any | One tool run: tool, inputs, outputs |
 | `GET /agents/memory` | any | Policies and sessions |
 | `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, `stage` events, and `edit` events (shapes below) |
-| `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, `brief` (a JSON string of the Brief), and files `platform_csv` and `target_csv`. Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}}`. 422 names the file, row, and column. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
+| `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, files `platform_csv` and `target_csv`, and exactly one of `brief` (a JSON string of the Brief; the reader is skipped) or `agreement_txt` (the credit agreement as a UTF-8 `.txt` file, same 2 MB limit; the deal starts with `brief_status` `none` and the run starts with the Brief Reader, unless an approved Brief for the same agreement hash is reused). Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}, "brief_status"}`. 422 when neither or both of `brief` and `agreement_txt` are sent, for an empty or non-UTF-8 agreement or a name not ending in `.txt`, and naming the file, row, and column for a bad CSV. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
+| `POST /deals/{id}/brief/amounts` | human (controller) | Set fields of the draft Brief (D20), most often an adjustment amount from the books with its source. Body `{"amounts": [{"field": "ebitda_addbacks[2].amount", "value": 698.0, "source_ref": "...", "inferred": false, "note": ""}]}`; each entry goes through `gateway.amend_brief` in order (a new adjustment is added by its `.name` at the next index). Returns `{"brief", "brief_draft", "brief_status", "stage"}` (response model `BriefAmountsResponse`). 404 unknown deal; 422 for an empty list, a boolean or non-finite `value` (the message names the field path), or a gateway refusal (unknown field, an amount with no `source_ref`); 403 for an agent (DENIED row, before any write); 409 when there is no draft or the Brief is approved. A refusal stops the list there; the entries before it stay applied. |
+| `POST /deals/{id}/brief/approve` | human (controller) | Approve the draft Brief through `gateway.approve_brief`; it is locked and mapping can start. Returns the deal (`brief_status` `approved`, `stage` `new`). 404 unknown deal; 403 for an agent, or while a `brief_field` flag is open; 409 when there is no draft (a second approve, or a deal whose Brief came as JSON). |
 | `POST /deals/{id}/run` | human | Run the job runner until the deal waits on a human. Body `{"backend": "droid", "sync": true}` is optional. |
 | `POST /work-items/{id}/answer` | human | `{"option_id": "b"}`. Posts the flag and, if no flag is open, continues the run in the background. `?auto_advance=false` turns that off. |
 | `POST /work-items/{id}/approve` | human | Approve the result. The gateway posts it. |
@@ -135,7 +137,8 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 
 `edits`, `adjustments`, and `brief_draft` are the phase 2 additions (shapes in the next section).
 They are on `/case` and `CaseResponse` now (verified by `backend/tests/test_case_phase2.py`).
-The edit routes (`POST /deals/{id}/edits`, `POST /edits/{id}/reason`, `DELETE /edits/{id}`) fill `edits` and `adjustments` (verified by `backend/tests/test_api_edits.py`); the Brief Reader routes fill `brief_draft` when they land, and until then it is null.
+The edit routes (`POST /deals/{id}/edits`, `POST /edits/{id}/reason`, `DELETE /edits/{id}`) fill `edits` and `adjustments` (verified by `backend/tests/test_api_edits.py`); `brief_draft` is the live draft from `gateway.brief_draft` (the Brief, its citations, its flag ids, `removed`), null for a deal whose Brief came as JSON or before the reader ran (verified by `backend/tests/test_api_brief.py`).
+`deal.brief` is null while a deal from agreement text has no draft yet.
 `reason_chips` holds the chips the edit bubble offers, per kind (`amount`, `remap`), from the gateway's `reason_chips`; they are hardcoded per deal for the demo.
 `edits` lists the deal's edits in order, reverted ones included; `adjustments` lists every learned adjustment, as `policies` does.
 They are declared in `CaseResponse` in `backend/app/api/schemas.py`:
@@ -405,8 +408,11 @@ A `stage` event is sent once on connect and again whenever the stage changes:
 
 ```
 event: stage
-data: {"deal_id": "d_kequ_nuaire", "stage": "awaiting_flag", "open_flags": ["wi_002"], "at": "<iso timestamp>"}
+data: {"deal_id": "d_kequ_nuaire", "stage": "awaiting_flag", "open_flags": ["wi_002"], "brief_status": "approved", "at": "<iso timestamp>"}
 ```
+
+`brief_status` is the deal's (`none`, `draft`, or `approved`).
+Every change of it in the gateway comes with a stage change, so it has no event of its own.
 
 An `edit` event is sent whenever the deal's edits change (an edit applied, reasoned, or reverted), with every edit's id and status in order; nothing is sent on connect while the deal has no edits:
 

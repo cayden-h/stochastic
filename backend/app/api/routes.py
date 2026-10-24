@@ -22,7 +22,8 @@ from app.agents.jobs import advance
 from app.api import certificate as cert_doc
 from app.api import export as export_doc
 from app.api.events import next_events
-from app.api.schemas import CaseResponse, DealCreated, EditBody, EditReasonBody, EditResponse, HealthResponse
+from app.api.schemas import (BriefAmountsBody, BriefAmountsResponse, CaseResponse, DealCreated, EditBody,
+                             EditReasonBody, EditResponse, HealthResponse)
 from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, Edit, State
 from app.db.loader import MAX_BYTES, LoaderError, parse_statement_csv
 from app.gateway.gateway import Gateway, GatewayError
@@ -230,7 +231,7 @@ def build_router(gw: Gateway) -> APIRouter:
             capacity, capacity_run = _debt_capacity(store, result)
             verdict = {"leverage": result.leverage, "limit": result.limit, "verdict": result.verdict,
                        "headroom_turns": result.headroom_turns, "ebitda": result.ebitda, "debt": result.debt,
-                       "debt_term": d.brief.debt_term, "debt_capacity": capacity,
+                       "debt_term": d.brief.debt_term if d.brief else "", "debt_capacity": capacity,
                        "debt_capacity_run_id": capacity_run, "review": dump(result.review) if result.review else None,
                        "tie_out_ok": result.tie_out_ok, "backend": result.backend,
                        "approval_item": approval.id if approval else None,
@@ -254,7 +255,7 @@ def build_router(gw: Gateway) -> APIRouter:
             "backend": backend_status(),
             "edits": [dump(e) for e in store.deal_edits(deal_id)],
             "adjustments": [dump(a) for a in store.adjustments.values()],
-            "brief_draft": None,  # the Brief Reader routes fill this later
+            "brief_draft": dump(draft) if (draft := gw.brief_draft(deal_id)) else None,
             "reason_chips": {kind: [dump(c) for c in gw.reason_chips(deal_id, kind)] for kind in ("amount", "remap")},
         }
 
@@ -345,10 +346,10 @@ def build_router(gw: Gateway) -> APIRouter:
                 "sessions": [dump(s) for s in store.sessions.values()], "backend": backend_status()}
 
     # ------------------------------------------------------------------ writes (human)
-    async def read_upload(field: str, upload: UploadFile) -> str:
-        """Read one CSV upload with a hard size cap. Never trusts content-length."""
-        if not (upload.filename or "").lower().endswith(".csv"):
-            raise HTTPException(status_code=422, detail=f"{field}: file name must end in .csv")
+    async def read_upload(field: str, upload: UploadFile, ext: str = ".csv") -> str:
+        """Read one upload (a CSV, or the agreement as .txt) with a hard size cap. Never trusts content-length."""
+        if not (upload.filename or "").lower().endswith(ext):
+            raise HTTPException(status_code=422, detail=f"{field}: file name must end in {ext}")
         raw = await upload.read(MAX_BYTES + 1)
         if len(raw) > MAX_BYTES:
             raise HTTPException(status_code=422, detail=f"{field}: file is larger than {MAX_BYTES // (1024 * 1024)} MB")
@@ -361,10 +362,14 @@ def build_router(gw: Gateway) -> APIRouter:
     async def create_deal(name: str = Form(..., min_length=1, max_length=200),
                           platform: str = Form(..., min_length=1, max_length=100),
                           target: str = Form(..., min_length=1, max_length=100),
-                          brief: str = Form(...),
+                          brief: str | None = Form(None),
                           platform_csv: UploadFile = File(...), target_csv: UploadFile = File(...),
+                          agreement_txt: UploadFile | None = File(None),
                           x_actor: str = Header(default=CONTROLLER)):
-        """Load an unseen deal from two statement CSVs and a brief (JSON). Does not run the deal.
+        """Load an unseen deal from two statement CSVs and either a brief (JSON) or the credit agreement as text
+        (agreement_txt), exactly one. Does not run the deal. With the agreement, the deal starts with no Brief
+        (brief_status "none") and the run starts with the Brief Reader, unless an approved Brief for the same
+        agreement text is reused by its hash.
 
         The console calls POST /deals/{id}/run next. /dev/reset reseeds only the demo deal, so uploaded deals
         are lost on reset, which is fine for the demo.
@@ -373,17 +378,28 @@ def build_router(gw: Gateway) -> APIRouter:
         name, platform, target = name.strip(), platform.strip(), target.strip()
         if not name or not platform or not target or platform.lower() == target.lower():
             raise HTTPException(status_code=422, detail="name, platform and target are required, and platform and target must differ")
+        has_brief, has_agreement = bool(brief and brief.strip()), agreement_txt is not None
+        if has_brief == has_agreement:
+            raise HTTPException(status_code=422, detail="send exactly one of brief (a JSON string) or agreement_txt "
+                                                        "(the credit agreement as a .txt file)")
         platform_text = await read_upload("platform_csv", platform_csv)
         target_text = await read_upload("target_csv", target_csv)
-        try:
-            parsed_brief = Brief.model_validate_json(brief)
-        except ValidationError as error:
-            raise HTTPException(status_code=422, detail=f"brief: {error.errors()[0]['loc']} {error.errors()[0]['msg']}")
-        bad_path = first_non_finite(parsed_brief)
-        if bad_path:
-            raise HTTPException(status_code=422, detail=f"brief: {bad_path} must be finite")
-        if not math.isfinite(parsed_brief.limit) or parsed_brief.limit <= 0:
-            raise HTTPException(status_code=422, detail="brief: limit must be a finite number greater than 0")
+        parsed_brief, agreement_text = None, None
+        if has_agreement:
+            agreement_text = await read_upload("agreement_txt", agreement_txt, ext=".txt")
+            if not agreement_text.strip():
+                raise HTTPException(status_code=422, detail="agreement_txt: the agreement text is empty")
+        else:
+            try:
+                parsed_brief = Brief.model_validate_json(brief)
+            except ValidationError as error:
+                raise HTTPException(status_code=422,
+                                    detail=f"brief: {error.errors()[0]['loc']} {error.errors()[0]['msg']}")
+            bad_path = first_non_finite(parsed_brief)
+            if bad_path:
+                raise HTTPException(status_code=422, detail=f"brief: {bad_path} must be finite")
+            if not math.isfinite(parsed_brief.limit) or parsed_brief.limit <= 0:
+                raise HTTPException(status_code=422, detail="brief: limit must be a finite number greater than 0")
         deal_id = store.next_id("d")
         loaded = {}
         for field, company, text in (("platform_csv", platform, platform_text), ("target_csv", target, target_text)):
@@ -391,10 +407,40 @@ def build_router(gw: Gateway) -> APIRouter:
                 loaded[field] = parse_statement_csv(text, company, deal_id, store.next_id)
             except (LoaderError, ValueError, ValidationError) as error:
                 raise HTTPException(status_code=422, detail=f"{field}: {error}")
-        deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=parsed_brief)
-        guard(lambda: gw.create_deal(x_actor, deal, loaded["platform_csv"] + loaded["target_csv"]))
-        return {"deal_id": deal_id, "stage": deal.stage,
+        lines = loaded["platform_csv"] + loaded["target_csv"]
+        if has_agreement:
+            deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=None, brief_status="none")
+            source = (agreement_txt.filename or "agreement.txt").strip()[:200]
+            created = guard(lambda: gw.create_deal_from_agreement(x_actor, deal, lines, agreement_text, source=source))
+        else:
+            deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=parsed_brief)
+            guard(lambda: gw.create_deal(x_actor, deal, lines))
+            created = store.deals[deal_id]
+        return {"deal_id": deal_id, "stage": created.stage, "brief_status": created.brief_status,
                 "lines": {"platform": len(loaded["platform_csv"]), "target": len(loaded["target_csv"])}}
+
+    # ------------------------------------------------------------------ the Brief Reader (D20), thin over the gateway
+    @r.post("/deals/{deal_id}/brief/amounts", response_model=BriefAmountsResponse)
+    def brief_amounts(deal_id: str, body: BriefAmountsBody, x_actor: str = Header(default=CONTROLLER)):
+        """The controller sets fields of the draft Brief, most often an add-back amount from the books with its
+        source. Each entry goes through gateway.amend_brief in order; a refusal stops the list there (the entries
+        before it stay applied, each with its own audit row)."""
+        need_deal(deal_id)
+        guard(lambda: gw._require(x_actor, "amend_brief", deal_id, deal_id))  # an agent is refused before any write
+        brief = None
+        for a in body.amounts:
+            brief = guard(lambda a=a: gw.amend_brief(x_actor, deal_id, a.field, a.value, source_ref=a.source_ref,
+                                                     inferred=a.inferred, note=a.note))
+        d = store.deals[deal_id]
+        draft = gw.brief_draft(deal_id)
+        return {"brief": dump(brief), "brief_draft": dump(draft) if draft else None,
+                "brief_status": d.brief_status, "stage": d.stage}
+
+    @r.post("/deals/{deal_id}/brief/approve")
+    def brief_approve(deal_id: str, x_actor: str = Header(default=CONTROLLER)):
+        """The controller approves the draft Brief; it is then locked and mapping can start. No agent can."""
+        need_deal(deal_id)
+        return dump(guard(lambda: gw.approve_brief(x_actor, deal_id)))
 
     @r.post("/deals/{deal_id}/run")
     def run_deal(deal_id: str, body: RunBody | None = None, tasks: BackgroundTasks = None,

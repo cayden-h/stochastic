@@ -1,13 +1,13 @@
 """Response models for the console. /docs and /openapi.json show these shapes."""
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 import math
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
 
-from app.core.models import (AgentSession, BriefDraft, Deal, Edit, EditKind, LearnedAdjustment, Mapping, Policy,
+from app.core.models import (AgentSession, Brief, BriefDraft, Deal, Edit, EditKind, LearnedAdjustment, Mapping, Policy,
                              ReasonChip, Result, Review, Section, SourceLine, WorkItem)
 
 
@@ -201,7 +201,43 @@ class HealthResponse(BaseModel):
 
 
 class DealCreated(BaseModel):
-    """Result of POST /deals: the new deal id, its stage, and how many lines each company loaded."""
+    """Result of POST /deals: the new deal id, its stage, how many lines each company loaded, and the Brief's status
+    ("approved" for a Brief sent as JSON or reused by the agreement's hash, "none" until the reader runs)."""
     deal_id: str
     stage: str
     lines: dict[str, int]
+    brief_status: Literal["approved", "draft", "none"] = "approved"
+
+
+class BriefAmount(BaseModel):
+    """One field of the draft Brief to set, by path (for example "ebitda_addbacks[2].amount"). An amount is USD
+    thousands from the books and needs source_ref; the gateway checks the path, the type, and the source."""
+    field: str = Field(min_length=1, max_length=200)
+    value: Any = None  # a number for an amount, a cap, or the limit; text for a text field; null for no cap
+    source_ref: str | None = Field(default=None, max_length=500)
+    inferred: bool = False
+    note: str = Field(default="", max_length=2000)
+
+    @model_validator(mode="after")
+    def _finite(self) -> "BriefAmount":
+        """A boolean is not a number, and a figure must be finite. The message names the field path."""
+        if isinstance(self.value, bool):
+            raise ValueError(f"{self.field}: value must be a JSON number or text, not a boolean")
+        if isinstance(self.value, float) and not math.isfinite(self.value):
+            raise ValueError(f"{self.field}: value must be a finite number")
+        if not isinstance(self.value, (int, float, str, type(None))):
+            raise ValueError(f"{self.field}: value must be a JSON number, text, or null")
+        return self
+
+
+class BriefAmountsBody(BaseModel):
+    """POST /deals/{id}/brief/amounts: one or more fields of the draft Brief, applied in order."""
+    amounts: list[BriefAmount] = Field(min_length=1, max_length=100)
+
+
+class BriefAmountsResponse(BaseModel):
+    """The amended Brief and the draft as /case shows it, with the stage after the amendments."""
+    brief: Brief
+    brief_draft: BriefDraft | None = None
+    brief_status: Literal["approved", "draft", "none"]
+    stage: str
