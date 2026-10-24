@@ -102,3 +102,12 @@ Items in another person's folder say who to ask.
 - [x] Turn off the Next.js dev indicator, or demo from `next build && next start`. Done 2026-10-24 evening (0e3829f, 3938ca9).
 - [x] Count "Learned" only from a real `policy_id`, not the reason text. Done 2026-10-24 evening (0e3829f, 3938ca9).
 - [x] Review screenshots: superseded, the issues they showed are fixed in the console (commit 3938ca9) and checked at 1280 and 1920 in a headless browser.
+
+## 6. Desktop app and review edits (D19, start after the demo beat is done)
+
+Spec: `docs/design/review-companion.md`.
+- [ ] Electron shell: loads the built console, hidden title bar, 1280 by 800 minimum, save dialog for Download final files (section 11).
+- [ ] Edit routes in the gateway: `POST /deals/{id}/edits`, `POST /edits/{id}/reason`, `DELETE /edits/{id}`, `edits` on the case. Audit rows as `human:controller`, recompute through the tools, the Reviewer's checks re-run, approval refused while an edit has no reason (section 10).
+- [ ] Learning: a remap reason becomes a platform-scoped `Policy`; an amount reason becomes an adjustment the Preparer proposes next time; Undo retires it.
+- [ ] Companion layer in the console: cursor follow, glide to the cell, bubble, states (sections 5 and 6). Coordinate with Josie on the files.
+- [ ] Hardcoded reason chips for the demo deal.

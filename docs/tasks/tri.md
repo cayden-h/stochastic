@@ -30,3 +30,9 @@ From the risk review (D18 in `decisions.md`); every change has tests, 167 offlin
 - `backend/app/main.py`: `/dev/reset` refuses with 409 during a run, frees the fork slot, and returns `keep_memory`; `app.state.gateway` is set for tests.
 - The gateway (Cayden's) now refuses numbers from agents in `leverage` (system only), and checks that `debt_run_id` and `ebitda_run_id` name runs of those tools.
 - Tests touched in `backend/tests/`: `test_api.py`, `test_demo_run.py`, `test_trust_rules.py`, `test_mapper_retry.py`, and new `test_gateway_guards.py` and `test_demo_reset.py`.
+
+## Desktop app and review edits (D19)
+
+Spec: `docs/design/review-companion.md`.
+- [ ] Recompute with an edit applied: the consolidate, EBITDA, covenant debt, and leverage tools take the controller's edits as inputs, with new run ids. Tests: an amount edit moves leverage by the hand-computed amount; a remap moves the line between sections and the tie-out still holds.
+- [ ] `GET /deals/{id}/export.xlsx` (409 before approval): Combined sheet with edited cells filled and noted, an Edits sheet, an Audit sheet (section 8). Add the edits to the certificate.
