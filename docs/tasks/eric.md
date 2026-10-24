@@ -3,14 +3,13 @@
 Branch: `eric/data`.
 Folders: `data/`, `scripts/`, `evals/`.
 
-1. Pull the Kewaunee and Nu Aire filings. Use the links in `docs/research/real-deal-candidates.md`.
-2. Put the filings in `data/`. Git ignores this folder.
-3. Use a real contact email in the SEC User-Agent.
-4. Build the platform file (Kewaunee) as a CSV of statement lines. Put the script in `scripts/`.
-5. Build the target file (Nu Aire) the same way. Use the audited statements for the year to 2024-09-30.
-6. Build the answer key from Note 2 in Ex 99.2. List each Nu Aire line and its Kewaunee line. Put it in `evals/`.
-7. Mark the answer key as preliminary. It matches in shape only.
-8. Write the brief. State the 2.50x limit. Give the covenant definitions of Senior Funded Bank Debt and EBITDA, with section numbers.
-9. Write down the facts behind the flag. Cover the "Financing liability" line, its parts, and what the credit agreement excludes.
-10. Quote the filing in fewer than 15 words, with the exhibit and section.
-11. Draft the Devpost text and the real-versus-simulated list by Saturday night.
+The filings are already read and the figures are loaded in `backend/app/db/fixtures/kewaunee.py` (Cayden, 2026-10-24). Your job is to check them, make them yours, and build the proof around them.
+
+1. Check every figure in the fixture against the filings. The sources are in the file header. Flag any difference to Cayden.
+2. Export the platform file (Kewaunee) and the target file (Nu Aire) as CSVs in `data/` (git-ignored), with the fixture's columns: company, line, section, period, amount, unit, source_ref, is_total.
+3. Write `scripts/load_lines.py` that reads those CSVs into `SourceLine` rows, so the fixture and `POST /deals` can use it.
+4. Build the answer key from Note 2 of Ex 99.2 in `evals/answer_key.csv`: each Nu Aire line and its Kewaunee line. Mark it preliminary, shape only.
+5. Score the Mapper: run `POST /deals/d_kequ_nuaire/run`, read `GET /deals/d_kequ_nuaire/mappings`, count agreements with the key, and write the score, the date, and the backend into `evals/README.md`.
+6. Write the flag card facts: the "Financing liability" line, its three parts ($27,782K sale-leaseback, $20,563K PNC term loan and revolver, $22,540K seller notes), and the agreement's two exclusions, with quotes under 15 words and the exhibit and section.
+7. Write the brief as prose for the Devpost and the slide.
+8. Draft the Devpost text and the real-versus-simulated list by Saturday night. The honest-limits list is in `demo-script.md` section 6.

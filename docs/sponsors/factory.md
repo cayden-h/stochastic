@@ -288,7 +288,7 @@ Open build choices (the agent-framework comparison is in `../research/agent-fram
 - Factory also ships a Python Droid SDK, so the whole backend can stay in one language. It has `run(prompt, output=PydanticModel)`, in-process `@tool` tools that can call our REST gateway, and a real allowlist (`restrict_tools`). The TypeScript SDK has no allowlist. [verified: https://docs.factory.com/sdk/python.md]
 - Prefer the Python SDK over the TypeScript one. This replaces the earlier idea of a TypeScript runner that calls the Python gateway. [inferred]
 - Write one `run_agent(role, item)` function with two backends, switched by `AGENT_BACKEND`. The Anthropic API is the real path and the stage fallback. The Droid SDK handles the agents that run through it. Claim "built with Droid" only for runs that went through it. [inferred, from the framework report]
-- Run each agent as a fresh `run()` call per work item, so the agents stay stateless and replicable. Do not reuse a multi-turn session. [inferred]
+- Run each agent once per work item. Agents are stateful (decided 2026-10-24): the backend keeps one Droid session per role and the gateway keeps the policies, so a session may be resumed. [inferred]
 - Skip A2A. Agents pass work items through the gateway, and A2A adds a second path. [inferred]
 - Keep a recorded output and a config flag that routes the same work item to a plain model call, in case the CLI fails live.
 
@@ -296,3 +296,36 @@ Still unconfirmed, ask at the 6pm Friday workshop:
 1. Which models the key lists through `listModels()`, and whether Claude models are available.
 2. Whether use beside our own stack qualifies for the Factory prize, and what the rubric is.
 3. How the hackathon credits attach to a Plus account, when they expire, and what the rate limits are for four people.
+
+## Update 2026-10-24: Factory's Cal Hacks deck
+
+Source: https://factory-davidgu.github.io/calhacks13/ (a 12-slide intro by David G. of Factory, titled "Put an agent in your hack").
+We read the deck's `slides.json`. The deck is Factory's own material, so claims here are self-reported by Factory.
+
+What the deck confirms:
+- Setup has three steps: install the CLI with `curl -fsSL https://app.factory.ai/cli | sh`, add the SDK with `npm install @factory/droid-sdk`, and create a key at `app.factory.ai/settings/api-keys`. Node 20 or later is needed. [verified: deck slide 3]
+- The SDK starts `droid` for you, so the CLI must be on `PATH`. The SDK reads `FACTORY_API_KEY` from the environment. [verified: deck slide 3]
+- `run(prompt, options)` is a one-shot call, and `run()` closes its session. Our first Droid backend uses it per work item; per-role session resume is the next step. [verified: deck slide 4]
+- Structured output works in the TypeScript SDK with `outputFormat` and a JSON Schema from Zod, and the result is in `result.structuredOutput`. [verified: deck slide 5]
+- `createSession()` keeps context across prompts. We do not use it. [verified: deck slide 6]
+- A daemon (`droid daemon --port 37643`) lets a web page run sessions through `connectToDaemon()`. We do not need it. The deck warns not to put a real API key in a public web page. [verified: deck slide 7]
+- Factory lists "Multi-agent apps" as a use case: run several sessions at once and let one agent hand work to the others. This fits our replicable agents. [verified: deck slide 8]
+
+Credits:
+- The cover slide has a link to a Google Form to claim Factory credits: https://docs.google.com/forms/d/e/1FAIpQLSd90bta_Gj7szptt1sprHlO2mz_t-ZGeXHWO0e-p_rcuh2fgQ/viewform
+- Each team member who wants credits must submit the form with their own details. We did not submit it. [verified: deck slide 1]
+- The amount and the expiry are not in the deck. The earlier Slack post said $200 per member. [self-reported, Slack 2026-10-23]
+
+What the deck does not say:
+- It has no prize rules, no judging criteria, and no model list. The prize rubric is still unknown.
+- It does not mention a tool allowlist. The framework report says the Python SDK has `restrict_tools` and the TypeScript SDK has none. [verified: `../research/agent-framework-options.md`]
+
+Risks for us (inferred):
+- Droid is a coding agent. The deck says it works in the current directory, reads files, and uses its tools. A finance agent must not get that access. Run each agent in an empty working directory, and allow only our tools.
+- The deck teaches the TypeScript SDK, and the Factory prompt on slide 3 says "Use the typescript Factory Droid SDK". Our plan uses the Python SDK. If a judge expects TypeScript, say that the Python SDK is also from Factory.
+- If the Python SDK fails to install or run, the fallback is a small TypeScript runner that the Python gateway calls. The `anthropic` backend remains the main fallback.
+
+Updated to-do:
+1. Each team member claims credits with the form, if they want them.
+2. Cayden runs `list_models()` and tests one `run()` call with structured output, in an empty directory.
+3. Cayden tests the tool allowlist (`restrict_tools`) before any finance data goes in.

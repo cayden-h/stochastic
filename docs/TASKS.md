@@ -1,96 +1,98 @@
 # Tasks: who builds what
 
-Last updated: 2026-10-23.
+Last updated: 2026-10-24, 02:30.
 The product and scope are in `STOCHASTIC.md`. This file only splits the work.
-We do not know each person's strengths from our notes. [inferred]
-The split below follows the work, so swap tasks freely and tell the team when you do.
 Josie owns UI and UX only. She gets no other task.
+Swap tasks freely and tell the team when you do.
 
-## Per-person files, branches, and folders
+## State of the build
 
-Each person has a task file in `tasks/`, a branch, and a set of folders they own.
-The table and the rules for parallel work are in `tasks/README.md`.
+The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.77x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 17 tests pass. [verified: `backend/tests/test_trust_rules.py`]
+Not yet run live: the Anthropic backend (no key in `.env`) and the Droid backend (the `droid` CLI is not installed).
+Not yet done: the console on the new API, the Note 2 answer key, the Devpost text, the recorded model run, the rehearsals.
 
 ## The four seats
 
-| Person | Area |
-| --- | --- |
-| Cayden | Agent layer, gateway changes, and the demo run |
-| Josie | UI and UX only |
-| Eric | Data: the two input files, the brief, the answer key, and the real-deal facts |
-| Tri | Math tools, tests, and the API that the console reads |
+| Person | Area | Branch | Folders |
+| --- | --- | --- | --- |
+| Cayden | Agent layer, gateway, demo run | `cayden/agents` | `backend/app/agents/`, `backend/app/gateway/`, `backend/app/core/` |
+| Josie | UI and UX only | `josie/design` | `frontend/`, `docs/design/` |
+| Eric | Data, answer key, facts, Devpost | `eric/data` | `data/`, `scripts/`, `evals/` |
+| Tri | Math tools, tests, API | `tri/tools` | `backend/app/tools/`, `backend/app/api/`, `backend/app/db/`, `backend/tests/` |
 
-## Shared contract (agree first, 30 minutes)
+Cayden wrote first versions of `backend/app/tools/finance.py`, `backend/app/api/routes.py`, `backend/app/db/fixtures/kewaunee.py`, and `backend/tests/test_trust_rules.py` so the pipeline could run. Tri and Eric own them from here.
 
-Write these down before anyone builds. Put them in `architecture/gateway-and-api.md`.
+## Shared contract (done)
 
-1. The shape of a source line: `company`, `line`, `section` (income statement or balance sheet), `period`, `amount`, `unit`, `source_ref`.
-2. The shape of a mapping: `target_line`, `platform_line`, `confidence`, `reason`, `flagged`.
-3. The shape of the result: the combined table rows, the leverage figure, the limit, the verdict, and a run id for each number.
-4. The three API reads and writes the console needs: get the case, answer the flag, approve the result.
+The contract is in `backend/app/core/models.py` and described in `architecture/gateway-and-api.md`.
+The console reads one route, `GET /deals/{id}/case`, and writes three: `POST /deals/{id}/run`, `POST /work-items/{id}/answer`, `POST /work-items/{id}/approve`.
+Change requests go to Cayden.
 
 ## Cayden
 
-1. Run `list_models()` on the Factory key and answer: can Droid run Claude? Do this first, because it decides the backend.
-2. Write `run_agent(role, item)` with two backends (`anthropic` and `droid`), switched by `AGENT_BACKEND`.
-3. Write the three agents (Mapper, Preparer, Reviewer) with typed outputs. The Preparer and Reviewer call tools through `@tool` functions that hit the gateway.
-4. Update the gateway: new work-item types for mapping, flag, result, and approval. Keep maker-checker and the audit chain, and keep the existing tests green. The architecture review found four gaps in the current gateway: no reverse method, no run-id check on numbers, no check of the Reviewer's verdict before approval, and a default actor named `human:reviewer` that should be the controller.
-5. Write the job runner that moves items between the agents.
-6. Record one full run, and add the switch to replay it. Rehearse the failure switch once.
-7. Write the 1:30 pitch and the 30-second demo script, and run the rehearsals.
+Done on 2026-10-24: the contract, the gateway rewrite (per-role permissions, run-id checks, Reviewer-pass check, reverse, controller default, agent memory), the three roles, `run_agent` with four backends, the job runner, the recording and replay, the Droid probe script, and the docs.
+
+Open:
+1. Install the `droid` CLI in your own shell: `curl -fsSL https://app.factory.ai/cli | sh` (the script was read; it downloads a checksummed binary to `~/.local/bin`). Then run `backend/.venv/bin/python scripts/droid_probe.py` and write the model list into `sponsors/factory.md`.
+2. Run the Mapper on Droid: `AGENT_BACKEND=droid backend/.venv/bin/python scripts/record_run.py --backend droid`. Fix the `restrict_tools` ids from the probe's tool list if the default guess fails.
+3. Put an Anthropic key in `.env` and record a model run: `scripts/record_run.py --backend anthropic`. Commit the recordings.
+4. Rehearse the failure switch: start on `droid`, kill the CLI, show the fallback in `GET /health`.
+5. Write the 1:30 pitch words into `demo-script.md` (the structure is there) and run the rehearsals.
+6. Ask a Hyphenate mentor whether PE add-on integration counts as a corner of a finance team, and whether a learned policy counts as the "improves with every correction" signal.
 
 ## Eric
 
-1. Pull the Kewaunee and Nu Aire filings from the links in `research/real-deal-candidates.md`. Cache them in `data/` (git-ignored). Use a real contact email in the SEC User-Agent.
-2. Build the platform file (Kewaunee) and the target file (Nu Aire) as CSVs of statement lines. Use Nu Aire's audited September 2024 statements as the raw target input.
-3. Build the answer key from Note 2 of Ex 99.2: each Nu Aire line and its Kewaunee line. Mark it as preliminary and aligned in shape only.
-4. Write the one-paragraph brief: the 2.50x limit and the covenant's definitions of Senior Funded Bank Debt and EBITDA, with the section numbers.
-5. Write down the facts behind the flag: the "Financing liability" line, its parts, and what the credit agreement excludes. Quote the filing under 15 words, with the exhibit and section.
-6. Write the Devpost text and the real-versus-simulated proof list. Draft it by Saturday night.
+1. Check every figure in `backend/app/db/fixtures/kewaunee.py` against the filings. The links are in the file header and in `research/real-deal-candidates.md`. Flag any difference to Cayden; the tools recompute from the fixture.
+2. Export the two input files as CSVs in `data/` (git-ignored) with the fixture's columns, and write the loader script in `scripts/` so the fixture can read CSVs later.
+3. Build the answer key from Note 2 of Ex 99.2 in `evals/`: each Nu Aire line and its Kewaunee line. Score the Mapper's output from `GET /deals/{id}/mappings` against it, and write the score down with the date and the backend.
+4. Write the facts behind the flag on one card: the "Financing liability" line, its three parts ($27,782K, $20,563K, $22,540K), and the agreement's exclusions, with quotes under 15 words and the exhibit and section.
+5. Write the brief as prose for the Devpost and the slide: the 2.50x limit, Section 4.8(a), the definitions of Senior Funded Bank Debt and EBITDA.
+6. Write the Devpost text and the real-versus-simulated list by Saturday night. Include: statement lines are real, account detail is not claimed, the rent and transaction-cost inputs are inferred, which backend produced the shown run, and that agent memory is policies written by the gateway.
 
 ## Tri
 
-1. Build the tools in `backend/app/tools/`: consolidate two sets of lines, compute EBITDA with the covenant's add-backs, compute Senior Funded Bank Debt, compute leverage, and test it against the limit. Every output carries a run id.
-2. Get what is missing from the filings: Kewaunee's D&A (10-K cash flow) and the revolver draw at close (10-Q or 8-K). Compute the leverage twice, a naive version and the covenant version, and write down both with sources.
-3. Write tests with the real figures: a tie-out test, a test that a naive and a covenant answer differ, and the existing trust-rule tests stay green.
-4. Replace the demo fixture (the invented "Northwind Foods") with the Kewaunee case in `backend/app/db/fixtures/`.
-5. Write the API routes the console needs, following the shared contract, and keep them thin.
+1. Review `backend/app/tools/finance.py` and own it. Check the EBITDA build (net income plus interest, taxes, D&A; add-backs; rent deduction) against Ex 10.1's definition. Add any add-back the agreement names that we left at zero, with its source.
+2. Add tests: a test per tool with hand-computed expected values from the fixture, a test that `consolidate` refuses an unapproved flagged mapping, and a test for `limit_test` at exactly 2.50x.
+3. Add `debt_capacity` to the verdict in `GET /deals/{id}/case` (it is already in the `limit_test` output) so the console can show "room for the next deal".
+4. Make `POST /deals` accept two CSV uploads and a brief, using Eric's loader, so a judge can try an unseen input. Keep the route thin.
+5. Make the SSE stream also emit stage changes, so the console can refresh the case without polling.
 6. Cut the demo video if the team agrees on one. Hyphenate wants a video that opens with the moment. [verified: `hyphenate-workshop.md`]
 
-## Josie (no new tasks)
+## Josie (UI and UX only)
 
-Josie works on the design only.
-The console now has one working screen: the flag card, the combined table, and the verdict line, plus a log link.
-The older mockups in Figma show four screens for a different workflow, so she decides what to keep.
-These are inputs for her, not tasks:
-- The shape of the data comes from the shared contract above.
-- The frontend lives in `frontend/`. The API base URL is `NEXT_PUBLIC_API_URL`.
-- The design rules are in `design/README.md`.
+Josie works on the design only. She has no other task.
+The console must move from the old routes (`/plans`, `/facts`, `/clauses`) to `GET /deals/{id}/case`; the old routes are gone.
+Inputs for the design:
+- The case shape, the flag shape, and the verdict shape are in `architecture/gateway-and-api.md`.
+- The flag card shows the question, the evidence quotes, and the options with their computed effects; the default option is marked.
+- The verdict line shows leverage against the limit, OK or Over the limit, the room left, and the Reviewer badge; the Approve button is live only when `approval_state` is `PROPOSED`.
+- A small "learned" chip on a mapping or a tag whose reason starts with "Policy", and a second-run moment: after `POST /dev/reset`, Run again shows no flag.
+- The backend badge from `GET /health` ("scripted", "anthropic", "droid", "replay").
+- The design rules are in `design/README.md`, and the Figma file is linked there. The Figma track needs the frame on screen in the pitch.
+
+## Everyone
+
+- Claim Factory credits with the form in `sponsors/factory.md`, if you want them.
+- Install the `droid` CLI on the demo laptop.
+- Pull `main` and run `backend/.venv/bin/python -m pytest` in `backend/` before you merge.
 
 ## Track checklist
 
-We target Hyphenate, Factory, and Figma. The full needs for each track are in section 15 of `STOCHASTIC.md`.
-
 | Track | Owner of the proof | What must be true by Saturday night |
 | --- | --- | --- |
-| Hyphenate | Cayden (demo), Eric (Devpost and the real-versus-simulated list) | The real deal runs end to end with the flag. The video opens with the flag moment. |
-| Factory | Cayden | At least one agent runs with `AGENT_BACKEND=droid`. We know if Droid can run Claude models. |
+| Hyphenate | Cayden (demo), Eric (Devpost and the real-versus-simulated list) | The real deal runs end to end with the flag on the console. The video opens with the flag moment. The second run shows memory. |
+| Factory | Cayden | The Mapper runs with `AGENT_BACKEND=droid` at least once, recorded. We know if Droid can run Claude models. |
 | Figma | Josie (design) | The console frame exists in Figma and the console follows it. Figma is on screen in the pitch. |
-
-Josie's part is design only, and it is the same work she already does. No other task moves to her.
 
 ## Order of work
 
-Today is Saturday. If a Friday step is not finished, finish it first.
-
-1. **Friday night.** The shared contract. The `list_models()` answer. The filings cached. The two input files started.
-2. **Saturday morning.** Tools and tests (Tri). Both backends and the Mapper (Cayden). The input files and answer key finished (Eric). The first screen on fixtures (Josie).
-3. **Saturday afternoon.** The Preparer, the Reviewer, and the job runner. The API routes. The console reads real data.
-4. **Saturday night.** The recorded run. Full rehearsals. Devpost draft. Freeze new features.
-5. **Sunday morning.** Fix only blockers. Submit before 9am. Practice the 2 minutes once more before judging at 10:30am.
+1. **Saturday morning.** Josie: the console on `/case`. Eric: figure check and CSVs. Tri: tool review and tests. Cayden: Droid CLI, probe, first Droid run.
+2. **Saturday afternoon.** Console reads real data and the flag card works. Answer key scored. Anthropic run recorded. `POST /deals` with uploads if time allows.
+3. **Saturday night.** Recorded model run committed. Full rehearsals with the failure switch. Devpost draft. Freeze new features.
+4. **Sunday morning.** Fix only blockers. Submit before 9am. Practice the 2 minutes once more before judging at 10:30am.
 
 ## Risks to watch
 
-- The covenant ratio is not computed yet. If it comes out under the limit with either treatment of the flag, the verdict does not change, and the moment is weaker. Tri computes it early. Then we choose the flag wording. [inferred]
-- The fiscal years differ (April and September). Do not try to match the pro forma column to the dollar.
-- The Droid subprocess can fail live. The switch and the recorded run are the answer.
+- The naive-versus-covenant gap rests on the inferred rent deduction and zero transaction costs. If Tri or Eric change them, re-read the flag effects before the pitch. The code recomputes; the words must follow.
+- The Droid subprocess can fail live. The switch, the fallback chain, and the recording are the answer. Rehearse it.
+- The console is the only part not yet on the new API. Everything else waits on it for the live demo.

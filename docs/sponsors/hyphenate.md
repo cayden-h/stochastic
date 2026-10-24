@@ -4,7 +4,7 @@
 
 Stochastic is now a PE add-on integration tool.
 It merges the books of a newly acquired company into the platform company's books, flags the few lines a human must decide, and checks the combined result against the lender's limit.
-Three small stateless agents do the work (Mapper, Preparer, Reviewer), code does all the math, and a controller approves.
+Three stateful agents do the work (Mapper, Preparer, Reviewer), code does all the math, and a controller approves. What the controller decides once, the agents keep.
 The demo uses a real public deal: Kewaunee Scientific buying Nu Aire. [verified: `../STOCHASTIC.md` section 12]
 
 ### How Hyphenate fits now

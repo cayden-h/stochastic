@@ -14,7 +14,7 @@ The full split and the order of work are in `../TASKS.md`.
 ## Rules for working in parallel
 
 1. Edit only the folders that you own. If you need a change in another folder, ask the owner.
-2. The shared contract (source line, mapping, result) lives in `backend/app/core/models.py`. Cayden owns this file. Send change requests to Cayden.
+2. The shared contract lives in `backend/app/core/models.py`. Cayden owns this file. Send change requests to Cayden.
 3. Only Cayden edits `docs/STOCHASTIC.md`. Everyone edits their own task file.
 4. Make small commits. Merge to `main` at least every few hours.
 5. Before you merge, pull `main` into your branch and run `backend/.venv/bin/python -m pytest` in `backend/`.

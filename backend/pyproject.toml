@@ -7,6 +7,9 @@ dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "pydantic>=2.8",
+  "python-dotenv>=1.0",
+  "anthropic>=0.40",
+  "droid-sdk[mcp]>=0.5",
 ]
 
 [dependency-groups]

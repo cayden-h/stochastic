@@ -1,9 +1,9 @@
 # Demo script: the 2:00 pitch
 
-Last updated: 2026-10-23.
+Last updated: 2026-10-24, 02:30. The figures below are computed by the tools on the fixture and tested.
 The product and scope are in `STOCHASTIC.md`. This file only says what we show and say.
 Claims are tagged [verified] when a source file shows them and [inferred] when they are our judgment.
-Figures come only from `research/real-deal-candidates.md`. Anything else is marked PLACEHOLDER.
+Figures come from the filings loaded in `backend/app/db/fixtures/kewaunee.py` and the tool runs. [verified: `backend/tests/test_trust_rules.py`]
 
 ## 1. The 2:00 plan
 
@@ -14,7 +14,7 @@ Order: the problem, then what Stochastic does, then the proof. Do not lead with 
 | --- | --- | --- | --- |
 | 0:00 - 0:25 | Problem | The judge feels the gate: the next deal waits on the books. | Title slide or the empty console. No demo yet. |
 | 0:25 - 0:55 | What Stochastic does | Five steps in plain words: map, flag, combine, test, approve. | A simple flow slide, or the console at rest. |
-| 0:55 - 1:30 | Proof and honesty | A real public deal. Small stateless agents. Math is code. Say what is simulated. | The real-versus-simulated list. |
+| 0:55 - 1:30 | Proof and honesty | A real public deal. Stateful agents that learn from the controller. Math is code. Say what is simulated. | The real-versus-simulated list. |
 | 1:30 - 2:00 | Live demo | One flag, one approval, one verdict line. | The one console screen. |
 
 Who speaks: one presenter talks. A second person drives the keyboard. The rest of the team stands back. [inferred]
@@ -45,7 +45,7 @@ Part 3, proof and honesty (0:55 - 1:30):
 
 ```text
 We ran it on a real public deal, Kewaunee Scientific buying Nu Aire, closed November 2024.
-The agents are small and stateless, like roles on a real team.
+The agents are roles on a real team, and they keep what the controller decides: ask once, apply next time.
 They never do math. Code does all of it.
 The gateway is the only thing that writes, and it logs every action.
 Here is what is simulated. [say the honest-limits statement from section 6]
@@ -78,83 +78,71 @@ What is a fallback: a recorded run, played when both backends fail. See section 
 - Backup driver: holds the recorded-run switch and watches the clock.
 
 ## 3. The data on screen
-
-Use only these figures. All are from filings. [verified: `research/real-deal-candidates.md`]
+Use only these figures. All are from filings or computed by the tools from them. [verified: fixture and tests]
 
 | Item | Figure | Source |
 | --- | --- | --- |
 | Deal | Kewaunee Scientific buys Nu Aire | Ex 99.2 |
 | Close date | 2024-11-01 | 8-K |
 | Price | $55M, subject to adjustments | Ex 99.2 |
-| Funding | $15M PNC term loan, a $20M PNC revolver, $23M of 8% subordinated seller notes | Ex 99.2 |
+| Funding | $15,000K PNC term loan, $5,563K drawn on a $20M PNC revolver, $22,540K of 8% subordinated seller notes | Ex 99.2 Note 4(h) |
 | Leverage covenant | Senior Funded Bank Debt to EBITDA below 2.50 to 1.00, Section 4.8(a) | Ex 10.1 |
 | Fixed charge covenant | At least 1.20 to 1, Section 4.8(b) | Ex 10.1 |
 | Acquisition basket | $5,000,000, Section 5.8(ii) | Ex 10.1 |
 | Kewaunee fiscal 2024 net sales | $203,755K | Ex 99.2 |
-| Nu Aire reclassed fiscal 2024 net sales (April year) | $80,875K | Ex 99.2 |
 | Nu Aire audited net revenues (year to 2024-09-30) | $74,850,302 | Ex 99.1 |
+| Kewaunee depreciation, fiscal 2024 | $3,125K | 10-K cash flow |
 | Nu Aire D&A (year to 2024-09-30) | $1,830,395 | Ex 99.1 |
-| Pro forma operating profit, year to 2024-04-30 | $20,817K (Kewaunee $18,281K, Nu Aire $5,652K, transaction adjustments $(3,105)K, financing adjustments $(11)K) | Ex 99.2 |
-| Pro forma operating profit, six months to 2024-10-31 | $7,304K | Ex 99.2 |
-| Kewaunee pension expense, fiscal 2024 | $(4,177)K | Ex 99.2 |
-| Kewaunee financing liability at 2024-10-31 | $750K current plus $27,032K long-term | 10-Q |
-| Sale-leaseback carrying value | $27,782,000 | 10-Q |
-| Pro forma addition to financing liability | $3,000K current plus $40,103K long-term | Ex 99.2 |
-| Pro forma total financing liability | $3,750K current plus $67,135K long-term, so $70,885K | Ex 99.2 |
-| Example reclasses (Note 2) | Accrued Commissions to Employee compensation and amounts withheld, $0.9M. Accrued Compensation to Other accrued expenses, $0.2M. Interest Income - Net to Other income, net, $0.3M | Ex 99.2 |
+| Kewaunee financing liability at 2024-10-31 | $750K current plus $27,032K long-term; carrying value $27,782K | 10-Q |
+| Statesville cash rent (deducted from EBITDA) | $1,970K, next-year obligation; inferred as the year's rent | 10-K contractual obligations |
+| Covenant EBITDA | $28,033K | tool run `ebitda` |
+| Senior Funded Bank Debt, agreement's reading | $21,633K | tool run `covenant_debt` |
+| Whole financing liability counted (naive) | $71,955K | tool run `covenant_debt`, naive |
+| Covenant leverage | 0.77x, 1.73x of room, about $48M of debt capacity | tool runs `leverage`, `limit_test` |
+| Naive leverage | 2.57x, over the limit | tool runs |
+| Combined total assets | $182,456K, and the combined balance sheet balances | tool runs `consolidate`, `tie_out` |
+| Example reclasses (Note 2) | Accrued Commissions to Employee compensation and amounts withheld. Income taxes payable to Other accrued expenses. Interest Income - Net to Other income, net | Ex 99.2 |
 
-Placeholders. These are not computed yet, and the screen must show the word PLACEHOLDER or a dash until Tri fills them:
-
-| Item | State | Owner |
-| --- | --- | --- |
-| Kewaunee D&A | PLACEHOLDER. Needs the 10-K cash flow statement. | Tri |
-| Revolver draw at close | PLACEHOLDER. Needs the 10-Q or 8-K. | Tri |
-| Covenant EBITDA (with add-backs) | PLACEHOLDER | Tri |
-| Senior Funded Bank Debt (covenant version) | PLACEHOLDER | Tri |
-| Naive leverage (all of financing liability as debt) | PLACEHOLDER | Tri |
-| Covenant leverage | PLACEHOLDER | Tri |
-| Combined table rows beyond the figures above | PLACEHOLDER | Eric and Tri |
-
-Leverage ratios are not computed yet. [verified: `STOCHASTIC.md`, section 12]
-Do not show or say any ratio until Tri writes both versions down with sources.
-The expectation that covenant leverage is well under 2.50x and naive leverage is much closer is [inferred], not computed.
+Two inputs are inferred and are said in the honest-limits statement: the rent deduction, and transaction and integration costs applied as zero because the filings do not quantify them.
+If Tri or Eric change a figure, the tools recompute; re-read the flag effects on screen before the pitch and do not say a number from memory.
 
 ## 4. The flag moment and the two verdicts
-
 ### The flag
 
-The flag is Kewaunee's "Financing liability" line. [verified: `STOCHASTIC.md`, section 12]
-It holds the Statesville sale-leaseback ($27,782K carrying value) and, after the deal, the acquisition financing. [verified]
-The credit agreement's Senior Funded Bank Debt excludes the capital lease on the property at 2700 West Front Street and excludes the seller notes. [verified: Ex 10.1]
-So the card asks which part of the line is covenant debt.
+The flag is Kewaunee's "Financing liability" line. [verified: fixture]
+It holds the Statesville sale-leaseback ($27,782K), the new PNC term loan and revolver ($20,563K), and the 8% seller notes ($22,540K).
+The credit agreement's Senior Funded Bank Debt excludes the capital lease on 2700 West Front Street and excludes subordinated debt. [verified: Ex 10.1]
+So the card asks which parts count.
 
-The card shows:
+The card shows (all from the API, nothing typed by hand):
 - The question, in one sentence.
-- The evidence: the line and its filing reference, with any quote under 15 words.
-- Two options, each with its effect on leverage.
-- A suggested default, if the Mapper has one.
+- The evidence: the covenant wording and the two exclusions, with the exhibit and section.
+- Three options, each with its computed effect and a run id.
+- The default, option b, the agreement's reading.
 
-Option wording is an example. [inferred]
-- Option A: the whole line counts as debt. Effect: leverage PLACEHOLDER (higher).
-- Option B: only the covenant part counts as debt. Effect: leverage PLACEHOLDER (lower).
+| Option | Effect on the card | Verdict |
+| --- | --- | --- |
+| a. Whole line counts (70,885K) | Senior Funded Bank Debt 71,955K. Leverage 2.57x against 2.50x. | Over the limit |
+| b. Only the PNC term loan and revolver count | Senior Funded Bank Debt 21,633K. Leverage 0.77x against 2.50x. | OK |
+| c. PNC debt and the seller notes count | Senior Funded Bank Debt 44,173K. Leverage 1.58x against 2.50x. | OK |
 
-The effect text on the card must come from real tool runs by the demo date. Do not ship the words "goes up" or "goes down" without a computed number behind them.
+A second, smaller flag asks where Nu Aire's Certificates of Deposit ($991K) belong. Answer it with the default (cash equivalents) in one click, or raise the Mapper threshold to drop it.
 
 ### Two outcomes
 
-The verdict line depends on the controller's answer.
-
 | Answer | Verdict line | Presenter says | Reviewer badge |
 | --- | --- | --- | --- |
-| Treatment that gives leverage below 2.50x | OK. Combined leverage PLACEHOLDER next to 2.50x. | "Under the limit, with the covenant's own definition of debt." | pass |
-| Treatment that gives leverage at or above 2.50x | Over the limit. Combined leverage PLACEHOLDER next to 2.50x. | "Over the limit. The item goes back to the controller as needs-attention. It cannot be approved." | needs_attention |
+| b (the agreement's reading) | OK. 0.77x against 2.50x. Room 1.73x. | "Under the limit, with the covenant's own definition of debt. Room for the next deal." | pass |
+| a (whole line) | Over the limit. 2.57x against 2.50x. | "Over the limit. The item comes back as needs-attention and cannot be approved." | needs_attention |
 
 Notes:
-- Over the limit returns the item to the human as needs-attention. The Reviewer found a breach. [verified: `STOCHASTIC.md`, section 8]
-- A result cannot be approved while its review verdict is needs-attention. This is a new gateway check, so confirm it is built before the demo. [inferred: `architecture/gateway-and-api.md`, check 5]
-- If the covenant ratio is under 2.50x with both treatments, the verdict does not change and the moment is weaker. Tri computes it early. Then the team picks the flag wording. [verified: `TASKS.md`, risks]
-- Fallback moment if both treatments give OK: say what the naive and covenant numbers are, and show that they differ. That still shows why the covenant definition matters.
-- Pick which answer to click before the demo. Do it by what the computed numbers show, not by hope.
+- Over the limit returns the item to the human as needs-attention, and the gateway refuses approval. [verified: `test_result_cannot_be_approved_before_review_passes`]
+- Click b in the demo. Show a on the card as the effect text, and say the naive number out loud. That is the moment: one line, two readings, 1.8x apart.
+- The memory moment, if time allows: reset, run again, no flag. "It asked once. The controller's answer is now a policy, written by the gateway, and the log shows it applied."
+
+### The honest sensitivity
+
+The naive reading stays over 2.50x as long as covenant EBITDA stays below $28,782K. Our figure is $28,033K. An add-back above $750K that we have not found would move the naive reading under the limit; the covenant reading would still be far under. Know this before a judge asks.
 
 ## 5. Failure plan
 
@@ -177,43 +165,44 @@ Rules for failure:
 - The time limit still applies. If the demo has eaten 30 seconds, stop and take questions.
 
 ## 6. The honest-limits statement
-
 The presenter must say this in the proof part, in these words or close to them:
 
 ```text
 A few things are not real, so you know what you are looking at.
 The statement lines come from public filings, not from the companies' internal books.
-Account-level detail is not public, so we do not claim it. Any account-level detail is synthetic.
-The agent messages you see are hardcoded or recorded.
-The gateway, the math, and the audit log are real.
-The two companies have different fiscal years, April and September, so we do not match the filed pro forma to the dollar.
-And the filing says its own reclassification review, Note 2, is preliminary.
+Account-level detail is not public, so we do not claim it.
+The agent text you see is recorded or scripted, and the screen says which backend ran. The gateway, the math, and the audit log are real.
+The two companies have different fiscal years, April and September, so the combined income statement adds two different years and does not match the filed pro forma.
+Two inputs are our estimates: the Statesville rent we deduct, and transaction costs, which we set to zero.
+And the filing says its own reclassification table, Note 2, is preliminary.
 ```
 
-Checklist of the five points. All five must appear:
-1. Statement lines from public filings. [verified: `STOCHASTIC.md`, section 2]
-2. Account-level detail is synthetic or not claimed. [verified]
-3. Agent text is hardcoded or recorded. [verified]
-4. Fiscal-year mismatch: Kewaunee April 30, Nu Aire September 30. [verified: `research/real-deal-candidates.md`]
-5. Note 2 is preliminary. [verified: the filing says Kewaunee is "conducting a more detailed review of reclassifications"]
+Checklist. All seven must appear:
+1. Statement lines from public filings.
+2. Account-level detail is not claimed.
+3. Agent text is recorded or scripted, and which backend ran.
+4. Fiscal-year mismatch: Kewaunee April 30, Nu Aire September 30.
+5. The combined table is historical plus target, not the filed pro forma; no purchase accounting.
+6. The rent deduction and zero transaction costs are inferred.
+7. Note 2 is preliminary.
 
-Also say, if time allows: other situations are roadmap, not built. The output is a combined set of books and a limit check that a human approves. It is not advice. [verified: `STOCHASTIC.md`, section 2]
+Also say, if time allows: other situations are roadmap, not built. The output is a combined set of books and a limit check that a human approves. It is not advice. Agent memory is policies the gateway wrote from the controller's answers, not model weights.
 
 ## 7. Rehearsal checklist
 
 Before the first rehearsal:
 - [ ] Both input CSVs and the brief are final. Cached filings are in `data/` and stay out of git.
-- [ ] Tri has written both leverage figures with sources. No PLACEHOLDER shows on screen.
+- [ ] Both leverage figures match the tool runs on screen (0.77x covenant, 2.57x naive). No PLACEHOLDER shows anywhere.
 - [ ] The flag card effect text matches the computed numbers.
 - [ ] The tests with the real figures pass, including the tie-out test and the naive-versus-covenant test.
 - [ ] The recorded run exists and replays.
-- [ ] `list_models()` answer is known, so we know if `droid` can run Claude.
+- [ ] `scripts/droid_probe.py` has run, so we know if `droid` can run Claude, and a Droid run is recorded.
 - [ ] Keys are in `.env` only. None are in docs, slides, or screenshots.
 
 Each rehearsal:
 - [ ] Time the 2:00 with a stopwatch. Target 1:55.
 - [ ] Run the demo from a cold start (fresh `POST /dev/reset`, fresh browser tab).
-- [ ] Run once with `anthropic`, once with `droid`, once from the recording.
+- [ ] Run once with `anthropic`, once with `droid`, once with `replay`, once with `scripted`. Check the backend badge each time.
 - [ ] Force one failure on purpose and switch backends live.
 - [ ] Say the honest-limits statement every time.
 - [ ] Check the screen at projector size and at the table-side laptop size. Text must be readable from two meters.
@@ -234,7 +223,7 @@ Answers are short and honest. If we do not know, say so.
 | # | Question | Short honest answer |
 | --- | --- | --- |
 | 1 | Is it real enough? (Hyphenate Q1) | The deal, the filings, and the lender's covenant are real and public. The statement lines are real. Account-level detail is not public, so we do not claim it. |
-| 2 | Would you hire it? (Q2) | It does the repeatable mapping and combining, and it asks a human only when unsure. It cannot approve its own work, and every step is logged. We have not tested it with a real controller. [inferred] |
+| 2 | Would you hire it? (Q2) | It does the repeatable mapping and combining, asks a human only when unsure, and keeps what the controller decides so it asks once. It cannot approve its own work, the gateway refuses a number no tool produced, and every step is logged. We have not tested it with a real controller. [inferred] |
 | 3 | What did we see that is new? (Q3) | The flagged line that changes the covenant verdict, and a gateway that enforces maker-checker and logs denied actions. The check against the lender's own definitions is the new part. |
 | 4 | Was there a moment? (Q4) | One line, Financing liability, holds two kinds of debt. The model stops and asks. The controller's answer moves the leverage result. [inferred: depends on the computed figures] |
 | 5 | How is this different from VistaAI? | VistaAI, HackMIT 2026 first place (self-reported), ingests messy CSV and XLSX and proposes field mappings with provenance. We work on accounting lines, check the result against a lender's limit, and post through a gateway with maker-checker and an audit log. [verified: `STOCHASTIC.md`, section 16] |
@@ -246,10 +235,10 @@ Answers are short and honest. If we do not know, say so.
 | 11 | How do you know the mapping is right? | We check it against Note 2 in the filing, as an answer key for shape, not to the dollar. Note 2 is preliminary, and the fiscal years differ. Unsure lines become flags. Precision comes before recall. |
 | 12 | What does the audit log hold, and can it be edited? | Every action, allowed or denied, with actor, target, reason, and evidence. Each row stores the hash of the row before it, so a change in the past breaks the chain. Postgres would use a role with no update or delete rights. |
 | 13 | Why Kewaunee and Nu Aire? | It is small, it has a real 2.50x leverage covenant and a $5M acquisition basket, a filed reclass table, and one unclear line that needs a human. [verified: `research/real-deal-candidates.md`] |
-| 14 | What is the leverage result? | Only answer with computed numbers. If Tri's figures are not final, say: "We computed both versions, and they differ. Here is the one on screen." Never invent a ratio. |
+| 14 | What is the leverage result? | 0.77x under the agreement's definition, 2.57x if you count the whole financing liability line. Both are tool runs on screen with run ids. Never say a number that is not on screen. |
 | 15 | Does covenant EBITDA match the pro forma EBITDA? | No. Covenant EBITDA is a defined term with capped add-backs, so it is a negotiated number, not the pro forma operating profit. [verified: `research/real-deal-candidates.md`] |
 | 16 | Does it work for other deals or other situations? | Not yet. Other deals and situations are roadmap. We built one workflow deep. [verified: `STOCHASTIC.md`, section 2] |
-| 17 | What would you build next? | A second flag, such as the seller notes, learning policies from the controller's corrections, and a real Postgres store. Learning from corrections is not built. [verified: `hyphenate-workshop.md` lists it as a gap] |
+| 17 | What would you build next? | Purchase accounting with a provisional label, intercompany eliminations, a second deal to show the policies carrying over, confidence calibration from the answer key, and a Postgres store. Learning from corrections is built as policies; backtesting them is not. |
 | 18 | Is this advice? | No. It produces a mapped, combined set of books and a limit check that a human approves. |
 | 19 | Who is the user? | A portfolio controller or a PE associate who owns the integration, right after an add-on closes. [inferred: no practitioner has checked this] |
 | 20 | How long does it take today without this? | One vendor playbook says about 12 weeks for a full integration (self-reported, Aleph). The compliance certificate is due 45 to 60 days after quarter end in the samples we found. We do not claim a speedup we have not measured. |
@@ -292,3 +281,15 @@ During judging:
 After judging:
 - [ ] Write down every judge's feedback while it is fresh.
 - [ ] Update `ideation/tracks.md` in the CalHacks repo if a track status changed.
+
+## 10. Backend switch cheat sheet
+
+```text
+AGENT_BACKEND=droid      the Factory run; say "built with the Droid SDK" only for this
+AGENT_BACKEND=anthropic  Claude with tool use; the stage fallback
+AGENT_BACKEND=replay     recorded outputs from backend/recordings/, tools re-run
+AGENT_BACKEND=scripted   deterministic rules, no model, no network
+```
+
+Set it in `.env` and restart uvicorn, or pass `{"backend": "droid"}` in the body of `POST /deals/{id}/run`.
+`GET /health` shows the configured backend, the fallback chain, which keys are present, and the last runs.

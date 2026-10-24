@@ -327,12 +327,12 @@ Which part of the financing liability line fits it is the open question for the 
 
 ## Stateless agent
 
-A stateless agent keeps no memory between jobs.
+A stateless agent keeps no memory between jobs. A stateful agent does; Stochastic's agents are stateful.
 It gets one work item with all inputs, returns one typed result, and stops.
 State lives in the store.
 Because it has no memory, the same agent can run many times in parallel.
 
-In Stochastic: Mapper, Preparer, and Reviewer are stateless. A plain job runner, which is code and not a model, moves items between them. [verified: source file, `STOCHASTIC.md` sections 6 and 7]
+In Stochastic: Mapper, Preparer, and Reviewer are stateful. Each keeps a session, and the Mapper applies the policies the gateway wrote from the controller's answers. A plain job runner, which is code and not a model, moves items between them. [verified: `STOCHASTIC.md` sections 6 and 7, 2026-10-24]
 
 ## Statement line versus account
 

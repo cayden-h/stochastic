@@ -1,17 +1,17 @@
 # Stochastic: reference for Claude
 
-Last updated: 2026-10-23 (evening, after the reframe to PE add-on integration).
+Last updated: 2026-10-24, 02:30 (backend built end to end on the scripted backend; agents made stateful).
 Read this file first in any session about Stochastic.
 It holds the main features, the architecture, and the scope.
 If this file and a PDF or an older note disagree, this file is correct.
 Claims are tagged [verified] when a source file or a filing shows them, and [inferred] when they are our judgment.
 
 ## 1. What Stochastic is
-
 Stochastic merges the books of a newly acquired company into the books of the platform company that bought it.
 It flags the few lines that need a human, and then checks the combined result against the lender's limit.
 It is built for private equity buy-and-build firms, which keep buying add-on companies.
-Small agents do the repeatable work, code does all the math, and a human controller approves.
+Three stateful agents do the repeatable work, code does all the math, and a human controller approves.
+What the controller decides once, the agents keep: the next run and the next deal start with that memory.
 Every step goes in an audit log.
 
 This replaces two earlier framings.
@@ -19,6 +19,10 @@ The first was an all-in-one platform for any corporate-finance special situation
 The second was an investment-bank analysis tool that recommends plans.
 Both are archived in `planning-notes.md` and `research/`.
 They are roadmap ideas only. The product is the integration workflow in this file.
+
+Build status on 2026-10-24, 02:30: the backend runs the whole deal end to end on the real filing figures through the gateway, the tools, and the audit log, on the scripted backend. [verified: `backend/tests/test_trust_rules.py`, 17 tests pass]
+The Anthropic and Droid backends are written and not yet run live (no Anthropic key in `.env`, and the `droid` CLI is not installed on the build machine).
+The console still implements the earlier workflow. Josie is rebuilding it against `GET /deals/{id}/case`.
 
 ## 2. The pitch rules
 
@@ -62,56 +66,65 @@ There is no after-close monitoring and no ongoing consolidation in the MVP.
 The user sees one screen with a flag card, a small combined table, and one verdict line.
 
 ## 5. Main features
-
 1. **Mapping with confidence.** Each target line gets a platform line, a confidence, and a short reason.
-2. **Human flags.** Only unclear lines reach the human, with both options and the effect on the result.
-3. **Combined books.** A combined table of platform, target, and total. Code does the arithmetic.
-4. **Limit check.** Combined leverage next to the lender's limit, with the covenant's own definition of debt and EBITDA.
-5. **Maker-checker.** The agent that prepares a result cannot approve it. A reviewer agent checks it, and a human approves it.
-6. **Audit log.** Every action is logged, and each row is chained to the row before it.
-7. **Replicable agents.** The same stateless agent definition can run once per company, or once per batch of lines.
+2. **Human flags.** Only unclear lines reach the human, with the options and the computed effect of each on leverage.
+3. **Combined books.** A combined table of platform, target, and total. Code does the arithmetic, and a tie-out check balances the combined balance sheet.
+4. **Limit check.** Combined leverage next to the lender's limit, with the covenant's own definition of debt and EBITDA, and the room left for the next deal.
+5. **Maker-checker.** The agent that prepares a result cannot approve it. A reviewer agent checks it, and a human approves it. The gateway refuses approval until the review passes.
+6. **Audit log.** Every action is logged, allowed or denied, and each row is chained to the row before it.
+7. **Stateful agents that learn.** The controller's answer to a flag becomes a policy. The Mapper applies it next time with the policy as evidence instead of asking again. Each agent keeps a session across work items.
+8. **Replicable agents.** The same role definition runs on four backends (Anthropic, Droid, scripted, replay), once per work item, and the result says which backend produced it.
 
 ## 6. Architecture
-
 The system has four parts.
 
 - **People and files.** The console, the two data files, and the brief.
-- **Agents.** Three small stateless agents and a plain job runner.
-- **The gateway.** It is the only writer. It checks permissions, enforces work-item states, and writes the log.
-- **The store.** The MVP can keep the same tables in memory. Postgres on Tiger Cloud is a later swap.
+- **Agents.** Three stateful agents and a plain job runner.
+- **The gateway.** It is the only writer. It checks permissions, enforces work-item states, runs the tools, writes the log, and writes the agents' memory.
+- **The store.** In memory. It holds the record, the work items, the tool runs, the audit log, the policies, and the agent sessions. Postgres on Tiger Cloud is a later swap.
 
-Code tools hold all the math: line matching helpers, consolidation, EBITDA, leverage, and the limit test.
+Code tools hold all the math: consolidation, tie-out, EBITDA, covenant debt, leverage, and the limit test. [verified: `backend/app/tools/finance.py`]
 Agents call tools through the gateway. They do not talk to each other.
-A job runner moves work items from one agent to the next. The runner is code, not a model.
+A job runner moves work items from one agent to the next. The runner is code, not a model. [verified: `backend/app/agents/jobs.py`]
 The console talks only to the gateway.
 
-The agent layer uses one function, `run_agent(role, item)`, with two backends. [inferred, from `research/agent-framework-options.md`]
-The Anthropic API is the real path and the stage fallback.
-The Factory Droid Python SDK runs the agents that we show as built with Droid.
-An `AGENT_BACKEND` setting switches between them, and a recorded run exists as a last fallback.
+The agent layer uses one function, `run_agent(role, item)`, with four backends. [verified: `backend/app/agents/runner.py`]
+The Anthropic API is the real model path and the stage fallback.
+The Factory Droid Python SDK runs the agents that we show as built with Droid, one session per role.
+The scripted backend is deterministic rules with no model, the last fallback and the reference answer.
+The replay backend plays recorded outputs from `backend/recordings/`.
+`AGENT_BACKEND` picks the backend, `AGENT_FALLBACK` lists the fallbacks, and every result says which backend produced it.
+The details are in `architecture/`.
 
 ## 7. The three agents
+Each agent is stateful.
+It receives one work item with all its inputs, plus its own session and the policies it learned, and returns one typed result.
+The state lives in the store, not in a process, so a restart loses nothing and the same role can run many items in turn or in parallel.
+Agents never write to the store and never talk to each other.
 
-Each agent is stateless.
-It receives one work item with all its inputs, returns one typed result, and keeps no memory.
-State lives in the store.
+| Agent | Real-team role | Gets | Returns | Keeps | Never |
+| --- | --- | --- | --- | --- | --- |
+| Mapper | Staff accountant | The target's lines, the platform's lines, the brief, its policies, its session | A mapping with confidence and reasons, a covenant tag for each balance sheet line (debt, not debt, unclear, or n/a), and flag proposals with options | A policy per answered flag, which it applies next time and cites | Guesses a low-confidence match or an unclear tag |
+| Preparer | Senior accountant | Both books, the approved mappings, the brief, its session | The draft combined table and the EBITDA, debt, and leverage figures, from tool runs, with run ids | Its session transcript | Computes a number itself, or approves its own draft |
+| Reviewer | Reviewer | The draft and its run ids, its session | Pass or needs-attention, with reasons that name run ids | Its session transcript | Changes the draft |
 
-| Agent | Real-team role | Gets | Returns | Never |
-| --- | --- | --- | --- | --- |
-| Mapper | Staff accountant | One company's lines, the platform's chart, and the covenant definitions from the brief | A mapping with confidence and reasons, a covenant tag for each line (debt, not debt, or unclear), and a list of flags | Guesses a low-confidence match or an unclear tag |
-| Preparer | Senior accountant | Both mapped books and the approved flags | The draft combined table and the leverage figure, from tool calls | Computes a number itself, or approves its own draft |
-| Reviewer | Reviewer | The draft and the limit | Pass or needs-attention, with reasons | Changes the draft |
+The human controller answers flags and approves the final result.
 
-The human controller approves flagged lines and the final result.
+Memory, in detail. [verified: `backend/app/gateway/gateway.py`, `_learn`]
+- When the controller answers a flag, the gateway writes a `Policy`: the line name, the decision, who decided, and the flag it came from.
+- On the next run the Mapper applies the policy with confidence 0.98 and the reason "Policy p_001: human:controller decided this on wi_002", and the gateway logs `policy:apply`.
+- Each role has an `AgentSession`: backend, backend session id (the Droid backend resumes it), turn count, and a short transcript that the Anthropic backend replays.
+- `POST /dev/reset` keeps the memory. The second run of the demo deal asks no question at all. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
+- Policies are per role and per line name. Confidence calibration and cross-deal statistics are roadmap.
 
 ## 8. Human moments
+There are two, plus one that shows memory.
 
-There are two.
+- **Flag.** A line is unclear, and the human chooses how to treat it. Each option shows the leverage it gives, computed by the tools.
+- **Approval.** The controller approves the combined result before it posts. The gateway refuses until the Reviewer verdict is pass.
+- **Second run.** After a reset, the same deal runs with no flag, because the Mapper applies what the controller decided. The audit log shows `policy:apply`.
 
-- **Flag.** A line is unclear, and the human chooses how to treat it.
-- **Approval.** The controller approves the combined result before it posts.
-
-If the Reviewer finds a tie-out error or a breach of the limit, the item returns to the human as needs-attention.
+If the Reviewer finds a tie-out error or a breach of the limit, the approval item opens as needs-attention with the reasons.
 An earlier design had six escalation points (E1 to E6). They are archived. Two are enough for this workflow.
 
 ## 9. Work items and gateway rules
@@ -155,18 +168,18 @@ Whether we may redistribute cached filings is unresolved, so the cached files st
 - Precision before recall. If a mapping is unsure, it becomes a flag.
 
 ## 12. The demo
-
 ### The real deal
 
 The proof deal is Kewaunee Scientific buying Nu Aire, closed 2024-11-01, for $55M. [verified: `research/real-deal-candidates.md`]
 Kewaunee is the platform (fiscal year ends April 30). Nu Aire is the target (fiscal year ends September 30).
 Backups, in the agent's ranking: DLH and GRSi, Mama's Creations and Crown I, Shutterstock and Envato.
 
-What the filings give us:
-- Nu Aire's audited statements for the year to 2024-09-30 (8-K/A Ex 99.1).
-- Kewaunee's pro forma combined statements, with a "Nu Aire, Inc. Reclassed" column and a Note 2 that maps Nu Aire's lines to Kewaunee's lines (Ex 99.2).
-- The PNC credit agreement (Ex 10.1): leverage covenant in Section 4.8(a), senior funded bank debt to EBITDA below 2.50 to 1.00, and a $5M acquisition basket in Section 5.8(ii).
-- Links are in `research/real-deal-candidates.md`.
+What the filings give us, and what is loaded in `backend/app/db/fixtures/kewaunee.py` [verified: read from EDGAR on 2026-10-24]:
+- Kewaunee's balance sheet at 2024-10-31 (10-Q), 38 lines, and its fiscal 2024 income statement (Ex 99.2 historical column) and depreciation of $3,125K (10-K cash flow).
+- The closing financing from Ex 99.2 Note 4(h): term loan $15,000K, revolver draw $5,563K, seller notes $22,540K, all added to the "Financing liability" line.
+- Nu Aire's audited statements for the year to 2024-09-30 (Ex 99.1), 40 balance sheet lines and 14 income statement lines in whole dollars, and D&A of $1,830,395.
+- The PNC credit agreement (Ex 10.1): leverage covenant in Section 4.8(a), Senior Funded Bank Debt to EBITDA below 2.50 to 1.00, with the exclusions and add-backs loaded into the brief.
+- Note 2 of Ex 99.2 as the answer key for the shape of the mapping (Eric builds the scored key in `evals/`).
 
 Rules for using it:
 - Use Nu Aire's audited September statements as the raw target input.
@@ -174,70 +187,80 @@ Rules for using it:
 - Public filings give statement lines, not trial balances. The demo maps statement lines. Account-level detail would be synthetic, so we do not claim it.
 - The demo is a reconstruction from public filings. It does not show the lender's or the company's internal views.
 
-### The flag
+### The flag and the computed figures
 
-The one flag is real: Kewaunee's "Financing liability" line.
-It holds a sale-leaseback of the Statesville property ($27,782K carrying value in the 10-Q) and, after the deal, the new acquisition financing. [verified: research report]
-The credit agreement's "Senior Funded Bank Debt" excludes the capital lease on that property and excludes the seller notes.
-The flag belongs to the platform side, not the target side. So it comes from the covenant tag that the Mapper gives each line, and not from the line-to-line match.
-The Mapper cannot tag the line as debt or not debt, so the agent asks the controller which part of the line is covenant debt.
-The answer changes the leverage result. [inferred: not computed yet]
+The one flag is real: Kewaunee's "Financing liability" line. [verified: fixture and `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
+It holds the Statesville sale-leaseback ($27,782K), the new PNC term loan and revolver ($20,563K), and the 8% seller notes ($22,540K).
+The credit agreement's Senior Funded Bank Debt excludes the capital lease on that property and excludes subordinated debt.
+The Mapper tags the line "unclear" and asks which parts count. The gateway computes the effect of each option with the tools.
+
+| Option | Senior Funded Bank Debt | Leverage | Verdict |
+| --- | --- | --- | --- |
+| a. Whole line counts | $71,955K | 2.57x | Over the 2.50x limit |
+| b. Only the PNC term loan and revolver count (the agreement's reading, the default) | $21,633K | 0.77x | OK, 1.73x of room, about $48M of debt capacity |
+| c. PNC debt plus the seller notes | $44,173K | 1.58x | OK |
+
+Covenant EBITDA is $28,033K: Kewaunee $18,043K (net earnings 19,057, plus interest 1,799, less the tax benefit 5,938, plus depreciation 3,125), Nu Aire $7,783K (net income 5,438, plus taxes 514, plus D&A 1,830), plus the noncash pension termination $4,177K, less Statesville cash rent $1,970K. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
+Two inputs are inferred and must be said out loud: the rent deduction uses the 10-K's next-year obligation, and transaction and integration costs are applied as 0 because the filings do not quantify them.
+The verdict changes with the controller's answer, so the moment holds. [verified]
+
+A second, smaller flag asks where Nu Aire's "Certificates of Deposit" belong (cash equivalents or other assets). It shows a mapping flag next to the covenant flag. It can be turned off by raising the Mapper's threshold if the 30 seconds are tight.
 
 ### The output screen
 
 One screen, three parts:
-1. The flag card, with Approve and Change.
-2. A small combined table of about ten rows, with columns platform, target, and combined.
-3. One verdict line: combined leverage against the 2.50x limit, with OK or Over the limit.
+1. The flag card, with the question, the evidence, and the options with their computed effects.
+2. A combined table of platform, target, and combined, in USD thousands. The balance sheet balances: combined total assets $182,456K. The console shows about ten rows and can expand.
+3. One verdict line: combined leverage against the 2.50x limit, OK or Over the limit, with the room left.
 
 The audit log is a small link. There is no other screen in the demo.
+The whole screen comes from `GET /deals/{id}/case`. [verified: `architecture/gateway-and-api.md`]
 
 ### The 30-second run
 
-Two files and a brief go in. The mapping runs. One flag appears, and the controller approves it. The verdict line shows the leverage next to the limit.
-The agent text is hardcoded or recorded. The gateway, tools, and log run for real.
+Press Run. The Mapper maps 54 lines and stops on one flag. The controller picks the covenant reading. Code combines the books and tests the limit. The verdict line shows 0.77x against 2.50x, Reviewer pass. The controller approves and the gateway posts.
+If time allows, reset and run again: no flag, because the Mapper learned.
+The agent text is hardcoded, recorded, or scripted, and we say which. The gateway, tools, and log run for real.
 
 ### The 1:30 pitch outline
 
 - 0:00 to 0:25: the problem. A PE firm's next deal is gated by lender limits, and the team combines the books by hand, in weeks.
-- 0:25 to 0:55: what Stochastic does. It maps, flags, combines, tests against the limit, and a controller approves.
-- 0:55 to 1:30: the proof and the honesty. It runs on a real public deal. The agents are small and stateless, like roles on a real team. The math is code. The log is real. Say what is simulated.
+- 0:25 to 0:55: what Stochastic does. It maps, flags, combines, tests against the limit, and a controller approves. What the controller decides, the agents keep.
+- 0:55 to 1:30: the proof and the honesty. It runs on a real public deal. The agents are stateful roles on a real team. The math is code. The log is real. Say what is simulated.
 
 ## 13. MVP scope
-
-Must (the demo does not work without these):
-1. The two input files and the brief for the Kewaunee and Nu Aire deal, built from the filings.
-2. The Mapper, with a typed output, running through `run_agent`.
-3. Consolidation, EBITDA, and leverage tools, with tests that use the real figures.
-4. The gateway with work-item states, maker-checker, and the audit log.
-5. The Preparer and the Reviewer (hardcoded text is fine, but the tool calls are real).
-6. The console screen: flag card, combined table, verdict line. It is built from the Figma frame (Figma track).
-7. A recorded run and a backend switch, so the demo survives a failure.
-8. Track proofs: at least one agent runs with `AGENT_BACKEND=droid` (Factory), and the Figma file is on screen in the pitch (Figma).
+Must (the demo does not work without these). Status on 2026-10-24, 02:30:
+1. The two input files and the brief for the Kewaunee and Nu Aire deal, built from the filings. Done as a fixture. Eric moves it to CSVs and checks every figure against the filings.
+2. The Mapper, with a typed output, running through `run_agent`. Done on the scripted backend. Not yet run on Anthropic or Droid.
+3. Consolidation, EBITDA, and leverage tools, with tests that use the real figures. Done. Tri reviews and extends.
+4. The gateway with work-item states, maker-checker, run-id checks, the audit log, and agent memory. Done.
+5. The Preparer and the Reviewer, with real tool calls. Done on the scripted backend.
+6. The console screen: flag card, combined table, verdict line, built from the Figma frame. Josie, in progress, against `GET /deals/{id}/case`.
+7. A recorded run and a backend switch, so the demo survives a failure. Done (`backend/recordings/`, `AGENT_BACKEND=replay`). The recording is from the scripted backend until a model run is recorded.
+8. Track proofs: at least one agent runs with `AGENT_BACKEND=droid` (Factory), and the Figma file is on screen in the pitch (Figma). Open. The Droid backend is written; it needs the `droid` CLI installed and `scripts/droid_probe.py` run.
 
 Should (if the schedule holds):
-- A live Droid-backed agent call in the demo.
-- An answer-key score for the mapping against Note 2.
-- A second flag, such as the seller notes.
-- Tiger Cloud Postgres in place of the memory store, and a fork to compare two answers to the flag.
+- A live Anthropic-backed or Droid-backed agent call in the demo.
+- An answer-key score for the mapping against Note 2 (Eric).
+- The second-run memory moment on stage.
 - A downloadable draft compliance certificate.
+- Tiger Cloud Postgres in place of the memory store.
 
 Cut (do not build this weekend):
-- Purchase accounting beyond a "provisional" label.
-- Intercompany schedules and eliminations beyond one seeded example.
+- Purchase accounting beyond a "provisional" label. The combined table is historical plus target; the pro forma adjustments are not applied.
+- Intercompany schedules and eliminations.
 - Other situations, other deals, arbitrary uploads, accounts, login, mobile.
 - Plan search, Monte Carlo, and rejection-to-policy. These belong to the earlier framing.
 - A live SEC call on stage.
 - A staged denied-action demo.
 
 ## 14. Tech stack (proposed)
-
 - Frontend: Next.js, React, TypeScript, Tailwind. Josie leads the design.
-- Backend: Python, FastAPI. The gateway, tools, and tests are in Python.
-- Agents: Python, `run_agent(role, item)`. The Anthropic API is the default backend. The Factory Droid Python SDK is the second backend.
-- Store: in memory first. Postgres on Tiger Cloud is optional.
-- Models: Claude through the Anthropic API. Droid model access is unconfirmed.
-- Keys: `FACTORY_API_KEY` and the Anthropic key live in `.env`, which git ignores.
+- Backend: Python 3.12, FastAPI, Pydantic. The gateway, tools, agents, and tests are in Python. [verified]
+- Agents: `run_agent(role, item)` with backends `anthropic` (Anthropic SDK, tool use), `droid` (Factory Droid Python SDK 0.5.0), `scripted`, and `replay`. [verified: installed in `backend/.venv`]
+- Store: in memory. Postgres on Tiger Cloud is optional.
+- Models: Claude through the Anthropic API (`ANTHROPIC_MODEL`, default `claude-sonnet-5-5`). Droid model access is unconfirmed until `scripts/droid_probe.py` runs.
+- Keys: `ANTHROPIC_API_KEY` and `FACTORY_API_KEY` live in the repo-root `.env`, which git ignores and the app loads. `.env.example` lists every setting.
 
 ## 15. Tracks and sponsors
 
@@ -273,7 +296,9 @@ Factory:
 - The agents we show run through the Droid SDK, one fresh `run()` per work item.
 - `AGENT_BACKEND=droid` must work for at least one agent in the demo, or we do not claim "built with Droid".
 - A short statement of what the SDK made possible: a tool allowlist (`restrict_tools`), typed output, and per-run isolation.
-- Open: the prize rubric, and whether our key can run Claude models.
+- Each agent runs in an empty working directory with only our tools allowed, because Droid is a coding agent that reads files by default. [from Factory's Cal Hacks deck, see `sponsors/factory.md`]
+- Each team member can claim Factory credits with the form linked in `sponsors/factory.md`.
+- Open: the prize rubric, and whether our key can run Claude models. The deck does not answer either one.
 
 Figma:
 - The Figma file is the design source for the console, with the Tokens variables and components already built.
@@ -314,14 +339,15 @@ Do not lead the pitch with ingestion.
 - Use a plain hyphen and never an em dash.
 
 ## 18. Open questions
-
-- Does PE add-on integration count as a corner of a finance team for Hyphenate? The Friday workshop has passed. Ask a Hyphenate mentor or the sponsor channel today, unless Cayden already asked.
-- Which part of Kewaunee's financing liability counts as covenant debt? A practitioner should confirm. We have not computed the ratio.
-- Kewaunee's D&A and revolver draw were not in the pages the agent read. Tri must get them from the 10-K and 10-Q.
-- Can Droid run Claude models on our key? Run `list_models()`, and ask Factory.
+- Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask a Hyphenate mentor on Saturday, unless Cayden already asked.
+- Which part of Kewaunee's financing liability counts as covenant debt? We computed all three readings (section 12). A practitioner should confirm the default, reading b.
+- Can Droid run Claude models on our key? Install the CLI (`curl -fsSL https://app.factory.ai/cli | sh`, the script is reviewed and only downloads a checksummed binary to `~/.local/bin`) and run `backend/.venv/bin/python scripts/droid_probe.py`. The install was blocked on the build machine's agent and needs Cayden's own shell.
+- What are the exact MCP tool ids for `restrict_tools` in the Python SDK? The probe prints the tool list; set `DROID_RESTRICT_TOOLS` if the default guess is wrong.
 - Does the Python Droid SDK qualify for "Building with the Droid SDK" when the tools call our own gateway?
-- Does the SEC allow us to redistribute the cached filings?
+- Is there an Anthropic key for the team? None is in `.env`, so the Anthropic backend has not run.
+- Does the SEC allow us to redistribute the cached filings? The fixture holds only line values and source references, not the filings.
 - Does a former-banker or controller reviewer count as the human seat?
+- Is the Statesville cash rent deduction ($1,970K, from the 10-K obligations table) the right figure for the test period? It is inferred.
 
 ## 19. Where to find more
 

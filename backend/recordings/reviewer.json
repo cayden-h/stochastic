@@ -1,0 +1,13 @@
+{
+  "role": "reviewer",
+  "backend": "scripted",
+  "input_key": "7f40ca04728e",
+  "output": {
+    "verdict": "pass",
+    "reasons": [],
+    "run_ids": [
+      "run_017",
+      "run_018"
+    ]
+  }
+}

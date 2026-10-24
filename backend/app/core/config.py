@@ -7,8 +7,9 @@ from dataclasses import dataclass
 class Settings:
     database_url: str = os.getenv("DATABASE_URL", "")
     cors_origins: tuple[str, ...] = tuple(
-        os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+        os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
     )
+    agent_backend: str = os.getenv("AGENT_BACKEND", "scripted")
 
 
 settings = Settings()

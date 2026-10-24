@@ -1,157 +1,95 @@
 # Agents and work items
 
 Agents never chat with each other.
-They receive one work item and return one typed result.
-The gateway stores the result.
-Everything below is a design proposal [inferred], except where a source file says otherwise.
-The earlier six-agent design, its escalation points E1 to E6, and its work-item types are archived. They are not used here.
+Each agent receives one work item and returns one typed result through the gateway.
+Agents are stateful: each role keeps a session and the Mapper applies the policies the controller taught it.
+The state lives in the store, so it survives a restart, and a second deal starts with what the first one taught.
+This file describes the code in `backend/app/agents/` as of 2026-10-24.
 
 ## Work-item types
 
-| Type | Made by | Meaning |
+| Type | Opened by | Meaning |
 | --- | --- | --- |
-| `map_lines` | Job runner | Map one company's lines to the platform chart. The Mapper handles it. |
-| `flag` | Gateway, from the Mapper's flags | One line is unclear. A human must choose. |
+| `map_lines` | Job runner (through the gateway) | Map the target's lines to the platform's chart and tag the balance sheet lines. The Mapper handles it. |
+| `flag` | Gateway, from the Mapper's flag proposals | One line is unclear. The controller must choose. Each option carries an effect computed by the tools. |
 | `prepare_result` | Job runner | Build the draft combined table and the leverage figure. The Preparer handles it. |
 | `review_result` | Job runner | Check the draft. The Reviewer handles it. |
-| `approve_result` | Gateway | The controller approves the final result before it posts. |
+| `approve_result` | Gateway, after the review | The controller approves the result before it posts. It is proposed by the Preparer, so maker-checker applies. |
+| `reverse:<type>` | Gateway, on a reversal | A new item linked to the original. |
 
 ## States
-
-A work item has one state at a time.
-These states are already in `backend/app/core/models.py`.
 
 ```mermaid
 stateDiagram-v2
     [*] --> NEW
-    NEW --> PROPOSED: agent returns a result
-    PROPOSED --> NEEDS_INFO: flag or needs-attention
-    NEEDS_INFO --> PROPOSED: human answers
-    PROPOSED --> APPROVED: human approves
-    PROPOSED --> REJECTED: human rejects
-    NEEDS_INFO --> REJECTED: human rejects
+    NEW --> PROPOSED: agent result stored
+    PROPOSED --> POSTED: gateway posts (map_lines, review_result)
+    NEW --> NEEDS_INFO: flag opened
+    NEEDS_INFO --> APPROVED: controller answers a flag
     APPROVED --> POSTED: gateway posts
-    POSTED --> REVERSED: reverse and repost
+    PROPOSED --> APPROVED: controller approves (approve_result)
+    PROPOSED --> REJECTED: controller rejects
+    NEEDS_INFO --> REJECTED: controller rejects
+    POSTED --> REVERSED: controller reverses
 ```
 
 A forbidden action is DENIED. It is not a state.
 The gateway does not apply a denied action, and it writes a row to the audit log.
-The preparer of an item cannot approve it.
-Only the gateway moves an item to POSTED.
-A reversal is a new item linked to the original. The system never deletes.
+The controller's answer to a flag is the approval of that flag, so an answered flag posts at once.
 
 ## The three agent contracts
 
-Each agent is stateless.
-It gets one work item with all its inputs.
-It returns one typed result and keeps no memory.
-It can call only the tools it was given, and only through the gateway.
-The gateway checks the result with its own Pydantic model before it stores anything.
+Types are in `backend/app/core/models.py`.
 
 ### Mapper (staff accountant)
 
-Input:
-
-```python
-class MapperInput(BaseModel):
-    company: str                    # the target
-    lines: list[SourceLine]         # the target's lines
-    platform_chart: list[SourceLine]  # the platform's lines to map onto
-```
-
-Output:
-
-```python
-class MapperOutput(BaseModel):
-    mappings: list[Mapping]         # target_line, platform_line, confidence, reason, flagged
-    flags: list[str]                # target lines the Mapper could not place with confidence
-```
-
-Tools: line matching helpers.
-Never: guesses a low-confidence match. Precision before recall, so an unsure line becomes a flag.
+Input: `MapperInput` with the target lines, the platform lines, the brief, the policies it learned, and its session.
+Output: `MapperOutput` with `mappings` (target line id, platform line, confidence, reason, policy id), `tags` (a covenant tag for every balance sheet line), and `flags` (a question, evidence, options, and the tags or platform line each option applies).
+Tools: none. It only proposes.
+Never: guesses a low-confidence match or an unclear tag. Precision before recall.
 
 ### Preparer (senior accountant)
 
-Input:
+Input: `PreparerInput` with both companies' lines, the usable mappings, the brief, and its session.
+Output: `PreparerOutput` with rows (each with the consolidate run id), ebitda, debt, leverage, limit, run ids.
+Tools: `consolidate`, `ebitda`, `covenant_debt`, `leverage`.
+Never: types a number of its own. The gateway refuses a value that no run produced.
 
-```python
-class PreparerInput(BaseModel):
-    platform_lines: list[SourceLine]
-    target_lines: list[SourceLine]
-    mappings: list[Mapping]         # all approved, including the answers to flags
-    brief: Brief                    # the limit and the covenant definitions
-```
+### Reviewer
 
-Output:
-
-```python
-class PreparerOutput(BaseModel):
-    rows: list[ResultRow]           # platform, target, combined, with a run id each
-    leverage: float
-    limit: float
-    run_ids: list[str]              # from the math tools
-```
-
-Tools: consolidate, remove intercompany, EBITDA, debt, leverage.
-Never: computes a number itself, or approves its own draft.
-
-### Reviewer (reviewer)
-
-Input:
-
-```python
-class ReviewerInput(BaseModel):
-    draft: PreparerOutput
-    limit: float
-```
-
-Output:
-
-```python
-class ReviewerOutput(BaseModel):
-    verdict: Literal["pass", "needs_attention"]
-    reasons: list[str]              # tie-out error, or limit breach, with the numbers' run ids
-```
-
-Tools: tie-out check, limit test.
+Input: `ReviewerInput` with the draft rows, figures, run ids, and its session.
+Output: `ReviewerOutput` with `pass` or `needs_attention`, reasons, and the run ids of its checks.
+Tools: `tie_out`, `limit_test`, `leverage`.
 Never: changes the draft.
-
-The Mapper and the Reviewer run through `run_agent(role, item)`.
-The Preparer and the Reviewer may use hardcoded text in the demo, but their tool calls are real. [verified: `../STOCHASTIC.md`, section 13]
 
 ## The job runner
 
-The runner is plain code, not a model.
-It reads work items from the gateway and moves them from one agent to the next:
+`backend/app/agents/jobs.py`, plain code.
+`advance(gw, deal_id)` does every step that needs no human, then stops:
 
-1. A new deal creates a `map_lines` item.
-2. When the Mapper's result is stored and no `flag` is open, it creates a `prepare_result` item.
-3. When the Preparer's result is stored, it creates a `review_result` item.
-4. When the Reviewer's verdict is stored, the gateway creates `approve_result` for the human, or returns the item to NEEDS_INFO on needs-attention.
+1. No `map_lines` yet: open one, run the Mapper, store the mapping. The gateway opens a flag per proposal.
+2. A flag is open: stop. The console shows the flag card.
+3. Flags answered and no draft: open `prepare_result`, run the Preparer, store the result.
+4. Draft stored and no review: open `review_result`, run the Reviewer, store the verdict. The gateway opens `approve_result`.
+5. Waiting on the controller: stop.
 
-The runner holds no state of its own.
-It can crash and restart, and it will find the next item in the store.
+`POST /deals/{id}/run` calls it. Answering the last open flag calls it again in the background.
+The runner holds no state. It can run again at any time and finds the next thing to do.
 
-## Stateless and replicable
+## Memory
 
-An agent is a role: a system prompt, a tool list, and a typed result.
-It has no memory and no local files.
-So the same definition can run once per company, or once per batch of lines, in parallel.
-Two runs on the same item can be compared, because the item holds all the inputs. [inferred]
+- `Policy`: role, kind (`covenant_tag` or `mapping`), the normalized line name, the decision, who approved it, the flag it came from, how many times it was applied.
+- `AgentSession`: role, backend, backend session id (Droid resumes it), turns, a short transcript.
+- The gateway writes both. `GET /agents/memory` reads them. `POST /dev/reset` keeps them.
+- The demo moment for memory: reset the deal, run again, and the Mapper asks nothing. The audit log shows `policy:apply` rows.
 
 ## The two human moments
 
-- **Flag.** A line is unclear. The console shows both options and the effect on the result. The controller chooses.
-- **Approval.** The controller approves the combined result before it posts.
+- **Flag.** A line is unclear. The console shows the question, the evidence, and the options with their computed effects. The controller chooses.
+- **Approval.** The controller approves the combined result before it posts. The gateway refuses until the Reviewer verdict is pass.
 
-If the Reviewer finds a tie-out error or a breach of the limit, the item returns to the human as needs-attention.
+If the Reviewer finds a tie-out error or a breach of the limit, `approve_result` opens as NEEDS_INFO with the reasons, and the controller rejects it or reverses a flag.
 
 ## Flag payload
 
-Every flag carries the same fields, so the console shows one card shape.
-These fields already exist on `WorkItem`.
-
-- `question`: one sentence.
-- `evidence`: the source line, with its filing reference.
-- `options`: two or three answers, each with its effect on the result.
-- `default`: the option the agent suggests, if any.
+Every flag carries the same fields, so the console shows one card shape: `question`, `evidence` (quote and document id), `options` (id, label, effect, run id), `default`, and `payload.kind` (`covenant_tag` or `mapping`) with `payload.line_ids`.

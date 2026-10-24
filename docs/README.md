@@ -7,7 +7,8 @@ Start with `STOCHASTIC.md`. It is the product reference.
 | `STOCHASTIC.md` | Features, architecture summary, scope, demo plan, open questions |
 | `TASKS.md` | Who builds what, the shared contract, the order of work, and risks |
 | `tasks/` | One task file per person, with branches and owned folders, and the rules for parallel work |
-| `demo-script.md` | The 2:00 plan, the 30-second demo beat by beat, the failure plan, and judge Q&A prep |
+| `demo-script.md` | The 2:00 plan, the 30-second demo beat by beat, the computed figures, the failure plan, and judge Q&A prep |
+| `review.md` | The 2026-10-24 review: is the problem good, is the solution right, what to add |
 | `glossary.md` | Finance and product terms in plain language, with examples from the Kewaunee deal |
 | `decisions.md` | The dated decision log and the open decisions |
 | `architecture/` | How we build it: parts, agents, work items, gateway, API, data model, repo conventions |

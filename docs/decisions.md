@@ -1,6 +1,6 @@
 # Decision log
 
-Last updated: 2026-10-23.
+Last updated: 2026-10-24.
 This log explains how Stochastic got to its current shape.
 The source of truth for the product is `STOCHASTIC.md`.
 If the two disagree, `STOCHASTIC.md` wins.
@@ -296,15 +296,75 @@ A Hyphenate mentor says the sponsor tracks cost too much attention.
 
 ---
 
+## D12. Agents are stateful, with memory the gateway writes
+
+Date: 2026-10-24.
+
+Decision:
+Agents are stateful, not stateless. [set by Cayden, 2026-10-24]
+Each role keeps an `AgentSession` (backend, backend session id, turns, a short transcript).
+The controller's answer to a flag becomes a `Policy` that the Mapper applies next time and cites as its reason.
+The state lives in the store, and only the gateway writes it. [verified: `backend/app/gateway/gateway.py`]
+
+Why:
+- Hyphenate's workshop names "memory that ends with the context window" as a weak signal and "improves with every correction" as a strong one. [verified: `hyphenate-workshop.md`]
+- A second run that asks nothing is a visible moment, and it is honest: the policy row and the `policy:apply` log row are on screen.
+- The Droid SDK keeps sessions per role, so the backend supports it directly.
+
+Rejected:
+- Stateless one-shot agents (D5's wording). The runner, the roles, and the typed contracts stay the same; only the memory was added.
+- Memory inside the model's context only. It would not survive a restart or reach the audit log.
+
+Revisit if:
+A judge reads the policy as the agent approving its own future work. The answer is that the controller approved the decision once, the gateway recorded it, and a reversal clears it.
+
+## D13. The flag figures are computed, and the moment holds
+
+Date: 2026-10-24.
+
+Decision:
+Covenant EBITDA is $28,033K. Senior Funded Bank Debt under the agreement's reading is $21,633K, leverage 0.77x. Counting the whole financing liability line gives $71,955K and 2.57x, over the 2.50x limit. [verified: `backend/tests/test_trust_rules.py`]
+The default option on the flag is the agreement's reading (b).
+Two inputs are inferred and are said out loud: the Statesville cash rent deduction ($1,970K from the 10-K obligations table) and transaction and integration costs applied as 0.
+
+Why:
+- Every figure comes from the filings read on 2026-10-24 (10-Q, 10-K, Ex 99.1, Ex 99.2, Ex 10.1).
+- The verdict changes with the controller's answer, which is what the demo needs.
+
+Rejected:
+- Using the filed pro forma column for Nu Aire. The fiscal years differ, and the audited September year is the honest raw input.
+- Annualizing the six-month figures. It would be an invented number.
+
+Revisit if:
+Eric's check of the figures against the filings finds a different depreciation, rent, or financing figure. The tools recompute; only the fixture changes.
+
+## D14. One backend function, four backends, and the result says which ran
+
+Date: 2026-10-24.
+
+Decision:
+`run_agent` tries `AGENT_BACKEND` and falls back along `AGENT_FALLBACK` (default `anthropic,scripted`). The `replay` backend plays recorded outputs; the Preparer and Reviewer re-run their tools on replay so the run ids are real. Every result carries `backend`. [verified: `backend/app/agents/runner.py`]
+
+Why:
+The pitch must be honest about which runs went through Droid, and the demo must survive any backend failing.
+
+Rejected:
+- Hiding the fallback. The console shows the backend status from `GET /health`.
+
+Revisit if:
+Factory's rubric requires the TypeScript SDK. Then a small Node runner behind the same function is the swap.
+
+---
+
 ## Open decisions
 
 These come from `STOCHASTIC.md` section 18.
 They are not decided yet.
 
-1. Does PE add-on integration count as a corner of a finance team for Hyphenate? The Friday workshop has passed. Ask a Hyphenate mentor today.
-2. Which part of Kewaunee's financing liability counts as covenant debt? A practitioner should confirm. We have not computed the ratio.
-3. Kewaunee's D&A and revolver draw were not in the pages the agent read. Tri must get them from the 10-K and 10-Q.
-4. Can Droid run Claude models on our key? Run `list_models()`, and ask Factory.
+1. Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask a Hyphenate mentor on Saturday.
+2. Which part of Kewaunee's financing liability counts as covenant debt? All three readings are computed (D13). A practitioner should confirm the default.
+3. Kewaunee's depreciation ($3,125K, 10-K) and the revolver draw ($5,563K, Ex 99.2 Note 4(h)) are now loaded. Eric re-checks them against the filings.
+4. Can Droid run Claude models on our key? Install the `droid` CLI and run `scripts/droid_probe.py`.
 5. Does the Python Droid SDK qualify for "Building with the Droid SDK" when the tools call our own gateway?
 6. Does the SEC allow us to redistribute the cached filings?
 7. Does a former-banker or controller reviewer count as the human seat?

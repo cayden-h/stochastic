@@ -3,7 +3,7 @@
 Tables hold exact facts.
 The rule "vectors find, tables decide" still holds, but the MVP has no vector search and no vector table.
 The table names below are a design proposal and can change in the build [inferred].
-The list of tables matches `../STOCHASTIC.md`, section 10: `deal`, `source_line`, `mapping`, `work_item`, `result`, `audit_log`.
+The tables are `deal`, `source_line`, `mapping`, `work_item`, `result`, `tool_run`, `audit_log`, `policy`, and `agent_session`. The code is `backend/app/db/memory.py` and the Pydantic models in `backend/app/core/models.py` (2026-10-24).
 The earlier framing had document, chunk, fact, clause, plan, and simulation tables. They are archived and are not used.
 
 Tags: [verified] means a source file or filing shows it. [inferred] means it is our design judgment.
@@ -306,6 +306,38 @@ Example rows:
 
 Row 42 matches the example in `gateway-and-api.md`. The demo does not stage it. [verified: `../STOCHASTIC.md`, section 9]
 
+### 2.7 `tool_run`
+
+One row per math tool call. Every number on screen traces to one of these. Written by the gateway in `run_tool`.
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `run_id` | text, primary key | Example `run_017` |
+| `deal_id` | text | |
+| `tool` | text | `consolidate`, `tie_out`, `ebitda`, `covenant_debt`, `leverage`, `limit_test` |
+| `actor` | text | Who asked: an agent or `system:gateway` for a flag what-if |
+| `inputs` | jsonb | The arguments, including the run ids it read |
+| `outputs` | jsonb | The tool's full output |
+| `at` | timestamptz | |
+
+### 2.8 `policy` (agent memory)
+
+What an agent learned from the controller. Written by the gateway when a flag is answered. Survives a deal reset.
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `id` | text, primary key | Example `p_001` |
+| `role` | text | `agent:mapper` |
+| `kind` | text | `covenant_tag` or `mapping` |
+| `pattern` | text | The normalized line name |
+| `decision` | text | The tag, or the platform line |
+| `reason`, `approved_by`, `learned_from`, `deal_id` | text | Who decided, on which flag |
+| `times_applied` | int | Counted on each later run |
+
+### 2.9 `agent_session`
+
+One row per role: `role`, `backend`, `session_id` (the Droid session to resume), `turns`, `transcript` (jsonb, last 20 turns), `updated_at`.
+
 ## 3. The in-memory store and the Postgres mapping
 
 ### 3.1 In-memory shape
@@ -322,11 +354,13 @@ class MemoryStore:
     mappings: dict[str, Mapping]
     items: dict[str, WorkItem]
     results: dict[str, Result]
-    audit: list[AuditRow]          # append only, in order
+    tool_runs: dict[str, ToolRun]
+    policies: dict[str, Policy]          # agent memory, kept across reset_deals()
+    sessions: dict[str, AgentSession]    # keyed by role
+    audit: list[AuditRow]                # append only, in order
 ```
 
-The collection names `source_lines`, `mappings`, and `results` are new. [verified: previous version of this file]
-`SourceLine`, `Mapping`, and `Result` do not exist in `models.py` yet. [verified: `models.py`]
+This is the shape in the code. [verified: `backend/app/db/memory.py`, 2026-10-24]
 
 ### 3.2 Mapping to Postgres
 
@@ -471,7 +505,7 @@ Reversal:
 
 ## 8. What is intentionally not stored
 
-- **Model reasoning and chat text.** Agents are stateless. We store the typed result and a short `reason`, not the model's full output. [verified: `../STOCHASTIC.md`, section 7]
+- **Model reasoning and chat text.** We store the typed result, a short `reason`, and a short session transcript summary per role, not the model's full output. [verified: `../STOCHASTIC.md`, section 7]
 - **Numbers made by a model.** The model never writes a number into any table. Every number comes from a math tool run. [verified: `../STOCHASTIC.md`, section 11]
 - **Trial balances and account-level detail.** Public filings give statement lines, not accounts. Any account-level detail would be synthetic, so the demo does not claim it. [verified: `../research/real-deal-candidates.md`]
 - **Vectors and embeddings.** The MVP has no vector search. [verified: `../STOCHASTIC.md`, section 10]

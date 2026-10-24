@@ -49,6 +49,16 @@ Gaps against what they said they want:
 6. Unclear seat. They frame the work as a function a CFO would delegate (billing, cash, close), and a deal desk that runs a few times a year is advisory work.
 7. Monte Carlo is not in their blueprint. Keep it as a seeded, reproducible tool, and put the demo time on the loop.
 
+## Gap status after the 2026-10-24 build (inferred)
+
+1. Learning source: partly closed. The Mapper learns policies from the controller's flag answers and applies them on the next run. There is still no table of past deals.
+2. Self-improvement loop: partly closed. A correction becomes a policy with evidence and an approver (the controller's answer). It is not backtested.
+3. Limits in code: closed. The gateway denies and logs: agents cannot approve, the Preparer cannot approve its own result, a number without a run id is refused, and the approval waits for the Reviewer's pass.
+4. Time dimension: open. One deal, one run, plus the second run that shows memory.
+5. Answer key: partly closed. The real figures are tested; the Note 2 mapping score is Eric's task.
+6. Seat: a portfolio controller right after an add-on closes. Still to confirm with a Hyphenate mentor.
+7. Monte Carlo: dropped from the product.
+
 ## The seat choice (revised 2026-10-23)
 
 Revised the same day: Cayden asked why the system must track a company over quarters, and the answer is that it does not.

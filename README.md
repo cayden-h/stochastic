@@ -2,20 +2,19 @@
 
 **Merge an acquired company's books into the platform's books, flag the unclear lines for a human, and check the combined leverage against the lender's limit.**
 Stochastic is built for private equity buy-and-build firms that keep buying add-on companies.
-Three small AI agents do the repeatable work, code does all the math, and a human controller approves.
+Three stateful AI agents do the repeatable work, code does all the math, and a human controller approves.
+What the controller decides once, the agents keep and apply next time.
 
 Built at Cal Hacks 13.0 (Oct 23-25, 2026, San Francisco) for the Hyphenate track, "The Hyphenated Enterprise: Autonomous Systems for Finance".
 
 | | |
 | --- | --- |
-| Status | Early prototype. Figma mockups, a gateway API with tests, and a console exist. They implement an earlier workflow on invented data and are being updated to the workflow below. |
+| Status | Backend runs the demo deal end to end on real filing figures (2026-10-24): mapping, flags with computed effects, consolidation with tie-out, covenant leverage 0.77x against 2.50x, maker-checker, hash-chained log, learned policies. The console is being rebuilt on the new API. |
 | Visibility | Private. |
 | Team | UTSA, four people. |
 | Start here | [`docs/STOCHASTIC.md`](docs/STOCHASTIC.md), the reference for features, architecture, and scope. |
 | Who builds what | [`docs/TASKS.md`](docs/TASKS.md). |
 
-The backend gateway and the console currently implement an earlier workflow on invented data.
-They will be updated to the new workflow, as set out in `docs/TASKS.md`.
 
 An earlier idea was one all-in-one platform for any corporate-finance special situation.
 It is archived as roadmap in `docs/planning-notes.md` and `docs/research/`.
@@ -39,8 +38,9 @@ Errors in the mapping flow silently into every later number. [inferred]
 2. **Flags** only the unclear lines for a human, with both options and the effect on the result.
 3. **Combines** the books in code: platform, target, and total, with intercompany amounts removed and EBITDA adjusted.
 4. **Tests** combined leverage against the lender's limit, using the covenant's own definitions of debt and EBITDA.
-5. **Checks** the work with a reviewer agent, and a human controller approves. The agent that prepares a result cannot approve it.
+5. **Checks** the work with a reviewer agent, and a human controller approves. The agent that prepares a result cannot approve it, and the gateway refuses a number that no tool run produced.
 6. **Logs** every action in an audit log, and each row is chained to the row before it.
+7. **Learns.** The controller's answer to a flag becomes a policy. The Mapper applies it on the next run instead of asking again, and the log shows it.
 
 ## How it works
 
@@ -61,7 +61,7 @@ The system has four parts.
 flowchart TB
     CON["Console"]
     GW["Gateway: the only writer"]
-    subgraph AG["Agents (stateless)"]
+    subgraph AG["Agents (stateful)"]
         MA["Mapper"]
         PR["Preparer"]
         RE["Reviewer"]
@@ -79,10 +79,8 @@ Agents never talk to each other.
 A job runner, which is code and not a model, moves work items from one agent to the next.
 The console talks only to the gateway.
 
-The agent layer uses one function, `run_agent(role, item)`, with two backends. [inferred]
-The Anthropic API is the real path and the stage fallback.
-The Factory Droid Python SDK runs the agents that we show as built with Droid.
-An `AGENT_BACKEND` setting switches between them, and a recorded run is the last fallback.
+The agent layer uses one function, `run_agent(role, item)`, with four backends: `anthropic` (the real model path and the stage fallback), `droid` (the Factory Droid Python SDK, one session per role), `scripted` (deterministic rules, no model), and `replay` (recorded outputs).
+`AGENT_BACKEND` picks one, `AGENT_FALLBACK` lists the fallbacks, and every result says which backend produced it.
 
 ### Design rules
 
@@ -95,8 +93,9 @@ An `AGENT_BACKEND` setting switches between them, and a recorded run is the last
 
 ## The three agents
 
-Each agent is stateless.
-It receives one work item with all its inputs, returns one typed result, and keeps no memory.
+Each agent is stateful.
+It receives one work item with all its inputs, plus its session and the policies it learned, and returns one typed result.
+The state lives in the store, written only by the gateway, so it survives a restart and carries to the next deal.
 
 | Agent | Real-team role | Gets | Returns | Never |
 | --- | --- | --- | --- | --- |
@@ -114,42 +113,25 @@ The data comes from public filings: Nu Aire's audited statements, Kewaunee's pro
 Public filings give statement lines, not trial balances, so the demo maps statement lines.
 
 **The one flag** is real: Kewaunee's "Financing liability" line.
-It holds a sale-leaseback of the Statesville property and, after the deal, the new acquisition financing. [verified]
-The credit agreement's senior funded bank debt excludes the capital lease on that property and the seller notes.
-So the agent asks the controller which part of the line is covenant debt.
-The answer may change the leverage result. [inferred: not computed yet]
+It holds the Statesville sale-leaseback ($27,782K), the new PNC term loan and revolver ($20,563K), and the 8% seller notes ($22,540K). [verified]
+The credit agreement's Senior Funded Bank Debt excludes the capital lease on that property and subordinated debt.
+So the agent asks the controller which parts count, and each option shows the leverage it gives, computed by the tools.
+Counting the whole line gives 2.57x, over the 2.50x limit. The agreement's reading gives 0.77x. [verified: `backend/tests/test_trust_rules.py`]
 
-**The one screen** has a flag card with Approve and Change, a combined table of about ten rows, and one verdict line that shows combined leverage against the 2.50x limit.
+**The one screen** has the flag card with its options and effects, a combined table (the combined balance sheet balances at $182,456K of total assets), and one verdict line that shows combined leverage against the 2.50x limit with the room left.
 The audit log is a small link.
 
 Pitch time is 1:30, and the live demo is 0:30.
-The agent messages in the demo are hardcoded or recorded.
+The screen says which backend produced the agent output.
 The gateway, the math, and the audit log are real.
+Run the deal again after a reset and the Mapper asks nothing: the controller's answer became a policy.
 
 ## MVP scope
 
-**Must have**
-1. The two input files and the brief for the Kewaunee and Nu Aire deal.
-2. The Mapper, with a typed output, running through `run_agent`.
-3. Consolidation, EBITDA, and leverage tools, with tests that use the real figures.
-4. The gateway with work-item states, maker-checker, and the audit log.
-5. The Preparer and the Reviewer (hardcoded text is fine, but the tool calls are real).
-6. The console screen: flag card, combined table, verdict line.
-7. A recorded run and a backend switch.
-
-**Should have**
-- A live Droid-backed agent call in the demo.
-- An answer-key score for the mapping.
-- A second flag, such as the seller notes.
-- Postgres on Tiger Cloud in place of the memory store, and a fork to compare two answers to the flag.
-- A downloadable draft compliance certificate.
-
-**Cut for the weekend**
-- Purchase accounting beyond a "provisional" label.
-- Intercompany schedules and eliminations beyond one seeded example.
-- Other situations, other deals, arbitrary uploads, accounts, login, mobile.
-- Plan search, Monte Carlo, and rejection-to-policy (these belong to the earlier framing).
-- A live SEC call on stage, and a staged denied-action demo.
+Status on 2026-10-24 is in `docs/STOCHASTIC.md`, section 13.
+Done: the input data from the filings, the three agents through `run_agent`, the tools with tests on the real figures, the gateway with maker-checker, run-id checks, the audit log, and agent memory, the recorded run and the backend switch.
+Open: the console on the new API, a live model run (Anthropic or Droid), the Note 2 answer-key score.
+Cut for the weekend: purchase accounting, intercompany eliminations, other deals, login, Postgres, a live SEC call, a staged denial.
 
 ## Tracks
 
@@ -169,10 +151,10 @@ Other tracks are not targeted. The details, the per-track checklist, and the ope
 | --- | --- |
 | Frontend | Next.js, React, TypeScript, Tailwind (the console) |
 | Backend | Python, FastAPI (gateway, tools, tests) |
-| Agents | Python, `run_agent(role, item)`. Anthropic API by default, Factory Droid Python SDK as the second backend |
-| Store | In memory first. Postgres on Tiger Cloud is optional |
-| Models | Claude through the Anthropic API. Droid model access is unconfirmed |
-| Keys | `FACTORY_API_KEY` and the Anthropic key live in `.env`, which git ignores |
+| Agents | Python, `run_agent(role, item)`: `anthropic`, `droid` (Factory Droid Python SDK 0.5.0), `scripted`, `replay` |
+| Store | In memory, with agent memory kept across resets. Postgres on Tiger Cloud is optional |
+| Models | Claude through the Anthropic API (`ANTHROPIC_MODEL`, default `claude-sonnet-5-5`). Droid model access is unconfirmed until `scripts/droid_probe.py` runs |
+| Keys | `ANTHROPIC_API_KEY` and `FACTORY_API_KEY` live in the repo-root `.env`, which git ignores and the app loads |
 
 ## Repository layout
 
@@ -191,11 +173,11 @@ stochastic/
     diagrams/          PDFs from the first framing (stale)
     planning-notes.md  Archive from earlier framings
     hyphenate-workshop.md
-  backend/             FastAPI gateway, in-memory store, deal math, tests (earlier workflow)
-  frontend/            Console: Next.js, Tailwind (earlier workflow)
-  evals/               Answer key and scoring (planned)
-  data/                Cached public filings (git-ignored)
-  scripts/             Helper scripts (planned)
+  backend/             FastAPI gateway, agents and backends, deal math, fixture, tests, recordings
+  frontend/            Console: Next.js, Tailwind (being rebuilt on GET /deals/{id}/case)
+  evals/               Answer key and scoring (Eric, planned)
+  data/                Cached public filings and CSVs (git-ignored)
+  scripts/             droid_probe.py (can Droid run Claude?) and record_run.py (run and record a backend)
 ```
 
 ## Getting started
@@ -203,10 +185,12 @@ stochastic/
 Run the backend and the console in two terminals.
 
 ```
+cp .env.example .env                                        # then add keys; AGENT_BACKEND=scripted needs none
+
 cd backend
 uv venv --python 3.12 .venv
-uv pip install -p .venv/bin/python fastapi "uvicorn[standard]" pydantic pytest httpx
-.venv/bin/python -m pytest                                  # trust-rule tests
+uv pip install -p .venv/bin/python fastapi "uvicorn[standard]" pydantic pytest httpx python-dotenv anthropic "droid-sdk[mcp]"
+.venv/bin/python -m pytest -q                               # 17 trust-rule and math tests on the real figures
 .venv/bin/uvicorn app.main:app --port 8000 --reload
 
 cd frontend
@@ -214,9 +198,22 @@ npm install
 npm run dev                                                 # http://localhost:3000
 ```
 
-The console reads `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`).
-Call `POST /dev/reset` on the API to reseed the demo data.
-The demo data is still the earlier invented data: an invented company, invented numbers, and invented quotes.
+Run the deal without the console:
+
+```
+curl -X POST localhost:8000/deals/d_kequ_nuaire/run          # Mapper runs, stops on the flag
+curl localhost:8000/deals/d_kequ_nuaire/case                 # the whole screen, including open_flags
+curl -X POST localhost:8000/work-items/wi_002/answer -H 'content-type: application/json' -d '{"option_id":"b"}'
+curl -X POST localhost:8000/work-items/wi_003/answer -H 'content-type: application/json' -d '{"option_id":"a"}'
+curl -X POST localhost:8000/deals/d_kequ_nuaire/run          # Preparer and Reviewer run; verdict 0.77x against 2.50x
+curl -X POST localhost:8000/work-items/wi_006/approve        # controller approves; the gateway posts
+curl -X POST localhost:8000/dev/reset && curl -X POST localhost:8000/deals/d_kequ_nuaire/run   # second run: no flag
+```
+
+Or from the command line: `backend/.venv/bin/python scripts/record_run.py --backend scripted`.
+The console reads `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`) and `GET /deals/{id}/case`.
+`POST /dev/reset` reseeds the deal and keeps the agents' memory; add `?keep_memory=false` to clear it.
+The Droid backend needs the `droid` CLI on PATH: `curl -fsSL https://app.factory.ai/cli | sh`.
 
 ## Documentation
 
@@ -239,15 +236,16 @@ The demo data is still the earlier invented data: an invented company, invented 
 
 ## A worked example of the flag
 
-This example uses only facts from the filings. The ratios are not computed yet. [inferred where marked]
+Every figure is from the filings or computed by the tools. [verified: `backend/tests/test_trust_rules.py`]
 
-1. Kewaunee's balance sheet has one line, "Financing liability". At 2024-10-31 it was $750K current plus $27,032K long-term. [verified]
-2. The 10-Q says the line comes from a sale-leaseback of the Statesville property, carried at $27,782K. [verified]
-3. After the deal, the pro forma balance sheet adds $3,000K current and $40,103K long-term to the same line for the new acquisition financing. [verified]
-4. The credit agreement defines Senior Funded Bank Debt. It excludes the capital lease on that property and it excludes the subordinated seller notes. [verified]
-5. So the Mapper cannot say which part of the line is covenant debt. It raises a flag instead of guessing.
-6. The controller answers. The Preparer calls the leverage tool with that answer. The Reviewer tests the result against 2.50x.
-7. A naive ratio, which adds the whole line, and the covenant ratio can differ a lot. [inferred: Tri computes both first]
+1. Kewaunee's balance sheet has one line, "Financing liability". At 2024-10-31 it was $750K current plus $27,032K long-term, a sale-leaseback of the Statesville property carried at $27,782K. [10-Q]
+2. At close the pro forma adds $43,103K to the same line: the $15,000K term loan, the $5,563K revolver draw, and the $22,540K seller notes. [Ex 99.2 Note 4(h)]
+3. The credit agreement's Senior Funded Bank Debt excludes the capital lease on that property and excludes subordinated debt. [Ex 10.1]
+4. The Mapper tags the line unclear and raises a flag with three options. The gateway runs the tools for each option and writes the effect on the card.
+5. Whole line: debt $71,955K, leverage 2.57x, over the limit. Agreement's reading: debt $21,633K, leverage 0.77x, OK. Bank debt plus seller notes: 1.58x.
+6. Covenant EBITDA is $28,033K: both companies' net income plus interest, taxes, and D&A, plus the $4,177K noncash pension add-back, less $1,970K of Statesville cash rent (inferred from the 10-K obligations table).
+7. The controller picks b. The Preparer calls consolidate, ebitda, covenant_debt, and leverage. The Reviewer calls tie_out and limit_test. The controller approves and the gateway posts.
+8. Reset and run again: the Mapper applies the policy and asks nothing.
 
 ## Team and branches
 
@@ -263,10 +261,10 @@ Cayden owns the shared data contract in `backend/app/core/models.py`.
 
 ## Open questions
 
-- Does PE add-on integration count as a corner of a finance team for Hyphenate? The Friday workshop has passed, so ask a Hyphenate mentor today.
-- Which part of Kewaunee's financing liability counts as covenant debt? A practitioner should confirm.
-- Can Droid run Claude models on our key?
-- Does the SEC allow us to redistribute the cached filings?
+- Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask a Hyphenate mentor on Saturday.
+- Which reading of Kewaunee's financing liability is right? All three are computed; a practitioner should confirm the default.
+- Can Droid run Claude models on our key? Run `scripts/droid_probe.py` once the `droid` CLI is installed.
+- Is there an Anthropic key for the team? None is in `.env` yet.
 
 The full list is in section 18 of `docs/STOCHASTIC.md`.
 
@@ -274,7 +272,8 @@ The full list is in section 18 of `docs/STOCHASTIC.md`.
 
 - Claims in the docs are tagged verified or inferred. No practitioner has checked the user assumptions.
 - The demo is a reconstruction from public filings. It does not show the internal views of the lender or the company.
-- The agent messages in the demo are hardcoded or recorded. The gateway, the math, and the audit log are real.
+- The screen says which backend produced the agent output: anthropic, droid, scripted, or replay. The gateway, the math, and the audit log are real.
+- The rent deduction and zero transaction costs in covenant EBITDA are inferred, not filed figures. The combined table is historical plus target, without purchase accounting, and the two fiscal years differ.
 - The output is a mapped, combined set of books and a limit check that a human approves. It is not advice.
 - Other situations are roadmap, not built.
 - Sponsor and vendor numbers are self-reported.
