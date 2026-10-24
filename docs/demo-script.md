@@ -71,7 +71,7 @@ Measured on live Droid on 2026-10-24 08:30 (Mapper Sonnet 5.5, Preparer and Revi
 - Last answer to a live Approve button: 36 to 38 s (Preparer about 28 s, Reviewer about 9 s). Answer the flag early and talk over this wait: the gateway, the tools, the run ids.
 - Second run after a reset with memory kept: 58 s to approval, no flag. Show it at the table only if a judge has the time, or point to the Learned chips.
 - If the timing does not fit, use `AGENT_BACKEND=replay` for the pitch and say so: the recorded Sonnet 5.5 Droid run's text, with every tool run live. The pinned replay is a first run, so it raises the covenant flag. [verified: `test_demo_reset.py`]
-- Between judges, reset with memory cleared: the console's "Fresh deal, clear memory", or `curl -X POST 'localhost:8000/dev/reset?keep_memory=false'`. The plain reset keeps memory, and the next judge would see no flag. The reset is refused while a run is going (409) and frees the fork slot.
+- Between judges, reset with memory cleared: the console's "Fresh deal (clear memory)" on the Case page, or `curl -X POST 'localhost:8000/dev/reset?keep_memory=false'`. The plain reset keeps memory, and the next judge would see no flag. The reset is refused while a run is going (409) and frees the fork slot.
 - The console shows a progress row while the agents work: which agent, and for how many seconds.
 
 The beats below are the original plan; Cayden times the real version with a stopwatch (`tasks/cayden.md` task 5).
@@ -351,7 +351,7 @@ Roles at the table:
 - [ ] Each judge gets a name written down, with their questions and any follow-up they ask for.
 
 During judging:
-- [ ] Reset the demo state before every new judge with memory cleared ("Fresh deal, clear memory", or `POST /dev/reset?keep_memory=false`), and check that the screen is clean.
+- [ ] Reset the demo state before every new judge with memory cleared ("Fresh deal (clear memory)" on the Case page, or `POST /dev/reset?keep_memory=false`), and check that the screen is clean.
 - [ ] Open with the problem, not the demo. The demo is the last 30 seconds.
 - [ ] Say the honest-limits statement every time, before a judge asks.
 - [ ] Offer the audit log if a judge asks "can it be tampered with". Show `chain_valid`.
