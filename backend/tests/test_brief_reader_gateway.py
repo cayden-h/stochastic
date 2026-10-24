@@ -413,3 +413,16 @@ def test_a_brief_sent_as_json_must_have_finite_figures(world):
     with pytest.raises(Invalid, match="finite"):
         gw.create_deal(CONTROLLER, deal, [])
     assert "d_bad" not in store.deals
+
+
+def test_the_pinned_reader_recording_is_a_droid_draft_that_follows_the_rules():
+    """recordings/brief_reader.json is the live Sonnet 5.5 run on the full Ex 10.1 (2026-10-25), which passed every
+    check in the gateway. The full text stays out of git, so this checks what can be checked without it."""
+    from app.agents import recording
+    from app.core.models import BriefReaderOutput
+    out, backend, _ = recording.load("brief_reader", BriefReaderOutput)
+    assert backend == "droid"
+    assert out.brief.limit == 2.5 and out.brief.debt_term == "Senior Funded Bank Debt"
+    assert all(len(c.quote.split()) >= agr.MIN_QUOTE_WORDS for c in out.citations)
+    assert all(a.amount == 0 and a.inferred for a in out.brief.ebitda_addbacks + out.brief.ebitda_deductions)
+    assert any("Fixed Charge Coverage" in f.question for f in out.flags)
