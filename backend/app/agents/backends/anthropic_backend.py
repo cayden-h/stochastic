@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.agents.roles import Role
+from app.agents.settings import role_model
 from app.tools.finance import TOOL_DESCRIPTIONS
 
 TOOL_SCHEMAS: dict[str, dict] = {
@@ -40,7 +41,7 @@ def run_anthropic(role: Role, inp: BaseModel, call_tool, transcript: list[dict] 
     import anthropic  # imported here so the scripted backend works without the package
 
     client = anthropic.Anthropic()
-    model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
+    model = role_model("ANTHROPIC_MODEL", role.name) or "claude-haiku-5-5"
     memory = ""
     if transcript:
         memory = "\n\nYour earlier turns (most recent last):\n" + "\n".join(

@@ -131,6 +131,7 @@ class SourceLine(BaseModel):
     unit: str = "USD thousands"
     source_ref: str
     is_total: bool = False  # subtotals are not added again in consolidation
+    note: str | None = None  # what the filing says about the line, such as the 10-Q note on a sale-leaseback
     covenant_tag: CovenantTag = "na"
     covenant_note: str | None = None
 
@@ -177,6 +178,7 @@ class Result(BaseModel):
     tie_out_ok: bool | None = None
     review: Review | None = None
     run_ids: list[str]
+    run_ids_by_tool: dict[str, str] = Field(default_factory=dict)
     backend: str = "scripted"  # which agent backend produced it: anthropic, droid, scripted, replay
 
 
@@ -281,8 +283,10 @@ class FlagOption(BaseModel):
     label: str
     # For covenant_tag flags: the tag to apply to each line id if chosen.
     tags: dict[str, CovenantTag] = Field(default_factory=dict)
-    # For mapping flags: the platform line to map to if chosen (None means leave unmapped).
+    # For mapping flags: the platform line (name or id) to map to if chosen (None means leave unmapped).
     platform_line: str | None = None
+    # For mapping flags that cover several target lines: target line id -> platform line (name or id).
+    mappings: dict[str, str | None] = Field(default_factory=dict)
 
 
 class FlagProposal(BaseModel):
@@ -340,6 +344,10 @@ class PreparerOutput(BaseModel):
     leverage: float
     limit: float
     run_ids: list[str]
+    consolidate_run_id: str | None = None
+    ebitda_run_id: str | None = None
+    debt_run_id: str | None = None
+    leverage_run_id: str | None = None
     note: str = ""
 
 
@@ -353,6 +361,8 @@ class ReviewerInput(BaseModel):
     leverage: float
     limit: float
     run_ids: list[str]
+    consolidate_run_id: str | None = None
+    leverage_run_id: str | None = None
     session: AgentSession | None = None
 
 

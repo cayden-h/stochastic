@@ -229,3 +229,55 @@ def test_units_and_limit_test():
     assert finance.to_thousands(74850302, "USD") == 74850.302
     assert finance.limit_test(2.499, 2.5)["ok"] and not finance.limit_test(2.5, 2.5)["ok"]
     assert finance.limit_test(0.772, 2.5, ebitda_value=28032.6, debt=21633.0)["debt_capacity"] == pytest.approx(48448.5)
+
+
+# ---- contract details the model backends rely on -------------------------------------------------------------
+
+def test_mapping_flag_resolves_names_and_ids_per_line(world):
+    from app.core.models import FlagOption, FlagProposal, MapperOutput, MappingProposal
+    store, gw = world
+    deal = store.deals[DEAL_ID]
+    cds = next(l for l in store.lines(DEAL_ID, deal.target) if l.line == "Certificates of Deposit")
+    prepaid = next(l for l in store.lines(DEAL_ID, deal.platform) if l.line.startswith("Prepaid"))
+    item = gw.create_item(DEAL_ID, "map_lines")
+    out = MapperOutput(
+        mappings=[MappingProposal(target_line_id=cds.id, platform_line=None, confidence=0.4, reason="unsure")],
+        tags=[],
+        flags=[FlagProposal(kind="mapping", line_ids=[cds.id], question="Where do the CDs go?",
+                            options=[FlagOption(id="a", label="by id", mappings={cds.id: prepaid.id}),
+                                     FlagOption(id="b", label="by name", mappings={cds.id: "cash and cash equivalents"})])])
+    gw.store_mapping(MAPPER, item.id, out)
+    flag = gw.open_flags(DEAL_ID)[0]
+    assert "Prepaid expenses" in flag.options[0].effect and "Cash and cash equivalents" in flag.options[1].effect
+    gw.answer(CONTROLLER, flag.id, "a")
+    m = next(m for m in store.deal_mappings(DEAL_ID) if m.target_line_id == cds.id)
+    assert m.platform_line_id == prepaid.id and m.approved_by == CONTROLLER
+
+
+def test_named_run_ids_must_match_their_tool(world):
+    store, gw = world
+    advance(gw, DEAL_ID)
+    answer_all(gw)
+    item = gw.create_item(DEAL_ID, "prepare_result")
+    cons = gw.run_tool(PREPARER, DEAL_ID, "consolidate", {})
+    eb = gw.run_tool(PREPARER, DEAL_ID, "ebitda", {})
+    debt = gw.run_tool(PREPARER, DEAL_ID, "covenant_debt", {})
+    lev = gw.run_tool(PREPARER, DEAL_ID, "leverage", {"debt_run_id": debt.run_id, "ebitda_run_id": eb.run_id})
+    rows = [ResultRow(line=r["line"], section=r["section"], platform=r["platform"], target=r["target"],
+                      combined=r["combined"], run_id=cons.run_id) for r in cons.outputs["rows"]]
+    swapped = PreparerOutput(rows=rows, ebitda=eb.outputs["ebitda"], debt=debt.outputs["debt"],
+                             leverage=lev.outputs["leverage"], limit=2.5,
+                             run_ids=[cons.run_id, eb.run_id, debt.run_id, lev.run_id],
+                             leverage_run_id=eb.run_id)  # wrong tool
+    with pytest.raises(Invalid):
+        gw.store_result(PREPARER, item.id, swapped)
+    good = swapped.model_copy(update={"leverage_run_id": lev.run_id})
+    result = gw.store_result(PREPARER, item.id, good)
+    assert result.run_ids_by_tool == {"leverage": lev.run_id, "consolidate": cons.run_id, "ebitda": eb.run_id,
+                                      "covenant_debt": debt.run_id}
+
+
+def test_source_lines_carry_filing_notes(world):
+    store, _ = world
+    fin = next(l for l in store.lines(DEAL_ID) if l.line == "Long-term portion of financing liability")
+    assert fin.note and "2700 West Front Street" in fin.note

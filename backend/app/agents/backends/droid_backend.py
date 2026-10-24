@@ -16,6 +16,7 @@ import tempfile
 from pydantic import BaseModel
 
 from app.agents.roles import Role
+from app.agents.settings import role_model
 from app.tools.finance import TOOL_DESCRIPTIONS
 
 
@@ -70,7 +71,7 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None):
     with tempfile.TemporaryDirectory(prefix="stochastic-droid-") as cwd:
         kwargs = dict(cwd=cwd, output=role.output_type, config=config,
                       timeout=float(os.getenv("DROID_TIMEOUT", "240")))
-        model = os.getenv("DROID_MODEL")
+        model = role_model("DROID_MODEL", role.name)
         if model:
             kwargs["model"] = model
         result = await run(prompt, **kwargs)

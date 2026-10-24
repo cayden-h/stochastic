@@ -1,15 +1,15 @@
 {
   "role": "preparer",
   "backend": "droid",
-  "input_key": "23ef2ad4c97b",
+  "input_key": "1d907c2a1783",
   "output": {
     "rows": [
       {
         "line": "Cash and cash equivalents",
         "section": "balance_sheet",
         "platform": 25963.0,
-        "target": 14447.056,
-        "combined": 40410.056,
+        "target": 13455.974,
+        "combined": 39418.974,
         "run_id": "run_013"
       },
       {
@@ -40,8 +40,8 @@
         "line": "Prepaid expenses and other current assets",
         "section": "balance_sheet",
         "platform": 6228.0,
-        "target": 972.345,
-        "combined": 7200.345,
+        "target": 1963.427,
+        "combined": 8191.427,
         "run_id": "run_013"
       },
       {
@@ -445,9 +445,12 @@
       "run_013",
       "run_014",
       "run_015",
-      "run_016",
-      "run_017"
+      "run_016"
     ],
-    "note": "Draft for controller review. Leverage 0.772 against a limit of 2.50 (Section 4.8(a)). Debt excludes the Statesville financing liability and the 8% Seller Notes per the controller's decision on flag wi_002. Statesville cash rent of 1,970 is inferred from the 10-K's next-year obligation. Transaction and integration add-backs are applied at 0 because they were not quantified in the filings. The combined income statement adds Kewaunee's FY ended 2024-04-30 to Nu Aire's FY ended 2024-09-30, so it is not the filed pro forma. The platform pension expense of 4,177 and the 304 non-controlling interest rows appear on the platform side only. Nu Aire's D&A includes amortization that the platform's depreciation line does not. The leverage tool was called twice with the same inputs: run_016 and run_017 returned identical results, and run_016 is the one cited."
+    "consolidate_run_id": "run_013",
+    "ebitda_run_id": "run_014",
+    "debt_run_id": "run_015",
+    "leverage_run_id": "run_016",
+    "note": "Draft for controller review. Debt (run_015) is the covenant-tagged set: it includes the PNC revolver draw, PNC term loan, short-term borrowings, and finance leases, and excludes the Statesville financing liability and the 8% subordinated seller notes per the controller's wi_002 decisions. Combined income statement adds the filed years (Kewaunee FYE 2024-04-30, Nu Aire FYE 2024-09-30) and is not the filed pro forma. Open items for the controller: transaction and integration add-backs are 0 (not quantified in the filings read); Statesville cash rent of 1,970 is taken from the 10-K next-year obligation; Nu Aire D&A includes amortization that the platform does not separate. Leverage 0.772 is below the 2.50 limit in Section 4.8(a)."
   }
 }

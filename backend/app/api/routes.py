@@ -13,6 +13,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.agents import runner as agent_runner
+from app.agents import settings as agent_settings
 from app.agents.jobs import advance
 from app.core.models import CONTROLLER, State
 from app.gateway.gateway import Gateway, GatewayError
@@ -62,6 +63,7 @@ def build_router(gw: Gateway) -> APIRouter:
             "anthropic_key": bool(os.getenv("ANTHROPIC_API_KEY")),
             "factory_key": bool(os.getenv("FACTORY_API_KEY")),
             "last_runs": agent_runner.LAST_RUNS[-6:],
+            "settings": agent_settings.summary(),
         }
 
     def run_in_background(deal_id: str, backend: str | None, tasks: BackgroundTasks):

@@ -260,14 +260,13 @@ class Gateway:
                        item.deal_id, actor, "propose:map_lines", item.id)
         deal = self._deal(item.deal_id)
         out = MapperOutput.model_validate(out.model_dump())  # the gateway re-validates the typed result
-        platform_by_name = {(l.section, l.line.strip().lower()): l for l in self._platform_lines(deal)}
         target_by_id = {l.id: l for l in self._target_lines(deal)}
         flagged_ids = {lid for f in out.flags if f.kind == "mapping" for lid in f.line_ids}
         for p in out.mappings:
             t = target_by_id.get(p.target_line_id)
             if t is None:
                 raise Invalid(f"mapping names unknown target line {p.target_line_id}")
-            pl = platform_by_name.get((t.section, (p.platform_line or "").strip().lower()))
+            pl = self._platform_line(deal, t.section, p.platform_line)
             m = Mapping(id=self.store.next_id("m"), deal_id=deal.id, target_line_id=t.id,
                         platform_line_id=pl.id if pl else None, target_line=t.line,
                         platform_line=pl.line if pl else p.platform_line, confidence=p.confidence,
@@ -329,12 +328,18 @@ class Gateway:
                           f"against {deal.brief.limit:.2f}x. {verdict}.")
                 return effect, test.run_id
             if flag.kind == "mapping":
-                amount = sum(finance.to_thousands(l.amount, l.unit) for l in lines.values())
-                if opt.platform_line:
-                    effect = f"Adds {_fmt(amount)}K to {opt.platform_line}."
-                else:
-                    effect = f"Leaves {_fmt(amount)}K out of the combined table, listed as unmapped."
-                return effect, None
+                parts = []
+                for lid, l in lines.items():
+                    ref = opt.mappings.get(lid, opt.platform_line) if opt.mappings else opt.platform_line
+                    pl = self._platform_line(deal, l.section, ref)
+                    amt = finance.to_thousands(l.amount, l.unit)
+                    if pl:
+                        parts.append(f"{l.line} ({_fmt(amt)}K) to {pl.line}")
+                    elif ref:
+                        parts.append(f"{l.line} ({_fmt(amt)}K) to '{ref}', which is not a platform line")
+                    else:
+                        parts.append(f"{l.line} ({_fmt(amt)}K) left unmapped and listed")
+                return "; ".join(parts) + ".", None
             return "No effect computed.", None
         except GatewayError as error:
             return f"Effect not computed: {error.message}", None
@@ -378,17 +383,33 @@ class Gateway:
                     self._learn(MAPPER, "covenant_tag", line.line, tag, label, actor, item)
         elif kind == "mapping":
             deal = self._deal(item.deal_id)
-            platform_by_name = {(l.section, l.line.strip().lower()): l for l in self._platform_lines(deal)}
+            per_line = action.get("mappings") or {}
             for m in self.store.deal_mappings(item.deal_id):
                 if m.target_line_id in item.payload.get("line_ids", []):
                     t = self.store.source_lines[m.target_line_id]
-                    name = action.get("platform_line")
-                    pl = platform_by_name.get((t.section, (name or "").strip().lower()))
-                    m.platform_line = pl.line if pl else name
+                    ref = per_line.get(t.id, action.get("platform_line")) if per_line else action.get("platform_line")
+                    pl = self._platform_line(deal, t.section, ref)
+                    m.platform_line = pl.line if pl else ref
                     m.platform_line_id = pl.id if pl else None
                     m.approved_by = actor
                     m.flagged = True
-                    self._learn(MAPPER, "mapping", t.line, name or "", label, actor, item)
+                    self._learn(MAPPER, "mapping", t.line, (pl.line if pl else ref) or "", label, actor, item)
+
+    def _platform_line(self, deal: Deal, section: str, ref: str | None) -> SourceLine | None:
+        """Find a platform line by id or by name (case-insensitive) within a section."""
+        if not ref:
+            return None
+        line = self.store.source_lines.get(ref)
+        if line is not None and line.deal_id == deal.id and line.company == deal.platform:
+            return line
+        key = ref.strip().lower()
+        for l in self._platform_lines(deal):
+            if l.section == section and l.line.strip().lower() == key:
+                return l
+        for l in self._platform_lines(deal):  # a name that exists in another section still resolves
+            if l.line.strip().lower() == key:
+                return l
+        return None
 
     def _learn(self, role: str, kind: str, pattern: str, decision: str, label: str, actor: str, item: WorkItem) -> Policy:
         """The controller's answer becomes a policy the agent applies next time. The gateway is the writer."""
@@ -520,10 +541,22 @@ class Gateway:
         if abs(out.limit - deal.brief.limit) > 1e-9:
             self._deny(Invalid("limit must come from the brief"), deal.id, actor, "propose:prepare_result", item.id)
         test = finance.limit_test(out.leverage, deal.brief.limit)
+        by_tool = {k: v for k, v in (("consolidate", out.consolidate_run_id), ("ebitda", out.ebitda_run_id),
+                                      ("covenant_debt", out.debt_run_id), ("leverage", out.leverage_run_id)) if v}
+        for tool, rid in list(by_tool.items()):
+            run = self.store.tool_runs.get(rid)
+            if run is None or run.tool != tool or run.deal_id != deal.id:
+                self._deny(Invalid(f"{tool}_run_id {rid} is not a {tool} run for this deal"), deal.id, actor,
+                           "propose:prepare_result", item.id)
+        for tool in ("consolidate", "ebitda", "covenant_debt", "leverage"):  # fill from run_ids when not named
+            if tool not in by_tool:
+                rid = next((r for r in out.run_ids if r in runs and runs[r] and runs[r].tool == tool), None)
+                if rid:
+                    by_tool[tool] = rid
         result = Result(id=self.store.next_id("r"), deal_id=deal.id, work_item_id=item.id, rows=out.rows,
                         ebitda=out.ebitda, debt=out.debt, leverage=out.leverage, limit=out.limit,
                         verdict=test["verdict"], headroom_turns=test["headroom_turns"], run_ids=out.run_ids,
-                        backend=backend)
+                        run_ids_by_tool=by_tool, backend=backend)
         self.store.results[result.id] = result
         item.payload = {"result_id": result.id, "note": out.note}
         item.state = State.PROPOSED

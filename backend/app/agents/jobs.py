@@ -73,7 +73,9 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
             result = store.results[result_id]
             inp = ReviewerInput(deal_id=deal_id, item_id=item.id, result_id=result.id, rows=result.rows,
                                 ebitda=result.ebitda, debt=result.debt, leverage=result.leverage, limit=result.limit,
-                                run_ids=result.run_ids, session=store.sessions.get(REVIEWER_ROLE.name))
+                                run_ids=result.run_ids, consolidate_run_id=result.run_ids_by_tool.get("consolidate"),
+                                leverage_run_id=result.run_ids_by_tool.get("leverage"),
+                                session=store.sessions.get(REVIEWER_ROLE.name))
             run = _run(gw, REVIEWER_ROLE, inp, deal_id, item.id, backend)
             gw.store_review(REVIEWER_ROLE.actor, item.id, run.output)
             gw.update_session(REVIEWER_ROLE.name, run.backend, item.id, f"{run.output.verdict} on {result.id}")

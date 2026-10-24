@@ -153,7 +153,7 @@ Other tracks are not targeted. The details, the per-track checklist, and the ope
 | Backend | Python, FastAPI (gateway, tools, tests) |
 | Agents | Python, `run_agent(role, item)`: `anthropic`, `droid` (Factory Droid Python SDK 0.5.0), `scripted`, `replay` |
 | Store | In memory, with agent memory kept across resets. Postgres on Tiger Cloud is optional |
-| Models | Claude through the Anthropic API (`ANTHROPIC_MODEL`, default `claude-sonnet-5-5`). Droid model access is unconfirmed until `scripts/droid_probe.py` runs |
+| Models | Claude Haiku 5.5 by default on both backends (`DROID_MODEL`, `ANTHROPIC_MODEL`), with per-role overrides such as `DROID_MODEL_MAPPER`. The Factory key lists Claude, GPT, and Gemini models |
 | Keys | `ANTHROPIC_API_KEY` and `FACTORY_API_KEY` live in the repo-root `.env`, which git ignores and the app loads |
 
 ## Repository layout
@@ -221,6 +221,7 @@ The Droid backend needs the `droid` CLI on PATH: `curl -fsSL https://app.factory
 | --- | --- |
 | [`docs/STOCHASTIC.md`](docs/STOCHASTIC.md) | The reference. Read it first. |
 | [`docs/TASKS.md`](docs/TASKS.md) | Who builds what, the shared contract, and the order of work |
+| [`docs/agents.md`](docs/agents.md) | The agents: roles, memory, backends, settings, run log |
 | [`docs/tasks/`](docs/tasks) | One task file per person, with branches and owned folders |
 | [`docs/demo-script.md`](docs/demo-script.md) | The 2:00 plan, the 30-second demo beat by beat, failure plan, and judge Q&A |
 | [`docs/glossary.md`](docs/glossary.md) | Finance terms in plain language, with examples from the Kewaunee deal |
