@@ -48,6 +48,8 @@ Opt-in mechanics: the MLH export lists "Opt-In Prizes (any categories/tracks the
 The guide does not say who judges MLH categories, and no Cal Hacks 13.0 judging rubric was published [verified: same guide, plus the https://www.mlh.com/events/cal-hacks-13-0/prizes page has no rubric].
 The Devpost page returned HTTP 403 to our fetcher, so Devpost-only wording was not read; the MLH event prize page was [verified: https://www.mlh.com/events/cal-hacks-13-0/prizes].
 The MLH Hack Days guide has no Tiger Data page; its partner list is Gemini, Gemma, Snowflake, Cloudflare, Solana [verified: https://hackdays-guide.mlh.com/partner-details/partner-details], so there is no published judge checklist [verified by absence].
+Our measured figures (2026-10-24, `scripts/tiger_bench.py`, server time, median of 25, read-only on the live schema of 3,892 records and 748 log rows): BM25 ranked top 10 in 0.09 ms against 3.9 ms for an ILIKE scan; the continuous aggregate in 0.14 ms against 0.38 ms from the raw hypertable; a fork in 33 to 35 s. The data is small, so say "the shape, not scale". [verified]
+
 The three stated axes are innovative, impactful, performance-driven [verified: prize text], which suggests judges want measured speed or a clever use of forks or time-series, not just a Postgres connection [inferred].
 
 What Tiger Data is pushing: Agentic Postgres launched 2025-10-21 with copy-on-write instant forks, the Tiger MCP server inside the Tiger CLI (`tiger mcp install <client>`), pg_textsearch (BM25), pgvectorscale, and a free plan with forks [verified: https://www.infoq.com/news/2025/12/agentic-postgres-fast-forking/ and https://www.tigerdata.com/blog/five-features-tiger-cli-you-arent-using-but-should via search summaries].

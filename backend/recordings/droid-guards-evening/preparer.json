@@ -1,0 +1,456 @@
+{
+  "role": "preparer",
+  "backend": "droid",
+  "input_key": "2dbc105a2ab9",
+  "output": {
+    "rows": [
+      {
+        "line": "Cash and cash equivalents",
+        "section": "balance_sheet",
+        "platform": 25963.0,
+        "target": 13455.974,
+        "combined": 39418.974,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Restricted cash",
+        "section": "balance_sheet",
+        "platform": 3701.0,
+        "target": 0.0,
+        "combined": 3701.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Receivables, less allowance",
+        "section": "balance_sheet",
+        "platform": 41885.0,
+        "target": 10560.193,
+        "combined": 52445.193,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Inventories",
+        "section": "balance_sheet",
+        "platform": 18659.0,
+        "target": 12559.018,
+        "combined": 31218.018,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Prepaid expenses and other current assets",
+        "section": "balance_sheet",
+        "platform": 6228.0,
+        "target": 1963.427,
+        "combined": 8191.427,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Total Current Assets",
+        "section": "balance_sheet",
+        "platform": 96436.0,
+        "target": 38538.612,
+        "combined": 134974.612,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Property, plant and equipment, at cost",
+        "section": "balance_sheet",
+        "platform": 65098.0,
+        "target": 21248.838,
+        "combined": 86346.838,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Accumulated depreciation",
+        "section": "balance_sheet",
+        "platform": -48108.0,
+        "target": -18856.875,
+        "combined": -66964.875,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Net Property, Plant and Equipment",
+        "section": "balance_sheet",
+        "platform": 16990.0,
+        "target": 2391.963,
+        "combined": 19381.963,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Right of use assets",
+        "section": "balance_sheet",
+        "platform": 6941.0,
+        "target": 6413.855,
+        "combined": 13354.855,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Deferred income taxes",
+        "section": "balance_sheet",
+        "platform": 8305.0,
+        "target": 606.057,
+        "combined": 8911.057,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Other assets",
+        "section": "balance_sheet",
+        "platform": 5806.0,
+        "target": 27.694,
+        "combined": 5833.694,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Total Assets",
+        "section": "balance_sheet",
+        "platform": 134478.0,
+        "target": 47978.181,
+        "combined": 182456.181,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Short-term borrowings",
+        "section": "balance_sheet",
+        "platform": 805.0,
+        "target": 0.0,
+        "combined": 805.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Current portion of financing liability",
+        "section": "balance_sheet",
+        "platform": 750.0,
+        "target": 0.0,
+        "combined": 750.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Current portion of financing lease liabilities",
+        "section": "balance_sheet",
+        "platform": 109.0,
+        "target": 0.0,
+        "combined": 109.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Current portion of operating lease liabilities",
+        "section": "balance_sheet",
+        "platform": 2112.0,
+        "target": 1315.402,
+        "combined": 3427.402,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Accounts payable",
+        "section": "balance_sheet",
+        "platform": 21458.0,
+        "target": 3650.249,
+        "combined": 25108.249,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Employee compensation and amounts withheld",
+        "section": "balance_sheet",
+        "platform": 3708.0,
+        "target": 2127.269,
+        "combined": 5835.269,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Deferred revenue",
+        "section": "balance_sheet",
+        "platform": 6239.0,
+        "target": 0.0,
+        "combined": 6239.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Other accrued expenses",
+        "section": "balance_sheet",
+        "platform": 1290.0,
+        "target": 3426.502,
+        "combined": 4716.502,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Total Current Liabilities",
+        "section": "balance_sheet",
+        "platform": 36471.0,
+        "target": 10519.422,
+        "combined": 46990.422,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Long-term portion of financing liability",
+        "section": "balance_sheet",
+        "platform": 27032.0,
+        "target": 0.0,
+        "combined": 27032.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Financing liability: PNC Revolving Credit Facility",
+        "section": "balance_sheet",
+        "platform": 5563.0,
+        "target": 0.0,
+        "combined": 5563.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Financing liability: PNC Term Loan",
+        "section": "balance_sheet",
+        "platform": 15000.0,
+        "target": 0.0,
+        "combined": 15000.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Financing liability: 8% Seller Notes (subordinated)",
+        "section": "balance_sheet",
+        "platform": 22540.0,
+        "target": 0.0,
+        "combined": 22540.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Long-term portion of financing lease liabilities",
+        "section": "balance_sheet",
+        "platform": 156.0,
+        "target": 0.0,
+        "combined": 156.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Long-term portion of operating lease liabilities",
+        "section": "balance_sheet",
+        "platform": 5035.0,
+        "target": 5376.568,
+        "combined": 10411.568,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Accrued pension and deferred compensation costs",
+        "section": "balance_sheet",
+        "platform": 3625.0,
+        "target": 0.0,
+        "combined": 3625.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Deferred income taxes (liability)",
+        "section": "balance_sheet",
+        "platform": 1042.0,
+        "target": 0.0,
+        "combined": 1042.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Other non-current liabilities",
+        "section": "balance_sheet",
+        "platform": 460.0,
+        "target": 0.0,
+        "combined": 460.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Total Liabilities",
+        "section": "balance_sheet",
+        "platform": 73821.0,
+        "target": 15895.99,
+        "combined": 89716.99,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Common stock",
+        "section": "balance_sheet",
+        "platform": 7353.0,
+        "target": 30.03,
+        "combined": 7383.03,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Additional paid-in-capital",
+        "section": "balance_sheet",
+        "platform": 4885.0,
+        "target": 12.359,
+        "combined": 4897.359,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Retained earnings",
+        "section": "balance_sheet",
+        "platform": 52715.0,
+        "target": 32039.802,
+        "combined": 84754.802,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Accumulated other comprehensive loss",
+        "section": "balance_sheet",
+        "platform": -3574.0,
+        "target": 0.0,
+        "combined": -3574.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Common stock in treasury, at cost",
+        "section": "balance_sheet",
+        "platform": -2051.0,
+        "target": 0.0,
+        "combined": -2051.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Non-controlling interest",
+        "section": "balance_sheet",
+        "platform": 1329.0,
+        "target": 0.0,
+        "combined": 1329.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Total Stockholders' Equity",
+        "section": "balance_sheet",
+        "platform": 60657.0,
+        "target": 32082.191,
+        "combined": 92739.191,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Total Liabilities and Stockholders' Equity",
+        "section": "balance_sheet",
+        "platform": 134478.0,
+        "target": 47978.181,
+        "combined": 182456.181,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Net sales",
+        "section": "income_statement",
+        "platform": 203755.0,
+        "target": 74850.302,
+        "combined": 278605.302,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Cost of products sold",
+        "section": "income_statement",
+        "platform": 151704.0,
+        "target": 51168.691,
+        "combined": 202872.691,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Gross profit",
+        "section": "income_statement",
+        "platform": 52051.0,
+        "target": 23681.611,
+        "combined": 75732.611,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Operating expenses",
+        "section": "income_statement",
+        "platform": 33770.0,
+        "target": 18433.001,
+        "combined": 52203.001,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Operating profit",
+        "section": "income_statement",
+        "platform": 18281.0,
+        "target": 5248.61,
+        "combined": 23529.61,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Pension expense",
+        "section": "income_statement",
+        "platform": 4177.0,
+        "target": 0.0,
+        "combined": 4177.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Other income, net",
+        "section": "income_statement",
+        "platform": 814.0,
+        "target": 703.61,
+        "combined": 1517.61,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Interest expense",
+        "section": "income_statement",
+        "platform": 1799.0,
+        "target": 0.0,
+        "combined": 1799.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Profit before income taxes",
+        "section": "income_statement",
+        "platform": 13119.0,
+        "target": 5952.22,
+        "combined": 19071.22,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Income tax (benefit) expense",
+        "section": "income_statement",
+        "platform": -5938.0,
+        "target": 513.949,
+        "combined": -5424.051,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Net earnings",
+        "section": "income_statement",
+        "platform": 19057.0,
+        "target": 5438.271,
+        "combined": 24495.271,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Net earnings attributable to the non-controlling interest",
+        "section": "income_statement",
+        "platform": 304.0,
+        "target": 0.0,
+        "combined": 304.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Net earnings attributable to Kewaunee Scientific Corporation",
+        "section": "income_statement",
+        "platform": 18753.0,
+        "target": 0.0,
+        "combined": 18753.0,
+        "run_id": "run_013"
+      },
+      {
+        "line": "Depreciation",
+        "section": "cash_flow",
+        "platform": 3125.0,
+        "target": 1830.395,
+        "combined": 4955.395,
+        "run_id": "run_013"
+      }
+    ],
+    "ebitda": 28378.845,
+    "debt": 21633.0,
+    "leverage": 0.762,
+    "limit": 2.5,
+    "run_ids": [
+      "run_013",
+      "run_014",
+      "run_015",
+      "run_016"
+    ],
+    "consolidate_run_id": "run_013",
+    "ebitda_run_id": "run_014",
+    "debt_run_id": "run_015",
+    "leverage_run_id": "run_016",
+    "note": "Debt is the covenant figure (naive=false) and includes Kewaunee short-term borrowings, PNC revolver and term loan draws, and finance leases. It excludes the Statesville sale-leaseback financing (current and long-term), the 8% seller notes, and operating leases. Ebitda is covenant basis, with the 10-K pension termination and stock-based compensation add-backs and the Statesville cash rent deduction. Transaction and integration cost add-backs are zero (not quantified in the filings read). Nu Aire combined figures use the filed years, not the filed pro forma."
+  }
+}

@@ -18,7 +18,7 @@ function num(v: number): string {
 
 /** The combined books, in platform order and USD thousands, with the tie-out state and the run id. */
 export function CombinedTable({ result, platform, target }: { result: Result; platform: string; target: string }) {
-  const [open, setOpen] = useState<string>("balance_sheet");
+  const [open, setOpen] = useState<string>("");  // collapsed: the verdict above carries the figures that matter
   const consolidateRun = result.run_ids_by_tool.consolidate;
   return (
     <section className="flex flex-col gap-3">
@@ -34,7 +34,7 @@ export function CombinedTable({ result, platform, target }: { result: Result; pl
       <div className="overflow-x-auto rounded-card border border-rule bg-card">
         <div className="min-w-[680px]">
         <div className="grid grid-cols-[1fr_160px_160px_160px] gap-4 border-b border-hairline px-4 py-2">
-          <Label>Line</Label>
+          <span><Label>Line</Label></span>
           <span className="text-right"><Label>{platform}</Label></span>
           <span className="text-right"><Label>{target}</Label></span>
           <span className="text-right"><Label>Combined</Label></span>

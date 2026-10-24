@@ -20,6 +20,7 @@ DEBT = 21633.0  # 15,000 + 5,563 + 805 + 109 + 156 (the agreement's reading)
 LEVERAGE = 0.762  # 21,633 / 28,378.845
 DEBT_CAPACITY = 49314.113  # 2.5 * 28,378.845 - 21,633
 NAIVE_DEBT = 71955.0  # whole line: 21,633 + 27,782 sale-leaseback + 22,540 seller notes
+REPORTED_EBITDA = 25311.845  # as filed: 18,043 Kewaunee + 7,268.845 Nu Aire, no add-backs and no rent deduction
 TOTAL_ASSETS = 182456.181  # 134,478 + 47,978.181
 
 
@@ -43,7 +44,8 @@ def test_the_demo_run_beat_by_beat():
     fin = next(f for f in body["flags"] if "Financing liability" in f["question"])
     effects = {o["id"]: o["effect"] for o in fin["options"]}
     assert fin["default"] == "b"
-    assert effects["a"] == "Senior Funded Bank Debt 71,955K. Leverage 2.54x against 2.50x. Over the limit."
+    # The whole-line reading is one reading end to end: balance sheet debt over reported EBITDA, as filed.
+    assert effects["a"] == "As filed: debt 71,955K over reported EBITDA 25,312K. Leverage 2.84x against 2.50x. Over the limit."
     assert effects["b"] == "Senior Funded Bank Debt 21,633K. Leverage 0.76x against 2.50x. OK."
     assert effects["c"] == "Senior Funded Bank Debt 44,173K. Leverage 1.56x against 2.50x. OK."
     assert all(o["run_id"] for o in fin["options"])  # every effect traces to a limit_test run
@@ -69,13 +71,13 @@ def test_the_demo_run_beat_by_beat():
     assert v["debt_term"] == "Senior Funded Bank Debt"
     assert v["debt_capacity"] == pytest.approx(DEBT_CAPACITY, abs=0.01)
     assert v["debt_capacity_run_id"] in body["result"]["review"]["run_ids"]
-    # Sensitivity: the whole-line reading (71,955) misses the limit by 403.155 of EBITDA: 71,955 / 2.5 - 28,378.845.
-    # The rent deduction would have to fall to 1,970 - 403.155 = 1,566.845 for it to pass.
+    # Sensitivity: the whole-line reading as filed is 71,955 over reported EBITDA 25,312 = 2.843. It would need
+    # 71,955 / 2.5 - 25,312 = 3,470 more EBITDA to pass, so a missed add-back or a rent estimate cannot flip it.
     assert v["naive_debt"] == pytest.approx(NAIVE_DEBT, abs=0.001)
-    assert v["naive_leverage"] == pytest.approx(2.536, abs=0.0005)
-    assert v["naive_flip_addback"] == pytest.approx(NAIVE_DEBT / LIMIT - EBITDA, abs=0.001)
-    assert v["naive_flip_addback"] == pytest.approx(403.155, abs=0.001)
-    assert v["naive_flip_rent"] == pytest.approx(1566.845, abs=0.001)
+    assert v["naive_ebitda"] == pytest.approx(REPORTED_EBITDA, abs=0.5)
+    assert v["naive_leverage"] == pytest.approx(2.843, abs=0.0005)
+    assert v["naive_flip_addback"] == pytest.approx(NAIVE_DEBT / LIMIT - v["naive_ebitda"], abs=0.001)
+    assert v["naive_flip_addback"] > 3000
     assert c.get(f"/runs/{v['sensitivity_run_id']}").json()["tool"] == "limit_test"
     assert v["review"]["verdict"] == "pass" and v["tie_out_ok"] is True
     assert v["approval_state"] == "PROPOSED" and v["posted"] is False

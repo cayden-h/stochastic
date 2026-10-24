@@ -56,15 +56,16 @@ def _debt_capacity(store, result) -> tuple[float | None, str | None]:
     return None, None
 
 
-SENSITIVITY_KEYS = ("naive_debt", "naive_leverage", "naive_flip_addback", "naive_flip_rent")
+SENSITIVITY_KEYS = ("naive_debt", "naive_ebitda", "naive_leverage", "naive_flip_addback")
 
 
-def _whole_line_debt_run(store, deal_id: str) -> str | None:
-    """The covenant_debt run behind the covenant flag option that counts every flagged line as debt.
+def _whole_line_runs(store, deal_id: str) -> tuple[str, str] | None:
+    """The covenant_debt and as-filed ebitda runs behind the covenant flag option that counts every flagged line as
+    debt: the whole-line reading, which the gateway computes as filed (balance sheet debt over reported EBITDA).
 
     After the controller answers, the flagged lines carry their settled tags, so a fresh naive covenant_debt run
     no longer gives the whole-line figure. The option's what-if run, made by the gateway when the flag opened, does.
-    The chain is option limit_test run -> its leverage run -> its covenant_debt run. Run ids only, no numbers."""
+    The chain is option limit_test run -> its leverage run -> its covenant_debt and ebitda runs. Run ids only."""
     for item in reversed(store.deal_items(deal_id)):
         if item.type != "flag" or item.payload.get("kind") != "covenant_tag":
             continue
@@ -76,8 +77,9 @@ def _whole_line_debt_run(store, deal_id: str) -> str | None:
             test = store.tool_runs.get(opt.run_id)
             lev = store.tool_runs.get(test.inputs.get("leverage_run_id", "")) if test else None
             debt = store.tool_runs.get(lev.inputs.get("debt_run_id", "")) if lev else None
-            if debt and debt.tool == "covenant_debt":
-                return debt.run_id
+            eb = store.tool_runs.get(lev.inputs.get("ebitda_run_id", "")) if lev else None
+            if debt and debt.tool == "covenant_debt" and eb and eb.tool == "ebitda":
+                return debt.run_id, eb.run_id
     return None
 
 
@@ -87,7 +89,7 @@ _SENSITIVITY_FAILED: set[tuple[str, str, str]] = set()
 
 
 def _sensitivity(gw: Gateway, deal: Deal, result) -> dict | None:
-    """How far the whole-line reading of debt is from the limit, from a limit_test run made by the gateway.
+    """How far the whole-line reading (as filed) is from the limit, from a limit_test run made by the gateway.
 
     Only for a result the Reviewer passed, and only when a covenant flag option gives the whole-line covenant_debt
     run. With no such flag (for example a second run where a policy settled the lines) nothing runs and the keys
@@ -108,13 +110,13 @@ def _sensitivity(gw: Gateway, deal: Deal, result) -> dict | None:
                     if t.deal_id == deal.id and t.tool == "limit_test" and t.inputs.get("sensitivity") is True
                     and t.inputs.get("leverage_run_id") == lev_id), None)
         if run is None:
-            naive_id = _whole_line_debt_run(gw.store, deal.id)
-            if naive_id is None:
+            naive = _whole_line_runs(gw.store, deal.id)
+            if naive is None:
                 return None
             try:
                 run = gw.run_tool(SYSTEM, deal.id, "limit_test",
-                                  {"leverage_run_id": lev_id, "naive_debt_run_id": naive_id,
-                                   "ebitda_run_id": result.run_ids_by_tool.get("ebitda"), "sensitivity": True})
+                                  {"leverage_run_id": lev_id, "naive_debt_run_id": naive[0],
+                                   "naive_ebitda_run_id": naive[1], "sensitivity": True})
             except GatewayError:
                 _SENSITIVITY_FAILED.add(failed_key)
                 return None
@@ -167,6 +169,7 @@ def build_router(gw: Gateway) -> APIRouter:
     # would start a second Preparer; the gateway would deny its result, but the click should get a clear 409 instead.
     running: set[str] = set()
     running_lock = threading.Lock()
+    gw.running = running  # /dev/reset refuses while a run is in flight
 
     def claim(deal_id: str) -> bool:
         with running_lock:
@@ -190,6 +193,10 @@ def build_router(gw: Gateway) -> APIRouter:
             advance(gw, deal_id, backend=backend)
         except Exception as error:  # keep the server up; the audit log and LAST_RUNS hold the trace
             agent_runner.LAST_RUNS.append({"role": "runner", "backend": backend, "error": str(error)[:300]})
+            try:
+                gw.note_run_failed(deal_id, f"{type(error).__name__}: {error}")
+            except Exception:  # noqa: BLE001 - the deal may have been reset meanwhile
+                pass
         finally:
             release(deal_id)
 

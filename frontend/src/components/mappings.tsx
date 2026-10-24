@@ -20,12 +20,12 @@ export function Mappings({ mappings, lines }: { mappings: Mapping[]; lines: Sour
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 className="font-serif text-[26px] leading-8 font-medium">Mapping</h2>
         <span className="text-muted">
-          {plural(mappings.length, "target line")} mapped. {flagged.length} flagged. {low.length} below 0.80 confidence.
+          {plural(mappings.length, "target line")} mapped. {flagged.length} in a mapping question. {low.length} below 0.80 confidence.
         </span>
         {learned.length + learnedTags.length > 0 ? (
           <span className="inline-flex items-center gap-2">
             <Tag tone="agent">Learned</Tag>
-            <span className="text-muted">{learned.length + learnedTags.length} from earlier answers</span>
+            <span className="text-muted">{plural(learned.length + learnedTags.length, "line")} settled by earlier answers</span>
           </span>
         ) : null}
         <span className="flex-1" />

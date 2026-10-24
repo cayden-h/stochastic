@@ -21,7 +21,8 @@ Both are archived in `planning-notes.md` and `research/`.
 They are roadmap ideas only. The product is the integration workflow in this file.
 
 Build status on 2026-10-24, 02:30: the backend runs the whole deal end to end on the real filing figures through the gateway, the tools, and the audit log, on the scripted backend. [verified: `backend/tests/test_trust_rules.py`, 103 tests pass]
-The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 (recorded in `backend/recordings/`). The Anthropic backend is written and not yet run live (no Anthropic key in `.env`).
+The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 (recorded in `backend/recordings/`). The Anthropic backend ran later on Eric's key (one full recorded run, about 50 Mapper trials); the demo laptop has no key, so it is not in the stage fallback chain. [verified: `evals/README.md`]
+Status on 2026-10-24 evening: 167 tests pass offline and 176 with Tiger. The whole-line reading is computed as filed (2.84x), and the gateway guards against model-made exclusions, borrowed run ids, and unbacked review passes (D18). [verified: `backend/tests/test_gateway_guards.py`]
 The console still implements the earlier workflow. Josie is rebuilding it against `GET /deals/{id}/case`.
 
 ## 2. The pitch rules
@@ -69,7 +70,7 @@ The user sees one screen with a flag card, a small combined table, and one verdi
 1. **Mapping with confidence.** Each target line gets a platform line, a confidence, and a short reason.
 2. **Human flags.** Only unclear lines reach the human, with the options and the computed effect of each on leverage.
 3. **Combined books.** A combined table of platform, target, and total. Code does the arithmetic, and a tie-out check balances the combined balance sheet.
-4. **Limit check.** Combined leverage next to the lender's limit, with the covenant's own definition of debt and EBITDA, and the room left for the next deal.
+4. **Limit check.** Combined leverage next to the lender's limit, with the covenant's own definition of debt and EBITDA, and the covenant headroom left. The next add-on is still capped by the acquisition basket and the revolver.
 5. **Maker-checker.** The agent that prepares a result cannot approve it. A reviewer agent checks it, and a human approves it. The gateway refuses approval until the review passes.
 6. **Audit log.** Every action is logged, allowed or denied, and each row is chained to the row before it.
 7. **Stateful agents that learn.** The controller's answer to a flag becomes a policy. The Mapper applies it next time with the policy as evidence instead of asking again. Each agent keeps a session across work items.
@@ -89,9 +90,9 @@ A job runner moves work items from one agent to the next. The runner is code, no
 The console talks only to the gateway.
 
 The agent layer uses one function, `run_agent(role, item)`, with four backends. [verified: `backend/app/agents/runner.py`]
-The Anthropic API is the real model path and the stage fallback.
-The Factory Droid Python SDK runs the agents that we show as built with Droid, one session per role.
-The scripted backend is deterministic rules with no model, the last fallback and the reference answer.
+The Factory Droid Python SDK is the stage path: one session per role, Mapper on Claude Sonnet 5.5, Preparer and Reviewer on Haiku 5.5.
+The Anthropic API backend ran on a teammate's key; with no key on the demo laptop it is not in the stage chain.
+The scripted backend is deterministic rules with no model, the stage fallback and the reference answer. If the gateway refuses a model's result, the Mapper retries once with the reason and then the scripted backend makes the result under the same checks.
 The replay backend plays recorded outputs from `backend/recordings/`.
 `AGENT_BACKEND` picks the backend, `AGENT_FALLBACK` lists the fallbacks, and every result says which backend produced it.
 The details are in `architecture/`.
@@ -115,6 +116,8 @@ Memory, in detail. [verified: `backend/app/gateway/gateway.py`, `_learn`]
 - On the next run the Mapper applies the policy with confidence 0.98 and the reason "Policy p_001: human:controller decided this on wi_002", and the gateway logs `policy:apply`.
 - Each role has an `AgentSession`: backend, backend session id (the Droid backend resumes it), turn count, and a short transcript that the Anthropic backend replays.
 - `POST /dev/reset` keeps the memory. The second run of the demo deal asks no question at all. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
+- `POST /dev/reset?keep_memory=false` clears it, so the next judge sees the flag. The reset is refused while a run is going and frees the fork slot. [verified: `test_demo_reset.py`]
+- A policy applies only to the company whose line it was learned on, and a reversal retires the policies the flag taught. [verified: `test_gateway_guards.py`]
 - Policies are per role and per line name. Confidence calibration and cross-deal statistics are roadmap.
 
 ## 8. Human moments
@@ -196,13 +199,15 @@ The Mapper tags the line "unclear" and asks which parts count. The gateway compu
 
 | Option | Senior Funded Bank Debt | Leverage | Verdict |
 | --- | --- | --- | --- |
-| a. Whole line counts | $71,955K | 2.54x | Over the 2.50x limit |
-| b. Only the PNC term loan and revolver count (the agreement's reading, the default) | $21,633K | 0.76x | OK, 1.74x of room, about $49M of debt capacity |
+| a. Whole line counts, read as filed (over reported EBITDA $25,312K) | $71,955K | 2.84x | Over the 2.50x limit |
+| b. Only the PNC term loan and revolver count (the agreement's reading, the default) | $21,633K | 0.76x | OK, 1.74x of room, about $49.3M of covenant headroom |
 | c. PNC debt plus the seller notes | $44,173K | 1.56x | OK |
 
 Covenant EBITDA is $28,379K: Kewaunee $18,043K (net earnings 19,057, plus interest 1,799, less the tax benefit 5,938, plus depreciation 3,125), Nu Aire $7,269K (net income 5,438, plus taxes 514, plus D&A 1,830, less interest income 514), plus the noncash pension termination $4,019K and stock-based compensation $1,018K, less Statesville cash rent $1,970K. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
 Covenant EBITDA subtracts interest income, as Addendum I of Ex 10.1 requires; Nu Aire's $514K of interest income is taken out. [verified: `test_ebitda_subtracts_interest_income`]
 Two inputs are inferred and must be said out loud: the rent deduction uses the 10-K's next-year obligation, and transaction and integration costs are applied as 0 because the filings do not quantify them.
+They move only options b and c. Option a is computed as filed, with no add-back and no rent deduction, because counting the Statesville financing as debt while deducting its rent would mix two readings (D18). It would need $3,470K more EBITDA to pass.
+The test period is each company's latest fiscal year; the agreement tests the last twelve months to the closing quarter, which is next.
 The verdict changes with the controller's answer, so the moment holds. [verified]
 
 A second, smaller flag asks where Nu Aire's "Certificates of Deposit" belong (cash equivalents or other assets). It shows a mapping flag next to the covenant flag. It can be turned off by raising the Mapper's threshold if the 30 seconds are tight.
@@ -232,12 +237,12 @@ The agent text is hardcoded, recorded, or scripted, and we say which. The gatewa
 ## 13. MVP scope
 Must (the demo does not work without these). Status on 2026-10-24, 02:30:
 1. The two input files and the brief for the Kewaunee and Nu Aire deal, built from the filings. Done as a fixture. Eric moves it to CSVs and checks every figure against the filings.
-2. The Mapper, with a typed output, running through `run_agent`. Done on the scripted backend. Not yet run on Anthropic or Droid.
+2. The Mapper, with a typed output, running through `run_agent`. Done on the scripted backend, live on Droid, and on the Anthropic API with a teammate's key.
 3. Consolidation, EBITDA, and leverage tools, with tests that use the real figures. Done. Tri reviews and extends.
 4. The gateway with work-item states, maker-checker, run-id checks, the audit log, and agent memory. Done.
 5. The Preparer and the Reviewer, with real tool calls. Done on the scripted backend.
 6. The console screen: flag card, verdict line, combined table, mapping, log link, on `GET /deals/{id}/case`. Done 2026-10-24, with the backend badge and the second-run moment.
-7. A recorded run and a backend switch, so the demo survives a failure. Done (`backend/recordings/`, `AGENT_BACKEND=replay`). The default recording is the Sonnet 5.5 Droid run of 2026-10-24.
+7. A recorded run and a backend switch, so the demo survives a failure. Done (`backend/recordings/`, `AGENT_BACKEND=replay`). The default recording is the Sonnet 5.5 Droid first run of 2026-10-24, which raises the covenant flag. [verified: `test_demo_reset.py`]
 8. Track proofs: at least one agent runs with `AGENT_BACKEND=droid` (Factory): done, all three ran. The Figma file on screen in the pitch (Figma): open.
 
 Should (if the schedule holds):
@@ -355,7 +360,7 @@ Do not lead the pitch with ingestion.
 - Which part of Kewaunee's financing liability counts as covenant debt? We computed all three readings (section 12). A practitioner should confirm the default, reading b.
 - Closed on 2026-10-24, 03:30: Droid runs Claude on our key (`claude-sonnet-5-5`, Opus 5.5, Fable 5.1, Haiku 5.5 listed), and the whole deal ran on `AGENT_BACKEND=droid` with our tools through MCP. See `sponsors/factory.md`.
 - Does the Python Droid SDK qualify for "Building with the Droid SDK" when the tools call our own gateway?
-- Is there an Anthropic key for the team? None is in `.env`, so the Anthropic backend has not run.
+- Anthropic key: answered. Eric's key ran the backend; the demo laptop has none.
 - Does the SEC allow us to redistribute the cached filings? The fixture holds only line values and source references, not the filings.
 - Does a former-banker or controller reviewer count as the human seat?
 - Is the Statesville cash rent deduction ($1,970K, from the 10-K obligations table) the right figure for the test period? It is inferred.

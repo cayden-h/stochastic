@@ -350,12 +350,12 @@ def test_flag_option_that_leaves_a_line_unclear_is_refused(world):
 
 
 def test_flag_effect_text_matches_the_verdict_rounding(world):
-    # 71,955 / 28,378.8 = 2.5355: the card must say 2.54x, the same as the verdict line. (Before the add-backs, 2.6148 showed as 2.62x.)
+    # As filed, 71,955 / 25,312 = 2.8427: the card must say 2.84x. (Before the add-backs, 2.6148 once showed as 2.62x.)
     store, gw = world
     advance(gw, DEAL_ID)
     fin = next(f for f in gw.open_flags(DEAL_ID) if "Financing liability" in (f.question or ""))
     effects = {o.id: o.effect for o in fin.options}
-    assert "Leverage 2.54x" in effects["a"]
+    assert "Leverage 2.84x" in effects["a"] and effects["a"].startswith("As filed")
     assert "Leverage 1.56x" in effects["c"]  # 44,173 / 28,378.8 = 1.5566
     from app.core.models import FlagOption, FlagProposal
     for o in fin.options:

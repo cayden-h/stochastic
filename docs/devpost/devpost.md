@@ -48,20 +48,22 @@ One Kewaunee line, "Financing liability", holds three debts after the close: a S
 The agreement's definition of Senior Funded Bank Debt excludes subordinated debt and capitalized leases on the Statesville property. [verified: Ex 10.1, definitions]
 The Mapper flags the line, and the gateway computes each reading with the tools:
 
-| Reading | Senior Funded Bank Debt | Leverage | Verdict |
+| Reading | Debt | Leverage | Verdict |
 | --- | --- | --- | --- |
-| Whole line counts | $71,955K | 2.54x | Over the 2.50x limit |
+| Whole line counts, read as filed (reported EBITDA $25,312K) | $71,955K | 2.84x | Over the 2.50x limit |
 | PNC debt only (the agreement's reading, the default) | $21,633K | 0.76x | OK |
 | PNC debt plus the seller notes | $44,173K | 1.56x | OK |
 
-The same books read two ways are 1.78x apart: a blocked next deal, or about $49M of debt room under the limit. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`; room is arithmetic]
+The same books read two ways are 2.08x apart: a covenant breach, or about $49.3M of covenant headroom. [verified: `test_the_demo_run_beat_by_beat`; headroom is the `limit_test` run's debt capacity]
+The headroom is a covenant figure, not money to spend: the next add-on is still capped by the agreement's $5M acquisition basket (Section 5.8(ii)) and the undrawn revolver, about $14.4M. [verified: Ex 10.1; revolver arithmetic]
+The whole-line reading is computed as filed, balance sheet debt over reported EBITDA, because counting the Statesville financing as debt while still deducting its rent would mix two readings. [verified: `test_choosing_the_whole_line_reading_is_as_filed_end_to_end`]
 The table is the flag the scripted backend raises. [verified: scripted run of the fixture]
 The recorded model runs raised the same flag with a different middle reading: 1.76x on Sonnet 5.5, and 0.74x on Haiku 5.5, as computed at the time, before interest income was subtracted. [verified: `docs/agents.md`, run log]
 
 These figures are preliminary.
 Covenant EBITDA is $28,379K, built the way the agreement defines it: interest income subtracted, the pension termination expense and stock-based compensation added back, Statesville cash rent deducted. [verified: `evals/fixture_check.md`]
-The first reading stays over the limit only while covenant EBITDA is below $28,782K, a margin of $403K. [verified: arithmetic]
-If add-backs that large turn out to belong, the whole-line reading drops under 2.50x, while the agreement's reading stays far under. [verified: arithmetic]
+The as-filed reading would need $3,470K more EBITDA to pass, so no add-back or rent estimate in question flips it. [verified: arithmetic, `limit_test` sensitivity run]
+The agreement's reading stays far under the limit with or without the inferred inputs. [verified: arithmetic]
 
 Mapping score against Note 2: 33 of 33 scored Nu Aire lines go to the same Kewaunee line as the filed table, on both recorded model runs (Claude Sonnet 5.5 and Claude Haiku 5.5, requested through Factory Droid, 2026-10-24). [verified: `evals/README.md`]
 23 of those lines are mapped directly in Note 2, and 10 are inferred from a Note 2 total. [verified: `evals/README.md`]
@@ -91,12 +93,13 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 - The face of the balance sheet and the lender's definitions disagree. One line holds three debts with different covenant treatment, and only the agreement says which count.
 - Public filings give statement lines, not trial balances, so we map statement lines.
 - The two companies have different fiscal years, April 30 and September 30.
-- An early Mapper run decided the debt exclusions itself instead of asking. We changed the prompt so exclusions are the controller's call, and put the filing's note on each line so the model knows what it is. [verified: `docs/agents.md`, run log]
-- The EBITDA definition has add-backs that the filings do not fully pin down for the tested period, which leaves the naive reading close to the limit. [verified: `flag-card.md`, "How firm the figures are"]
+- An early Mapper run decided the debt exclusions itself instead of asking. The prompt said not to, so we moved the rule into the gateway: a model's "not debt" tag is refused unless it cites a policy the controller made for that company's line. [verified: `backend/tests/test_gateway_guards.py`]
+- A review of our own gateway found that a model could cite the what-if run of an option the controller did not pick, pass raw numbers to the leverage tool, or pass a review with no checks. Each is now refused, with a test per attack. [verified: `backend/tests/test_gateway_guards.py`]
+- Our first naive reading counted the sale-leaseback as debt but still deducted its rent from EBITDA. We now compute the whole-line reading as filed, end to end. [verified: `test_choosing_the_whole_line_reading_is_as_filed_end_to_end`]
 
 ## Accomplishments that we're proud of
 
-- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 150 tests pass, plus 9 against Tiger Cloud]
+- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 167 tests pass offline, 176 with Tiger Cloud]
 - The flag is real. It comes from a real line in a real filing, and the answer moves the leverage verdict. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 - The whole deal ran through Factory Droid with our gateway tools, once with Claude Sonnet 5.5 and once with Claude Haiku 5.5 requested, and both passed review at 0.77x as computed then; the Sonnet recording replays at 0.76x today, after the EBITDA definition items were applied. [verified: `docs/agents.md`, run log]
 - After a reset, the same deal runs with no flag, because the Mapper applies the controller's policy, and the log shows `policy:apply`. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
@@ -122,7 +125,7 @@ None is built.
 
 Python, FastAPI, Pydantic, Uvicorn, pytest, Factory Droid SDK, Claude, Anthropic Python SDK, Tiger Cloud (PostgreSQL, TimescaleDB, TimescaleDB Toolkit, pg_textsearch), Tiger CLI, Tiger MCP, psycopg, Next.js, React, TypeScript, Tailwind CSS, Figma.
 All are in `backend/pyproject.toml`, `frontend/package.json`, or `docs/design/README.md`. [verified]
-The Anthropic SDK backend is written but has not run live, because no key was available. [verified: `docs/agents.md`, section 10]
+The Anthropic SDK backend ran on a teammate's key: one full recorded run (0.76x, Reviewer pass, 32 of 33 against Note 2) and about 50 Mapper trials scoring 27 to 33. The demo laptop has no key, so it is not in the stage fallback chain. [verified: `evals/README.md`, `backend/recordings/anthropic-haiku-5-5/`]
 
 ## What is real and what is simulated
 
@@ -145,17 +148,17 @@ Not real, or not claimed:
 - As an extra, the loader script reads a QuickBooks Online trial balance export with its Account List, so a private company with no filings could be an input. It is not used in the demo. [verified: `scripts/README.md`]
   It was checked against real exports from the QuickBooks Online test-drive demo company, and the loaded totals match that company's own Balance Sheet report. [verified: `scripts/test_load_lines.py`, `scripts/samples/qbo/`]
 - On the scripted backend the Mapper knows only the demo deal's line names, so a new company's lines arrive as flags. [verified: the QuickBooks demo company raised 40 flags on the scripted backend, reproduced 2026-10-24]
-  A model backend should map them by reading them, but we have not run one on a QuickBooks file. [inferred]
+  On live Droid the same QuickBooks company raised 2 questions instead of 40, mapped all 53 lines, and ended at 1.03x with a Reviewer pass and no gateway refusals. One run, not a trial. [verified: `evals/unseen-input-quickbooks.md`, `scripts/run_unseen_deal.py`, 2026-10-24]
 - The loader also has layout profiles for NetSuite, Sage Intacct, Microsoft Dynamics 365, Epicor, and Infor. They are not integrations. [verified: `scripts/README.md`]
   We wrote them from how those reports are usually laid out, tested them only on small files we made ourselves, and never ran them on a real export. [verified: `scripts/README.md`, `scripts/test_load_lines.py`]
 - Agent output comes from one of four backends (droid, anthropic, scripted, or replay), and the API names the backend on every result. [verified: `backend/app/agents/runner.py`]
 - Droid does not report which model served a run, so the model names above are what we requested. [verified: `docs/agents.md`, section 8]
-- The default replay is the Sonnet 5.5 run, which runs through. The Haiku 5.5 run is kept in `backend/recordings/haiku-5-5/`; the gateway now rejects its Mapper output, because one option left "Short-term borrowings" unclear. [verified: `evals/README.md`, `test_flag_option_that_leaves_a_line_unclear_is_refused`]
+- The default replay is the Sonnet 5.5 first run, which raises the covenant flag and runs through. [verified: `backend/tests/test_demo_reset.py`] The Haiku 5.5 run is kept in `backend/recordings/haiku-5-5/`; the gateway now rejects its Mapper output, because one option left "Short-term borrowings" unclear. [verified: `evals/README.md`, `test_flag_option_that_leaves_a_line_unclear_is_refused`]
 - The fiscal years differ, April 30 and September 30, so the combined income statement adds two different years and does not match the filed pro forma.
 - The combined table is historical plus target. No purchase accounting is applied.
 - Two inputs are our estimates: the Statesville cash rent we deduct ($1,970K, the 10-K's next-year obligation), and transaction and integration costs, which we set to zero. [inferred]
-  The filing estimates $698K of transaction costs after the close, and we have not decided whether they fall in the tested period. [verified: Ex 99.2, Note 5(b); timing inferred]
-- The leverage figures are preliminary: the rent and transaction-cost inputs are our estimates, and Nu Aire's period is one month off the agreement's. [verified: `evals/fixture_check.md`]
+  The filing estimates transaction costs after the close, and we have not decided whether they fall in the tested period; either way they move only the agreement's reading, which stays far under the limit. [verified: Ex 99.2, Note 5(b); timing inferred]
+- The leverage figures are preliminary: the rent and transaction-cost inputs are our estimates, and we use each company's latest fiscal year, while the agreement tests the last twelve months to the closing quarter. [verified: `evals/fixture_check.md`; the period is the next step]
 - The filing calls its own reclassification table, Note 2, preliminary. We use it as an answer key for which line goes where, not for amounts. [verified: Ex 99.2, Note 2]
 - The scripted Mapper's synonym table was written with Note 2 at hand, so its 33 of 33 is not independent evidence. The model runs are the score that matters. [verified: `evals/README.md`]
 - The agreement's reading of the financing liability is our reading. No controller or lender has checked it. [inferred]
@@ -172,6 +175,7 @@ Claim nothing unconfirmed.
   Say "built with the Droid SDK" only about `droid` runs.
 - Figma: the console's design system and screen frames are in the Figma file. The team board (Schocastic) has a card per piece of evidence for each track, including Tiger Data. [verified: `docs/design/README.md`]
 - Tiger Data: the record, the audit log, and the agents' memory are stored in Postgres on Tiger Cloud, and the audit log is a TimescaleDB hypertable that refuses edits. Each covenant flag's what-ifs live in a zero-copy fork of the ledger, made in about 35 s and deleted by the answer. The record is searchable with BM25, and the runs are readable in SQL through a continuous aggregate, typed views, and Toolkit statistics. [verified: `backend/tests/test_postgres_store.py`, `backend/tests/test_whatif_forks.py`]
+  Measured on the live schema (3,892 records, 748 log rows; server time, median of 25): BM25 returns the ranked top 10 for "lease" in 0.09 ms against 3.9 ms for an unranked ILIKE scan, and the continuous aggregate answers the activity rollup in 0.14 ms against 0.38 ms from the raw log. The data is small, so these show the shape, not scale. [verified: `scripts/tiger_bench.py`, 2026-10-24]
   Say how the shipped screen was built from it only once Josie confirms.
 
 ## Images for the gallery
