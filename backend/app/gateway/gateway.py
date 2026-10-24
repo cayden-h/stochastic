@@ -44,14 +44,16 @@ from app.core.models import (
     WorkItem,
     now,
 )
-from app.agents.backends.scripted import policy_applies, reason_chips
+from app.agents.backends.scripted import reason_chips
+from app.core.policies import newest_covering, policy_applies, same_name
 from app.db.memory import MemoryStore
 from app.tools import finance
 
 GENESIS = "0" * 64
 BASELINE_OPTION = "count_all"  # the option id of the baseline reading the gateway adds to a covenant flag
 # The tools that take the controller's review edits (Tri's T1). The gateway refuses an edit while they do not.
-EDIT_TOOLS = ("consolidate", "ebitda", "covenant_debt", "tie_out")
+# tie_out takes none: its rows come from the edited consolidate run, so applying the edits again would double count.
+EDIT_TOOLS = ("consolidate", "ebitda", "covenant_debt")
 T1_MISSING = "edit-aware tools not installed (T1)"
 
 # Per-role permissions. Agents are named, so the Mapper cannot call the Preparer's tools.
@@ -339,6 +341,8 @@ class Gateway:
                              rent_deduction=rent, naive_ebitda=naive_eb)
             else:
                 raise ValueError(f"no argument binding for {name}")
+            if ekw:
+                self._check_edits_applied(name, outputs, [e.id for e in ekw["edits"]])
         except ValueError as error:
             self._log(deal_id, actor, f"tool:{name}", "ALLOWED", None, reason=f"error: {error}")
             raise Invalid(str(error))
@@ -368,6 +372,20 @@ class Gateway:
                 raise ValueError(f"edit {eid} is reverted")
             edits.append(e)
         return {"edits": edits}
+
+    @staticmethod
+    def _check_edits_applied(name: str, outputs: dict, live: list[str]) -> None:
+        """The T1 contract: an edit-aware tool returns `edits_applied`, the ids of the edits it used. Every id must be
+        a live edit it was given, and consolidate, which every edit changes, must have applied all of them."""
+        applied = outputs.get("edits_applied")
+        if not isinstance(applied, list) or not all(isinstance(i, str) for i in applied):
+            raise ValueError(f"{name} did not return edits_applied, the list of edit ids it applied")
+        unknown = [i for i in applied if i not in live]
+        if unknown or len(set(applied)) != len(applied):
+            raise ValueError(f"{name} reports edits it was not given: {', '.join(unknown) or 'a duplicate id'}")
+        if name == "consolidate" and set(applied) != set(live):
+            missing = [i for i in live if i not in applied]
+            raise ValueError(f"consolidate did not apply edits {', '.join(missing)}")
 
     def _run(self, deal_id: str, run_id: str) -> ToolRun:
         run = self.store.tool_runs.get(run_id)
@@ -659,14 +677,18 @@ class Gateway:
         """A policy id an agent cites counts only if that policy exists, is live, is of this kind, decided the same
         thing, was learned on this line name, and its scope covers this line: a company policy only that company's
         lines, a platform policy (kind mapping, from a remap edit) only the add-on lines of the platform it names.
-        So a platform policy never settles a covenant tag, and never a not_debt (D18). The model's own wording never
-        marks a line as learned; the gateway does, from the policy record."""
+        So a platform policy never settles a covenant tag, and never a not_debt (D18). It must also be the newest live
+        policy covering the line, so an older answer that a later correction replaced cannot be cited. The model's
+        own wording never marks a line as learned; the gateway does, from the policy record."""
         p = self.store.policies.get(policy_id) if policy_id else None
         if not p or p.retired_by or p.kind != kind or (decision or "").strip().lower() != p.decision.strip().lower():
             return None
-        if p.pattern != line.line.strip().lower() or not self._policy_applies(p, line.deal_id, line.company):
+        deal = self.store.deals.get(line.deal_id)
+        if deal is None or p.pattern != line.line.strip().lower():
             return None
-        return p.id
+        newest = newest_covering((q for q in self.store.policies.values() if q.role == p.role), kind, p.pattern,
+                                 line.company, deal.platform, deal.target)
+        return p.id if newest is not None and newest.id == p.id else None
 
     def _policy_applies(self, p: Policy, deal_id: str, company: str) -> bool:
         deal = self.store.deals.get(deal_id)
@@ -985,7 +1007,9 @@ class Gateway:
     def _recompute(self, deal_id: str, edit_ids: list[str]) -> dict[str, ToolRun]:
         """Recompute the books with the live edits, as the system, through the same tools: consolidate, ebitda,
         covenant_debt, leverage, tie_out, limit_test. Every run is new and names the edits it applied, and every
-        figure of the new result is read from these runs. The gateway does no math of its own here."""
+        figure of the new result is read from these runs. The gateway does no math of its own here.
+        When a covenant flag gave the whole-line reading, its what-if pair is run again with the edits too
+        (naive covenant_debt, as-filed ebitda, leverage), under the `naive_*` keys of `run_ids_by_tool`."""
         missing = [n for n in EDIT_TOOLS if "edits" not in inspect.signature(finance.TOOLS[n]).parameters]
         if missing:
             raise NotReady(f"{T1_MISSING}: {', '.join(missing)} take no edits")
@@ -994,10 +1018,43 @@ class Gateway:
         eb = self.run_tool(SYSTEM, deal_id, "ebitda", dict(with_edits))
         debt = self.run_tool(SYSTEM, deal_id, "covenant_debt", {"naive": False, **with_edits})
         lev = self.run_tool(SYSTEM, deal_id, "leverage", {"debt_run_id": debt.run_id, "ebitda_run_id": eb.run_id})
-        tie = self.run_tool(SYSTEM, deal_id, "tie_out", {"run_id": cons.run_id, **with_edits})
+        tie = self.run_tool(SYSTEM, deal_id, "tie_out", {"run_id": cons.run_id})
         test = self.run_tool(SYSTEM, deal_id, "limit_test", {"leverage_run_id": lev.run_id})
-        return {"consolidate": cons, "ebitda": eb, "covenant_debt": debt, "leverage": lev, "tie_out": tie,
+        runs = {"consolidate": cons, "ebitda": eb, "covenant_debt": debt, "leverage": lev, "tie_out": tie,
                 "limit_test": test}
+        runs.update(self._naive_with_edits(deal_id, with_edits))
+        return runs
+
+    def _whole_line_tags(self, deal_id: str) -> dict[str, str] | None:
+        """The tags of the covenant flag option that counts every flagged line as debt (the as-filed reading)."""
+        for item in reversed(self.store.deal_items(deal_id, "flag")):
+            if item.payload.get("kind") != "covenant_tag":
+                continue
+            for action in item.payload.get("option_actions", {}).values():
+                tags = action.get("tags") or {}
+                if tags and all(t == "debt" for t in tags.values()):
+                    return tags
+        return None
+
+    def _naive_with_edits(self, deal_id: str, with_edits: dict) -> dict[str, ToolRun]:
+        """The whole-line what-if again, on the edited books, so the sensitivity figures reflect the edits. The
+        flagged lines are tagged debt for the runs and restored after, as in `_flag_effect`."""
+        tags = self._whole_line_tags(deal_id)
+        if not tags:
+            return {}
+        lines = {lid: self.store.source_lines[lid] for lid in tags if lid in self.store.source_lines}
+        saved = {lid: (line.covenant_tag, line.covenant_note) for lid, line in lines.items()}
+        try:
+            for line in lines.values():
+                line.covenant_tag = "debt"
+            debt = self.run_tool(SYSTEM, deal_id, "covenant_debt", {"naive": True, "what_if": "whole_line", **with_edits})
+            eb = self.run_tool(SYSTEM, deal_id, "ebitda", {"as_filed": True, "what_if": "whole_line", **with_edits})
+            lev = self.run_tool(SYSTEM, deal_id, "leverage", {"debt_run_id": debt.run_id, "ebitda_run_id": eb.run_id,
+                                                               "what_if": "whole_line"})
+        finally:
+            for lid, (tag, note) in saved.items():
+                lines[lid].covenant_tag, lines[lid].covenant_note = tag, note
+        return {"naive_covenant_debt": debt, "naive_ebitda": eb, "naive_leverage": lev}
 
     def _revise(self, deal: Deal, approval: WorkItem, runs: dict[str, ToolRun], edit: Edit,
                 edit_ids: list[str]) -> tuple[Result, WorkItem]:
@@ -1027,9 +1084,10 @@ class Gateway:
         approval.state = State.SUPERSEDED
         approval.payload = {**approval.payload, "superseded_by_result": result.id}
         passed = review.verdict == "pass"
-        # Proposed by the Preparer, as before, so the maker-checker rule still applies to the approval.
+        # The revision is the gateway's recompute, so the system proposes it; the controller, who did not propose
+        # it, approves it, and maker-checker holds.
         new = WorkItem(id=self.store.next_id("wi"), deal_id=deal.id, type="approve_result",
-                       state=State.PROPOSED if passed else State.NEEDS_INFO, proposed_by=PREPARER,
+                       state=State.PROPOSED if passed else State.NEEDS_INFO, proposed_by=SYSTEM,
                        payload={"result_id": result.id, "review_item": approval.payload.get("review_item"),
                                 "edit_id": edit.id, "supersedes": approval.id},
                        question=None if passed else "The checks found a problem after the edit: " + "; ".join(reasons))
@@ -1172,16 +1230,9 @@ class Gateway:
 
     def _learn_from_edit(self, actor: str, deal: Deal, edit: Edit) -> Policy:
         """A reasoned remap teaches the Mapper a platform policy: this line name, at any add-on of this platform,
-        maps to this platform line. A live one for the same line is updated in place."""
+        maps to this platform line. Each edit learns its own policy, never updating an older one; the newest live
+        policy wins, so reverting this edit makes an older one effective again."""
         key = edit.line.strip().lower()
-        for p in self.store.policies.values():
-            if (p.role == MAPPER and p.kind == "mapping" and p.scope == "platform" and p.platform == deal.platform
-                    and p.pattern == key and not p.retired_by):
-                p.decision, p.reason, p.approved_by, p.learned_from = edit.new_platform_line, edit.reason_text, actor, edit.id
-                p.deal_id, p.at = deal.id, now()
-                self._log(deal.id, SYSTEM, "policy:update", "ALLOWED", p.id,
-                          reason=f"source: edit {edit.id}; {key} -> {p.decision} for every add-on of {deal.platform}")
-                return p
         policy = Policy(id=self.store.next_id("p"), role=MAPPER, kind="mapping", pattern=key,
                         decision=edit.new_platform_line, reason=edit.reason_text, approved_by=actor,
                         learned_from=edit.id, deal_id=deal.id, company=None, scope="platform", platform=deal.platform)
@@ -1225,7 +1276,8 @@ class Gateway:
         of a deal on the platform it was learned under. A subtotal is never offered."""
         if line.deal_id != deal.id or line.is_total or line.line.strip().lower() != adj.line.strip().lower():
             return False
-        return line.company == adj.company or (adj.platform == deal.platform and line.company == deal.target)
+        return same_name(line.company, adj.company) or (same_name(adj.platform, deal.platform)
+                                                        and same_name(line.company, deal.target))
 
     def adjustments_for(self, deal_id: str) -> list[LearnedAdjustment]:
         """The live learned adjustments the Preparer may offer on this deal: not retired, not learned on this deal's
