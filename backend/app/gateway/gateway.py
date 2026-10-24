@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import inspect
 import json
+import math
 import threading
 from typing import Any
 
@@ -21,14 +23,17 @@ from app.core.models import (
     AuditRow,
     Deal,
     AgentSession,
+    Edit,
     Evidence,
     FlagOption,
     FlagProposal,
+    LearnedAdjustment,
     Mapping,
     MapperOutput,
     Option,
     Policy,
     PreparerOutput,
+    ReasonChip,
     Result,
     ResultRow,
     Review,
@@ -39,11 +44,15 @@ from app.core.models import (
     WorkItem,
     now,
 )
+from app.agents.backends.scripted import policy_applies, reason_chips
 from app.db.memory import MemoryStore
 from app.tools import finance
 
 GENESIS = "0" * 64
 BASELINE_OPTION = "count_all"  # the option id of the baseline reading the gateway adds to a covenant flag
+# The tools that take the controller's review edits (Tri's T1). The gateway refuses an edit while they do not.
+EDIT_TOOLS = ("consolidate", "ebitda", "covenant_debt", "tie_out")
+T1_MISSING = "edit-aware tools not installed (T1)"
 
 # Per-role permissions. Agents are named, so the Mapper cannot call the Preparer's tools.
 PERMISSIONS: dict[str, set[str]] = {
@@ -79,6 +88,11 @@ class Invalid(GatewayError):
     status = 422
 
 
+class NotReady(GatewayError):
+    """A feature whose code has not landed yet, such as the edit-aware tools. Nothing is written."""
+    status = 503
+
+
 def parse_actor(actor: str) -> tuple[str, str]:
     kind, _, name = actor.partition(":")
     if kind not in ("agent", "human", "system") or not name:
@@ -97,6 +111,11 @@ def _count(n: int, word: str) -> str:
 
 def _fmt(x: float) -> str:
     return f"{x:,.0f}"
+
+
+def _signed(x: float) -> str:
+    """A change as accountants write it: +500, or (500) for a decrease."""
+    return f"({abs(x):,.0f})" if x < 0 else f"+{x:,.0f}"
 
 
 def _writes(method):
@@ -191,7 +210,14 @@ class Gateway:
         return [m for m in self.store.deal_mappings(deal_id) if not m.flagged or m.approved_by]
 
     def open_flags(self, deal_id: str) -> list[WorkItem]:
-        return [i for i in self.store.deal_items(deal_id, "flag") if i.state == State.NEEDS_INFO]
+        """The flags that block the books: covenant and mapping questions. An adjustment flag does not block the
+        Preparer or the Reviewer, because it is decided on the finished books; it blocks approval instead."""
+        return [i for i in self.store.deal_items(deal_id, "flag")
+                if i.state == State.NEEDS_INFO and i.payload.get("kind") != "adjustment"]
+
+    def open_adjustment_flags(self, deal_id: str) -> list[WorkItem]:
+        return [i for i in self.store.deal_items(deal_id, "flag")
+                if i.state == State.NEEDS_INFO and i.payload.get("kind") == "adjustment"]
 
     # ------------------------------------------------------------------ deals and items
     @_writes
@@ -239,11 +265,12 @@ class Gateway:
         platform_lines = self._platform_lines(deal)
         target_lines = self._target_lines(deal)
         try:
+            ekw = self._edits_kwarg(actor, deal_id, name, fn, inputs)  # {"edits": [...]} on a recompute, else {}
             if name == "consolidate":
                 mappings = self._usable_mappings(deal_id)
                 if self.open_flags(deal_id):
                     raise ValueError("flags are still open")
-                outputs = fn(platform_lines, target_lines, mappings)
+                outputs = fn(platform_lines, target_lines, mappings, **ekw)
                 inputs["mapping_ids"] = [m.id for m in mappings]
             elif name == "tie_out":
                 rows = inputs.get("rows")
@@ -251,15 +278,15 @@ class Gateway:
                     rows = self._run(deal_id, inputs["run_id"]).outputs["rows"]
                 if rows is None:
                     raise ValueError("tie_out needs rows or run_id")
-                outputs = fn(rows)
+                outputs = fn(rows, **ekw)
             elif name == "ebitda":
                 # The deal's basis decides: as filed only after the controller chose the whole-line reading.
                 # The system's what-ifs may ask for the as-filed figure explicitly.
                 as_filed = deal.ebitda_basis == "as_filed" or (actor == SYSTEM and bool(inputs.get("as_filed")))
                 inputs["as_filed"] = as_filed
-                outputs = fn(platform_lines, target_lines, deal.brief, as_filed=as_filed)
+                outputs = fn(platform_lines, target_lines, deal.brief, as_filed=as_filed, **ekw)
             elif name == "covenant_debt":
-                outputs = fn(platform_lines, target_lines, deal.brief, naive=bool(inputs.get("naive", False)))
+                outputs = fn(platform_lines, target_lines, deal.brief, naive=bool(inputs.get("naive", False)), **ekw)
             elif name == "leverage":
                 # An agent passes run ids only, so its ratio always divides two tool outputs. The system may pass
                 # values (the API's /tools route for people checking a figure by hand runs as the system).
@@ -320,6 +347,27 @@ class Gateway:
         self.store.tool_runs[run.run_id] = run
         self._log(deal_id, actor, f"tool:{name}", "ALLOWED", run.run_id)
         return run
+
+    def _edits_kwarg(self, actor: str, deal_id: str, name: str, fn, inputs: dict[str, Any]) -> dict[str, Any]:
+        """The review edits a run applies, named by id in its inputs so the run records them.
+        Only the gateway's recompute passes them, and only the live (not reverted) edits of this deal count."""
+        if "edit_ids" not in inputs:
+            return {}
+        if actor != SYSTEM:
+            raise ValueError("only the gateway recomputes with review edits")
+        if name not in EDIT_TOOLS:
+            raise ValueError(f"{name} takes no edits; it reads the runs it is given")
+        if "edits" not in inspect.signature(fn).parameters:
+            raise ValueError(T1_MISSING)
+        edits = []
+        for eid in inputs["edit_ids"]:
+            e = self.store.edits.get(eid)
+            if e is None or e.deal_id != deal_id:
+                raise ValueError(f"edit {eid} not found for this deal")
+            if e.status == "reverted":
+                raise ValueError(f"edit {eid} is reverted")
+            edits.append(e)
+        return {"edits": edits}
 
     def _run(self, deal_id: str, run_id: str) -> ToolRun:
         run = self.store.tool_runs.get(run_id)
@@ -524,6 +572,8 @@ class Gateway:
                        item.deal_id, actor, "answer", item.id)
         if option_id not in {o.id for o in item.options}:
             self._deny(IllegalTransition(f"unknown option '{option_id}'"), item.deal_id, actor, "answer", item.id)
+        if item.type == "flag" and item.payload.get("kind") == "adjustment":
+            return self._answer_adjustment(actor, item, option_id)
         item.answer = option_id
         if item.type == "flag":
             self._apply_flag_answer(actor, item, option_id)
@@ -605,18 +655,29 @@ class Gateway:
         self._log(item.deal_id, SYSTEM, "policy:learn", "ALLOWED", policy.id, reason=f"{key} -> {decision}")
         return policy
 
-    def _cited_policy(self, policy_id: str | None, kind: str, decision: str | None,
-                      line: SourceLine | None = None) -> str | None:
+    def _cited_policy(self, policy_id: str | None, kind: str, decision: str | None, line: SourceLine) -> str | None:
         """A policy id an agent cites counts only if that policy exists, is live, is of this kind, decided the same
-        thing, and was learned on this line name at this company. The model's own wording never marks a line as
-        learned; the gateway does, from the policy record."""
+        thing, was learned on this line name, and its scope covers this line: a company policy only that company's
+        lines, a platform policy (kind mapping, from a remap edit) only the add-on lines of the platform it names.
+        So a platform policy never settles a covenant tag, and never a not_debt (D18). The model's own wording never
+        marks a line as learned; the gateway does, from the policy record."""
         p = self.store.policies.get(policy_id) if policy_id else None
         if not p or p.retired_by or p.kind != kind or (decision or "").strip().lower() != p.decision.strip().lower():
             return None
-        if line is not None and (p.pattern != line.line.strip().lower()
-                                 or (p.company is not None and p.company != line.company)):
+        if p.pattern != line.line.strip().lower() or not self._policy_applies(p, line.deal_id, line.company):
             return None
         return p.id
+
+    def _policy_applies(self, p: Policy, deal_id: str, company: str) -> bool:
+        deal = self.store.deals.get(deal_id)
+        return deal is not None and policy_applies(p, company, deal.platform, deal.target)
+
+    def policies_for(self, role: str, deal_id: str) -> list[Policy]:
+        """The live policies of a role whose scope covers this deal, which is what the agent is given. Another
+        company's policies are left out, so a model is never shown an answer it may not apply."""
+        deal = self._deal(deal_id)
+        return [p for p in self.store.role_policies(role)
+                if any(self._policy_applies(p, deal.id, c) for c in (deal.platform, deal.target))]
 
     @_writes
     def note_policy_applied(self, policy_id: str, deal_id: str, line: str) -> None:
@@ -675,6 +736,17 @@ class Gateway:
             result = self.store.results.get(item.payload.get("result_id", ""))
             if result is None or result.review is None or result.review.verdict != "pass":
                 self._deny(Denied("a result cannot be approved until the Reviewer verdict is pass"),
+                           item.deal_id, actor, "approve", item.id)
+            offered = self.open_adjustment_flags(item.deal_id)
+            if offered:
+                self._deny(Denied(f"flag {offered[0].id} offers a learned adjustment; apply it or skip it before the "
+                                  f"result can be approved"), item.deal_id, actor, "approve", item.id)
+            waiting = [e for e in self.store.deal_edits(item.deal_id) if e.status == "needs_reason"]
+            if waiting:
+                e = waiting[0]
+                self._deny(Denied(f"edit {e.id} ({e.company}, {e.line}) needs a reason before the result can be "
+                                  f"approved" + (f"; {len(waiting) - 1} more edit(s) also need one" if len(waiting) > 1
+                                                 else "")),
                            item.deal_id, actor, "approve", item.id)
         item.state = State.APPROVED
         self._log(item.deal_id, actor, "approve", "ALLOWED", item.id)
@@ -756,6 +828,7 @@ class Gateway:
                     by_tool[tool] = rid
         try:
             self._check_provenance(deal, actor, out, by_tool)
+            offers = self._check_adjustment_flags(deal, out)
         except Invalid as error:
             self._deny(error, deal.id, actor, "propose:prepare_result", item.id)
         result = Result(id=self.store.next_id("r"), deal_id=deal.id, work_item_id=item.id, rows=out.rows,
@@ -767,6 +840,8 @@ class Gateway:
         item.state = State.PROPOSED
         self._log(deal.id, actor, "propose:prepare_result", "ALLOWED", item.id,
                   reason=f"result {result.id}: leverage {out.leverage:.2f}x against {out.limit:.2f}x")
+        for proposal, adj, line in offers:
+            self._open_adjustment_flag(deal, item, proposal, adj, line)
         deal.stage = "awaiting_review"
         return result
 
@@ -869,3 +944,369 @@ class Gateway:
                   reason="ready for the controller" if out.verdict == "pass" else "needs attention")
         deal.stage = "awaiting_approval" if out.verdict == "pass" else "needs_attention"
         return approval
+
+    # ------------------------------------------------------------------ review edits (D19)
+    def reason_chips(self, deal_id: str, kind: str) -> list[ReasonChip]:
+        """The reasons the bubble offers for an edit of this kind. Hardcoded per deal for the demo."""
+        return reason_chips(deal_id, kind)
+
+    def _edit(self, edit_id: str) -> Edit:
+        edit = self.store.edits.get(edit_id)
+        if not edit:
+            raise NotFound(f"edit {edit_id} not found")
+        return edit
+
+    def _live_edits(self, deal_id: str, without: str | None = None) -> list[Edit]:
+        return [e for e in self.store.deal_edits(deal_id) if e.status != "reverted" and e.id != without]
+
+    def _live_approval(self, deal_id: str) -> WorkItem | None:
+        """The approval item an edit may change: PROPOSED, after the agents and before approval. A NEEDS_INFO item
+        counts only when an edit made it (its recompute failed a check), so the controller can fix or undo that edit."""
+        for item in reversed(self.store.deal_items(deal_id, "approve_result")):
+            if item.state == State.PROPOSED or (item.state == State.NEEDS_INFO and item.payload.get("edit_id")):
+                return item
+            if item.state != State.SUPERSEDED:
+                return None
+        return None
+
+    def _require_controller(self, actor: str, deal_id: str, action: str, target: str | None) -> None:
+        """Only the controller edits the books. An agent, the system, or another human is refused and logged."""
+        if actor != CONTROLLER:
+            self._deny(Denied(f"{actor} may not {action}: only {CONTROLLER} edits the combined books"),
+                       deal_id, actor, action, target)
+
+    def _approval_for_edit(self, deal_id: str, actor: str, action: str, target: str | None) -> WorkItem:
+        approval = self._live_approval(deal_id)
+        if approval is None:
+            self._deny(IllegalTransition("the books can be edited only while the result is PROPOSED, after the "
+                                         "agents and before approval"), deal_id, actor, action, target)
+        return approval
+
+    def _recompute(self, deal_id: str, edit_ids: list[str]) -> dict[str, ToolRun]:
+        """Recompute the books with the live edits, as the system, through the same tools: consolidate, ebitda,
+        covenant_debt, leverage, tie_out, limit_test. Every run is new and names the edits it applied, and every
+        figure of the new result is read from these runs. The gateway does no math of its own here."""
+        missing = [n for n in EDIT_TOOLS if "edits" not in inspect.signature(finance.TOOLS[n]).parameters]
+        if missing:
+            raise NotReady(f"{T1_MISSING}: {', '.join(missing)} take no edits")
+        with_edits = {"edit_ids": list(edit_ids)}
+        cons = self.run_tool(SYSTEM, deal_id, "consolidate", dict(with_edits))
+        eb = self.run_tool(SYSTEM, deal_id, "ebitda", dict(with_edits))
+        debt = self.run_tool(SYSTEM, deal_id, "covenant_debt", {"naive": False, **with_edits})
+        lev = self.run_tool(SYSTEM, deal_id, "leverage", {"debt_run_id": debt.run_id, "ebitda_run_id": eb.run_id})
+        tie = self.run_tool(SYSTEM, deal_id, "tie_out", {"run_id": cons.run_id, **with_edits})
+        test = self.run_tool(SYSTEM, deal_id, "limit_test", {"leverage_run_id": lev.run_id})
+        return {"consolidate": cons, "ebitda": eb, "covenant_debt": debt, "leverage": lev, "tie_out": tie,
+                "limit_test": test}
+
+    def _revise(self, deal: Deal, approval: WorkItem, runs: dict[str, ToolRun], edit: Edit,
+                edit_ids: list[str]) -> tuple[Result, WorkItem]:
+        """Write a new result revision from the recompute runs and a new approval item for it. The old approval item
+        becomes SUPERSEDED and stays in the log; the old result stays too."""
+        old = self.store.results[approval.payload["result_id"]]
+        cons, eb, debt, lev, tie, test = (runs[t] for t in ("consolidate", "ebitda", "covenant_debt", "leverage",
+                                                             "tie_out", "limit_test"))
+        reasons = []
+        if not tie.outputs.get("ok"):
+            reasons.append(f"Tie-out failed ({tie.run_id}) after edit {edit.id}")
+        if not test.outputs.get("ok"):
+            reasons.append(f"Leverage {test.outputs['leverage']:.2f}x is not below the {test.outputs['limit']:.2f}x "
+                           f"limit ({test.run_id}) after edit {edit.id}")
+        review = Review(verdict="pass" if not reasons else "needs_attention", reasons=reasons,
+                        run_ids=[tie.run_id, test.run_id])
+        rows = [ResultRow(line=r["line"], section=r["section"], platform=r["platform"], target=r["target"],
+                          combined=r["combined"], run_id=cons.run_id) for r in cons.outputs["rows"]]
+        result = Result(id=self.store.next_id("r"), deal_id=deal.id, work_item_id=old.work_item_id, rows=rows,
+                        ebitda=eb.outputs["ebitda"], debt=debt.outputs["debt"], leverage=lev.outputs["leverage"],
+                        limit=deal.brief.limit, verdict=test.outputs["verdict"],
+                        headroom_turns=test.outputs["headroom_turns"], tie_out_ok=bool(tie.outputs.get("ok")),
+                        review=review, run_ids=[r.run_id for r in runs.values()],
+                        run_ids_by_tool={t: r.run_id for t, r in runs.items()}, backend=old.backend,
+                        supersedes=old.id, edit_ids=list(edit_ids))
+        self.store.results[result.id] = result
+        approval.state = State.SUPERSEDED
+        approval.payload = {**approval.payload, "superseded_by_result": result.id}
+        passed = review.verdict == "pass"
+        # Proposed by the Preparer, as before, so the maker-checker rule still applies to the approval.
+        new = WorkItem(id=self.store.next_id("wi"), deal_id=deal.id, type="approve_result",
+                       state=State.PROPOSED if passed else State.NEEDS_INFO, proposed_by=PREPARER,
+                       payload={"result_id": result.id, "review_item": approval.payload.get("review_item"),
+                                "edit_id": edit.id, "supersedes": approval.id},
+                       question=None if passed else "The checks found a problem after the edit: " + "; ".join(reasons))
+        self.store.items[new.id] = new
+        approval.payload["superseded_by"] = new.id
+        self._log(deal.id, SYSTEM, "supersede", "ALLOWED", approval.id, reason=f"replaced by {new.id} after edit {edit.id}")
+        self._log(deal.id, SYSTEM, "create:approve_result", "ALLOWED", new.id,
+                  reason=f"result {result.id} after edit {edit.id}: leverage {result.leverage:.2f}x"
+                         + ("" if passed else "; needs attention"))
+        deal.stage = "awaiting_approval" if passed else "needs_attention"
+        return result, new
+
+    @staticmethod
+    def _edit_response(edit: Edit, result: Result, approval: WorkItem, chips: list[ReasonChip]) -> dict[str, Any]:
+        verdict = {"leverage": result.leverage, "limit": result.limit, "verdict": result.verdict,
+                   "headroom_turns": result.headroom_turns, "ebitda": result.ebitda, "debt": result.debt,
+                   "tie_out_ok": result.tie_out_ok, "review": result.review, "approval_item": approval.id,
+                   "approval_state": approval.state.value}
+        return {"edit": edit, "result": result, "verdict": verdict, "approval": approval, "reasons": chips}
+
+    def _find_edit_line(self, deal: Deal, company: str, line: str, section: str | None) -> SourceLine:
+        if company not in (deal.platform, deal.target):
+            raise Invalid(f"company must be {deal.platform} or {deal.target}, not '{company}'")
+        key = line.strip().lower()
+        hits = [sl for sl in self.store.lines(deal.id, company)
+                if sl.line.strip().lower() == key and (section is None or sl.section == section)]
+        if not hits:
+            raise Invalid(f"{company} has no line '{line}'" + (f" in {section}" if section else ""))
+        if len(hits) > 1:
+            raise Invalid(f"{company} has {len(hits)} lines named '{line}'; give the section")
+        if hits[0].is_total:
+            raise Invalid(f"'{hits[0].line}' is a subtotal; subtotals are always computed")
+        return hits[0]
+
+    @_writes
+    def apply_edit(self, actor: str, deal_id: str, kind: str, company: str, line: str, value: float | None = None,
+                   platform_line: str | None = None, section: str | None = None) -> dict[str, Any]:
+        """The controller changes the combined books after the agents and before approval (D19).
+
+        `amount` replaces one company's value on one statement line (USD thousands); `remap` moves one target line
+        to another platform line. The edit is recorded on top of the agents' run, never over it: the mappings and
+        the source lines stay as the agents left them, and the system recomputes every figure through the
+        edit-aware tools with new run ids. The result gets a new revision and a new PROPOSED approval item; the old
+        approval item is SUPERSEDED. Returns the edit, the new verdict and result, the approval item, and the chips."""
+        action = "edit:apply"
+        deal = self._deal(deal_id)
+        self._require_controller(actor, deal_id, action, None)
+        approval = self._approval_for_edit(deal_id, actor, action, None)
+        try:
+            src = self._find_edit_line(deal, company, line, section)
+            open_same = [e for e in self._live_edits(deal_id)
+                         if e.kind == kind and e.company == src.company and e.line == src.line and e.section == src.section]
+            if open_same:
+                raise IllegalTransition(f"edit {open_same[0].id} already changes this line; undo it first")
+            fields: dict[str, Any] = {}
+            if kind == "amount":
+                if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
+                    raise Invalid("an amount edit needs a finite value in USD thousands")
+                old_value = round(finance.to_thousands(src.amount, src.unit), 3)
+                if abs(float(value) - old_value) < 1e-9:
+                    raise Invalid(f"the value is already {old_value}")
+                fields = {"old_value": old_value, "new_value": float(value)}
+                summary = f"{old_value:,.3f} -> {float(value):,.3f}"
+            elif kind == "remap":
+                if src.company != deal.target:
+                    raise Invalid(f"only the target's lines are remapped; {src.company} is the platform")
+                mapping = next((m for m in self._usable_mappings(deal_id) if m.target_line_id == src.id), None)
+                if mapping is None:
+                    raise Invalid(f"'{src.line}' has no approved mapping to change")
+                pl = self._platform_line(deal, src.section, platform_line)
+                if pl is None:
+                    raise Invalid(f"'{platform_line}' is not a {deal.platform} line")
+                if (mapping.platform_line or "").strip().lower() == pl.line.strip().lower():
+                    raise Invalid(f"'{src.line}' is already mapped to {pl.line}")
+                fields = {"old_platform_line": mapping.platform_line, "new_platform_line": pl.line}
+                summary = f"{mapping.platform_line or 'unmapped'} -> {pl.line}"
+            else:
+                raise Invalid(f"kind must be amount or remap, not '{kind}'")
+            edit = Edit(id=self.store.next_id("e"), deal_id=deal_id, kind=kind, company=src.company, line=src.line,
+                        section=src.section, actor=actor, **fields)
+        except GatewayError as error:
+            self._deny(error, deal_id, actor, action, None)
+        except (TypeError, ValueError) as error:  # a value that is not a number, or an Edit the model refuses
+            self._deny(Invalid(f"invalid edit: {error}"), deal_id, actor, action, None)
+        self.store.edits[edit.id] = edit
+        edit_ids = [e.id for e in self._live_edits(deal_id)]
+        try:
+            runs = self._recompute(deal_id, edit_ids)
+        except GatewayError as error:  # nothing is kept but the audit rows of the runs that were made
+            del self.store.edits[edit.id]
+            self._deny(type(error)(f"edit not applied: {error.message}"), deal_id, actor, action, edit.id)
+        edit.run_ids = [r.run_id for r in runs.values()]
+        before = self.store.results[approval.payload["result_id"]].leverage
+        result, new_approval = self._revise(deal, approval, runs, edit, edit_ids)
+        self._log(deal_id, actor, action, "ALLOWED", edit.id,
+                  reason=f"{kind} {src.company}, {src.line}: {summary}; leverage {before:.3f}x -> {result.leverage:.3f}x "
+                         f"(result {result.id})")
+        return self._edit_response(edit, result, new_approval, self.reason_chips(deal_id, kind))
+
+    @_writes
+    def reason_edit(self, actor: str, edit_id: str, chip: int | None = None, text: str | None = None,
+                    remember: bool = True) -> Edit:
+        """The controller says why. With `remember`, a remap becomes a mapping policy for every add-on of this
+        platform (the D12 path), and an amount edit becomes a LearnedAdjustment, which the Preparer may propose as a
+        flag on a later deal and which is never applied silently."""
+        action = "edit:reason"
+        edit = self._edit(edit_id)
+        deal = self._deal(edit.deal_id)
+        self._require_controller(actor, deal.id, action, edit.id)
+        if edit.status != "needs_reason":
+            self._deny(IllegalTransition(f"edit {edit.id} is {edit.status}; only an edit that needs a reason takes one"),
+                       deal.id, actor, action, edit.id)
+        typed = (text or "").strip()
+        if (chip is None) == (not typed):
+            self._deny(Invalid("give a chip or a text reason, one of the two"), deal.id, actor, action, edit.id)
+        if chip is not None:
+            chips = {c.id: c for c in self.reason_chips(deal.id, edit.kind)}
+            if isinstance(chip, bool) or chip not in chips:
+                self._deny(Invalid(f"chip must be one of {sorted(chips)}"), deal.id, actor, action, edit.id)
+            label = chips[chip].label
+        else:
+            if len(typed) > 500:
+                self._deny(Invalid("a reason is at most 500 characters"), deal.id, actor, action, edit.id)
+            label = typed
+        edit.status, edit.reason_chip, edit.reason_text, edit.remember = "reasoned", chip, label, bool(remember)
+        self._log(deal.id, actor, action, "ALLOWED", edit.id,
+                  reason=f"{label}" + ("; remember" if remember else "; not remembered"))
+        if remember and edit.kind == "remap":
+            edit.policy_id = self._learn_from_edit(actor, deal, edit).id
+        elif remember and edit.kind == "amount":
+            adj = LearnedAdjustment(id=self.store.next_id("a"), deal_id=deal.id, company=edit.company,
+                                    platform=deal.platform, line=edit.line, amount=round(edit.new_value - edit.old_value, 3), reason=label,
+                                    edit_id=edit.id, status="applied")
+            self.store.adjustments[adj.id] = adj
+            edit.adjustment_id = adj.id
+            self._log(deal.id, SYSTEM, "policy:learn", "ALLOWED", adj.id,
+                      reason=f"source: edit {edit.id}; adjustment {_signed(edit.new_value - edit.old_value)} to {edit.company}, {edit.line}; "
+                             f"proposed as a flag on a later deal, never applied silently")
+        return edit
+
+    def _learn_from_edit(self, actor: str, deal: Deal, edit: Edit) -> Policy:
+        """A reasoned remap teaches the Mapper a platform policy: this line name, at any add-on of this platform,
+        maps to this platform line. A live one for the same line is updated in place."""
+        key = edit.line.strip().lower()
+        for p in self.store.policies.values():
+            if (p.role == MAPPER and p.kind == "mapping" and p.scope == "platform" and p.platform == deal.platform
+                    and p.pattern == key and not p.retired_by):
+                p.decision, p.reason, p.approved_by, p.learned_from = edit.new_platform_line, edit.reason_text, actor, edit.id
+                p.deal_id, p.at = deal.id, now()
+                self._log(deal.id, SYSTEM, "policy:update", "ALLOWED", p.id,
+                          reason=f"source: edit {edit.id}; {key} -> {p.decision} for every add-on of {deal.platform}")
+                return p
+        policy = Policy(id=self.store.next_id("p"), role=MAPPER, kind="mapping", pattern=key,
+                        decision=edit.new_platform_line, reason=edit.reason_text, approved_by=actor,
+                        learned_from=edit.id, deal_id=deal.id, company=None, scope="platform", platform=deal.platform)
+        self.store.policies[policy.id] = policy
+        self._log(deal.id, SYSTEM, "policy:learn", "ALLOWED", policy.id,
+                  reason=f"source: edit {edit.id}; {key} -> {policy.decision} for every add-on of {deal.platform}")
+        return policy
+
+    @_writes
+    def revert_edit(self, actor: str, edit_id: str) -> dict[str, Any]:
+        """Undo an edit: it is marked reverted (never deleted), the policy or adjustment it taught is retired the way
+        a reversed flag answer retires its policies (D18), and the books are recomputed without it."""
+        action = "edit:revert"
+        edit = self._edit(edit_id)
+        deal = self._deal(edit.deal_id)
+        self._require_controller(actor, deal.id, action, edit.id)
+        if edit.status == "reverted":
+            self._deny(IllegalTransition(f"edit {edit.id} is already reverted"), deal.id, actor, action, edit.id)
+        approval = self._approval_for_edit(deal.id, actor, action, edit.id)
+        edit_ids = [e.id for e in self._live_edits(deal.id, without=edit.id)]
+        try:
+            runs = self._recompute(deal.id, edit_ids)
+        except GatewayError as error:
+            self._deny(type(error)(f"edit not reverted: {error.message}"), deal.id, actor, action, edit.id)
+        edit.status = "reverted"
+        self._log(deal.id, actor, action, "ALLOWED", edit.id, reason=f"{edit.kind} {edit.company}, {edit.line} undone")
+        p = self.store.policies.get(edit.policy_id) if edit.policy_id else None
+        if p and not p.retired_by and p.learned_from == edit.id:
+            p.retired_by = edit.id
+            self._log(deal.id, SYSTEM, "policy:retire", "ALLOWED", p.id, reason=f"edit {edit.id} reverted")
+        adj = self.store.adjustments.get(edit.adjustment_id) if edit.adjustment_id else None
+        if adj and adj.status != "retired":
+            adj.status = "retired"
+            self._log(deal.id, SYSTEM, "policy:retire", "ALLOWED", adj.id, reason=f"edit {edit.id} reverted")
+        result, new_approval = self._revise(deal, approval, runs, edit, edit_ids)
+        return self._edit_response(edit, result, new_approval, self.reason_chips(deal.id, edit.kind))
+
+    # ------------------------------------------------------------------ learned adjustments on a later deal (D19)
+    def _adjustment_matches(self, adj: LearnedAdjustment, line: SourceLine, deal: Deal) -> bool:
+        """A learned adjustment covers a line of this deal with the same name, at the same company, or at the target
+        of a deal on the platform it was learned under. A subtotal is never offered."""
+        if line.deal_id != deal.id or line.is_total or line.line.strip().lower() != adj.line.strip().lower():
+            return False
+        return line.company == adj.company or (adj.platform == deal.platform and line.company == deal.target)
+
+    def adjustments_for(self, deal_id: str) -> list[LearnedAdjustment]:
+        """The live learned adjustments the Preparer may offer on this deal: not retired, not learned on this deal's
+        own edits, not already on an open flag, and covering one of its lines."""
+        deal = self._deal(deal_id)
+        offered = {i.payload.get("adjustment_id") for i in self.store.deal_items(deal_id, "flag")
+                   if i.payload.get("kind") == "adjustment" and i.state in (State.NEEDS_INFO, State.POSTED)}
+        lines = self.store.lines(deal_id)
+        out = []
+        for adj in self.store.adjustments.values():
+            own = self.store.edits.get(adj.edit_id)
+            if adj.status == "retired" or adj.id in offered or (own is not None and own.deal_id == deal_id):
+                continue
+            if any(self._adjustment_matches(adj, line, deal) for line in lines):
+                out.append(adj)
+        return out
+
+    def _check_adjustment_flags(self, deal: Deal, out: PreparerOutput) -> list[tuple]:
+        """Every adjustment the Preparer offers must be one the gateway would offer, on a line it covers, once."""
+        allowed = {a.id: a for a in self.adjustments_for(deal.id)}
+        seen: set[str] = set()
+        checked = []
+        for proposal in out.adjustment_flags:
+            adj = allowed.get(proposal.adjustment_id)
+            if adj is None:
+                raise Invalid(f"adjustment {proposal.adjustment_id} is not a live learned adjustment for this deal")
+            if adj.id in seen:
+                raise Invalid(f"adjustment {adj.id} is offered twice")
+            line = self.store.source_lines.get(proposal.line_id)
+            if line is None or not self._adjustment_matches(adj, line, deal):
+                raise Invalid(f"adjustment {adj.id} ({adj.line}) does not cover line {proposal.line_id}")
+            seen.add(adj.id)
+            checked.append((proposal, adj, line))
+        return checked
+
+    def _open_adjustment_flag(self, deal: Deal, parent: WorkItem, proposal, adj: LearnedAdjustment,
+                              line: SourceLine) -> WorkItem:
+        current = finance.to_thousands(line.amount, line.unit)
+        options = [
+            Option(id="apply", label=f"Apply it: {_signed(adj.amount)} to {line.company}, {line.line}",
+                   effect=f"{line.line} goes from {_fmt(current)}K to {_fmt(current + adj.amount)}K as your edit, "
+                          f"with the reason "
+                          f"'{adj.reason}'. Every figure is recomputed by the tools with new run ids."),
+            Option(id="skip", label="Skip it on this deal",
+                   effect="The books stay as the agents made them. The adjustment is kept for later deals."),
+        ]
+        item = WorkItem(id=self.store.next_id("wi"), deal_id=deal.id, type="flag", state=State.NEEDS_INFO,
+                        proposed_by=PREPARER, question=proposal.question, options=options, default="skip",
+                        evidence=[Evidence(quote=adj.reason, document_id=f"edit {adj.edit_id} on {adj.deal_id}")],
+                        payload={"kind": "adjustment", "adjustment_id": adj.id, "line_ids": [line.id],
+                                 "parent": parent.id})
+        self.store.items[item.id] = item
+        adj.status = "proposed"
+        self._log(deal.id, PREPARER, "ask:flag", "ALLOWED", item.id, reason=proposal.question, evidence=item.evidence)
+        self._log(deal.id, SYSTEM, "adjustment:propose", "ALLOWED", adj.id, reason=f"offered on flag {item.id}")
+        return item
+
+    def _answer_adjustment(self, actor: str, item: WorkItem, option_id: str) -> WorkItem:
+        """Apply: the adjustment becomes the controller's amount edit, through apply_edit and its recompute, reasoned
+        with the adjustment's reason, so it shows in Your edits. Skip: the books stay as the agents made them."""
+        adj = self.store.adjustments[item.payload["adjustment_id"]]
+        line = self.store.source_lines[item.payload["line_ids"][0]]
+        detail = "books left as the agents made them"
+        if option_id == "apply" and adj.status == "retired":
+            self._deny(IllegalTransition(f"adjustment {adj.id} was retired; skip it"), item.deal_id, actor, "answer",
+                       item.id)
+        if option_id == "apply":
+            # The change, on this deal's own agent value: the source line, which an edit never overwrites.
+            value = round(finance.to_thousands(line.amount, line.unit) + adj.amount, 3)
+            edit = self.apply_edit(actor, item.deal_id, "amount", line.company, line.line, value=value,
+                                   section=line.section)["edit"]
+            edit.from_adjustment_id = adj.id
+            self.reason_edit(actor, edit.id, text=adj.reason, remember=False)
+            item.payload = {**item.payload, "edit_id": edit.id}
+            detail = f"applied as edit {edit.id}"
+        item.answer = option_id
+        item.state = State.APPROVED
+        if adj.status == "proposed":
+            adj.status = "applied"  # live again for later deals, whichever way this deal went
+        self._log(item.deal_id, actor, "answer", "ALLOWED", item.id, reason=f"option {option_id}: {detail}")
+        self._log(item.deal_id, SYSTEM, f"adjustment:{option_id}", "ALLOWED", adj.id,
+                  reason=f"flag {item.id}: {detail}")
+        self._post(item)
+        return item

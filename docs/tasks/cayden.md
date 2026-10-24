@@ -122,6 +122,13 @@ In `backend/app/core/models.py`:
 - `CaseView` gains `edits: list[Edit]`, `adjustments: list[Adjustment]`, and `brief_draft` (the draft and its citations, or null).
 Done when: the models import, the 176 existing tests still pass, and `architecture/gateway-and-api.md` shows the new fields with example JSON.
 
+Done 2026-10-24 night (`cayden/phase2`, merged alone to `main`): 188 offline tests pass, 197 with Tiger.
+Notes for Tri and Eric:
+- The spec's `Adjustment` is `LearnedAdjustment` in code, because `Adjustment` already names the Brief's add-back.
+- There is no `CaseView`. The case response is `CaseResponse` in `backend/app/api/schemas.py` (Tri, T2 and T4). The three fields to add are in `architecture/gateway-and-api.md`.
+- `Deal.brief` is optional now, but a deal with `brief_status="approved"` must have one. A platform `Policy` must name its `platform`.
+- The policy matchers treat `company=None` as any company. The remap path in C2 must check `scope` and `platform`.
+
 ### C2. Edits in the gateway (about 3 hours)
 
 In `backend/app/gateway/gateway.py`:
@@ -145,6 +152,11 @@ In `backend/app/gateway/gateway.py`:
   - a revert retires the policy and restores the agents' value
   - every recompute figure equals its tool run
 Done when: the tests pass, and the demo beat in `design/review-companion.md` section 9 runs through the API with curl.
+
+Status (2026-10-24 night, branch `cayden/edits`): the gateway side is built, and `backend/tests/test_edits.py` passes.
+Four figure tests skip with "needs T1 edit-aware tools" and run by themselves when Tri's T1 lands; until then an edit is refused with 503.
+The Preparer offers a learned adjustment on a later deal as a flag (apply or skip); applying it is an amount edit through the same recompute.
+Open: the curl run of the demo beat waits on T2.
 
 ### C3. The Brief Reader, stage 1 (about 4 hours, after C2)
 
