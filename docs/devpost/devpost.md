@@ -1,12 +1,12 @@
 # Devpost draft
 
 Owner: Eric.
-Draft of 2026-10-24, for submission by Sunday 9am.
-The sections below follow the Devpost form.
-Pitch order is the problem, then what Stochastic does, then the proof.
-Tags in this file are for the team: [verified] means a source file, a filing, or a test shows it, and [inferred] means our judgment.
-Before pasting into Devpost, keep the tags where a reader would want them and drop the rest.
-Items marked "to fill" must be checked or filled before submission.
+Final pass of 2026-10-24, for submission by Sunday 9am.
+The sections below follow the Devpost form, in pitch order: the problem, then what Stochastic does, then the proof.
+Tags are for the reader: [verified] means a file, a filing, or a test in the repo shows it, and [inferred] means our judgment.
+Sponsor and vendor figures are marked self-reported.
+The facts behind the flag, with quotes and sections, are in `flag-card.md`, and the lender's definitions are in `brief.md`.
+What is still open is listed at the end, with who must answer it.
 
 ## Tagline
 
@@ -18,18 +18,18 @@ A private equity firm that keeps buying small companies has a gate on every deal
 The lender sets a limit, such as debt below 2.50 times EBITDA, and tests it on the combined company.
 So the next deal waits until someone merges two sets of books.
 Today that is a controller, a spreadsheet, and weeks: pull the statements, map each line of the new company to the platform's chart, add them up, adjust EBITDA, and prepare the lender's pack.
-One vendor playbook puts a full integration at about 12 weeks. [self-reported, Aleph]
-In the samples we found, the compliance certificate is due 45 to 60 days after quarter end. [verified snippets; terms vary per deal]
+One vendor playbook puts a full integration at about 12 weeks, and says compliance certificates are due 45 to 60 days after quarter end. [self-reported, Aleph; terms vary per deal]
 One wrong mapping flows silently into every number after it. [inferred]
 
 ## What it does
 
-Stochastic does the repeatable part of an add-on integration and keeps what the controller decides.
-1. Upload: the platform's statement file, the target's statement file, and a short brief with the lender's limit and its definitions of debt and EBITDA.
+Stochastic does the repeatable part of an add-on integration, asks a human about the rest, and remembers the answer.
+
+1. Inputs: the platform's statement lines, the target's statement lines, and a short brief with the lender's limit and its own definitions of debt and EBITDA.
 2. Map: a Mapper agent matches each target line to a platform line, with a confidence and a reason, and tags each balance sheet line as covenant debt or not.
-3. Flag: the Mapper stops on the lines it should not decide alone. The flag card shows the question, the filing evidence, and the effect of each answer on leverage, computed by code.
-4. Combine and test: a Preparer agent calls code tools that combine the books, tie them out, compute covenant EBITDA and debt, and test the limit. A Reviewer agent checks the tie-out and the run ids.
-5. Approve: the controller approves, and only then does the gateway post the result and write the log.
+3. Flag: the Mapper stops on the lines it should not decide alone. Each flag carries the question, the filing evidence, and the effect of each answer on leverage, computed by code.
+4. Combine and test: a Preparer agent calls code tools that combine the books, tie them out, compute covenant EBITDA and debt, and test the limit. A Reviewer agent re-runs the tie-out and the limit test.
+5. Approve: the controller approves, and only then does the gateway post the result.
 
 The controller's answer to a flag becomes a policy, written by the gateway.
 On the next run the Mapper applies the policy and cites it instead of asking again. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
@@ -39,53 +39,64 @@ It is not advice.
 
 ## The proof: a real public deal
 
-We ran it on a real add-on: Kewaunee Scientific buying Nu Aire, closed November 1, 2024, for $55M, from public SEC filings. [verified]
-The two companies use different charts of accounts, and the buyer's pro forma filing includes a reclassification table (Note 2) that we use as an answer key for the shape of the mapping. [verified: Ex 99.2]
+We ran it on a real add-on: Kewaunee Scientific buying Nu Aire, closed November 1, 2024, for $55M, from public SEC filings. [verified: `docs/STOCHASTIC.md`]
+The two companies use different charts of accounts.
+The buyer's pro forma filing includes a reclassification table, Note 2, that we use as an answer key for the mapping. [verified: 8-K/A Ex 99.2]
 
-The lender's test is Section 4.8(a) of the PNC Loan Agreement: a "ratio of Senior Funded Bank Debt to EBITDA of less than 2.50 to 1.00". [verified: Ex 10.1, Section 4.8(a)]
+The lender's test is Section 4.8(a) of the PNC Loan Agreement: a "ratio of Senior Funded Bank Debt to EBITDA of less than 2.50 to 1.00". [verified: 8-K Ex 10.1, Section 4.8(a)]
 One Kewaunee line, "Financing liability", holds three debts after the close: a Statesville sale-leaseback ($27,782K), the new PNC term loan and revolver ($20,563K), and 8% seller notes ($22,540K). [verified: 10-Q Note G; Ex 99.2 Note 4(h)]
-The agreement's definition of Senior Funded Bank Debt excludes subordinated debt and the capitalized lease on the Statesville property. [verified: Ex 10.1, definitions]
+The agreement's definition of Senior Funded Bank Debt excludes subordinated debt and capitalized leases on the Statesville property. [verified: Ex 10.1, definitions]
 The Mapper flags the line, and the gateway computes each reading with the tools:
 
 | Reading | Senior Funded Bank Debt | Leverage | Verdict |
 | --- | --- | --- | --- |
 | Whole line counts | $71,955K | 2.57x | Over the 2.50x limit |
-| PNC debt only (the agreement's reading) | $21,633K | 0.77x | OK |
+| PNC debt only (the agreement's reading, the default) | $21,633K | 0.77x | OK |
 | PNC debt plus the seller notes | $44,173K | 1.58x | OK |
 
-Same books, two readings, 1.80x apart: a blocked next deal, or about $48M of room. [verified: tool runs on the fixture]
-These figures are preliminary.
-Covenant EBITDA is $28,033K today, and three items in how we apply the agreement's EBITDA definition are still under review. [verified: `evals/fixture_check.md`]
-The margin on the first reading is thin: it stays over the limit only while covenant EBITDA is below $28,782K. [verified: arithmetic]
-If add-backs above $749K that we have not applied turn out to belong, the whole-line reading drops under 2.50x, while the agreement's reading stays far under. [verified: arithmetic]
-The facts behind the card, with quotes and sections, are in `docs/devpost/flag-card.md`, and the definitions are in `docs/devpost/brief.md`.
+The same books read two ways are 1.80x apart: a blocked next deal, or about $48M of debt room under the limit. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`; room is arithmetic]
+The table is the flag the scripted backend raises. [verified: scripted run of the fixture]
+The recorded model runs raised the same flag with a different middle reading: 1.76x on Sonnet 5.5, and 0.74x on Haiku 5.5. [verified: `docs/agents.md`, run log]
 
-Mapping score against Note 2: to fill from `evals/README.md` once task 5 has run (score, date, backend).
+These figures are preliminary.
+Covenant EBITDA is $28,033K, and three items in how we apply the agreement's EBITDA definition are still under review. [verified: `evals/fixture_check.md`]
+The first reading stays over the limit only while covenant EBITDA is below $28,782K, a margin of $749K. [verified: arithmetic]
+If add-backs that large turn out to belong, the whole-line reading drops under 2.50x, while the agreement's reading stays far under. [verified: arithmetic]
+
+Mapping score against Note 2: 33 of 33 scored Nu Aire lines go to the same Kewaunee line as the filed table, on both recorded model runs (Claude Sonnet 5.5 and Claude Haiku 5.5, requested through Factory Droid, 2026-10-24). [verified: `evals/README.md`]
+23 of those lines are mapped directly in Note 2, and 10 are inferred from a Note 2 total. [verified: `evals/README.md`]
+Four lines Note 2 does not cover are not scored. [verified: `evals/README.md`]
+The score covers the line mapping, not the covenant tags. [verified: `evals/README.md`]
 
 ## How we built it
 
-- Three stateful agents, Mapper, Preparer, and Reviewer, each a role on a real finance team. Each keeps a session and its policies in the store, not in a process. [verified: `backend/app/gateway/gateway.py`]
-- The agents never write to the record and never talk to each other. They call tools only through the gateway. A plain job runner, which is code, moves work items between them. [verified: `backend/app/agents/jobs.py`]
-- The gateway is the only writer. It enforces work-item states, maker-checker (the preparer of an item cannot approve it), tool permissions, and run ids on every number. [verified: `backend/tests/test_trust_rules.py`]
+- Three stateful agents, Mapper, Preparer, and Reviewer, each a role on a real finance team. Each keeps a session and its policies in the store, not in a process. [verified: `docs/agents.md`, section 6]
+- The agents never write to the record and never talk to each other. They call tools only through the gateway, and a plain job runner, which is code, moves work items between them. [verified: `backend/app/agents/jobs.py`]
+- The gateway is the only writer. It enforces work-item states, maker-checker (the preparer of an item cannot approve it), tool permissions per role, and a run id on every number. [verified: `backend/tests/test_trust_rules.py`]
 - Code does all the deal math: consolidation, tie-out, covenant EBITDA, covenant debt, leverage, and the limit test. A number no tool run produced is refused. [verified: `test_model_made_number_is_refused_even_with_real_run_ids`]
-- Every action, allowed or denied, goes in an audit log, and each row is chained to the row before it by hash. [verified]
-- One function, `run_agent(role, item)`, runs the same role on four backends: Factory Droid, the Anthropic API, scripted rules, and replay of a recorded run. Every result says which backend produced it, and the screen shows it. [verified: `backend/app/agents/runner.py`]
-- Backend: Python 3.12, FastAPI, Pydantic. Console: Next.js, React, TypeScript, Tailwind, designed in Figma. [verified for the backend; to fill: confirm the console stack and the Figma workflow with Josie]
+- Every action, allowed or denied, goes in an audit log, and each row is chained to the one before it by hash. [verified: `test_tampering_breaks_the_chain`, `test_agents_cannot_approve_and_denial_is_logged`]
+- One function, `run_agent(role, item)`, runs the same role on four backends: Factory Droid, the Anthropic API, scripted rules, and replay of a recorded run. It falls back along a set order, and every result names the backend that produced it. [verified: `backend/app/agents/runner.py`]
+- Droid runs each agent in an empty directory with only our gateway tools allowed (`restrict_tools`) and a typed output. [verified: `docs/agents.md`, section 7]
+- Backend: Python 3.12, FastAPI, Pydantic, Uvicorn, pytest. [verified: `backend/pyproject.toml`]
+- Console: Next.js 16, React 19, TypeScript, Tailwind CSS 4. [verified: `frontend/package.json`]
+- Design: the Figma file "Stochastic - Reviewer Console" holds a `Tokens` variable collection, seven text styles, five components, and four screen frames. [verified: `docs/design/README.md`]
+  The console follows its tokens and rules: one look ("Paper and ink"), state shown by color plus word plus shape, and nothing smaller than 14px. [verified: `docs/design/README.md`]
+  The mockups were made for an earlier four-screen workflow, and their numbers are placeholders, not engine output. [verified: `docs/design/README.md`]
 
 ## Challenges we ran into
 
 - The face of the balance sheet and the lender's definitions disagree. One line holds three debts with different covenant treatment, and only the agreement says which count.
-- Public filings give statement lines, not trial balances, so we map statement lines and do not claim account-level detail.
+- Public filings give statement lines, not trial balances, so we map statement lines.
 - The two companies have different fiscal years, April 30 and September 30.
-- An early Mapper run decided the debt exclusions itself instead of asking. We changed the prompt so exclusions are the controller's call, and put the filing notes on the lines so the model knows what each one is. [verified: `docs/agents.md`, run log]
-- The EBITDA definition has add-backs that the filings do not fully quantify for the tested period, which leaves the naive reading close to the limit.
+- An early Mapper run decided the debt exclusions itself instead of asking. We changed the prompt so exclusions are the controller's call, and put the filing's note on each line so the model knows what it is. [verified: `docs/agents.md`, run log]
+- The EBITDA definition has add-backs that the filings do not fully pin down for the tested period, which leaves the naive reading close to the limit. [verified: `flag-card.md`, "How firm the figures are"]
 
 ## Accomplishments that we're proud of
 
-- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/test_trust_rules.py`, 17 tests on the real Kewaunee figures]
+- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/test_trust_rules.py`, 20 tests pass]
 - The flag is real. It comes from a real line in a real filing, and the answer moves the leverage verdict. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
-- The whole deal ran through Factory Droid with our gateway tools, on both Claude Sonnet 5.5 and Claude Haiku 5.5 as requested models. [verified: `docs/agents.md`, run log]
-- After a reset, the same deal runs with no flag, because the Mapper applies the controller's policy, and the log shows `policy:apply`. [verified]
+- The whole deal ran through Factory Droid with our gateway tools, once with Claude Sonnet 5.5 and once with Claude Haiku 5.5 requested, and both passed review at 0.77x. [verified: `docs/agents.md`, run log]
+- After a reset, the same deal runs with no flag, because the Mapper applies the controller's policy, and the log shows `policy:apply`. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
 
 ## What we learned
 
@@ -96,49 +107,73 @@ Mapping score against Note 2: to fill from `evals/README.md` once task 5 has run
 
 These are roadmap.
 None is built.
+- An upload screen and route for new deals.
 - Purchase accounting with a provisional label, and intercompany eliminations.
 - A second deal, to show the policies carrying over.
 - Confidence calibration from the answer key.
 - A Postgres store in place of the in-memory store.
+- Checking the NetSuite, Sage Intacct, Microsoft Dynamics 365, Epicor, and Infor layouts against real exports.
+- Live connectors that pull the trial balance from those systems instead of a file export.
 - Other corporate-finance situations.
 
 ## Built with
 
-Python, FastAPI, Pydantic, Factory Droid SDK, Anthropic API, Claude, Next.js, React, TypeScript, Tailwind, Figma.
-To fill: drop any item the final build does not use.
+Python, FastAPI, Pydantic, Uvicorn, pytest, Factory Droid SDK, Claude, Anthropic Python SDK, Next.js, React, TypeScript, Tailwind CSS, Figma.
+All are in `backend/pyproject.toml`, `frontend/package.json`, or `docs/design/README.md`. [verified]
+The Anthropic SDK backend is written but has not run live, because no key was available. [verified: `docs/agents.md`, section 10]
 
 ## What is real and what is simulated
 
 Say this list on stage, and paste it into Devpost as is.
-It starts from the honest-limits statement in `docs/demo-script.md`, section 6.
+It covers the honest-limits statement in `docs/demo-script.md`, section 6.
 
 Real:
 - The deal, the filings, and the lender's covenant are real and public. [verified]
-- The statement lines are real: every amount in the input files matches its SEC filing. [verified: `evals/fixture_check.md`]
-- The gateway, the math tools, the tie-out check, and the audit log with its hash chain are real code, and they run live in the demo. [verified]
-- The flag and the leverage effect of each answer are computed by the tools, not written by a model. [verified]
-- Agent memory is real, and it is policies the gateway wrote from the controller's answers. It is not a change to model weights. [verified: `backend/app/gateway/gateway.py`, `_learn`]
+- Every amount in the input files matches its SEC filing. [verified: `evals/fixture_check.md`]
+- The gateway, the math tools, the tie-out check, and the audit log with its hash chain are real code, and they run live in the demo. [verified: `backend/tests/test_trust_rules.py`]
+- The flag and the leverage effect of each answer are computed by the tools, not written by a model. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
+- Agent memory is real: it is policies the gateway wrote from the controller's answers. It is not a change to model weights. [verified: `backend/app/gateway/gateway.py`, `_learn`]
 
 Not real, or not claimed:
 - The statement lines come from public filings, not from the companies' internal books.
 - Account-level detail is not public, so we do not claim it. The demo maps statement lines, not trial balances.
-- Agent output on screen comes from one of four backends, and the screen badge says which. The recorded run is Factory Droid with Claude Haiku 5.5 requested, from 2026-10-24, 04:30. Droid does not prove which model served a run, so we say "requested". [verified: `backend/recordings/`, `docs/agents.md`]
-- To fill on the day: which backend produced the run shown in the video and at the table (droid, anthropic, scripted, or replay).
-- The flag card wording is fixed text. The question, the options, and their effects come from the API.
+- The demo loads the deal from a fixture. There is no upload screen or upload route yet. [verified: `backend/app/api/routes.py`]
+- As an extra, the loader script reads a QuickBooks Online trial balance export with its Account List, so a private company with no filings could be an input. It is not used in the demo. [verified: `scripts/README.md`]
+  It was checked against real exports from the QuickBooks Online test-drive demo company, and the loaded totals match that company's own Balance Sheet report. [verified: `scripts/test_load_lines.py`, `scripts/samples/qbo/`]
+- On the scripted backend the Mapper knows only the demo deal's line names, so a new company's lines arrive as flags. [verified: the QuickBooks demo company raised 40 flags on the scripted backend, reproduced 2026-10-24]
+  A model backend should map them by reading them, but we have not run one on a QuickBooks file. [inferred]
+- The loader also has layout profiles for NetSuite, Sage Intacct, Microsoft Dynamics 365, Epicor, and Infor. They are not integrations. [verified: `scripts/README.md`]
+  We wrote them from how those reports are usually laid out, tested them only on small files we made ourselves, and never ran them on a real export. [verified: `scripts/README.md`, `scripts/test_load_lines.py`]
+- Agent output comes from one of four backends (droid, anthropic, scripted, or replay), and the API names the backend on every result. [verified: `backend/app/agents/runner.py`]
+- Droid does not report which model served a run, so the model names above are what we requested. [verified: `docs/agents.md`, section 8]
+- The default replay is the Haiku 5.5 run. Replayed with the default flag answer, it stops at the Preparer, because that Mapper also tagged "Short-term borrowings" unclear. The Sonnet 5.5 recording runs through. [verified: `evals/README.md`]
 - The fiscal years differ, April 30 and September 30, so the combined income statement adds two different years and does not match the filed pro forma.
 - The combined table is historical plus target. No purchase accounting is applied.
-- Two inputs are our estimates: the Statesville cash rent we deduct ($1,970K, the 10-K's next-year obligation), and transaction and integration costs, which we set to zero. [inferred] The filing estimates $698K of expected transaction costs after the close, and we have not yet decided whether they belong in the tested period. [verified: Ex 99.2, Note 5(b); timing inferred]
+- Two inputs are our estimates: the Statesville cash rent we deduct ($1,970K, the 10-K's next-year obligation), and transaction and integration costs, which we set to zero. [inferred]
+  The filing estimates $698K of transaction costs after the close, and we have not decided whether they fall in the tested period. [verified: Ex 99.2, Note 5(b); timing inferred]
 - Three items in how we apply the EBITDA definition are still under review, so the leverage figures are preliminary. [verified: `evals/fixture_check.md`]
-- The filing says its own reclassification table, Note 2, is preliminary. We use it as an answer key for shape, not to the dollar. [verified: Ex 99.2]
-- The default reading of the financing liability is ours. No controller or lender has checked it. [inferred]
+- The filing calls its own reclassification table, Note 2, preliminary. We use it as an answer key for which line goes where, not for amounts. [verified: Ex 99.2, Note 2]
+- The scripted Mapper's synonym table was written with Note 2 at hand, so its 33 of 33 is not independent evidence. The model runs are the score that matters. [verified: `evals/README.md`]
+- The agreement's reading of the financing liability is our reading. No controller or lender has checked it. [inferred]
+- The agreement also has a fixed charge coverage test, Section 4.8(b). We do not check it. [verified: Ex 10.1, Section 4.8(b)]
 - No practitioner has used the tool yet. [verified]
 - Other deals and other situations are roadmap, not built.
 - The output is a combined set of books and a limit check that a human approves. It is not advice.
 
 ## Tracks
 
-To fill before submission, and claim nothing unconfirmed:
+Claim nothing unconfirmed.
 - Hyphenate: select it on Devpost. One-line seat: "A portfolio controller at a PE-backed company, right after an add-on closes."
-- Factory: claim "built with the Droid SDK" only for runs on the `droid` backend, and name the recorded run.
-- Figma: describe only what Josie actually did in Figma and through the Figma MCP.
-- Whether one project can enter several sponsor tracks is not confirmed by Cal Hacks.
+- Factory: the agents ran through the Droid SDK on 2026-10-24, with Sonnet 5.5 and Haiku 5.5 requested. [verified: `docs/agents.md`, run log]
+  Say "built with the Droid SDK" only about `droid` runs.
+- Figma: the console's design system and screen frames are in the Figma file. [verified: `docs/design/README.md`]
+  Say how the shipped screen was built from it only once Josie confirms.
+
+## Open before submission
+
+- Josie: is the one-screen console (flag card, combined table, verdict line, log link) built against `GET /deals/{id}/case`, and does it show the backend badge? Until then, say the API names the backend, not the screen.
+- Josie: what was done in Figma and through the Figma MCP (`use_figma`), and is there a frame for the new one-screen console? `docs/decisions.md` D11 says the design system was built through `use_figma`, but `docs/design/README.md` does not say so.
+- Cayden, on the day: which backend produced the run in the video and at the table (droid, anthropic, scripted, or replay). Write it into the list above.
+- Cayden: which recording is the replay fallback on stage. The Haiku replay stops at the Preparer, and the Sonnet one runs through.
+- Cayden and Tri: decide the three EBITDA items in `evals/fixture_check.md` and the $698K of transaction costs. Then update every leverage figure in this file, `flag-card.md`, and `brief.md`.
+- Anyone, with a Cal Hacks organizer: can one project enter several sponsor tracks?

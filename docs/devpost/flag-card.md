@@ -1,12 +1,13 @@
 # Flag card: "Financing liability"
 
 Owner: Eric.
-Written 2026-10-24.
+Checked 2026-10-24 against the filings in `data/raw/`.
 This file holds the facts behind the one covenant flag in the demo, so the card, the slide, and the Devpost say the same thing.
-Tags: [verified] means a filing or a test shows it. [inferred] means our judgment.
+Tags: [verified] means a filing or a test shows it.
+[inferred] means our judgment.
 Every quote is under 15 words and names its exhibit and section.
 The figures are today's tool runs on the fixture.
-They are not final: three EBITDA items are still open with Cayden and Tri (see "How firm the figures are" below).
+They are not final: EBITDA items are still open with Cayden and Tri (see "How firm the figures are" below).
 
 ## The question on the card
 
@@ -70,8 +71,13 @@ Why a matters: it is what a reader gets who counts the balance sheet line as it 
 It is the naive figure. [verified: `covenant_debt` with `naive=True`]
 The gap between a and b is 1.80x on the same books. [verified: arithmetic]
 
-What the recorded Droid run proposed: the Haiku 5.5 Mapper run of 2026-10-24, 04:30 offered three readings, 0.77x (the agreement), 0.74x (short-term borrowings also excluded), and 2.57x (all counted). [verified: `docs/agents.md`, run log]
-So the third option on screen may differ from option c above, depending on which run is shown.
+The table above is the flag the scripted backend raises. [verified: scripted run of the fixture]
+The recorded Droid runs raised the same flag, but neither offered option c:
+- Sonnet 5.5, 2026-10-24, 03:30: 0.77x (the agreement), 1.76x, and 2.57x (all counted). [verified: `docs/agents.md`, run log]
+  The 1.76x matches PNC plus the Statesville lease, without the seller notes. [inferred: arithmetic]
+- Haiku 5.5, 2026-10-24, 04:30: 0.77x (the agreement), 0.74x (short-term borrowings also excluded), and 2.57x (all counted). [verified: `docs/agents.md`, run log]
+
+So the middle option on screen depends on which run is shown.
 Read the card on screen before the pitch.
 
 ## How firm the figures are
