@@ -206,7 +206,9 @@ The gateway rules carry over: edits are recorded in the audit log as `human:cont
 ## 11. Desktop shell
 
 - Electron loads the Next app built with `next build`, served locally, in one window. The minimum size is 1280 by 800.
-- The title bar is hidden (`titleBarStyle: "hiddenInset"`), so the traffic lights sit in the top bar. The top bar needs 72px of left padding for them.
+- The title bar is hidden (`titleBarStyle: "hiddenInset"`), so the traffic lights (x 20, y 20) sit over the sidebar.
+- In Electron, detected from the user agent, the sidebar's brand row moves down to a 52 px top offset so it clears the traffic lights.
+- The brand row and each page header are drag regions (`-webkit-app-region: drag`); their buttons and links are `no-drag`.
 - The companion is part of the page (a React layer), not a separate OS window. It only needs to be aware of the cursor inside the app, so no click-through overlay is needed.
 - The save dialog for Download final files comes from Electron's `dialog.showSaveDialog`.
 
