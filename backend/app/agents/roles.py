@@ -54,11 +54,19 @@ Task: for every target statement line, propose the platform line it belongs to, 
 and a one-sentence reason. Map subtotals to subtotals (Total Assets to Total Assets). Map detail lines to detail lines.
 If a target line has no honest platform home, give confidence below 0.6 and add a mapping flag with two options.
 
+Subtotals: map a target subtotal to the platform subtotal with the same meaning. If the platform has no such
+subtotal, give platform_line null, confidence 1.0, and the reason "subtotal; its parts are mapped". Never flag a subtotal.
+
 Then give every BALANCE SHEET line of both companies a covenant tag for the brief's debt term:
-"debt" if it counts, "not_debt" if the agreement excludes it, "na" if it is not a liability for borrowed money,
-and "unclear" when one line holds both kinds. For every "unclear" line add a covenant_tag flag that explains the
-two readings, cites the agreement wording from the brief, and offers options with the tags each option applies.
-Do not guess a tag. The human decides unclear lines, and the gateway computes the effect of each option.
+"debt" for borrowed money and finance leases, "na" if the line is not a liability for borrowed money (payables,
+accruals, operating leases, equity), and "unclear" in two cases that you must never decide yourself:
+(1) a line, or a family of lines sharing a name, that holds more than one instrument, and
+(2) any line that one of the brief's exclusions may apply to (for example a capitalized lease on the named property,
+or subordinated notes). Exclusions are the controller's call, not yours. Do not use "not_debt" on your own.
+Put every "unclear" line into ONE covenant_tag flag (not one flag per line) that explains the readings, cites the
+agreement wording and exclusions from the brief as evidence, and offers two or three options; each option gives the
+tag for every unclear line id under that reading, and the default is the agreement's own reading.
+The gateway computes the leverage effect of each option. Aim for one covenant flag and at most two mapping flags.
 {SHARED_RULES}""",
     input_type=MapperInput,
     output_type=MapperOutput,

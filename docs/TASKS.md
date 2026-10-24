@@ -8,7 +8,7 @@ Swap tasks freely and tell the team when you do.
 ## State of the build
 
 The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.77x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 17 tests pass. [verified: `backend/tests/test_trust_rules.py`]
-Not yet run live: the Anthropic backend (no key in `.env`) and the Droid backend (the `droid` CLI is not installed).
+The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded. Not yet run live: the Anthropic backend (no key in `.env`).
 Not yet done: the console on the new API, the Note 2 answer key, the Devpost text, the recorded model run, the rehearsals.
 
 ## The four seats
@@ -32,13 +32,13 @@ Change requests go to Cayden.
 
 Done on 2026-10-24: the contract, the gateway rewrite (per-role permissions, run-id checks, Reviewer-pass check, reverse, controller default, agent memory), the three roles, `run_agent` with four backends, the job runner, the recording and replay, the Droid probe script, and the docs.
 
+Done at 03:30: the `droid` CLI, the probe (Claude models are on our key), and a full Droid run with Claude Sonnet 5.5, recorded.
+
 Open:
-1. Install the `droid` CLI in your own shell: `curl -fsSL https://app.factory.ai/cli | sh` (the script was read; it downloads a checksummed binary to `~/.local/bin`). Then run `backend/.venv/bin/python scripts/droid_probe.py` and write the model list into `sponsors/factory.md`.
-2. Run the Mapper on Droid: `AGENT_BACKEND=droid backend/.venv/bin/python scripts/record_run.py --backend droid`. Fix the `restrict_tools` ids from the probe's tool list if the default guess fails.
-3. Put an Anthropic key in `.env` and record a model run: `scripts/record_run.py --backend anthropic`. Commit the recordings.
-4. Rehearse the failure switch: start on `droid`, kill the CLI, show the fallback in `GET /health`.
-5. Write the 1:30 pitch words into `demo-script.md` (the structure is there) and run the rehearsals.
-6. Ask a Hyphenate mentor whether PE add-on integration counts as a corner of a finance team, and whether a learned policy counts as the "improves with every correction" signal.
+1. Put an Anthropic key in `.env` and record a model run: `scripts/record_run.py --backend anthropic`. Commit the recordings.
+2. Rehearse the failure switch: start on `droid`, kill the CLI mid-run, show the fallback in `GET /health`.
+3. Write the 1:30 pitch words into `demo-script.md` (the structure is there) and run the rehearsals.
+4. Ask a Hyphenate mentor whether PE add-on integration counts as a corner of a finance team, and whether a learned policy counts as the "improves with every correction" signal.
 
 ## Eric
 
@@ -81,7 +81,7 @@ Inputs for the design:
 | Track | Owner of the proof | What must be true by Saturday night |
 | --- | --- | --- |
 | Hyphenate | Cayden (demo), Eric (Devpost and the real-versus-simulated list) | The real deal runs end to end with the flag on the console. The video opens with the flag moment. The second run shows memory. |
-| Factory | Cayden | The Mapper runs with `AGENT_BACKEND=droid` at least once, recorded. We know if Droid can run Claude models. |
+| Factory | Cayden | Done: all three agents ran on Droid with Claude Sonnet 5.5, recorded. Keep it working through the rehearsals. |
 | Figma | Josie (design) | The console frame exists in Figma and the console follows it. Figma is on screen in the pitch. |
 
 ## Order of work

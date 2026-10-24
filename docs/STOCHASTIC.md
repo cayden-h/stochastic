@@ -21,7 +21,7 @@ Both are archived in `planning-notes.md` and `research/`.
 They are roadmap ideas only. The product is the integration workflow in this file.
 
 Build status on 2026-10-24, 02:30: the backend runs the whole deal end to end on the real filing figures through the gateway, the tools, and the audit log, on the scripted backend. [verified: `backend/tests/test_trust_rules.py`, 17 tests pass]
-The Anthropic and Droid backends are written and not yet run live (no Anthropic key in `.env`, and the `droid` CLI is not installed on the build machine).
+The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 (recorded in `backend/recordings/`). The Anthropic backend is written and not yet run live (no Anthropic key in `.env`).
 The console still implements the earlier workflow. Josie is rebuilding it against `GET /deals/{id}/case`.
 
 ## 2. The pitch rules
@@ -237,7 +237,7 @@ Must (the demo does not work without these). Status on 2026-10-24, 02:30:
 5. The Preparer and the Reviewer, with real tool calls. Done on the scripted backend.
 6. The console screen: flag card, combined table, verdict line, built from the Figma frame. Josie, in progress, against `GET /deals/{id}/case`.
 7. A recorded run and a backend switch, so the demo survives a failure. Done (`backend/recordings/`, `AGENT_BACKEND=replay`). The recording is from the scripted backend until a model run is recorded.
-8. Track proofs: at least one agent runs with `AGENT_BACKEND=droid` (Factory), and the Figma file is on screen in the pitch (Figma). Open. The Droid backend is written; it needs the `droid` CLI installed and `scripts/droid_probe.py` run.
+8. Track proofs: at least one agent runs with `AGENT_BACKEND=droid` (Factory): done, all three ran. The Figma file on screen in the pitch (Figma): open.
 
 Should (if the schedule holds):
 - A live Anthropic-backed or Droid-backed agent call in the demo.
@@ -259,7 +259,7 @@ Cut (do not build this weekend):
 - Backend: Python 3.12, FastAPI, Pydantic. The gateway, tools, agents, and tests are in Python. [verified]
 - Agents: `run_agent(role, item)` with backends `anthropic` (Anthropic SDK, tool use), `droid` (Factory Droid Python SDK 0.5.0), `scripted`, and `replay`. [verified: installed in `backend/.venv`]
 - Store: in memory. Postgres on Tiger Cloud is optional.
-- Models: Claude through the Anthropic API (`ANTHROPIC_MODEL`, default `claude-sonnet-5-5`). Droid model access is unconfirmed until `scripts/droid_probe.py` runs.
+- Models: Claude through the Anthropic API (`ANTHROPIC_MODEL`, default `claude-sonnet-5-5`) and through Droid (`DROID_MODEL=claude-sonnet-5-5`; the key lists Claude, GPT, and Gemini models).
 - Keys: `ANTHROPIC_API_KEY` and `FACTORY_API_KEY` live in the repo-root `.env`, which git ignores and the app loads. `.env.example` lists every setting.
 
 ## 15. Tracks and sponsors
@@ -341,8 +341,7 @@ Do not lead the pitch with ingestion.
 ## 18. Open questions
 - Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask a Hyphenate mentor on Saturday, unless Cayden already asked.
 - Which part of Kewaunee's financing liability counts as covenant debt? We computed all three readings (section 12). A practitioner should confirm the default, reading b.
-- Can Droid run Claude models on our key? Install the CLI (`curl -fsSL https://app.factory.ai/cli | sh`, the script is reviewed and only downloads a checksummed binary to `~/.local/bin`) and run `backend/.venv/bin/python scripts/droid_probe.py`. The install was blocked on the build machine's agent and needs Cayden's own shell.
-- What are the exact MCP tool ids for `restrict_tools` in the Python SDK? The probe prints the tool list; set `DROID_RESTRICT_TOOLS` if the default guess is wrong.
+- Closed on 2026-10-24, 03:30: Droid runs Claude on our key (`claude-sonnet-5-5`, Opus 5.5, Fable 5.1, Haiku 5.5 listed), and the whole deal ran on `AGENT_BACKEND=droid` with our tools through MCP. See `sponsors/factory.md`.
 - Does the Python Droid SDK qualify for "Building with the Droid SDK" when the tools call our own gateway?
 - Is there an Anthropic key for the team? None is in `.env`, so the Anthropic backend has not run.
 - Does the SEC allow us to redistribute the cached filings? The fixture holds only line values and source references, not the filings.

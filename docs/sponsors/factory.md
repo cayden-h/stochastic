@@ -329,3 +329,14 @@ Updated to-do:
 1. Each team member claims credits with the form, if they want them.
 2. Cayden runs `list_models()` and tests one `run()` call with structured output, in an empty directory.
 3. Cayden tests the tool allowlist (`restrict_tools`) before any finance data goes in.
+
+## Update 2026-10-24, 03:30: the probe and the first Droid run
+
+Cayden installed the `droid` CLI (0.249.0) and the agent ran `scripts/droid_probe.py` and `scripts/record_run.py --backend droid`. [verified: terminal output]
+
+- `list_models()` on our key returns 60 or so models, including Claude: `claude-fable-5.1`, `claude-fable-5`, `claude-opus-5-5`, `claude-opus-5-5-fast`, `claude-opus-5`, `claude-opus-4-8`, `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-5-5`, `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-5-5`, plus GPT-5.x, Gemini 3.x and 4, Mistral, GLM, Kimi, Qwen, DeepSeek, Grok. So Droid can run Claude on this key. The open question is closed.
+- One `run()` with a Pydantic `output=` returned a typed result in one turn, in an empty temp directory with `restrict_tools=["none"]`.
+- The whole deal ran on `AGENT_BACKEND=droid` with `DROID_MODEL=claude-sonnet-5-5`: the Mapper mapped the lines, the Preparer called `consolidate`, `ebitda`, `covenant_debt`, and `leverage` through our in-process MCP server, the Reviewer called `tie_out` and `limit_test`, and the verdict was 0.77x against 2.50x with Reviewer pass. The default `restrict_tools` guess (tool names with and without the `MCP:stochastic/` prefix) worked.
+- First-run finding: the Mapper on Sonnet 5.5 decided the financing liability exclusions itself and raised six small flags (subtotals, short-term borrowings). The prompt now says exclusions are the controller's call and subtotals are never flagged. The second run is recorded in `backend/recordings/`.
+
+What the SDK made possible, in one sentence for the pitch: one Droid session per role with only our gateway tools allowed (`restrict_tools`), a typed result per work item (`output=` Pydantic), and an empty working directory so a coding agent never sees a file.

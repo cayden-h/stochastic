@@ -11,10 +11,11 @@ Done on 2026-10-24 (02:30):
 - `scripts/droid_probe.py` and `scripts/record_run.py`.
 - The docs: `STOCHASTIC.md`, `architecture/`, `decisions.md`, `TASKS.md`, `demo-script.md`, `review.md`.
 
+Done at 03:30: the `droid` CLI is installed, the probe shows Claude models on our key, and the whole deal ran on Droid with Claude Sonnet 5.5 (recorded).
+
 Open:
-1. Install the `droid` CLI in your own shell: `curl -fsSL https://app.factory.ai/cli | sh`. The script was read: it downloads version 0.249.0, checks the SHA-256, and copies it to `~/.local/bin/droid`. The agent's attempt to run it was blocked by a safety classifier.
-2. Run `backend/.venv/bin/python scripts/droid_probe.py`. Write the model list and the "can Droid run Claude" answer into `sponsors/factory.md`. If the probe shows MCP tool ids in a different format, set `DROID_RESTRICT_TOOLS` in `.env`.
-3. Record a Droid run: `backend/.venv/bin/python scripts/record_run.py --backend droid`. Then an Anthropic run with a key in `.env`. Commit `backend/recordings/`.
-4. Rehearse the failure switch once with a real failure.
-5. Write the pitch words in `demo-script.md` and run the rehearsals.
-6. Ask a Hyphenate mentor the two questions in `TASKS.md`.
+1. Record an Anthropic run once a key is in `.env`: `backend/.venv/bin/python scripts/record_run.py --backend anthropic`.
+2. Set `AGENT_BACKEND=droid` and `DROID_MODEL=claude-sonnet-5-5` in `.env` for the demo laptop, and rehearse the failure switch once with a real failure (kill the droid process mid-run; the fallback chain should land on scripted and `GET /health` should show it).
+3. Read the Droid Mapper's flags before each rehearsal. The prompt now keeps exclusions for the controller; if a run still decides them itself, say so and show the scripted run instead.
+4. Write the pitch words in `demo-script.md` and run the rehearsals.
+5. Ask a Hyphenate mentor the two questions in `TASKS.md`.
