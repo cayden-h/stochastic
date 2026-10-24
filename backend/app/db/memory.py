@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from app.core.models import (AgentSession, AuditRow, Deal, Edit, LearnedAdjustment, Mapping, Policy, Result, SourceLine,
-                             ToolRun, WorkItem)
+from app.core.models import (AgentSession, AgreementText, AuditRow, Deal, Edit, LearnedAdjustment, Mapping, Policy,
+                             Result, SourceLine, ToolRun, WorkItem)
 
 
 # TimescaleDB's default time_bucket origin for timestamptz, so both stores floor a row to the same bucket.
@@ -42,6 +42,7 @@ class MemoryStore:
         self.sessions: dict[str, AgentSession] = {}  # keyed by role
         self.edits: dict[str, Edit] = {}  # the controller's review edits (D19), part of the deal record
         self.adjustments: dict[str, LearnedAdjustment] = {}  # agent memory from amount edits: survives a reset
+        self.agreements: dict[str, AgreementText] = {}  # credit agreement texts (D20), part of the deal record
         self.audit: list[AuditRow] = []  # append only, in order
         self._seq: dict[str, int] = {}
 

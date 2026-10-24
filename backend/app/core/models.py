@@ -397,6 +397,9 @@ class BriefDraft(BaseModel):
     brief: Brief
     citations: list[BriefCitation] = Field(default_factory=list)
     flags: list[str] = Field(default_factory=list)  # the brief_field flag work item ids
+    # False means the draft reads the base agreement only, and the approval card says so (check 9).
+    amendments_supplied: bool = False
+    removed: list[str] = Field(default_factory=list)  # list fields the controller removed, applied at approval
 
 
 # ---------------------------------------------------------------------------

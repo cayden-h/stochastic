@@ -8,11 +8,21 @@ of debt. It says "scripted" in the result, so nobody can mistake it for a model 
 from __future__ import annotations
 
 import difflib
+import json
 import re
+from functools import lru_cache
+from pathlib import Path
 from typing import Callable
 
+from app.core import agreement as agr
 from app.core.models import (
     AdjustmentProposal,
+    Adjustment,
+    Brief,
+    BriefCitation,
+    BriefFieldFlag,
+    BriefReaderInput,
+    BriefReaderOutput,
     Evidence,
     FlagOption,
     FlagProposal,
@@ -311,3 +321,135 @@ def scripted_reviewer(inp: ReviewerInput, call_tool: CallTool) -> ReviewerOutput
     if not test.outputs["ok"]:
         reasons.append(f"Leverage {test.outputs['leverage']:.2f}x is not below the {test.outputs['limit']:.2f}x limit ({test.run_id})")
     return ReviewerOutput(verdict="pass" if not reasons else "needs_attention", reasons=reasons, run_ids=run_ids)
+
+
+# ---------------------------------------------------------------------------- the Brief Reader (D20)
+
+QUOTES = Path(__file__).resolve().parents[4] / "data" / "brief" / "kewaunee_quotes.json"
+
+
+@lru_cache(maxsize=1)
+def kewaunee_quotes() -> dict:
+    """The verbatim Ex 10.1 quotes, with the hashes of the texts they belong to. Empty if the file is missing."""
+    try:
+        return json.loads(QUOTES.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def scripted_brief_reader(inp: BriefReaderInput, call_tool: CallTool) -> BriefReaderOutput:
+    """On Kewaunee's PNC agreement (matched by its hash), the fixture Brief with the verbatim quotes. On any other
+    text, a regex read with low confidence, so the controller is asked about every field."""
+    quotes = kewaunee_quotes()
+    if quotes and inp.sha256 in quotes.get("sha256", {}).values():
+        return _kewaunee_brief(quotes)
+    return _regex_brief(inp, call_tool)
+
+
+def _kewaunee_brief(quotes: dict) -> BriefReaderOutput:
+    from app.db.fixtures.kewaunee import BRIEF  # imported here: the fixtures import the gateway, which imports us
+
+    def unknown(a: Adjustment) -> Adjustment:
+        return a.model_copy(update={"amount": 0.0, "inferred": True, "source_ref": quotes["source"],
+                                    "note": "The agreement names it; the amount comes from the books."})
+
+    brief = BRIEF.model_copy(update={
+        "agreement_ref": quotes["source"],
+        "ebitda_addbacks": [unknown(a) for a in BRIEF.ebitda_addbacks],
+        "ebitda_deductions": [unknown(a) for a in BRIEF.ebitda_deductions],
+        "closing_financing": [],  # Ex 99.2, not the agreement
+        "test_period_note": "Tested as of the end of each fiscal quarter (Section 4.8(a)). The test period itself is "
+                            "not in this Brief (stage 2).",
+    })
+    citations = [BriefCitation(field=c["field"], quote=c["quote"], section=c["section"], confidence=c["confidence"])
+                 for c in quotes["citations"]]
+    flags = [BriefFieldFlag(field=g["field"], question=g["question"],
+                            evidence=[Evidence(quote=g["quote"], document_id=f"{quotes['source']}, {g['section']}")])
+             for g in quotes.get("schema_gaps", [])]
+    return BriefReaderOutput(brief=brief, citations=citations, flags=flags,
+                             note="scripted backend: the Kewaunee Ex 10.1 quotes, matched by the agreement's hash")
+
+
+_LIMIT = re.compile(r"ratio of (?P<term>[A-Z][\w ,'-]{2,60}?) to (?:Consolidated )?EBITDA of (?P<cmp>less than|not "
+                    r"(?:more|greater) than|no (?:more|greater) than|not to exceed) (?P<x>\d+(?:\.\d+)?) to 1(?:\.0+)?")
+# A lender's name ends in a bank word; a borrower's "INC." or "LLC" is not one.
+_LENDER = re.compile(r"(?P<name>[A-Z][A-Z&.,' ]{2,80}?(?:BANK(?:, (?:N\.A\.|NATIONAL ASSOCIATION))?|ASSOCIATION|N\.A\.|CAPITAL))(?![A-Za-z])")
+
+
+def _clip(text: str, start: int, words: int = 12) -> str:
+    """At most `words` words of `text` from character `start`, as a quote."""
+    return " ".join(text[start:].split()[:words])
+
+
+def _regex_brief(inp: BriefReaderInput, call_tool: CallTool) -> BriefReaderOutput:
+    citations: list[BriefCitation] = []
+    flags: list[BriefFieldFlag] = []
+    looked = ", ".join(inp.excerpts) or "none"
+    where = f"not found in sections {looked}"
+    fields = dict(lender="", limit=0.0, limit_section="", limit_wording="", debt_term="", debt_definition="",
+                  ebitda_definition="", debt_excludes=[])
+
+    def cite(field: str, quote: str, section: str) -> None:
+        citations.append(BriefCitation(field=field, quote=quote, section=section, confidence=0.5,
+                                       note="scripted regex read"))
+
+    hit = next(((sid, m) for sid, body in inp.excerpts.items() if (m := _LIMIT.search(body))), None)
+    if hit:
+        sid, m = hit
+        wording = agr.normalize(m.group(0))
+        fields.update(limit=float(m.group("x")), limit_section=sid, limit_wording=wording,
+                      debt_term=m.group("term").strip())
+        for f in ("limit", "limit_section", "limit_wording"):
+            cite(f, wording, sid)
+    else:
+        for f in ("limit", "limit_section", "limit_wording", "debt_term", "debt_definition"):
+            flags.append(BriefFieldFlag(field=f, question=f"The leverage covenant's {f} was {where}."))
+
+    def definition(term: str) -> tuple[str, str] | None:
+        if term not in inp.definition_index:
+            return None
+        try:
+            run = call_tool("get_definition", {"term": term})
+        except Exception:  # noqa: BLE001 - a refused read is a field not found
+            return None
+        return run.outputs["text"], inp.definition_index[term]
+
+    if fields["debt_term"]:
+        got = definition(fields["debt_term"])
+        if got:
+            body, sid = got
+            at = body.find(" means")
+            fields["debt_definition"] = agr.normalize(body[at + 1:])[:600] if at >= 0 else body[:600]
+            cite("debt_term", _clip(body, 0), sid)
+            cite("debt_definition", _clip(body, max(at, 0) + 1), sid)
+            ex = re.search(r"excluding (.+)", body)
+            parts = [p.strip(" ,;.") for p in re.split(r"\((?:i|ii|iii|iv|v|vi)\)|;| and (?=\()", ex.group(1))
+                     if p.strip(" ,;.")] if ex else []
+            for i, part in enumerate(parts[:5]):
+                fields["debt_excludes"].append(part[:300])
+                cite(f"debt_excludes[{i}]", _clip(body, body.find(part), 8), sid)  # the words after it, if short
+        else:
+            flags.append(BriefFieldFlag(field="debt_definition",
+                                        question=f"The definition of {fields['debt_term']} was {where} or the definitions."))
+    got = definition("EBITDA")
+    if got:
+        body, sid = got
+        fields["ebitda_definition"] = body[:600]
+        cite("ebitda_definition", _clip(body, 0), sid)
+    else:
+        flags.append(BriefFieldFlag(field="ebitda_definition", question=f"The EBITDA definition was {where}."))
+    flags.append(BriefFieldFlag(field="ebitda_addbacks", question="The scripted reader does not list add-backs or "
+                                "deductions. Read the EBITDA definition and add each one with its cap."))
+    try:
+        pre = call_tool("get_section", {"id": agr.PREAMBLE}).outputs["text"]
+    except Exception:  # noqa: BLE001
+        pre = ""
+    if m := _LENDER.search(pre):
+        # Title case, keeping short all-caps words such as PNC as they are.
+        fields["lender"] = " ".join(w if len(w.strip(",.")) <= 3 else w.title() for w in m.group("name").strip(" ,").split())
+        cite("lender", _clip(pre, m.start()), agr.PREAMBLE)
+    else:
+        flags.append(BriefFieldFlag(field="lender", question="The lender was not found in sections preamble."))
+    brief = Brief(agreement_ref="", ebitda_addbacks=[], ebitda_deductions=[], **fields)
+    return BriefReaderOutput(brief=brief, citations=citations, flags=flags,
+                             note="scripted backend: regex read of the limit and the definitions, low confidence")
