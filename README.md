@@ -105,6 +105,10 @@ The state lives in the store, written only by the gateway, so it survives a rest
 
 The human controller approves flagged lines and the final result.
 
+Planned, not built: a fourth agent, the Brief Reader (credit analyst), reads the credit agreement and drafts the brief with a verbatim quote for every field.
+The gateway refuses a quote that is not in the agreement and a number that is not in its quote, and the controller approves the brief before mapping starts.
+Today a person writes the brief. See `docs/architecture/brief-reader.md`.
+
 ## The demo
 
 The proof deal is Kewaunee Scientific buying Nu Aire, closed 2024-11-01, for $55M. [verified]

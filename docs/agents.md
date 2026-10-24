@@ -13,6 +13,7 @@ Claims are tagged [verified] when a test or a run shows them, and [inferred] whe
 | Preparer | `agent:preparer` | Builds the draft combined books and the leverage figure by calling tools in order | `consolidate`, `ebitda`, `covenant_debt`, `leverage` | Little. It follows the tool sequence and copies the figures. | `PreparerOutput` |
 | Reviewer | `agent:reviewer` | Checks the draft: tie-out and limit test | `tie_out`, `limit_test`, `leverage` | Little. Pass when both checks pass, needs-attention when one fails. | `ReviewerOutput` |
 
+A fourth role, the Brief Reader (`agent:brief_reader`), is decided and not built (D20). It reads the credit agreement and drafts the brief with a quote for every field; the gateway checks the quotes and the controller approves the brief before the Mapper runs. Design: `architecture/brief-reader.md`.
 The roles are defined in `backend/app/agents/roles.py`: a system prompt, a tool list, an input type, and an output type.
 The same role runs on any backend.
 
@@ -173,3 +174,4 @@ Lessons written into the code after these runs:
 - The served model comes from the droid CLI's own session record, not from Factory's API (section 8). Say "Claude Haiku 5.5 through Droid, confirmed from the session record".
 - The scripted backend knows this deal's line names; on a new deal it would flag more and map less. That is the point of the model backends.
 - The Mapper's flag quality depends on the model. The run log above is the evidence; say which run is on screen.
+- The brief is written by hand, and only the PNC brief exists. The agents never read the credit agreement today; the Brief Reader (D20) is planned for that.

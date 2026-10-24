@@ -66,6 +66,17 @@ If someone edits an old row, the later fingerprints no longer match.
 In Stochastic: the gateway writes one row for every action, including denied ones. Each row is chained to the previous row. [verified: source file, `STOCHASTIC.md` section 9]
 The demo shows the log as a small link. A denied row is shown only if a judge asks.
 
+## Brief and Brief Reader
+
+The brief holds the lender's terms that the math needs: the limit, its wording, the defined debt term and what it excludes, and the EBITDA add-backs and deductions with their caps.
+Each term names the section of the credit agreement it comes from.
+
+In Stochastic: a person writes the brief today, and the PNC brief is the only one. [verified: `backend/app/db/fixtures/kewaunee.py`]
+The Brief Reader is a planned fourth agent that drafts the brief from the agreement, with a verbatim quote for every field. Code checks each quote, and the controller approves the brief before mapping starts. [verified: `decisions.md` D20; not built]
+
+Example: PNC's limit is "less than 2.50 to 1.00" in Section 4.8(a) of Ex 10.1. [verified: filing]
+The amounts of the add-backs, such as the $4,019K pension charge, come from the 10-K, not the agreement. [verified: source file]
+
 ## Buy-and-build (roll-up)
 
 Buy-and-build is a private equity plan.

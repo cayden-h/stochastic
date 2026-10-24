@@ -14,6 +14,7 @@ A real deployment would use signed tokens.
 | Actor | Who it is |
 | --- | --- |
 | `agent:mapper`, `agent:preparer`, `agent:reviewer` | The three agents. Each has its own permission set. |
+| `agent:brief_reader` (planned, D20) | The Brief Reader. It may store a draft brief (`propose:draft_brief`) and call the read-only tools `get_section` and `get_definition`, nothing else. See `brief-reader.md`. |
 | `human:controller` | The portfolio controller. |
 | `system:gateway` | The gateway itself. It posts, opens work items, and runs what-if tool calls for flag effects. |
 
