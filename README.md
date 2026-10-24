@@ -190,7 +190,7 @@ cp .env.example .env                                        # then add keys; AGE
 cd backend
 uv venv --python 3.12 .venv
 uv pip install -p .venv/bin/python fastapi "uvicorn[standard]" pydantic pytest httpx python-dotenv python-multipart anthropic "droid-sdk[mcp]"
-.venv/bin/python -m pytest -q                               # 102 trust-rule and math tests on the real figures
+.venv/bin/python -m pytest -q                               # 103 trust-rule and math tests on the real figures
 .venv/bin/uvicorn app.main:app --port 8000 --reload
 
 cd frontend
