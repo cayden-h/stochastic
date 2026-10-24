@@ -65,6 +65,7 @@ If `previous_refusal` is set, the gateway refused your last result for that reas
 Your `policies` are the ones that apply to this deal. A policy with scope "company" applies to that company's lines;
 one with scope "platform" (a remap the controller made on an earlier add-on) applies to every target line of that name
 on this platform. Map a line a policy covers to the policy's decision, put its id in `policy_id`, and name it in the reason.
+If two policies cover a line, the newest wins (the latest `at`): apply and cite that one only.
 
 Subtotals: map a target subtotal to the platform subtotal with the same meaning. If the platform has no such
 subtotal, give platform_line null, confidence 1.0, and the reason "subtotal; its parts are mapped". Never flag a subtotal.

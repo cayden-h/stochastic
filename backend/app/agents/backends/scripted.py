@@ -29,6 +29,7 @@ from app.core.models import (
     ReviewerOutput,
     ToolRun,
 )
+from app.core.policies import newest_covering
 from app.tools.finance import to_thousands
 
 CallTool = Callable[[str, dict], ToolRun]
@@ -53,21 +54,9 @@ def reason_chips(deal_id: str, kind: str) -> list[ReasonChip]:
     return list(REASON_CHIPS.get(deal_id, DEMO_REASON_CHIPS)[kind])
 
 
-def policy_applies(p: Policy, company: str, platform: str, target: str) -> bool:
-    """The scope rule, the same one the gateway enforces: a company policy applies to its own company's lines only,
-    and a platform policy (a remap edit, kind mapping) to the add-on lines of the platform it names."""
-    if p.retired_by:
-        return False
-    if p.scope == "platform":
-        return p.kind == "mapping" and p.platform == platform and company == target
-    return p.company is not None and p.company == company
-
-
 def _policy_for(inp: MapperInput, kind: str, company: str, key: str) -> Policy | None:
-    """The newest live policy of this kind for this line, so a later correction wins over an earlier answer."""
-    hits = [p for p in inp.policies if p.kind == kind and p.pattern == key
-            and policy_applies(p, company, inp.platform, inp.target)]
-    return max(hits, key=lambda p: p.at) if hits else None
+    """The newest live policy covering this line (app/core/policies.py), the same rule the gateway enforces."""
+    return newest_covering(inp.policies, kind, key, company, inp.platform, inp.target)
 
 
 def _policy_reason(pol: Policy) -> str:
@@ -150,7 +139,6 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
     mappings: list[MappingProposal] = []
     flags: list[FlagProposal] = []
     tags: list[LineTag] = []
-
     for t in inp.target_lines:
         key = t.line.strip().lower()
         names = _platform_names(inp, t.section)

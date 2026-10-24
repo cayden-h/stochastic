@@ -65,7 +65,9 @@ A policy has a `scope`.
 Flag answers make `company` policies, which apply only to the company whose line they were learned on (D18).
 Remap edits (D19) make `platform` policies, which apply to every add-on of the platform named in `Policy.platform`.
 The job runner gives the Mapper only the live policies whose scope covers the deal (`Gateway.policies_for`), so a model never sees another company's answers.
-When two policies cover a line, the scripted Mapper applies the newest, so a later correction wins over an earlier answer.
+When two policies cover a line, the newest wins, so a later correction beats an earlier answer: the scripted Mapper applies it, the Mapper prompt says so, and the gateway accepts a cited policy only if it is the newest covering the line.
+Each remembered remap learns its own policy and never updates an older one, so reverting it makes the older one effective again.
+Company and platform names are compared casefolded and stripped. The rule is in `backend/app/core/policies.py`, shared by the gateway and the scripted Mapper.
 A line mapped by a platform policy cites it in its reason and carries its id in `Mapping.policy_id`, so the Learned chip shows it on the next deal.
 Each role has an `AgentSession` (backend, session id, turns, a short transcript).
 `POST /dev/reset` keeps both unless `keep_memory=false`.
@@ -300,10 +302,28 @@ The edit is recorded on top of the agents' run, never over it: the source lines 
 A remap does not write a new `Mapping`; the edit itself carries the new platform line, and the edit-aware `consolidate` applies it.
 The recompute (`Gateway._recompute`) runs as `system:gateway`: `consolidate`, `ebitda`, `covenant_debt` (not naive), `leverage`, `tie_out`, `limit_test`.
 Every run is new, and the edit-aware runs carry `edit_ids` (the live edits) in their inputs.
-Only the gateway may pass `edit_ids` to a tool, and only to `consolidate`, `ebitda`, `covenant_debt`, and `tie_out`.
+Only the gateway may pass `edit_ids` to a tool, and only to `consolidate`, `ebitda`, and `covenant_debt`.
+`tie_out` takes no edits: its rows come from the edited `consolidate` run, so applying the edits again would double count.
 If those tools do not take `edits` yet (Tri's T1), the edit is refused with 503 ("edit-aware tools not installed (T1)") and nothing is kept.
-The new result has `supersedes` (the result it replaces), `edit_ids`, a `review` read from the `tie_out` and `limit_test` runs, and `run_ids_by_tool` for all six tools.
-The new approval item is proposed by the Preparer, as before, and is `PROPOSED` when both checks pass, `NEEDS_INFO` otherwise.
+When a covenant flag gave the whole-line reading, the recompute also runs that what-if again on the edited books: `covenant_debt` naive with the flagged lines tagged debt (restored after), `ebitda` as filed, and `leverage`, each with `what_if: "whole_line"`.
+The new result has `supersedes` (the result it replaces), `edit_ids`, a `review` read from the `tie_out` and `limit_test` runs, and `run_ids_by_tool` for the six tools plus `naive_covenant_debt`, `naive_ebitda`, and `naive_leverage` when the what-if ran.
+For Tri: `_whole_line_runs` in `routes.py` still reads the whole-line runs from the covenant flag's option, so the `/case` sensitivity figures do not show edits yet. It should prefer `result.run_ids_by_tool["naive_covenant_debt"]` and `["naive_ebitda"]` when the latest result has them.
+The new approval item is proposed by `system:gateway`, because the revision is the gateway's recompute; the controller approves it, so maker-checker holds. It is `PROPOSED` when both checks pass, `NEEDS_INFO` otherwise.
+
+### The T1 contract (edit-aware tools)
+
+```python
+consolidate(platform_lines, target_lines, mappings, edits=None)
+ebitda(platform_lines, target_lines, brief, as_filed=False, edits=None)
+covenant_debt(platform_lines, target_lines, brief, naive=False, edits=None)
+tie_out(rows, tolerance=0.5)  # unchanged: no edits
+```
+
+- `edits` is a list of `Edit` models: the live edits only, in the order they were made.
+- An `amount` edit names its line by `company`, `line`, and `section`, and carries `new_value` in USD thousands. Source lines keep their filed unit (Nu Aire files whole dollars), so the tool converts with `to_thousands` before it compares or replaces.
+- An amount edit on an income statement line must move the figures that depend on it; for example (500) of G&A raises Net Income, so covenant EBITDA rises by 500.
+- A `remap` edit carries `new_platform_line`. The agents' `Mapping` is not changed, so `consolidate` must move that target line to the new platform line itself.
+- Each of the three tools returns `edits_applied: list[str]`, the ids of the edits it used. The gateway refuses the recompute (a DENIED `edit:apply` or `edit:revert` row) if the key is missing, names an edit it was not given, repeats an id, or, for `consolidate`, leaves out any live edit.
 The old approval item becomes `SUPERSEDED` (a new `State`) and stays in the log.
 
 Audit rows of an edit:
@@ -315,7 +335,6 @@ Audit rows of an edit:
 | `create:approve_result` | `system:gateway` | new approval item | After every recompute. |
 | `edit:reason` | `human:controller` | edit id | The reason is given. |
 | `policy:learn` | `system:gateway` | policy or adjustment id | A remembered reason; the reason starts with `source: edit <id>`. |
-| `policy:update` | `system:gateway` | policy id | A remembered remap on a line that already has a live platform policy. |
 | `edit:revert` | `human:controller` | edit id | The edit is undone. |
 | `policy:retire` | `system:gateway` | policy or adjustment id | Its edit was reverted. |
 
