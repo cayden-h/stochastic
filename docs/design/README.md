@@ -1,13 +1,31 @@
 # Design
 
-## Status of the mockups
+## Current UI: Hi-fi v3 (start here)
 
-The Figma mockups were made for an earlier four-screen workflow.
-The console now needs one working screen: the flag card, the combined table, the verdict line, and a log link.
-Josie decides what to keep from the mockups.
+The latest UI is the `Hi-fi - v3` page of the team file, Schocastic: https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-2 [verified: Cayden, 2026-10-24 evening]
+Use it whenever you need to look back at the UI.
+Every screen is 1440 by 900, with a 240 px sidebar (deal, Dashboard, Case, Mapping, Agents, Log, the model, and the "Always learning from" counters for human answers and policies).
+
+| Frame | Shows | Link |
+| --- | --- | --- |
+| V3-1 Dashboard | The cases, with stage, verdict, and updated time | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-3 |
+| V3-2 Dashboard, upload | The upload modal | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-119 |
+| V3-3 Case | The flag card with the three readings, the verdict, the combined books, and Mapping, Review, and Log tiles | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-35 |
+| V3-4 Mapping | Target line, platform line, and confidence, filtered by All, Unsure, or By policy | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-195 |
+| V3-5 Log | The audit log | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-379 |
+| V3-6 Agents | The three agents | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=146-149 |
+
+Other pages in the same file:
+- `Components` (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=487-1681): the components behind v3.
+- `Technologies Used` (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2): material for the pitch deck and the pitches, not the UI. See "Team board" below.
+- `Hi-fi - v1`, `Hi-fi - v2`, `Wireframes + Ideation`, `Ideation`, and `3D Mockup`: earlier work, kept as history.
+
+The D19 additions (editable cells, the reason bubble, the companion) are specified in `review-companion.md` and go on top of V3-3 and V3-4.
 The tokens and rules below still apply.
 
-## Earlier four-screen design
+## Earlier four-screen design (history)
+
+Everything from here to "Team board" describes the first file, before Hi-fi v3.
 
 The reviewer console has four screens and one look, called "Paper and ink".
 The research behind it is in `ui-ux-research.md`.
@@ -30,8 +48,8 @@ All numbers in the mockups are illustrative placeholders. They are not engine ou
 
 ## Team board (Schocastic)
 
-File: https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi (Schocastic).
-Its `technologies` page (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2) holds one area per track: Tiger Data, Factory, Workflow, Tech stack, Research, and How it works.
+File: https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi (Schocastic). It holds the current UI (Hi-fi v3, above) and the pitch material.
+Its `Technologies Used` page is for the pitch deck and the pitches. It (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2) holds one area per track: Tiger Data, Factory, Workflow, Tech stack, Research, and How it works.
 Each item there is a card: a real screenshot (12 px corners, light stroke, soft shadow, dark backing at FIT), a DM Sans SemiBold 20 title, and a DM Sans Regular 15 description.
 Add new evidence as cards in the same style, by cloning an existing card.
 

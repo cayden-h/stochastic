@@ -16,7 +16,7 @@ Inputs for the design (2026-10-24):
 - Memory: a small "learned" chip on a mapping or a tag whose reason starts with "Policy". After a reset, Run again shows no flag; that is a moment worth one visible state.
 - The audit log link: `GET /deals/{id}/audit`, with `chain_valid`, and DENIED rows in red if any.
 - Coming from the backend on 2026-10-24 (each owner tells you when it lands): a Download certificate button for `GET /deals/{id}/certificate` (Tri), a fork id and state on each flag option (Cayden), the store badge from `GET /health` `store.kind` (`memory` or `postgres`), and a sensitivity line on the verdict (Tri).
-- The design rules are in `design/README.md`. The Figma file is https://www.figma.com/design/KDbPUruO6f5oPLyzyLgUZh. The Figma track needs the frame on screen in the pitch.
+- The design rules are in `design/README.md`. The current UI is the `Hi-fi - v3` page of the Schocastic file (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-2); the older Reviewer Console file is history. The Figma track needs the frame on screen in the pitch.
 
 ## Changed in your folder on 2026-10-24 evening (Cayden's agent, commit 3938ca9 on `cayden/risk-fixes`)
 
