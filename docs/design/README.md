@@ -28,6 +28,22 @@ File: https://www.figma.com/design/KDbPUruO6f5oPLyzyLgUZh (Stochastic - Reviewer
 The file holds one variable collection (`Tokens`), seven text styles, and five local components: Actor Chip, Button, Source Chip, Verdict, and Log Row.
 All numbers in the mockups are illustrative placeholders. They are not engine output and not from real filings.
 
+## Team board (Schocastic)
+
+File: https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi (Schocastic).
+Its `technologies` page (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2) holds one area per track: Tiger Data, Factory, Workflow, Tech stack, Research, and How it works.
+Each item there is a card: a real screenshot (12 px corners, light stroke, soft shadow, dark backing at FIT), a DM Sans SemiBold 20 title, and a DM Sans Regular 15 description.
+Add new evidence as cards in the same style, by cloning an existing card.
+
+The Tiger Data area has five rows of cards.
+Rows 1 to 3 hold the service, the schema, the hypertable, the hash chain, the fork, and the CLI and docs.
+Rows 4 and 5 (added 2026-10-24 afternoon) show the SQL read side and the console:
+- Row 4: `ledger_runs`, the BM25 search, and the `audit_activity` continuous aggregate, each captured in the Tiger Cloud SQL Editor.
+- Row 5: the columnstore and refresh jobs, the Toolkit `run_stats`, and two captures of the running console (the TIGER CLOUD badge, and the FORK rows in the log).
+
+All captures are from 2026-10-24, ledger 23.
+The run statistics are a snapshot and change with each run.
+
 ## Screens
 
 | Screen | One job | Primary action |

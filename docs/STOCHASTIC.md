@@ -312,7 +312,11 @@ Tiger Data:
 - The store runs on Tiger Cloud (`STORE=postgres`): every gateway write reaches Postgres, and a restart loads the record, the audit log, and the agents' memory back. [verified: `backend/tests/test_postgres_store.py`]
 - The audit log is a TimescaleDB hypertable that refuses UPDATE and DELETE. A reset starts a new ledger, so nothing is deleted.
 - Forks: each covenant flag's what-ifs go to a zero-copy fork of the ledger, and the answer deletes it. The flag card says "What-ifs held in Tiger fork ..." and the log has the three FORK rows. [verified: live run 2026-10-24 09:00; `backend/tests/test_whatif_forks.py`]
-- Show it in the pitch: the "Tiger Cloud" badge, the fork line on the flag card, then the `ledger` and `audit_log` tables in SQL after a restart.
+- Read in SQL (built 2026-10-24 afternoon, `ANALYTICS_SQL` in `backend/app/db/postgres.py`): a real-time continuous aggregate `audit_activity` (rows per minute by ledger, actor, and action), a columnstore policy that turns audit chunks older than a day columnar (one ledger per segment; the append-only trigger still holds), BM25 keyword search over every record with pg_textsearch (`ORDER BY search_text <@> 'seller notes'`), typed views `covenant_runs` (every limit test with its debt, EBITDA, and what-if option) and `ledger_runs` (one row per run: seconds, flags, policies applied, stage), and `run_stats` from the TimescaleDB Toolkit (mean, stddev, p50, p95 of a run). [verified: `test_the_record_reads_in_sql_and_survives_the_columnstore`, and on the live `stochastic` schema 2026-10-24]
+- The learning shows in SQL: in `ledger_runs`, a run with agent memory cleared raises 2 flags, and the next run with memory kept raises 0 and applies 6 policies. [verified: ledgers 19 to 23]
+- The Tiger MCP queries the demo database (password saved with `tiger db save-password` on 2026-10-24), so Claude can answer questions about the ledger live.
+- The team board in Figma (Schocastic, `technologies` page) has two rows of Tiger cards for this: SQL Editor captures of these views, and two console captures (`design/README.md`).
+- Show it in the pitch: the "Tiger Cloud" badge, the fork line on the flag card, then the `ledger` and `audit_log` tables in SQL after a restart, then `ledger_runs` and one BM25 search.
 - Open: whether forks for comparing two flag answers are worth building this weekend (see `sponsors/tiger-data.md`).
 Cal Hacks has not confirmed that one project can opt into several sponsor tracks. Ask at kickoff.
 

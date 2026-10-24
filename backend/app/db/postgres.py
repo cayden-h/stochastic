@@ -11,6 +11,8 @@ memory (policies and sessions). The hash chain is checked again after a load (`G
 The audit log is a TimescaleDB hypertable on `at`, and a trigger refuses UPDATE and DELETE on it.
 A demo reset starts a new ledger instead of deleting anything, so earlier ledgers stay in the database.
 Agent memory belongs to no ledger (ledger 0) and survives a reset unless `keep_memory=false`.
+`ANALYTICS_SQL` adds the SQL read side on Tiger features: a continuous aggregate, a columnstore policy, BM25
+search, typed views, and run statistics from the Toolkit.
 """
 from __future__ import annotations
 
@@ -100,6 +102,106 @@ CREATE OR REPLACE VIEW current_audit_log AS
     SELECT * FROM audit_log WHERE ledger = (SELECT max(id) FROM ledger) ORDER BY id;
 """
 
+# Reading the record in SQL, on Tiger Cloud features. The store never reads these; they are for the people and
+# the agents who query the database (psql, the Tiger MCP). Each part that needs an extension is skipped with a
+# notice when the extension is missing. Extensions go in `public`, never in the store's schema, because a test
+# drops its schema with CASCADE.
+ANALYTICS_SQL = """
+-- Typed views over the jsonb record: every limit test, and one row per ledger (one run of the demo).
+-- Dropped and made again on each start, so a change to a view's columns never blocks the migration.
+DROP VIEW IF EXISTS run_stats, ledger_runs, covenant_runs;
+CREATE VIEW covenant_runs AS
+    SELECT t.ledger, t.id AS run_id, (t.body->>'at')::timestamptz AS at, t.body->>'actor' AS actor,
+           coalesce((d.body->'inputs'->>'naive')::boolean, false) AS naive, d.body->'inputs'->>'what_if' AS what_if,
+           (d.body->'outputs'->>'debt')::numeric AS debt, (e.body->'outputs'->>'ebitda')::numeric AS ebitda,
+           (t.body->'outputs'->>'leverage')::numeric AS leverage, (t.body->'outputs'->>'limit')::numeric AS "limit",
+           (t.body->'outputs'->>'headroom_turns')::numeric AS headroom_turns, t.body->'outputs'->>'verdict' AS verdict,
+           l.id AS leverage_run_id, d.id AS debt_run_id, e.id AS ebitda_run_id
+    FROM record t
+    LEFT JOIN record l ON l.ledger = t.ledger AND l.kind = 'tool_run' AND l.id = t.body->'inputs'->>'leverage_run_id'
+    LEFT JOIN record d ON d.ledger = t.ledger AND d.kind = 'tool_run' AND d.id = l.body->'inputs'->>'debt_run_id'
+    LEFT JOIN record e ON e.ledger = t.ledger AND e.kind = 'tool_run' AND e.id = l.body->'inputs'->>'ebitda_run_id'
+    WHERE t.kind = 'tool_run' AND t.body->>'tool' = 'limit_test';
+CREATE VIEW ledger_runs AS
+    SELECT l.id AS ledger, l.started_at, l.reason, a.first_at, a.last_at,
+           extract(epoch FROM a.last_at - a.first_at)::numeric(10, 3) AS seconds, a.audit_rows, a.flags, a.answers,
+           a.policies_applied, coalesce(d.body->>'stage' = 'posted', false) AS posted, d.body->>'stage' AS stage,
+           res.body->>'verdict' AS verdict, (res.body->>'leverage')::numeric AS leverage
+    FROM ledger l
+    LEFT JOIN (SELECT ledger, min(at) AS first_at, max(at) AS last_at, count(*) AS audit_rows,
+                      count(*) FILTER (WHERE action = 'ask:flag') AS flags,
+                      count(*) FILTER (WHERE action = 'answer') AS answers,
+                      count(*) FILTER (WHERE action = 'policy:apply') AS policies_applied
+               FROM audit_log GROUP BY ledger) a ON a.ledger = l.id
+    LEFT JOIN record d ON d.ledger = l.id AND d.kind = 'deal'
+    LEFT JOIN LATERAL (SELECT body FROM record WHERE ledger = l.id AND kind = 'result' ORDER BY pos DESC LIMIT 1) res
+        ON true;
+
+-- Continuous aggregate: what each actor did, per minute, per ledger. Real time, so the newest rows count too.
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM timescaledb_information.continuous_aggregates
+                   WHERE view_schema = current_schema() AND view_name = 'audit_activity') THEN
+        CREATE MATERIALIZED VIEW audit_activity WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
+            SELECT time_bucket(INTERVAL '1 minute', at) AS bucket, ledger, actor, action, count(*) AS rows
+            FROM audit_log GROUP BY bucket, ledger, actor, action WITH NO DATA;
+        PERFORM add_continuous_aggregate_policy('audit_activity', start_offset => NULL,
+            end_offset => INTERVAL '1 minute', schedule_interval => INTERVAL '5 minutes');
+    END IF;
+END $$;
+
+-- Columnstore: chunks older than a day go columnar, one ledger per segment. The append-only trigger still holds,
+-- and inserts into a converted chunk still work.
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_schema = current_schema()
+                   AND hypertable_name = 'audit_log' AND compression_enabled) THEN
+        ALTER TABLE audit_log SET (timescaledb.enable_columnstore = true, timescaledb.segmentby = 'ledger',
+                                   timescaledb.orderby = 'id');
+    END IF;
+END $$;
+CALL add_columnstore_policy('audit_log', after => INTERVAL '1 day', if_not_exists => true);
+
+-- Run statistics from the TimescaleDB Toolkit: how long a full run takes, over every ledger that was posted.
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'timescaledb_toolkit') THEN
+        CREATE EXTENSION IF NOT EXISTS timescaledb_toolkit SCHEMA public;
+        CREATE OR REPLACE VIEW run_stats AS
+            SELECT num_vals(s) AS runs, round(average(s)::numeric, 3) AS mean_seconds,
+                   round(stddev(s)::numeric, 3) AS stddev_seconds,
+                   round(approx_percentile(0.5, p)::numeric, 3) AS p50_seconds,
+                   round(approx_percentile(0.95, p)::numeric, 3) AS p95_seconds
+            FROM (SELECT stats_agg(seconds::float8) AS s, percentile_agg(seconds::float8) AS p
+                  FROM ledger_runs WHERE posted) agg;
+    ELSE
+        RAISE NOTICE 'timescaledb_toolkit is not available: no run_stats view';
+    END IF;
+END $$;
+
+-- BM25 keyword search (pg_textsearch) over the text of every record: line names and notes, mapping reasons,
+-- flag questions, and policies. Query: ORDER BY search_text <@> 'lease' LIMIT 10 (lower is a better match).
+-- A column made by an earlier version (without the whitespace cleanup) is replaced; the index goes with it.
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_attribute a JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+               WHERE a.attrelid = 'record'::regclass AND a.attname = 'search_text'
+               AND pg_get_expr(d.adbin, d.adrelid) NOT LIKE '%regexp_replace%') THEN
+        ALTER TABLE record DROP COLUMN search_text;
+    END IF;
+END $$;
+ALTER TABLE record ADD COLUMN IF NOT EXISTS search_text text GENERATED ALWAYS AS (btrim(regexp_replace(
+    coalesce(body->>'line', '') || ' ' || coalesce(body->>'note', '') || ' ' ||
+    coalesce(body->>'covenant_note', '') || ' ' || coalesce(body->>'platform_line', '') || ' ' ||
+    coalesce(body->>'target_line', '') || ' ' || coalesce(body->>'reason', '') || ' ' ||
+    coalesce(body->>'question', '') || ' ' || coalesce(body->>'pattern', '') || ' ' ||
+    coalesce(body->>'name', ''), '\\s+', ' ', 'g'))) STORED;
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_textsearch') THEN
+        CREATE EXTENSION IF NOT EXISTS pg_textsearch SCHEMA public;
+        CREATE INDEX IF NOT EXISTS record_search ON record USING bm25 (search_text) WITH (text_config = 'english');
+    ELSE
+        RAISE NOTICE 'pg_textsearch is not available: no BM25 index on record';
+    END IF;
+END $$;
+"""
+
 UPSERT = """
 INSERT INTO record (ledger, kind, id, deal_id, pos, body) VALUES (%s, %s, %s, %s, %s, %s::jsonb)
 ON CONFLICT (ledger, kind, id) DO UPDATE SET body = EXCLUDED.body, deal_id = EXCLUDED.deal_id, updated_at = now()
@@ -175,6 +277,14 @@ class PostgresStore(MemoryStore):
         with self._conn.transaction():
             self._conn.execute(f"CREATE SCHEMA IF NOT EXISTS {self.schema}")
             self._conn.execute(SCHEMA_SQL)
+        # The SQL read side is extra: if it fails, the store still runs on Postgres, and /health says why.
+        try:
+            with self._conn.transaction():
+                self._conn.execute(ANALYTICS_SQL)
+            self._info["analytics_error"] = None
+        except psycopg.Error as error:
+            self._info["analytics_error"] = f"{type(error).__name__}: {error}".strip()[:300]
+            log.warning("analytics SQL skipped, the store runs without it: %s", error)
 
     def _load(self) -> int:
         """Load the latest ledger and the agent memory into the working set. Returns the ledger id."""

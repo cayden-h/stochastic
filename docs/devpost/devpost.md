@@ -79,6 +79,7 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 - Droid runs each agent in an empty directory with only our gateway tools allowed (`restrict_tools`) and a typed output. [verified: `docs/agents.md`, section 7]
 - The store is Postgres on Tiger Cloud: every gateway write goes through to it, the audit log is a TimescaleDB hypertable that refuses UPDATE and DELETE, and a restart loads the record, the log, and the agents' memory back. [verified: `backend/tests/test_postgres_store.py`]
 - Each covenant flag's what-ifs go to a zero-copy fork of the ledger on Tiger Cloud, made in about 35 s, so the live record never holds a hypothetical. The controller's answer keeps one option and deletes the fork. [verified: `backend/tests/test_whatif_forks.py`, live run 2026-10-24]
+- The record is readable in SQL on Tiger features: BM25 keyword search over every line, reason, flag, and policy (pg_textsearch), a real-time continuous aggregate of the audit log, a columnstore policy on the audit log, and run statistics from the TimescaleDB Toolkit. One view, `ledger_runs`, shows the learning: with agent memory cleared the Mapper asks 2 questions, and with memory kept it asks none and applies 6 policies. [verified: `test_the_record_reads_in_sql_and_survives_the_columnstore`, live ledgers 19 to 23]
 - Backend: Python 3.12, FastAPI, Pydantic, Uvicorn, pytest. [verified: `backend/pyproject.toml`]
 - Console: Next.js 16, React 19, TypeScript, Tailwind CSS 4. [verified: `frontend/package.json`]
 - Design: the Figma file "Stochastic - Reviewer Console" holds a `Tokens` variable collection, seven text styles, five components, and four screen frames. [verified: `docs/design/README.md`]
@@ -95,7 +96,7 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 
 ## Accomplishments that we're proud of
 
-- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 125 tests pass, plus 5 against Tiger Cloud]
+- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 150 tests pass, plus 9 against Tiger Cloud]
 - The flag is real. It comes from a real line in a real filing, and the answer moves the leverage verdict. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 - The whole deal ran through Factory Droid with our gateway tools, once with Claude Sonnet 5.5 and once with Claude Haiku 5.5 requested, and both passed review at 0.77x as computed then; the Sonnet recording replays at 0.76x today, after the EBITDA definition items were applied. [verified: `docs/agents.md`, run log]
 - After a reset, the same deal runs with no flag, because the Mapper applies the controller's policy, and the log shows `policy:apply`. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
@@ -119,7 +120,7 @@ None is built.
 
 ## Built with
 
-Python, FastAPI, Pydantic, Uvicorn, pytest, Factory Droid SDK, Claude, Anthropic Python SDK, Tiger Cloud (PostgreSQL, TimescaleDB), psycopg, Next.js, React, TypeScript, Tailwind CSS, Figma.
+Python, FastAPI, Pydantic, Uvicorn, pytest, Factory Droid SDK, Claude, Anthropic Python SDK, Tiger Cloud (PostgreSQL, TimescaleDB, TimescaleDB Toolkit, pg_textsearch), Tiger CLI, Tiger MCP, psycopg, Next.js, React, TypeScript, Tailwind CSS, Figma.
 All are in `backend/pyproject.toml`, `frontend/package.json`, or `docs/design/README.md`. [verified]
 The Anthropic SDK backend is written but has not run live, because no key was available. [verified: `docs/agents.md`, section 10]
 
@@ -169,9 +170,18 @@ Claim nothing unconfirmed.
 - Hyphenate: select it on Devpost. One-line seat: "A portfolio controller at a PE-backed company, right after an add-on closes."
 - Factory: the agents ran through the Droid SDK on 2026-10-24, with Sonnet 5.5 and Haiku 5.5 requested. [verified: `docs/agents.md`, run log]
   Say "built with the Droid SDK" only about `droid` runs.
-- Figma: the console's design system and screen frames are in the Figma file. [verified: `docs/design/README.md`]
-- Tiger Data: the record, the audit log, and the agents' memory are stored in Postgres on Tiger Cloud, and the audit log is a TimescaleDB hypertable that refuses edits. Each covenant flag's what-ifs live in a zero-copy fork of the ledger, made in about 35 s and deleted by the answer. [verified: `backend/tests/test_postgres_store.py`, `backend/tests/test_whatif_forks.py`]
+- Figma: the console's design system and screen frames are in the Figma file. The team board (Schocastic) has a card per piece of evidence for each track, including Tiger Data. [verified: `docs/design/README.md`]
+- Tiger Data: the record, the audit log, and the agents' memory are stored in Postgres on Tiger Cloud, and the audit log is a TimescaleDB hypertable that refuses edits. Each covenant flag's what-ifs live in a zero-copy fork of the ledger, made in about 35 s and deleted by the answer. The record is searchable with BM25, and the runs are readable in SQL through a continuous aggregate, typed views, and Toolkit statistics. [verified: `backend/tests/test_postgres_store.py`, `backend/tests/test_whatif_forks.py`]
   Say how the shipped screen was built from it only once Josie confirms.
+
+## Images for the gallery
+
+- `images/tiger-ledger-runs.png`: `ledger_runs` in the Tiger Cloud SQL Editor. With agent memory cleared, the Mapper asks 2 questions. With memory kept, it asks none and applies 6 policies.
+- `images/tiger-bm25.png`: one BM25 search over the record in the Tiger Cloud SQL Editor.
+- `images/console-tiger-badge.png`: the console after a posted run, with the TIGER CLOUD badge in the top bar.
+- `images/console-log-forks.png`: the log, with the three FORK rows of one covenant flag and the policies learned from the answer.
+
+All four are from 2026-10-24, ledger 23. [verified]
 
 ## Open before submission
 

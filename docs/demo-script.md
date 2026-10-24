@@ -185,6 +185,43 @@ Also found: Droid accepts an unknown model id without an error, so a wrong `DROI
 
 Checked on 2026-10-24 08:09: every top-level field of `GET /deals/{id}/case` was identical before and after the restart, and the restarted process had no runs of its own.
 
+### Tiger in SQL (optional, 30 seconds, for the Tiger Data judges)
+
+Use this part only when a Tiger Data judge is at the table, or when a judge asks where the data lives.
+Open `psql` on the `stochastic` service before the table opens (`tiger db psql p4a7k2ox3x`).
+The views are made by `ANALYTICS_SQL` in `backend/app/db/postgres.py`.
+
+1. Show the learning, one row per run:
+
+   ```sql
+   SELECT ledger, reason, flags, answers, policies_applied, stage, leverage
+   FROM stochastic.ledger_runs ORDER BY ledger DESC LIMIT 4;
+   ```
+
+   Words: "Each reset is a new ledger, and nothing is erased. With memory cleared, the Mapper asks two questions. With memory kept, it asks none and applies six policies. The leverage is the same."
+
+2. Show one BM25 search over the record:
+
+   ```sql
+   SELECT kind, id, left(search_text, 70) AS text
+   FROM stochastic.record WHERE ledger = (SELECT max(id) FROM stochastic.ledger)
+   ORDER BY search_text <@> 'seller notes subordinated' LIMIT 4;
+   ```
+
+   Words: "This is BM25 ranking with pg_textsearch, over every line, mapping reason, flag, and policy. The seller notes line comes first, and the flag that asked about it comes second."
+
+3. If there is time, show the measured number:
+
+   ```sql
+   SELECT * FROM stochastic.run_stats;
+   ```
+
+   Words: "This uses the TimescaleDB Toolkit over every posted run. The time includes the time that the controller took to answer."
+
+Other objects to name if asked: the continuous aggregate `audit_activity` (rows per minute by actor), and the columnstore policy on `audit_log` (chunks older than one day are columnar).
+Live on 2026-10-24: 23 ledgers, 12 posted runs, mean 98 s, p50 84 s, p95 465 s. [verified]
+The Tiger MCP can run the same queries from Claude Code. [verified: 2026-10-24]
+
 Rules for failure:
 - Never hide a failure. Say it in one short line and move on. The backend badge on screen already says what ran.
 - Say "built with the Factory Droid SDK" only about runs that went through the `droid` backend. [verified: `architecture/gateway-and-api.md`]
