@@ -1,5 +1,6 @@
 // Shapes returned by the gateway API. See docs/architecture/gateway-and-api.md, "The case shape".
-export type State = "NEW" | "PROPOSED" | "NEEDS_INFO" | "APPROVED" | "REJECTED" | "POSTED" | "REVERSED";
+/** SUPERSEDED: an approval item a review edit replaced (D19); it stays in the log. */
+export type State = "NEW" | "PROPOSED" | "NEEDS_INFO" | "APPROVED" | "REJECTED" | "POSTED" | "REVERSED" | "SUPERSEDED";
 /** The deal stages the gateway and the job runner set (backend/app/gateway, backend/app/agents/jobs.py). */
 export type Stage =
   | "new" | "mapping" | "awaiting_flag" | "mapped" | "flags_answered" | "preparing"
@@ -49,6 +50,8 @@ export interface Result {
   verdict: "ok" | "over_limit"; headroom_turns: number; tie_out_ok: boolean;
   review: { verdict: "pass" | "needs_attention"; reasons: string[]; run_ids: string[] } | null;
   run_ids: string[]; run_ids_by_tool: Record<string, string>; backend: Backend;
+  /** After a review edit: the result this one replaces, and the live edits it was computed with. */
+  supersedes?: string | null; edit_ids?: string[];
 }
 
 export interface Verdict {
@@ -72,11 +75,41 @@ export interface Case {
   deal: Deal; stage: Stage; source_lines: SourceLine[]; mappings: Mapping[]; flags: WorkItem[]; open_flags: string[];
   result: Result | null; verdict: Verdict | null; work_items: WorkItem[]; policies: Policy[]; sessions: unknown[];
   audit: { rows: number; chain_valid: boolean; denied: number }; backend: BackendStatus;
-  /** The controller's edits (D19). Absent until the edit API ships; the sidebar counts the reasoned ones. */
+  /** The controller's edits (D19), reverted ones included. Absent until Tri's T2 adds them to /case. */
   edits?: Edit[];
+  /** What reasoned amount edits taught (D19). */
+  adjustments?: LearnedAdjustment[];
 }
 
-export interface Edit { id: string; status: "pending" | "reasoned" | string; [key: string]: unknown }
+export type Section = SourceLine["section"];
+
+/** One change the controller made to the combined books, recorded on top of the agents' run (D19).
+ * `line` is the company's own source line name, not the combined row's platform line. Amounts in USD thousands. */
+export interface Edit {
+  id: string; deal_id: string; kind: "amount" | "remap"; company: string; line: string; section: Section;
+  old_value: number | null; new_value: number | null; old_platform_line: string | null; new_platform_line: string | null;
+  status: "needs_reason" | "reasoned" | "reverted"; reason_chip: number | null; reason_text: string | null;
+  remember: boolean; policy_id: string | null; adjustment_id: string | null; from_adjustment_id?: string | null;
+  actor: string; at: string; run_ids: string[];
+}
+
+export interface LearnedAdjustment {
+  id: string; deal_id: string; company: string; platform?: string | null; line: string; amount: number; reason: string;
+  edit_id: string; status: "applied" | "proposed" | "retired"; at: string;
+}
+
+/** A reason the bubble offers, id 0 to 2. Hardcoded per deal for the demo. */
+export interface ReasonChip { id: number; label: string }
+
+/** POST /deals/{id}/edits and DELETE /edits/{id}: the edit, the recomputed result and verdict, and the chips. */
+export interface EditResponse {
+  edit: Edit; result: Result; reasons: ReasonChip[]; approval?: WorkItem;
+  verdict: Pick<Verdict, "leverage" | "limit" | "verdict" | "headroom_turns" | "ebitda" | "debt" | "tie_out_ok" | "review" | "approval_item" | "approval_state">;
+}
+
+export type EditBody =
+  | { kind: "amount"; company: string; line: string; section: Section; value: number }
+  | { kind: "remap"; company: string; line: string; section: Section; platform_line: string };
 
 export interface StoreStatus {
   kind: "memory" | "postgres"; fallback_reason: string | null;

@@ -1,4 +1,4 @@
-import type { AuditResponse, Case, Deal, DealCreated, Health, ToolRun, WorkItem } from "./types";
+import type { AuditResponse, Case, Deal, DealCreated, Edit, EditBody, EditResponse, Health, ToolRun, WorkItem } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 /** The human seat. The gateway's default controller actor; every write carries it. */
@@ -19,9 +19,9 @@ async function errorText(res: Response): Promise<string> {
   return d?.message ?? d?.error ?? res.statusText;
 }
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
+async function post<T>(path: string, body?: unknown, method: "POST" | "DELETE" = "POST"): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json", "X-Actor": ACTOR },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -51,4 +51,17 @@ export const api = {
   createDeal,
   /** keepMemory=false clears the learned policies and sessions, so the next judge sees the flag again. */
   reset: (keepMemory = true) => post<{ ok: boolean }>(`/dev/reset?keep_memory=${keepMemory}`),
+  // Review edits (D19, Tri's T2): change an amount or remap a line, give the reason, undo.
+  edit: (dealId: string, body: EditBody) => post<EditResponse>(`/deals/${dealId}/edits`, body),
+  reason: (editId: string, reason: { chip: number } | { text: string }, remember: boolean) =>
+    post<Edit>(`/edits/${editId}/reason`, { ...reason, remember }),
+  revert: (editId: string) => post<EditResponse>(`/edits/${editId}`, undefined, "DELETE"),
 };
+
+/** The final files after approval: the workbook (Tri's T3) and the draft certificate. Absolute URLs. */
+export function finalFiles(deal: Deal): { url: string; name: string }[] {
+  return [
+    { url: `${API_URL}/deals/${deal.id}/export.xlsx`, name: `${deal.platform} + ${deal.target} combined books.xlsx` },
+    { url: `${API_URL}/deals/${deal.id}/certificate`, name: "Compliance certificate (draft).md" },
+  ];
+}
