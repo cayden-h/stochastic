@@ -155,7 +155,8 @@ Done when: the tests pass, and the demo beat in `design/review-companion.md` sec
 
 Status (2026-10-24 night, branch `cayden/edits`): the gateway side is built, and `backend/tests/test_edits.py` passes.
 Six figure tests skip with "needs T1 edit-aware tools" and run by themselves when Tri's T1 lands; until then an edit is refused with 503.
-Deviation on remap: the edit carries the new mapping, and `store_mapping` is not used, so the agents' `Mapping` is unchanged and a revert is lossless. The console must overlay `edits[]` on the mapping view.
+Deviation on remap: the edit carries the new mapping, and `store_mapping` is not used, so the agents' `Mapping` is unchanged and a revert is lossless.
+The console must overlay `edits[]` on the mapping view.
 The Preparer offers a learned adjustment on a later deal as a flag (apply or skip); applying it is an amount edit through the same recompute.
 Open: the curl run of the demo beat waits on T2.
 
@@ -164,9 +165,13 @@ Open: the curl run of the demo beat waits on T2.
 Build `architecture/brief-reader.md` sections 5 to 7, in the gateway and agent folders:
 - `roles.py`: `BRIEF_READER_ROLE` with the read-only tools `get_section(id)` and `get_definition(term)`.
 - `gateway.py`: `store_brief`, `_check_brief` (the nine checks in section 6), the `brief_field` branch in the flag answer, Brief approval, and the gates in `store_mapping` and `run_tool`.
-- `jobs.py`: the `draft_brief` step before mapping. The runner stops on open `brief_field` flags.
-- `runner.py` and `backends/scripted.py`: the scripted reader. On the Kewaunee Ex 10.1 text (matched by SHA-256), it returns the fixture Brief with Eric's quotes (E3). On any other text, it uses regex, with low confidence and flags.
-- Droid: run the reader live once on Sonnet 5.5 and record it to `backend/recordings/brief_reader.json` with `scripts/record_run.py`. Check whether `DROID_TIMEOUT` is enough.
+- `jobs.py`: the `draft_brief` step before mapping.
+  The runner stops on open `brief_field` flags.
+- `runner.py` and `backends/scripted.py`: the scripted reader.
+  On the Kewaunee Ex 10.1 text (matched by SHA-256), it returns the fixture Brief with Eric's quotes (E3).
+  On any other text, it uses regex, with low confidence and flags.
+- Droid: run the reader live once on Sonnet 5.5 and record it to `backend/recordings/brief_reader.json` with `scripts/record_run.py`.
+  Check whether `DROID_TIMEOUT` is enough.
 - `db/postgres.py`: the `agreement` kind and the new role.
 Done when: Tri's `test_brief_reader.py` passes (section 8), and a deal created from agreement text stops on the Brief, takes the controller's answers, and then maps.
 
@@ -175,14 +180,21 @@ Tri's T4 and Eric's E3 had not landed, so the ten section 8 behaviors are tested
 The Kewaunee quotes are in `data/brief/kewaunee_quotes.json`, extracted by Cayden's agent from the SEC copy of Ex 10.1 (each verbatim, under 15 words, with its section); Eric should check them against E3 and replace the file if his differ.
 The test agreement is `backend/tests/fixtures/kewaunee_ex101_excerpt.txt`, stitched from those quotes; the full text stays out of git.
 Droid, run once on Sonnet 5.5 over the full Ex 10.1 (10.8K characters of input): the whole script took about 51 s for two reader turns, so `DROID_TIMEOUT=75` is enough. [measured, 2026-10-25]
-Both drafts of that first run were refused: once by an extra rule (the limit's quote must repeat the debt term) that was then relaxed to "the limit is quoted from limit_section", and once for writing "THIS LOAN AGREEMENT" as "This Loan Agreement", which is correct. That run fell back to scripted, and nothing was kept.
-Second live run, after those fixes (2026-10-25, same settings, `DROID_TIMEOUT=75`): about 52 s for the script. The first draft was refused for a three-word quote ("any stock-based compensation"; the minimum is four). The runner's built-in retry with that reason then passed every check, in 23.7 s and 22,481 Factory credits for that turn (the refused turn's cost was not reported). It is pinned in `backend/recordings/brief_reader.json` (backend `droid`, input key matches the full Ex 10.1), and it replays through `store_brief` with no refusal.
-The Droid draft finds two items the hand-written fixture Brief leaves out: the add-back of Nu Aire's pro forma EBITDA and the deduction of extraordinary gains. It flags the 4.8(b) fixed charge covenant and the 2.00x threshold in 5.10(a) for seller note prepayments. One of its 18 quotes is 16 words; the gateway sets no upper limit, and the under-15 rule applies to the committed test excerpts.
+Both drafts of that first run were refused: once by an extra rule (the limit's quote must repeat the debt term) that was then relaxed to "the limit is quoted from limit_section", and once for writing "THIS LOAN AGREEMENT" as "This Loan Agreement", which is correct.
+That run fell back to scripted, and nothing was kept.
+Second live run, after those fixes (2026-10-25, same settings, `DROID_TIMEOUT=75`): about 52 s for the script.
+The first draft was refused for a three-word quote ("any stock-based compensation"; the minimum is four).
+The runner's built-in retry with that reason then passed every check, in 23.7 s and 22,481 Factory credits for that turn (the refused turn's cost was not reported).
+It is pinned in `backend/recordings/brief_reader.json` (backend `droid`, input key matches the full Ex 10.1), and it replays through `store_brief` with no refusal.
+The Droid draft finds two items the hand-written fixture Brief leaves out: the add-back of Nu Aire's pro forma EBITDA and the deduction of extraordinary gains.
+It flags the 4.8(b) fixed charge covenant and the 2.00x threshold in 5.10(a) for seller note prepayments.
+One of its 18 quotes is 16 words; the gateway sets no upper limit, and the under-15 rule applies to the committed test excerpts.
 
 ### C4. The console screens (after Josie's frames, with her review)
 
 Build the frames from Hi-fi v3 with the Figma MCP (`design/README.md` has the links), against `GET /deals/{id}/case`:
-- The v3 shell: a 240 px sidebar with the deal, the five pages, the model, and the "Always learning from" counters (Human answers, Policies, Edits). Leave 72 px at the top left for the macOS traffic lights.
+- The v3 shell: a 240 px sidebar with the deal, the five pages, the model, and the "Always learning from" counters (Human answers, Policies, Edits).
+  Leave 72 px at the top left for the macOS traffic lights.
 - V3-3 Case with the editable amount cells, the Your edits section, and Download final files (`review-companion.md` sections 3, 4, 7, and 8).
 - V3-4 Mapping with the Platform line dropdown and the Edited filter.
 - The Brief card at the start of a deal (D20 section 7, Frontend), when Josie has the frame.

@@ -680,7 +680,12 @@ def test_the_gateway_refuses_an_offer_it_would_not_make(flow):
             gw.store_result(PREPARER, item.id, out.model_copy(update={"adjustment_flags": bad}))
     assert not gw.open_adjustment_flags(second.id) and adj.status == "applied"
     gw.store_result(PREPARER, item.id, out)
-    assert gw.open_adjustment_flags(second.id)
+    assert not gw.open_adjustment_flags(second.id)  # not before the approval item exists: Apply would answer 409
+    advance(gw, second.id)  # the Reviewer passes, the approval item is PROPOSED, and the offer opens
+    approval = store.deal_items(second.id, "approve_result")[-1]
+    assert approval.state == State.PROPOSED and gw.open_adjustment_flags(second.id)
+    gw.answer(CONTROLLER, gw.open_adjustment_flags(second.id)[0].id, "apply")  # works at once, no 409
+    assert store.deal_edits(second.id)
 
 
 @needs_t1
