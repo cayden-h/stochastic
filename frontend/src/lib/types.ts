@@ -1,6 +1,9 @@
 // Shapes returned by the gateway API. See docs/architecture/gateway-and-api.md, "The case shape".
 export type State = "NEW" | "PROPOSED" | "NEEDS_INFO" | "APPROVED" | "REJECTED" | "POSTED" | "REVERSED";
-export type Stage = "new" | "awaiting_flag" | "mapped" | "flags_answered" | "awaiting_approval" | "posted" | string;
+/** The deal stages the gateway and the job runner set (backend/app/gateway, backend/app/agents/jobs.py). */
+export type Stage =
+  | "new" | "mapping" | "awaiting_flag" | "mapped" | "flags_answered" | "preparing"
+  | "awaiting_review" | "awaiting_approval" | "needs_attention" | "posted" | "run_failed";
 export type Backend = "scripted" | "anthropic" | "droid" | "replay" | string;
 
 export interface Evidence { quote: string; page: number | null; document_id: string | null }
@@ -88,3 +91,6 @@ export interface AuditRow {
 export interface AuditResponse { chain_valid: boolean; rows: AuditRow[] }
 
 export interface ToolRun { run_id: string; deal_id: string; tool: string; actor: string; inputs: Record<string, unknown>; outputs: Record<string, unknown>; at: string }
+
+/** POST /deals: the new deal's id, its stage, and the lines loaded per company. */
+export interface DealCreated { deal_id: string; stage: Stage; lines: { platform: number; target: number } }

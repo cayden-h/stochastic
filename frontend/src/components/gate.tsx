@@ -7,6 +7,17 @@ import { API_URL } from "@/lib/api";
 export function Gate({ children }: { children: React.ReactNode }) {
   const { error, kase, loading } = useDeal();
   if (loading) return <div className="px-[32px] py-[28px] text-slate">Loading the deal.</div>;
+  if (error?.kind === "no_deal") {
+    return (
+      <div className="drag flex flex-col gap-[12px] px-[32px] py-[28px]">
+        <h1 className="font-serif text-[32px] text-forest">No deal is loaded.</h1>
+        <p className="text-slate">The gateway at {API_URL} is running but holds no deal. Reset it to load the demo deal, then reload.</p>
+        <pre className="max-w-[640px] rounded-[12px] border border-line bg-white p-4 font-mono text-[12px]">
+          curl -X POST &apos;{API_URL}/dev/reset?keep_memory=false&apos;
+        </pre>
+      </div>
+    );
+  }
   if (error && kase) {
     // The API dropped after the first load: say so instead of leaving a stale screen that looks live.
     return (

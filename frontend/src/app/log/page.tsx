@@ -12,6 +12,18 @@ export default function Log() {
   const { audit, kase, refresh } = useDeal();
   const [deniedOnly, setDeniedOnly] = useState(false);
   const [verified, setVerified] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  /** Re-reads the chain. "Verified" is stamped only when the read came back; a failed read clears it. */
+  async function verify() {
+    setChecking(true);
+    try {
+      const ok = await refresh();
+      setVerified(ok ? clock(new Date().toISOString()) : null);
+    } finally {
+      setChecking(false);
+    }
+  }
 
   const items = kase?.work_items ?? [];
   const rows = deniedOnly ? audit.rows.filter((r) => r.result === "DENIED") : audit.rows;
@@ -38,7 +50,7 @@ export default function Log() {
         >
           Denied only ({deniedCount})
         </button>
-        <Button onClick={async () => { await refresh(); setVerified(clock(new Date().toISOString())); }}>Verify</Button>
+        <Button disabled={checking} onClick={verify}>{checking ? "Verifying" : "Verify"}</Button>
       </PageHeader>
 
       <Card className="flex w-full flex-col">

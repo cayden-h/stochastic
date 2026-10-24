@@ -1,4 +1,4 @@
-import type { AuditRow, Mapping, SourceLine, WorkItem } from "./types";
+import type { AuditRow, Mapping, SourceLine, Stage, WorkItem } from "./types";
 
 export function clock(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-GB", { timeZone: "America/Los_Angeles", hour12: false });
@@ -48,8 +48,13 @@ export function ago(iso: string, now = Date.now()): string {
   return clock(iso);
 }
 
+/** A run can start from a new deal or from a run that stopped. */
+export function canStart(stage: Stage): boolean {
+  return stage === "new" || stage === "run_failed";
+}
+
 /** The stage in the controller's words, and whether it waits on them. */
-export function stageWords(stage: string): { text: string; tone: "you" | "work" | "done" | "bad" | "idle" } {
+export function stageWords(stage: Stage): { text: string; tone: "you" | "work" | "done" | "bad" | "idle" } {
   switch (stage) {
     case "new": return { text: "Not started", tone: "idle" };
     case "mapping": return { text: "Mapping", tone: "work" };

@@ -9,12 +9,20 @@ interface DealData {
   kase: Case | null;
   health: Health | null;
   audit: AuditResponse;
-  error: string | null;
+  error: LoadError | null;
   loading: boolean;
-  refresh: () => Promise<void>;
+  /** Reads the case again. True when this read committed fresh data. */
+  refresh: () => Promise<boolean>;
   /** Make another deal the current one (the Dashboard rows and a new upload). */
-  select: (id: string) => Promise<void>;
+  select: (id: string) => Promise<boolean>;
 }
+
+/** The gateway answered but holds no deal: a different screen from the gateway being down. */
+class NoDeal extends Error {
+  constructor() { super("The gateway has no deal loaded."); }
+}
+
+export interface LoadError { kind: "unreachable" | "no_deal"; message: string }
 
 const emptyAudit: AuditResponse = { chain_valid: true, rows: [] };
 const Ctx = createContext<DealData | null>(null);
@@ -25,30 +33,40 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
   const [kase, setCase] = useState<Case | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [audit, setAudit] = useState<AuditResponse>(emptyAudit);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [loading, setLoading] = useState(true);
   const dealId = useRef<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  // Reads can overlap (a stream event while a reset is in flight, or select(B) while A loads). Each read takes a
+  // number; only the latest one may commit, so a slow, stale response never overwrites a newer state.
+  const seq = useRef(0);
+
+  const refresh = useCallback(async (): Promise<boolean> => {
+    const mine = ++seq.current;
     try {
       // The list is read every time: a reset drops uploaded deals, and the current one must fall back to the demo deal.
       const list = await api.deals();
+      if (mine !== seq.current) return false;
       if (!list.some((d) => d.id === dealId.current)) dealId.current = list[0]?.id ?? null;
       const id = dealId.current;
-      if (!id) throw new Error("The gateway has no deal loaded.");
+      if (!id) throw new NoDeal();
       const [c, h, a] = await Promise.all([api.case(id), api.health(), api.audit(id)]);
+      if (mine !== seq.current || id !== dealId.current) return false;
       setDeals(list); setCase(c); setHealth(h); setAudit(a);
       setError(null);
+      return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Cannot reach the gateway API");
+      if (mine !== seq.current) return false;
+      setError(e instanceof NoDeal ? { kind: "no_deal", message: e.message } : { kind: "unreachable", message: e instanceof Error ? e.message : "Cannot reach the gateway API" });
+      return false;
     } finally {
-      setLoading(false);
+      if (mine === seq.current) setLoading(false);
     }
   }, []);
 
   const select = useCallback(async (id: string) => {
     dealId.current = id;
-    await refresh();
+    return refresh();
   }, [refresh]);
 
   // The first read, from a timer callback so the effect body itself sets no state (react-hooks/set-state-in-effect).

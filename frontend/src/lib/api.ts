@@ -1,4 +1,4 @@
-import type { AuditResponse, Case, Deal, Health, ToolRun, WorkItem } from "./types";
+import type { AuditResponse, Case, Deal, DealCreated, Health, ToolRun, WorkItem } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 /** The human seat. The gateway's default controller actor; every write carries it. */
@@ -10,27 +10,29 @@ async function get<T>(path: string): Promise<T> {
   return res.json();
 }
 
+/** The error text from a FastAPI response: a string detail, a gateway {message|error} object, or a 422 list. */
+async function errorText(res: Response): Promise<string> {
+  const body = await res.json().catch(() => ({ detail: res.statusText }));
+  const d = body.detail;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d) && d.length) return d[0]?.msg ?? res.statusText;
+  return d?.message ?? d?.error ?? res.statusText;
+}
+
 async function post<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Actor": ACTOR },
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({ detail: res.statusText }));
-    const d = detail.detail;
-    throw new Error(typeof d === "string" ? d : d?.message ?? d?.error ?? res.statusText);
-  }
+  if (!res.ok) throw new Error(await errorText(res));
   return res.json();
 }
 
 /** Load a new deal from two statement CSVs and a brief (JSON). POST /deals is multipart, so it skips post(). */
-async function createDeal(form: FormData): Promise<{ deal_id: string; stage: string; lines: { platform: number; target: number } }> {
+async function createDeal(form: FormData): Promise<DealCreated> {
   const res = await fetch(`${API_URL}/deals`, { method: "POST", headers: { "X-Actor": ACTOR }, body: form });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(typeof detail.detail === "string" ? detail.detail : res.statusText);
-  }
+  if (!res.ok) throw new Error(await errorText(res));
   return res.json();
 }
 
