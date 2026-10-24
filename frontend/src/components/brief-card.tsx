@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { parseAmount } from "@/lib/edits";
 import { fmtK, fmtX, plural } from "@/lib/format";
-import type { Brief, BriefAdjustment, BriefCitation, BriefDraft, Deal, WorkItem } from "@/lib/types";
+import type { Brief, BriefAdjustment, Evidence, BriefCitation, BriefDraft, Deal, WorkItem } from "@/lib/types";
 import { ActorChip, Button, Label, Mono, Shape, Tag } from "./ui";
 
 /** "4.8(a)" reads as Section 4.8(a); "Addendum I" and "preamble" read as they are. */
@@ -71,6 +71,9 @@ function Question({ flag, brief, busy, onAnswer, onCorrect }: {
     await onCorrect(field, v, source.trim());
   };
   const ev = flag.evidence[0];
+  const unverified = Array.isArray(flag.payload.unverified_evidence)
+    ? (flag.payload.unverified_evidence as Evidence[]).filter((u) => u && typeof u.quote === "string")
+    : [];
   return (
     <div className="flex flex-col gap-[8px] rounded-[12px] border border-amber-line bg-amber-tint px-[14px] py-[12px]">
       <span className="flex items-center gap-[8px]">
@@ -81,18 +84,17 @@ function Question({ flag, brief, busy, onAnswer, onCorrect }: {
       </span>
       <p className="text-[14px] leading-[20px] text-body">{flag.question}</p>
       {ev ? (
-        ev.verified === false ? (
-          // Not found in the agreement by the gateway: the reader's own words, never shown as a quote.
-          <p className="flex flex-wrap items-baseline gap-x-[8px] border-l-2 border-line pl-[10px] text-[14px] leading-[20px] text-slate">
-            <span className="text-[11px] font-semibold tracking-[0.88px] uppercase">Reader&apos;s words</span>
-            {ev.quote} {ev.document_id ? <Mono>{ev.document_id}</Mono> : null}
-          </p>
-        ) : (
-          <p className="border-l-2 border-amber-line pl-[10px] font-serif text-[16px] leading-[21px] text-body">
-            &ldquo;{ev.quote}&rdquo; <Mono>{ev.document_id}</Mono>
-          </p>
-        )
+        <p className="border-l-2 border-amber-line pl-[10px] font-serif text-[16px] leading-[21px] text-body">
+          &ldquo;{ev.quote}&rdquo; <Mono>{ev.document_id}</Mono>
+        </p>
       ) : null}
+      {/* Evidence the gateway did not find in the agreement: the reader's own words, never shown as a quote. */}
+      {unverified.map((u, i) => (
+        <p key={i} className="flex flex-wrap items-baseline gap-x-[8px] border-l-2 border-line pl-[10px] text-[14px] leading-[20px] text-slate">
+          <span className="text-[11px] font-semibold tracking-[0.88px] uppercase">Reader&apos;s words</span>
+          {u.quote} {u.document_id ? <Mono>{u.document_id}</Mono> : null}
+        </p>
+      ))}
       <span className="flex flex-wrap gap-[8px]">
         {flag.options.map((o) => (
           <Button key={o.id} kind={o.id === flag.default ? "primary" : "secondary"} disabled={busy} title={o.effect} onClick={() => onAnswer(o.id)}>

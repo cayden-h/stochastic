@@ -223,7 +223,7 @@ Review fixes, 2026-10-24 night:
 - Adjustment flags: Apply waits for a PROPOSED approval item, approval waits for them, and they do not hold the progress row or the "no flag this time" note.
 - Until T2 puts `edits` on `/case`, the console keeps the edits the gateway returned, so an edit left for Later stays; `/case` wins by id. Chips come from `/case` `reason_chips`, else the last edit's response, else the demo list.
 - A reset (the deal's first audit row changes) closes the bubble and drops the session's edits and leverage moves.
-- A Brief question on a field path can be answered with a corrected value through the same amend route; evidence marked `verified: false` shows as "Reader's words".
+- A Brief question on a field path can be answered with a corrected value through the same amend route; the flag's `payload.unverified_evidence` shows as "Reader's words".
 - One unit conversion (`toK` in `frontend/src/lib/format.ts`, with millions as in `finance.to_thousands`).
 
 ### C5. The companion (about 2 hours, after C4)
