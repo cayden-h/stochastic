@@ -326,6 +326,10 @@ class Edit(BaseModel):
 class LearnedAdjustment(BaseModel):
     """What an amount edit teaches. The Preparer proposes it as a flag on a later deal; it is never applied silently.
 
+    `amount` is the signed change the controller made (new value minus the agents' value, USD thousands), not the
+    value: an add-back is "remove 500 of cost", which carries to another deal only as a change. Applying it on a later
+    deal sets that deal's line to its own agent value plus `amount`.
+
     Named apart from `Adjustment`, which is the Brief's EBITDA add-back or deduction.
     """
 
@@ -334,7 +338,7 @@ class LearnedAdjustment(BaseModel):
     company: str
     platform: str | None = None  # the deal's platform company, so a later add-on of that platform is offered it
     line: str
-    amount: float  # the edited value, in USD thousands
+    amount: float  # the signed change, new minus old, in USD thousands (-500.0 removes 500 of cost)
     reason: str
     edit_id: str
     # "applied": learned and live. "proposed": offered on a later deal's open flag. "retired": its edit was reverted.

@@ -29,6 +29,7 @@ from app.core.models import (
     ReviewerOutput,
     ToolRun,
 )
+from app.tools.finance import to_thousands
 
 CallTool = Callable[[str, dict], ToolRun]
 
@@ -297,10 +298,13 @@ def _offer_adjustments(inp: PreparerInput) -> list[AdjustmentProposal]:
         line = line or next((l for l in inp.target_lines if l in named), None)
         if line is None:
             continue
+        change = f"({abs(adj.amount):,.0f})" if adj.amount < 0 else f"+{adj.amount:,.0f}"
+        now_k = to_thousands(line.amount, line.unit)
         offers.append(AdjustmentProposal(
             adjustment_id=adj.id, line_id=line.id,
-            question=f"On an earlier deal the controller changed {adj.company}'s {adj.line} to {adj.amount:,.0f}K "
-                     f"('{adj.reason}'). Make the same change to {line.company}'s {line.line} on this deal?"))
+            question=f"On an earlier deal the controller made a change of {change} to {adj.company}'s {adj.line} "
+                     f"('{adj.reason}'). Make the same change of {change} to {line.company}'s {line.line} on this "
+                     f"deal, from {now_k:,.0f}K to {now_k + adj.amount:,.0f}K?"))
     return offers
 
 

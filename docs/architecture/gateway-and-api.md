@@ -215,12 +215,13 @@ The figures above are placeholders; the demo figures come from the filing.
 What a reasoned amount edit teaches.
 The Preparer proposes it as a flag on a later deal, and it is never applied silently.
 `status` is `applied` (learned on this deal), `proposed` (offered on a later deal), or `retired` (its edit was reverted).
+`amount` is the signed change the controller made (new value minus the agents' value), not the value: an add-back is "remove 500 of cost", which carries to another deal only as a change.
 In the spec this is called `Adjustment`; the code names it `LearnedAdjustment`, because `Adjustment` is already the Brief's EBITDA add-back or deduction.
 
 ```json
 {
   "id": "a_001", "deal_id": "d_kequ_nuaire", "company": "Nu Aire", "line": "Selling, general and administrative",
-  "amount": 9312.0, "reason": "One-time acquisition cost, an allowed add-back", "edit_id": "e_001", "status": "applied",
+  "amount": -500.0, "reason": "One-time acquisition cost, an allowed add-back", "edit_id": "e_001", "status": "applied",
   "at": "2026-10-25T10:45:00Z"
 }
 ```
@@ -325,10 +326,11 @@ An adjustment covers a line with the same name at the same company, or at the ta
 `Gateway.adjustments_for(deal_id)` lists the ones the Preparer may offer: not retired, not learned on this deal's own edits, and not already offered on this deal.
 The job runner passes them as `PreparerInput.adjustments`, and the Preparer returns `PreparerOutput.adjustment_flags` (`adjustment_id`, `line_id`, `question`).
 `store_result` refuses an offer the gateway would not make: an unknown or retired adjustment, a line it does not cover, or the same adjustment twice.
+The question states the change, for example "a change of (500) to Acme Labs's General and Administrative ... from 6,163K to 5,663K".
 The flag is a `flag` work item with `payload.kind` `adjustment`, proposed by the Preparer, with options `apply` and `skip` (default `skip`).
 While it is open, the adjustment's status is `proposed`.
 An adjustment flag does not block the Preparer, the Reviewer, or `consolidate` (`open_flags` leaves it out; `open_adjustment_flags` lists it), but approval is refused while one is open.
-Answering `apply` calls `apply_edit` with the adjustment's amount on that line, then `reason_edit` with the adjustment's reason and `remember=False`, so it shows in Your edits with `Edit.from_adjustment_id`.
+Answering `apply` calls `apply_edit` to set that line to this deal's agent value plus the adjustment's `amount`, then `reason_edit` with the adjustment's reason and `remember=False`, so it shows in Your edits with `Edit.from_adjustment_id`.
 Answering `skip` leaves the books as the agents made them.
 Either way the adjustment goes back to `applied`, live for later deals.
 Audit rows: `ask:flag` (the Preparer) and `adjustment:propose` when it opens, `answer` and `adjustment:apply` or `adjustment:skip` when it is answered.

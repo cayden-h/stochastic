@@ -271,7 +271,7 @@ def test_a_reasoned_amount_edit_becomes_a_logged_adjustment(flow):
     gw.reason_edit(CONTROLLER, edit.id, chip=0)
     adj = store.adjustments[edit.adjustment_id]
     assert (adj.status, adj.company, adj.line, adj.amount, adj.edit_id) == ("applied", TARGET, AMOUNT_LINE,
-                                                                           5662.806, edit.id)
+                                                                           -500.0, edit.id)  # the change, not the value
     assert adj.reason == AMOUNT_CHIPS[0]
     learn = rows(store, "policy:learn")[-1]
     assert learn.target == adj.id and learn.reason.startswith(f"source: edit {edit.id}")
@@ -532,7 +532,9 @@ def test_a_learned_adjustment_is_offered_as_a_flag_on_the_next_deal_and_never_ap
     assert [o.id for o in flag.options] == ["apply", "skip"] and flag.default == "skip"
     line = store.source_lines[flag.payload["line_ids"][0]]
     assert (line.company, line.line) == ("Acme Labs", AMOUNT_LINE) and line.amount == 6162806
-    assert AMOUNT_LINE in flag.question and adj.id not in flag.question
+    assert f"(500) to Acme Labs's {AMOUNT_LINE}" in flag.question and adj.id not in flag.question
+    assert "from 6,163K to 5,663K" in flag.question
+    assert next(o for o in flag.options if o.id == "apply").label == f"Apply it: (500) to Acme Labs, {AMOUNT_LINE}"
     assert adj.status == "proposed" and not store.deal_edits(second.id)  # never applied silently
     assert [r.target for r in rows(store, "adjustment:propose")] == [adj.id]
     assert any(r.actor == PREPARER and r.target == flag.id for r in rows(store, "ask:flag"))
@@ -560,11 +562,15 @@ def test_applying_the_offer_makes_a_reasoned_edit_through_the_recompute(flow):
     store, gw = flow
     adj = learn_adjustment(gw)
     second = next_deal(store, gw)
+    acme = next(sl for sl in store.lines(second.id, "Acme Labs") if sl.line == AMOUNT_LINE)
+    acme.amount = 7000000.0  # another company's own figure: the change carries, the old value does not
     old = run_to_approval(gw, second.id)
     flag = adjustment_flag(gw, second.id)
+    assert "from 7,000K to 6,500K" in flag.question
     gw.answer(CONTROLLER, flag.id, "apply")
     edit = store.edits[store.items[flag.id].payload["edit_id"]]
-    assert (edit.deal_id, edit.company, edit.line, edit.new_value) == (second.id, "Acme Labs", AMOUNT_LINE, adj.amount)
+    assert (edit.deal_id, edit.company, edit.line) == (second.id, "Acme Labs", AMOUNT_LINE)
+    assert (edit.old_value, edit.new_value) == (7000.0, 6500.0)  # this deal's agent value plus the change
     assert edit.status == "reasoned" and edit.reason_text == adj.reason and edit.from_adjustment_id == adj.id
     assert edit.adjustment_id is None and len(store.adjustments) == 1  # it does not teach itself again
     assert old.state == State.SUPERSEDED and adj.status == "applied"
@@ -582,7 +588,7 @@ def test_without_t1_applying_the_offer_is_refused_and_the_flag_stays_open(world)
     # Learn one by hand: before T1 no edit can be applied, so write the memory the way reason_edit would.
     from app.core.models import LearnedAdjustment
     store.adjustments["a_001"] = LearnedAdjustment(id="a_001", deal_id="d_earlier", company=TARGET, platform=PLATFORM,
-                                                   line=AMOUNT_LINE, amount=5662.806, reason=AMOUNT_CHIPS[0],
+                                                   line=AMOUNT_LINE, amount=-500.0, reason=AMOUNT_CHIPS[0],
                                                    edit_id="e_earlier")
     second = next_deal(store, gw)
     run_to_approval(gw, second.id)

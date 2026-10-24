@@ -113,6 +113,11 @@ def _fmt(x: float) -> str:
     return f"{x:,.0f}"
 
 
+def _signed(x: float) -> str:
+    """A change as accountants write it: +500, or (500) for a decrease."""
+    return f"({abs(x):,.0f})" if x < 0 else f"+{x:,.0f}"
+
+
 def _writes(method):
     """A public write holds the gateway lock, and the outermost one commits the store, also when it is denied."""
     @functools.wraps(method)
@@ -1156,12 +1161,12 @@ class Gateway:
             edit.policy_id = self._learn_from_edit(actor, deal, edit).id
         elif remember and edit.kind == "amount":
             adj = LearnedAdjustment(id=self.store.next_id("a"), deal_id=deal.id, company=edit.company,
-                                    platform=deal.platform, line=edit.line, amount=edit.new_value, reason=label,
+                                    platform=deal.platform, line=edit.line, amount=round(edit.new_value - edit.old_value, 3), reason=label,
                                     edit_id=edit.id, status="applied")
             self.store.adjustments[adj.id] = adj
             edit.adjustment_id = adj.id
             self._log(deal.id, SYSTEM, "policy:learn", "ALLOWED", adj.id,
-                      reason=f"source: edit {edit.id}; adjustment {edit.company}, {edit.line} -> {edit.new_value:,.3f}; "
+                      reason=f"source: edit {edit.id}; adjustment {_signed(edit.new_value - edit.old_value)} to {edit.company}, {edit.line}; "
                              f"proposed as a flag on a later deal, never applied silently")
         return edit
 
@@ -1260,8 +1265,9 @@ class Gateway:
                               line: SourceLine) -> WorkItem:
         current = finance.to_thousands(line.amount, line.unit)
         options = [
-            Option(id="apply", label=f"Apply it: {line.company}, {line.line} to {_fmt(adj.amount)}K",
-                   effect=f"{line.line} goes from {_fmt(current)}K to {_fmt(adj.amount)}K as your edit, with the reason "
+            Option(id="apply", label=f"Apply it: {_signed(adj.amount)} to {line.company}, {line.line}",
+                   effect=f"{line.line} goes from {_fmt(current)}K to {_fmt(current + adj.amount)}K as your edit, "
+                          f"with the reason "
                           f"'{adj.reason}'. Every figure is recomputed by the tools with new run ids."),
             Option(id="skip", label="Skip it on this deal",
                    effect="The books stay as the agents made them. The adjustment is kept for later deals."),
@@ -1287,7 +1293,9 @@ class Gateway:
             self._deny(IllegalTransition(f"adjustment {adj.id} was retired; skip it"), item.deal_id, actor, "answer",
                        item.id)
         if option_id == "apply":
-            edit = self.apply_edit(actor, item.deal_id, "amount", line.company, line.line, value=adj.amount,
+            # The change, on this deal's own agent value: the source line, which an edit never overwrites.
+            value = round(finance.to_thousands(line.amount, line.unit) + adj.amount, 3)
+            edit = self.apply_edit(actor, item.deal_id, "amount", line.company, line.line, value=value,
                                    section=line.section)["edit"]
             edit.from_adjustment_id = adj.id
             self.reason_edit(actor, edit.id, text=adj.reason, remember=False)
