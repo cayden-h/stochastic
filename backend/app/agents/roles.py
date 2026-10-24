@@ -62,6 +62,9 @@ A flag's `question` is read aloud to the controller: name the lines by their sta
 sale-leaseback financing"), never by their ids (sl_015). The ids go in `line_ids` only.
 Every `target_line_id` must be an id from `target_lines`, never an id from `platform_lines`.
 If `previous_refusal` is set, the gateway refused your last result for that reason: fix it and return the whole result.
+Your `policies` are the ones that apply to this deal. A policy with scope "company" applies to that company's lines;
+one with scope "platform" (a remap the controller made on an earlier add-on) applies to every target line of that name
+on this platform. Map a line a policy covers to the policy's decision, put its id in `policy_id`, and name it in the reason.
 
 Subtotals: map a target subtotal to the platform subtotal with the same meaning. If the platform has no such
 subtotal, give platform_line null, confidence 1.0, and the reason "subtotal; its parts are mapped". Never flag a subtotal.

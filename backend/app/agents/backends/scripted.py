@@ -19,8 +19,10 @@ from app.core.models import (
     MapperInput,
     MapperOutput,
     MappingProposal,
+    Policy,
     PreparerInput,
     PreparerOutput,
+    ReasonChip,
     ResultRow,
     ReviewerInput,
     ReviewerOutput,
@@ -30,6 +32,47 @@ from app.core.models import (
 CallTool = Callable[[str, dict], ToolRun]
 
 FLAG_THRESHOLD = 0.6
+
+# The reasons the edit bubble offers (design/review-companion.md section 5). Hardcoded per deal for the demo, and
+# the pitch says so; in the product, Claude would suggest them from the line, the change, and the filing notes.
+DEMO_REASON_CHIPS: dict[str, list[ReasonChip]] = {
+    "amount": [ReasonChip(id=0, label="One-time acquisition cost, an allowed add-back"),
+               ReasonChip(id=1, label="Auditor's late adjustment"),
+               ReasonChip(id=2, label="Correcting a typo in the source")],
+    "remap": [ReasonChip(id=0, label="Not a cash equivalent (over 90 days)"),
+              ReasonChip(id=1, label="Matches how the platform reports it"),
+              ReasonChip(id=2, label="Auditor's reclassification")],
+}
+REASON_CHIPS: dict[str, dict[str, list[ReasonChip]]] = {"d_kequ_nuaire": DEMO_REASON_CHIPS}
+
+
+def reason_chips(deal_id: str, kind: str) -> list[ReasonChip]:
+    """The chips for an edit of this kind on this deal. A deal with no list of its own gets the demo deal's."""
+    return list(REASON_CHIPS.get(deal_id, DEMO_REASON_CHIPS)[kind])
+
+
+def policy_applies(p: Policy, company: str, platform: str, target: str) -> bool:
+    """The scope rule, the same one the gateway enforces: a company policy applies to its own company's lines only,
+    and a platform policy (a remap edit, kind mapping) to the add-on lines of the platform it names."""
+    if p.retired_by:
+        return False
+    if p.scope == "platform":
+        return p.kind == "mapping" and p.platform == platform and company == target
+    return p.company is not None and p.company == company
+
+
+def _policy_for(inp: MapperInput, kind: str, company: str, key: str) -> Policy | None:
+    """The newest live policy of this kind for this line, so a later correction wins over an earlier answer."""
+    hits = [p for p in inp.policies if p.kind == kind and p.pattern == key
+            and policy_applies(p, company, inp.platform, inp.target)]
+    return max(hits, key=lambda p: p.at) if hits else None
+
+
+def _policy_reason(pol: Policy) -> str:
+    if pol.scope == "platform":
+        return (f"Policy {pol.id} (every add-on of {pol.platform}): {pol.approved_by} decided this on "
+                f"{pol.learned_from}: {pol.reason}")
+    return f"Policy {pol.id}: {pol.approved_by} decided this on {pol.learned_from}"
 
 
 def norm(s: str) -> str:
@@ -105,17 +148,14 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
     mappings: list[MappingProposal] = []
     flags: list[FlagProposal] = []
     tags: list[LineTag] = []
-    mapping_policies = {(p.company, p.pattern): p for p in inp.policies if p.kind == "mapping"}
-    tag_policies = {(p.company, p.pattern): p for p in inp.policies if p.kind == "covenant_tag"}
 
     for t in inp.target_lines:
         key = t.line.strip().lower()
         names = _platform_names(inp, t.section)
-        pol = mapping_policies.get((t.company, key)) or mapping_policies.get((None, key))
+        pol = _policy_for(inp, "mapping", t.company, key)
         if pol:
             mappings.append(MappingProposal(target_line_id=t.id, platform_line=pol.decision or None, confidence=0.98,
-                                            reason=f"Policy {pol.id}: {pol.approved_by} decided this on {pol.learned_from}",
-                                            policy_id=pol.id))
+                                            reason=_policy_reason(pol), policy_id=pol.id))
             continue
         if key in TOTALS and TOTALS[key] in names:
             mappings.append(MappingProposal(target_line_id=t.id, platform_line=TOTALS[key], confidence=1.0,
@@ -170,7 +210,7 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
         if line.section != "balance_sheet":
             continue
         key = line.line.strip().lower()
-        pol = tag_policies.get((line.company, key)) or tag_policies.get((None, key))
+        pol = _policy_for(inp, "covenant_tag", line.company, key)
         if pol:
             tags.append(LineTag(line_id=line.id, tag=pol.decision, note=f"Policy {pol.id} from {pol.approved_by}",
                                 policy_id=pol.id))
