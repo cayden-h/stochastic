@@ -26,14 +26,15 @@ export function Shape({ kind, size = 14 }: { kind: ShapeKind; size?: number }) {
 
 export type Role = "mapper" | "preparer" | "reviewer";
 
-/** Each agent's look in v3: its avatar, chip tint, and name color. */
-export const ROLES: Record<Role, { src: string; tint: string; ink: string; blend?: boolean }> = {
-  mapper: { src: "/v3/agent-mapper.png", tint: "bg-mint", ink: "text-clear", blend: true },
-  preparer: { src: "/v3/agent-preparer.png", tint: "bg-preparer-tint", ink: "text-preparer" },
-  reviewer: { src: "/v3/agent-reviewer.png", tint: "bg-reviewer-tint", ink: "text-reviewer" },
+/** Each agent's look in v3: its avatar, chip tint, chip text, and its name on the Agents timeline.
+ * The frames write the Mapper's chip in clear green and its timeline name in forest. */
+export const ROLES: Record<Role, { src: string; tint: string; ink: string; name: string; blend?: boolean }> = {
+  mapper: { src: "/v3/agent-mapper.png", tint: "bg-mint", ink: "text-clear", name: "text-forest", blend: true },
+  preparer: { src: "/v3/agent-preparer.png", tint: "bg-preparer-tint", ink: "text-preparer", name: "text-preparer" },
+  reviewer: { src: "/v3/agent-reviewer.png", tint: "bg-reviewer-tint", ink: "text-reviewer", name: "text-reviewer" },
 };
 
-export function isRole(name: string | undefined): name is Role {
+function isRole(name: string | undefined): name is Role {
   return name === "mapper" || name === "preparer" || name === "reviewer";
 }
 

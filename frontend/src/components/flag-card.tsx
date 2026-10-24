@@ -100,49 +100,49 @@ export function FlagCard({
         })}
       </div>
 
-      <details className="group rounded-[12px] border border-line bg-fog px-[14px] py-[10px]">
+      <details className="rounded-[12px] border border-line bg-fog px-[14px] py-[10px]">
         <summary className="cursor-pointer text-[13px] font-semibold text-forest">
           Evidence: {plural(item.options.length, "effect")}
           {flagged.length ? `, ${plural(flagged.length, "line")}` : ""}
           {item.evidence.length ? `, ${plural(item.evidence.length, "quote")} from the filings` : ""}
         </summary>
-          <div className="mt-[10px] flex flex-col gap-[12px]">
-            <div className="flex flex-col gap-[6px] rounded-[8px] border border-line bg-white px-[12px] py-[10px]">
-              {item.options.map((o, i) => (
-                <div key={o.id} className="flex items-baseline gap-[8px] text-[13px]">
-                  <span className="font-mono text-[12px] text-forest">{letter(i)}.</span>
-                  <span className="min-w-0 flex-1 text-body">{o.effect}</span>
-                  {o.run_id ? <Mono>{o.run_id}</Mono> : null}
+        <div className="mt-[10px] flex flex-col gap-[12px]">
+          <div className="flex flex-col gap-[6px] rounded-[8px] border border-line bg-white px-[12px] py-[10px]">
+            {item.options.map((o, i) => (
+              <div key={o.id} className="flex items-baseline gap-[8px] text-[13px]">
+                <span className="font-mono text-[12px] text-forest">{letter(i)}.</span>
+                <span className="min-w-0 flex-1 text-body">{o.effect}</span>
+                {o.run_id ? <Mono>{o.run_id}</Mono> : null}
+              </div>
+            ))}
+          </div>
+          {flagged.length ? (
+            <div className="flex flex-col gap-[4px] rounded-[8px] border border-line bg-white px-[12px] py-[10px]">
+              {flagged.map((l) => (
+                <div key={l.id} className="flex items-baseline gap-x-[12px]">
+                  <span className="min-w-0 flex-1 truncate text-[14px]" title={l.line}>{l.line}</span>
+                  <Mono>{l.company}</Mono>
+                  <span className="text-[14px] font-semibold text-forest">{lineK(l.amount, l.unit)}</span>
                 </div>
               ))}
+              {flagged.find((l) => l.note) ? (
+                <p className="mt-[4px] text-[13px] text-slate">{flagged.find((l) => l.note)!.note}</p>
+              ) : null}
             </div>
-            {flagged.length ? (
-              <div className="flex flex-col gap-[4px] rounded-[8px] border border-line bg-white px-[12px] py-[10px]">
-                {flagged.map((l) => (
-                  <div key={l.id} className="flex items-baseline gap-x-[12px]">
-                    <span className="min-w-0 flex-1 truncate text-[14px]" title={l.line}>{l.line}</span>
-                    <Mono>{l.company}</Mono>
-                    <span className="text-[14px] font-semibold text-forest">{lineK(l.amount, l.unit)}</span>
-                  </div>
-                ))}
-                {flagged.find((l) => l.note) ? (
-                  <p className="mt-[4px] text-[13px] text-slate">{flagged.find((l) => l.note)!.note}</p>
-                ) : null}
-              </div>
-            ) : null}
+          ) : null}
 
-            {item.evidence.length ? (
-              <div className="flex flex-col gap-[10px]">
-                {item.evidence.map((e, i) => (
-                  <figure key={i} className="flex flex-col gap-[6px] border-l-2 border-amber-line py-[2px] pl-[12px]">
-                    <p className="font-serif text-[18px] text-body">{`"${e.quote}"`}</p>
-                    <div><SourceChip evidence={e} line={flagged[0]} /></div>
-                  </figure>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </details>
+          {item.evidence.length ? (
+            <div className="flex flex-col gap-[10px]">
+              {item.evidence.map((e, i) => (
+                <figure key={i} className="flex flex-col gap-[6px] border-l-2 border-amber-line py-[2px] pl-[12px]">
+                  <p className="font-serif text-[18px] text-body">{`"${e.quote}"`}</p>
+                  <div><SourceChip evidence={e} line={flagged[0]} /></div>
+                </figure>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </details>
     </section>
   );
 }

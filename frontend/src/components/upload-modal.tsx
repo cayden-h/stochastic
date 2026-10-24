@@ -2,10 +2,10 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
-import { fmtX, plural } from "@/lib/format";
+import { canStart, fmtX, plural } from "@/lib/format";
 import { FileIcon, UploadIcon } from "./icons";
 import { Label } from "./ui";
 
@@ -24,7 +24,7 @@ function companyOf(file: File): string {
 }
 
 /** What the chip says under a chosen file: the CSV's row count, or the brief's own limit. Nothing is computed. */
-async function describe(slot: Slot, file: File): Promise<string> {
+async function summarize(slot: Slot, file: File): Promise<string> {
   const text = await file.text();
   if (slot === "brief") {
     try {
@@ -34,7 +34,8 @@ async function describe(slot: Slot, file: File): Promise<string> {
       return "Not valid JSON";
     }
   }
-  return plural(Math.max(0, text.split(/\r?\n/).filter((l) => l.trim()).length - 1), "row");
+  const rows = plural(Math.max(0, text.split(/\r?\n/).filter((l) => l.trim()).length - 1), "row");
+  return `${rows} \u00b7 as ${companyOf(file)}`;
 }
 
 /**
@@ -47,24 +48,46 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   const [picked, setPicked] = useState<Partial<Record<Slot, Picked>>>({});
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // The deal this modal created: a retry after a failed start re-runs it instead of creating a second deal.
+  const created = useRef<string | null>(null);
   const many = useRef<HTMLInputElement>(null);
   const one = useRef<Record<Slot, HTMLInputElement | null>>({ platform: null, target: null, brief: null });
+  const dialog = useRef<HTMLDivElement>(null);
+  const busyRef = useRef(false);
+  useEffect(() => { busyRef.current = busy; }, [busy]);
 
+  // Nothing closes the modal while a request is in flight.
+  const close = useCallback(() => { if (!busyRef.current) onClose(); }, [onClose]);
+
+  // Focus moves into the dialog on open, Tab stays inside it, and focus returns to the opener on close.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const opener = document.activeElement as HTMLElement | null;
+    const focusable = () => [...(dialog.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]):not(.hidden)") ?? [])];
+    focusable()[0]?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { close(); return; }
+      if (e.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    return () => { window.removeEventListener("keydown", onKey); opener?.focus(); };
+  }, [close]);
 
   if (!kase) return null;
   const { deal, source_lines } = kase;
 
   async function put(slot: Slot, file: File) {
-    const sub = await describe(slot, file);
+    const sub = await summarize(slot, file);
+    created.current = null;  // new inputs make a new deal
     setPicked((p) => ({ ...p, [slot]: { file, sub } }));
   }
 
-  /** Several files at once: the JSON is the brief, the CSVs fill platform then target in the order chosen. */
+  /** Several files at once: the JSON is the brief, the CSVs fill platform then target in the order chosen.
+   * The slots name the company each CSV is read as, and Swap exchanges them. */
   async function putMany(files: FileList | null) {
     if (!files) return;
     const csvs = [...files].filter((f) => f.name.toLowerCase().endsWith(".csv"));
@@ -72,6 +95,11 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
     if (csvs[0]) await put("platform", csvs[0]);
     if (csvs[1]) await put("target", csvs[1]);
     if (brief) await put("brief", brief);
+  }
+
+  function swap() {
+    created.current = null;
+    setPicked((p) => ({ ...p, platform: p.target, target: p.platform }));
   }
 
   const current: Record<Slot, { name: string; sub: string }> = {
@@ -85,7 +113,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
     try {
       const chosen = Object.keys(picked).length;
       if (chosen && chosen < 3) throw new Error("Choose the platform CSV, the target CSV, and the brief, or close to keep this deal.");
-      if (chosen) {
+      if (chosen && !created.current) {
         const p = picked.platform!.file, t = picked.target!.file;
         const form = new FormData();
         form.set("platform", companyOf(p));
@@ -94,10 +122,12 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         form.set("brief", await picked.brief!.file.text());
         form.set("platform_csv", p);
         form.set("target_csv", t);
-        const created = await api.createDeal(form);
-        await api.start(created.deal_id);
-        await select(created.deal_id);
-      } else if (kase!.stage === "new" || kase!.stage === "run_failed") {
+        created.current = (await api.createDeal(form)).deal_id;
+        await select(created.current);  // the new deal is current even if the start below fails
+      }
+      if (created.current) {
+        await api.start(created.current);
+      } else if (canStart(kase!.stage)) {
         await api.start(deal.id);
       }
       onClose();
@@ -110,13 +140,14 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-[rgba(15,41,33,0.45)] p-4 pt-[34px]" role="dialog" aria-modal="true" aria-label="New deal">
-      <button aria-label="Close" className="absolute inset-0 cursor-default" onClick={onClose} />
-      <div className="relative flex w-full max-w-[880px] flex-col gap-[18px] rounded-[20px] bg-white p-[28px] shadow-[0px_24px_60px_0px_rgba(15,41,33,0.3)]">
+    <div className="no-drag fixed inset-0 z-20 flex items-center justify-center bg-[rgba(15,41,33,0.45)] p-4 pt-[34px]">
+      {/* The backdrop closes on click but is not a tab stop; Close and Esc do the same from the keyboard. */}
+      <div aria-hidden="true" className="absolute inset-0" onClick={close} />
+      <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="new-deal-title" className="relative flex w-full max-w-[880px] flex-col gap-[18px] rounded-[20px] bg-white p-[28px] shadow-[0px_24px_60px_0px_rgba(15,41,33,0.3)]">
         <div className="flex w-full items-center gap-[12px]">
-          <h2 className="font-serif text-[30px] text-forest">New deal</h2>
+          <h2 id="new-deal-title" className="font-serif text-[30px] text-forest">New deal</h2>
           <span className="flex-1" />
-          <button className="text-[14px] font-semibold text-slate hover:text-forest" onClick={onClose}>Close</button>
+          <button className="text-[14px] font-semibold text-slate hover:text-forest disabled:opacity-40" onClick={close} disabled={busy}>Close</button>
         </div>
 
         <div className="flex w-full justify-center">
@@ -162,6 +193,14 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
+
+        {picked.platform || picked.target ? (
+          <div className="-mt-[6px] flex w-full justify-center">
+            <button className="text-[13px] font-semibold text-clear hover:underline disabled:opacity-40" onClick={swap} disabled={busy}>
+              Swap platform and target
+            </button>
+          </div>
+        ) : null}
 
         {note ? <p role="alert" className="rounded-[8px] bg-denied-tint px-[12px] py-[8px] text-[13px] font-semibold text-denied">{note}</p> : null}
 

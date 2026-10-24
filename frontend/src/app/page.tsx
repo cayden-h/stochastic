@@ -7,7 +7,7 @@ import { Button, Card, Label, PageHeader } from "@/components/ui";
 import { UploadModal } from "@/components/upload-modal";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
-import { ago, fmtX, stageWords } from "@/lib/format";
+import { ago, canStart, fmtX, stageWords } from "@/lib/format";
 import type { Deal } from "@/lib/types";
 
 const STAGE_TONE = { you: "text-escalation", work: "text-forest", done: "text-clear", bad: "text-denied", idle: "text-slate" } as const;
@@ -41,7 +41,7 @@ export default function Dashboard() {
   async function begin() {
     setBusy(true); setNote(null);
     try {
-      if (kase!.stage === "new" || kase!.stage === "run_failed") { await api.start(current); await refresh(); }
+      if (canStart(kase!.stage)) { await api.start(current); await refresh(); }
       router.push("/case");
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Could not start the run");

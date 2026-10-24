@@ -9,20 +9,24 @@ import { Button, Card, Label, Mono, PageHeader, Shape, Tag } from "@/components/
 import { VerdictLine } from "@/components/verdict-line";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
-import { fmtX, learnedPolicies, plural } from "@/lib/format";
-import type { Stage } from "@/lib/types";
+import { canStart, fmtX, learnedPolicies, plural } from "@/lib/format";
+import type { AuditRow, Stage } from "@/lib/types";
 
-/** The three agents in order, and which stage means each one is working. */
-const STEPS: { role: string; working: string[]; done: string[] }[] = [
-  { role: "Mapper", working: ["mapping"], done: ["awaiting_flag", "mapped", "flags_answered", "preparing", "awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
-  { role: "Preparer", working: ["mapped", "flags_answered", "preparing"], done: ["awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
-  { role: "Reviewer", working: ["awaiting_review"], done: ["awaiting_approval", "needs_attention", "posted"] },
+/** The three agents in order, which stage means each one is working, and the work item the gateway opens for it. */
+const STEPS: { role: string; item: string; working: Stage[]; done: Stage[] }[] = [
+  { role: "Mapper", item: "map_lines", working: ["mapping"], done: ["awaiting_flag", "mapped", "flags_answered", "preparing", "awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
+  { role: "Preparer", item: "prepare_result", working: ["mapped", "flags_answered", "preparing"], done: ["awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
+  { role: "Reviewer", item: "review_result", working: ["awaiting_review"], done: ["awaiting_approval", "needs_attention", "posted"] },
 ];
 
-/** While the agents run (30 to 60 s on a live model), show who is working and for how long, from the stage.
- * Keyed by the stage, so the clock restarts when the next agent starts. Sits in the verdict's place. */
-function Progress({ stage }: { stage: Stage }) {
-  const [since] = useState(() => Date.now());
+/** While the agents run (30 to 60 s on a live model), show who is working and for how long.
+ * The clock starts at the audit row where the gateway opened the working agent's item, so a reload or a
+ * remount does not reset it. Without that row it counts from when the row appeared. */
+function Progress({ stage, rows }: { stage: Stage; rows: AuditRow[] }) {
+  const step = STEPS.find((s) => s.working.includes(stage));
+  const opened = step ? rows.findLast((r) => r.action === `create:${step.item}`)?.at : undefined;
+  const [shown] = useState(() => Date.now());
+  const since = opened ? new Date(opened).getTime() : shown;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -47,7 +51,7 @@ function Progress({ stage }: { stage: Stage }) {
 }
 
 /** A tile in the right column: a label, one figure, one line under it. Each opens its page. */
-function Tile({ href, label, value, sub, children }: { href: string; label: string; value: string; sub: string; children?: React.ReactNode }) {
+function CaseTile({ href, label, value, sub, children }: { href: string; label: string; value: string; sub: string; children?: React.ReactNode }) {
   return (
     <Link href={href} className="flex w-full flex-col gap-[4px] rounded-card border border-line bg-white p-[16px] transition-colors duration-150 hover:border-mint-edge">
       <Label>{label}</Label>
@@ -62,7 +66,7 @@ function Tile({ href, label, value, sub, children }: { href: string; label: stri
  * Run, answer the flags, read the verdict, approve. Mapping, Review and Log are tiles on the right.
  */
 export default function CaseScreen() {
-  const { kase, refresh } = useDeal();
+  const { kase, refresh, audit: { rows: auditRows } } = useDeal();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -85,7 +89,7 @@ export default function CaseScreen() {
   const asFiled = asFiledOpt && deal.ebitda_basis !== "as_filed"
     ? { leverage: asFiledOpt.leverage!, ok: Boolean(asFiledOpt.ok), run_id: asFiledOpt.run_id } : null;
   const failed = stage === "run_failed";
-  const idle = stage === "new" || failed;
+  const idle = canStart(stage);
   const working = !idle && !open.length && (!verdict || !verdict.review);
   const review = verdict?.review?.verdict ?? null;
   const over = verdict?.verdict === "over_limit";
@@ -162,7 +166,7 @@ export default function CaseScreen() {
           <MoreFlags items={open.filter((f) => f !== current)} onOpen={setCurrentId} />
 
           {/* While an agent works the row shows who and for how long, also beside a verdict the Reviewer is checking. */}
-          {working ? <Progress key={stage} stage={stage} /> : null}
+          {working ? <Progress stage={stage} rows={auditRows} /> : null}
 
           {verdict ? (
             <VerdictLine
@@ -211,21 +215,21 @@ export default function CaseScreen() {
         </div>
 
         <div className="flex w-[280px] shrink-0 flex-col gap-[16px]">
-          <Tile
+          <CaseTile
             href="/mapping"
             label="Mapping"
             value={mappings.length ? `${mappings.length} placed` : "Not run"}
             sub={mappings.length ? `${mappings.length - unsure} sure · ${unsure} unsure${learnedLines ? ` · ${plural(learnedLines, "line")} learned` : ""}` : "The Mapper runs first"}
           >
             {learned > 0 ? <Tag tone="agent">Learned</Tag> : null}
-          </Tile>
-          <Tile
+          </CaseTile>
+          <CaseTile
             href="/agents"
             label="Review"
             value={review === "pass" ? "Pass" : review === "needs_attention" ? "Needs attention" : "Waiting"}
             sub={review === "pass" ? "The Reviewer re-ran the checks" : review === "needs_attention" ? "Read the reasons on the verdict" : open.length ? "Reviewer runs after your answer" : "Reviewer runs after the Preparer"}
           />
-          <Tile
+          <CaseTile
             href="/log"
             label="Log"
             value={plural(audit.rows, "row")}

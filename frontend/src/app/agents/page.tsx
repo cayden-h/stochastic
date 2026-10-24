@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { verbTone } from "@/components/audit-log";
 import { LockIcon, SilhouetteIcon } from "@/components/icons";
-import { ActorChip, Avatar, Label, Mono, PageHeader, actorOf } from "@/components/ui";
+import { ActorChip, Avatar, Label, Mono, PageHeader, ROLES, actorOf } from "@/components/ui";
 import { useDeal } from "@/lib/deal-context";
 import { clock, describe, verbOf } from "@/lib/format";
 import type { AuditRow } from "@/lib/types";
@@ -18,9 +18,11 @@ function storyRows(rows: AuditRow[]): AuditRow[] {
   });
 }
 
-const NAME_TONE: Record<string, string> = {
-  mapper: "text-forest", preparer: "text-preparer", reviewer: "text-reviewer", Human: "text-ink", Gateway: "text-agent",
-};
+/** The name's color on the timeline: the agent's own, the controller in ink, the gateway in agent blue. */
+function nameTone(actor: string): string {
+  const a = actorOf(actor);
+  return a.role ? ROLES[a.role].name : a.kind === "Human" ? "text-ink" : "text-agent";
+}
 
 /** The 22 px tile on the timeline: the agent's avatar, the controller in ink, the gateway with a lock. */
 function Tile({ actor }: { actor: string }) {
@@ -45,7 +47,8 @@ export default function Agents() {
   for (const r of story) latest.set(r.actor, r);
   const chat = [...latest.values()].sort((a, b) => a.id - b.id).slice(-5);
   const timeline = story.slice(-12);
-  const runs = new Set(kase.sessions.map((s) => (s as { turns?: number }).turns ?? 0));
+  // Runs of this deal on the record: each run opens a new mapping item.
+  const runs = audit.rows.filter((r) => r.action === "create:map_lines").length;
   const pending = kase.verdict?.approval_state === "PROPOSED";
 
   return (
@@ -75,7 +78,7 @@ export default function Agents() {
         <div className="relative flex h-full w-[300px] shrink-0 flex-col overflow-y-auto p-[18px]">
           <div className="flex w-full items-center text-slate">
             <Label className="flex-1">Agent timeline</Label>
-            <Mono>run {Math.max(1, ...runs)}</Mono>
+            {runs ? <Mono>run {runs}</Mono> : null}
           </div>
           <span className="h-[14px] shrink-0" />
           {timeline.map((r, i) => {
@@ -90,7 +93,7 @@ export default function Agents() {
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-[2px] pb-[14px]">
                   <div className="flex w-full gap-[8px]">
-                    <span className={`text-[13px] font-semibold ${NAME_TONE[a.role ?? a.kind] ?? "text-agent"}`}>{a.label}</span>
+                    <span className={`text-[13px] font-semibold ${nameTone(r.actor)}`}>{a.label}</span>
                     <span className="flex-1" />
                     <span className="font-mono text-[11px] text-slate">{clock(r.at)}</span>
                   </div>

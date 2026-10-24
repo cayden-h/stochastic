@@ -8,7 +8,7 @@ import type { Case, Health } from "@/lib/types";
 import { NavIcon, type NavIconName } from "./icons";
 import { Label } from "./ui";
 
-export const PAGES: { href: string; label: string; icon: NavIconName }[] = [
+const PAGES: { href: string; label: string; icon: NavIconName }[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/case", label: "Case", icon: "case" },
   { href: "/mapping", label: "Mapping", icon: "mapping" },
@@ -16,7 +16,7 @@ export const PAGES: { href: string; label: string; icon: NavIconName }[] = [
   { href: "/log", label: "Log", icon: "log" },
 ];
 
-export type Theme = "green" | "pink" | "purple";
+type Theme = "green" | "pink" | "purple";
 
 /** Each page's tint in v3: the Case is the Preparer's pink, the Log the Reviewer's purple, the rest the Mapper's green. */
 export function themeOf(path: string): Theme {
@@ -41,7 +41,7 @@ const BACKEND_WORDS: Record<string, { title: string; sub: string }> = {
 
 /** Which backend produced the agent output, from GET /health. When the Mapper and the Preparer ran on different
  * backends (a fallback), the card names the one that fell back, not the better one. */
-export function producedBy(health: Health | null, kase: Case | null): { produced: string; configured: string } | null {
+function producedBy(health: Health | null, kase: Case | null): { produced: string; configured: string } | null {
   const status = health?.backend ?? kase?.backend;
   if (!status) return null;
   const roles = status.last_runs.filter((r) => r.role !== "runner");
@@ -119,27 +119,29 @@ export function Sidebar() {
         <span className="font-serif text-[26px] whitespace-nowrap text-forest">Stochastic</span>
       </div>
 
-      <nav className="flex w-full flex-col gap-[4px]">
+      <div className="flex w-full flex-col gap-[4px]">
         <Label>Deal</Label>
         <span className="truncate text-[13px] text-slate" title={deal?.name}>{deal ? `${deal.platform} · ${deal.target}` : "-"}</span>
         <span className="h-[6px]" />
-        {PAGES.map((p) => {
-          const on = p.href === "/" ? path === "/" : path.startsWith(p.href);
-          return (
-            <Link
-              key={p.href}
-              href={p.href}
-              aria-current={on ? "page" : undefined}
-              className={`flex w-full items-center gap-[10px] rounded-[8px] px-[10px] py-[9px] text-[14px] transition-colors duration-150 ${
-                on ? "bg-forest font-semibold text-white" : "font-medium text-body hover:bg-mint/60 [&_svg]:text-forest"
-              }`}
-            >
-              <NavIcon name={p.icon} />
-              {p.label}
-            </Link>
-          );
-        })}
-      </nav>
+        <nav className="flex w-full flex-col gap-[4px]" aria-label="Pages">
+          {PAGES.map((p) => {
+            const on = p.href === "/" ? path === "/" : path.startsWith(p.href);
+            return (
+              <Link
+                key={p.href}
+                href={p.href}
+                aria-current={on ? "page" : undefined}
+                className={`flex w-full items-center gap-[10px] rounded-[8px] px-[10px] py-[9px] text-[14px] transition-colors duration-150 ${
+                  on ? "bg-forest font-semibold text-white" : "font-medium text-body hover:bg-mint/60 [&_svg]:text-forest"
+                }`}
+              >
+                <NavIcon name={p.icon} />
+                {p.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
 
       <div className="flex w-full flex-col gap-[6px]">
         <Label>Model</Label>
