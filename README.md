@@ -151,6 +151,18 @@ The gateway, the math, and the audit log are real.
 - Plan search, Monte Carlo, and rejection-to-policy (these belong to the earlier framing).
 - A live SEC call on stage, and a staged denied-action demo.
 
+## Tracks
+
+We target three tracks. [set by Cayden, 2026-10-24]
+
+| Track | What we show |
+| --- | --- |
+| Hyphenate (main) | A real messy corner (two charts of accounts from a real deal), an answer key, limits in code, and one moment: the flagged line that changes the leverage verdict. |
+| Factory | The agents run through the Droid SDK, one fresh `run()` per work item, with a tool allowlist and typed output. |
+| Figma | The console is designed in Figma and built from the Figma frame. The Figma file and one agent-driven edit are on screen in the pitch. |
+
+Other tracks are not targeted. The details, the per-track checklist, and the open questions are in section 15 of `docs/STOCHASTIC.md`.
+
 ## Tech stack (proposed)
 
 | Layer | Choice |
@@ -251,7 +263,7 @@ Cayden owns the shared data contract in `backend/app/core/models.py`.
 
 ## Open questions
 
-- Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask at the Friday 7pm workshop.
+- Does PE add-on integration count as a corner of a finance team for Hyphenate? The Friday workshop has passed, so ask a Hyphenate mentor today.
 - Which part of Kewaunee's financing liability counts as covenant debt? A practitioner should confirm.
 - Can Droid run Claude models on our key?
 - Does the SEC allow us to redistribute the cached filings?

@@ -267,12 +267,41 @@ The shared contract must be agreed first, in a 30-minute session. [verified: `TA
 
 ---
 
+## D11. Target tracks: Hyphenate, Factory, and Figma
+
+Date: 2026-10-24.
+
+Decision:
+We target three tracks: Hyphenate (main), Factory, and Figma. [set by Cayden, 2026-10-24]
+Tiger Data, Microsoft, and Most Technically Advanced are not targeted.
+
+Why:
+Each track asks for different proof, so the work overlaps little.
+Hyphenate needs the real deal, the limits in code, and a moment.
+Factory needs agents that run through the Droid SDK.
+Figma needs the console designed in Figma and built from the Figma frame, with Figma on screen.
+The Figma MCP is already in use: the design system and four screens were built through `use_figma`. [verified: `design/README.md`]
+The Figma prizes are five at $1,000 each (self-reported, from the pre-event guide and Devpost). [verified: `CalHacks/ideation/sponsors/figma.md`]
+
+Rejected:
+- Tiger Data as a target. The Postgres store is a Should item, and forks add little to a one-screen demo. [inferred]
+- Microsoft, because it needs Microsoft products that we do not use. [inferred]
+- Chasing every sponsor. Stacking three prizes is already rare (22 of 1,324 winners for three or more). [verified]
+- An earlier note that skipped Figma as "no honest fit". That note predates the design work.
+
+Revisit if:
+The Figma prompts, when read on the Live Site, ask for something we cannot show.
+Our team has no Figma Agent access, so only Best Design and Most Creative remain realistic.
+A Hyphenate mentor says the sponsor tracks cost too much attention.
+
+---
+
 ## Open decisions
 
 These come from `STOCHASTIC.md` section 18.
 They are not decided yet.
 
-1. Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask at the Friday 7pm workshop.
+1. Does PE add-on integration count as a corner of a finance team for Hyphenate? The Friday workshop has passed. Ask a Hyphenate mentor today.
 2. Which part of Kewaunee's financing liability counts as covenant debt? A practitioner should confirm. We have not computed the ratio.
 3. Kewaunee's D&A and revolver draw were not in the pages the agent read. Tri must get them from the 10-K and 10-Q.
 4. Can Droid run Claude models on our key? Run `list_models()`, and ask Factory.

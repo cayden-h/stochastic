@@ -67,7 +67,21 @@ These are inputs for her, not tasks:
 - The frontend lives in `frontend/`. The API base URL is `NEXT_PUBLIC_API_URL`.
 - The design rules are in `design/README.md`.
 
+## Track checklist
+
+We target Hyphenate, Factory, and Figma. The full needs for each track are in section 15 of `STOCHASTIC.md`.
+
+| Track | Owner of the proof | What must be true by Saturday night |
+| --- | --- | --- |
+| Hyphenate | Cayden (demo), Eric (Devpost and the real-versus-simulated list) | The real deal runs end to end with the flag. The video opens with the flag moment. |
+| Factory | Cayden | At least one agent runs with `AGENT_BACKEND=droid`. We know if Droid can run Claude models. |
+| Figma | Josie (design) | The console frame exists in Figma and the console follows it. Figma is on screen in the pitch. |
+
+Josie's part is design only, and it is the same work she already does. No other task moves to her.
+
 ## Order of work
+
+Today is Saturday. If a Friday step is not finished, finish it first.
 
 1. **Friday night.** The shared contract. The `list_models()` answer. The filings cached. The two input files started.
 2. **Saturday morning.** Tools and tests (Tri). Both backends and the Mapper (Cayden). The input files and answer key finished (Eric). The first screen on fixtures (Josie).

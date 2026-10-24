@@ -211,8 +211,9 @@ Must (the demo does not work without these):
 3. Consolidation, EBITDA, and leverage tools, with tests that use the real figures.
 4. The gateway with work-item states, maker-checker, and the audit log.
 5. The Preparer and the Reviewer (hardcoded text is fine, but the tool calls are real).
-6. The console screen: flag card, combined table, verdict line.
+6. The console screen: flag card, combined table, verdict line. It is built from the Figma frame (Figma track).
 7. A recorded run and a backend switch, so the demo survives a failure.
+8. Track proofs: at least one agent runs with `AGENT_BACKEND=droid` (Factory), and the Figma file is on screen in the pitch (Figma).
 
 Should (if the schedule holds):
 - A live Droid-backed agent call in the demo.
@@ -240,20 +241,46 @@ Cut (do not build this weekend):
 
 ## 15. Tracks and sponsors
 
-Status as of 2026-10-23. Sponsor research is in `sponsors/`.
+Status as of 2026-10-24. Sponsor research is in `sponsors/`.
 
 | Track | Status | Note |
 | --- | --- | --- |
 | Hyphenate (main) | Target | $8K, $5K, $3K, plus interviews for the top 5. Select it on Devpost. |
-| Factory | Target (build runner) | Cayden has a Factory account on the Plus plan. Droid runs the agents we show. Confirm prize rules and Claude model access at the workshop. |
-| Tiger Data (MLH) | Maybe | Only if the Postgres store gets built. A fork can hold the two answers to the flag. |
-| Microsoft | Maybe | Ask whether Microsoft products are required. |
-| Most Technically Advanced | Maybe | Costs no extra work. |
-| Mana | Skip, lean | Needs the founders' confirmation that it counts. |
+| Factory | Target (build runner) | Cayden has a Factory account on the Plus plan. Droid runs the agents we show. Confirm prize rules and Claude model access with a Factory mentor, because the Friday workshop has passed. |
+| Figma | Target | Five prizes at $1,000 each (self-reported): Best Use Case of Figma, Best Use Case of Figma Agent, Most Creative Use Case of Figma Agent, Best Design, Most Creative. Josie designs the console in Figma, and the Figma MCP is in the loop. Prompts are not published, so read the Live Site. |
+| Tiger Data (MLH) | Not targeted | Dropped as a target on 2026-10-24. Revisit only if the Postgres store gets built anyway. |
+| Microsoft | Not targeted | Dropped as a target. It needs Microsoft products that we do not use. |
+| Most Technically Advanced | Not targeted | Costs no extra work if it is open to all. Do not build for it. |
+| Mana | Skip | Needs the founders' confirmation that it counts. |
 | GoDaddy, Vultr, Gemini API (MLH) | Cheap | Count only if the integration is real. |
 | Others | Skip | No honest fit. |
 
-Stacking three or more prizes is rare. Plan for Hyphenate and Factory first. [verified: 22 of 1,324 winners in the scrape]
+The three target tracks are Hyphenate, Factory, and Figma. [set by Cayden, 2026-10-24]
+Stacking three prizes is rare. [verified: 22 of 1,324 winners in the scrape, for three or more]
+The three tracks ask for different proof, so the work does not overlap much.
+Cal Hacks has not confirmed that one project can opt into several sponsor tracks. Ask a Cal Hacks organizer today.
+
+### What each target track needs from us
+
+Hyphenate:
+- A real messy corner: two different charts of accounts from a real deal.
+- An answer key: Note 2 of the Kewaunee pro forma.
+- Limits in code: the covenant test, the maker-checker rule, and the gateway as the only writer.
+- A moment: the flagged line that changes the leverage verdict.
+- A demo video that opens with that moment, a live demo, a one-line seat, and a real-versus-simulated list.
+
+Factory:
+- The agents we show run through the Droid SDK, one fresh `run()` per work item.
+- `AGENT_BACKEND=droid` must work for at least one agent in the demo, or we do not claim "built with Droid".
+- A short statement of what the SDK made possible: a tool allowlist (`restrict_tools`), typed output, and per-run isolation.
+- Open: the prize rubric, and whether our key can run Claude models.
+
+Figma:
+- The Figma file is the design source for the console, with the Tokens variables and components already built.
+- The console screen is built from the Figma frame, using the Figma MCP or Code Connect, and not redrawn by hand.
+- Figma is on screen in the pitch: the frame, the component set, and one agent-driven edit through `use_figma`.
+- Design polish counts for Best Design: one hero screen, plain verdict words, state shown by color plus word plus shape, and a clickable prototype.
+- Open: the exact prompts for the five prizes, and whether our team has Figma Agent access (the Education plan is free).
 Cal Hacks has not confirmed that one project can opt into several sponsor tracks. Ask at kickoff.
 
 ## 16. Hyphenate judging
@@ -288,7 +315,7 @@ Do not lead the pitch with ingestion.
 
 ## 18. Open questions
 
-- Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask at the Friday 7pm workshop.
+- Does PE add-on integration count as a corner of a finance team for Hyphenate? The Friday workshop has passed. Ask a Hyphenate mentor or the sponsor channel today, unless Cayden already asked.
 - Which part of Kewaunee's financing liability counts as covenant debt? A practitioner should confirm. We have not computed the ratio.
 - Kewaunee's D&A and revolver draw were not in the pages the agent read. Tri must get them from the 10-K and 10-Q.
 - Can Droid run Claude models on our key? Run `list_models()`, and ask Factory.
