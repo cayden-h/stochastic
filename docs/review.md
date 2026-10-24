@@ -1,5 +1,9 @@
 # Review of the problem, the solution, and the research (2026-10-24, 01:00 to 02:30)
 
+Update, 2026-10-24 evening: the items in "What to add" are done, except judge-supplied input through a screen (the `POST /deals` route exists).
+A later six-part risk review changed the moment: the whole-line reading is now computed as filed, 2.84x, with $3,470K of EBITDA to spare, and the gateway enforces the exclusion, provenance, and review rules (D18 in `decisions.md`).
+The figures below are as written at 02:30.
+
 Written by Cayden's agent after reading every doc in `docs/`, the research, the sponsor notes, and the code, and after building the backend end to end.
 Tags: [verified] means a file, a filing, or a test shows it. [inferred] means judgment.
 
@@ -40,12 +44,12 @@ What is weaker than the docs suggested:
 
 ## What to add (ranked by value for the weekend)
 
-1. The console on the new API. Everything else waits on it. (Josie)
-2. One recorded model run (Anthropic first, Droid second) so the pitch can say the agent text came from a model at least once. (Cayden)
-3. The second-run memory moment on stage: reset, run again, no flag, `policy:apply` in the log. It costs nothing and answers "did we see something new". (Cayden, Josie for the visible state)
-4. The Note 2 answer-key score, as one number on the honesty slide. (Eric)
-5. `debt_capacity` on the verdict line: "room for the next deal: $49M" is the line a PE associate hears. (Tri)
-6. Judge-supplied input: `POST /deals` with two CSVs, so the system handles unseen input as the brief asks. (Tri, Eric)
+1. Done. The console on the new API. Everything else waits on it. (Josie)
+2. Done. One recorded model run (Anthropic first, Droid second) so the pitch can say the agent text came from a model at least once. (Cayden)
+3. Done. The second-run memory moment on stage: reset, run again, no flag, `policy:apply` in the log. It costs nothing and answers "did we see something new". (Cayden, Josie for the visible state)
+4. Done. The Note 2 answer-key score, as one number on the honesty slide. (Eric)
+5. Done, worded as covenant headroom (about $49.3M), with the $5M basket and the revolver as the real cap. `debt_capacity` on the verdict line. (Tri)
+6. Done as an API route, no screen yet. Judge-supplied input: `POST /deals` with two CSVs, so the system handles unseen input as the brief asks. (Tri, Eric)
 7. A one-line statement for each sponsor: what the Droid SDK made possible (per-role sessions, `restrict_tools`, typed output), and what Figma made possible.
 
 ## What not to add

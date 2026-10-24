@@ -23,7 +23,7 @@ It adds back the noncash pension termination expense, stock-based compensation, 
 It includes Nu Aire's EBITDA for the four quarters from November 1, 2023, and it deducts extraordinary gains and the cash rent on the Statesville property. [verified: Ex 10.1, definitions]
 
 The brief puts these terms in front of the tools, so the debt figure and the EBITDA figure follow the agreement and not a generic formula. [verified: `backend/app/db/fixtures/kewaunee.py`, `BRIEF`]
-That is why one balance sheet line can read as 2.54x or 0.76x: the face of the statements and the agreement disagree about what counts. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
+That is why one balance sheet line can read as 2.84x as filed or 0.76x under the agreement: the face of the statements and the agreement disagree about what counts. [verified: `test_the_demo_run_beat_by_beat`]
 Today's covenant EBITDA is $28,379K, built as the definition says: interest income subtracted, the pension termination expense and stock-based compensation added back, cash rent deducted. [verified: same test]
 It is not final: the filings do not give every input for the tested period, so the rent and transaction-cost figures are our estimates. [verified: `evals/fixture_check.md`]
 
@@ -45,5 +45,5 @@ Speaker line: "The tools use the agreement's definitions, not the balance sheet'
 
 - Whether the failed sale-leaseback counts as a "capitalized lease obligation" under the exclusion. We read it as yes. [inferred]
 - The Statesville cash rent for the tested period. We use $1,970K, the 10-K's obligation due within one year. [inferred]
-- Transaction and integration costs. The demo applies $0. Ex 99.2 Note 5(b) estimates $698K of expected transaction expenses after 2024-10-31, which may or may not fall in the tested period. [verified: Ex 99.2, Note 5(b); timing inferred]
+- Transaction and integration costs. The demo applies $0. Ex 99.2 Note 5(b) estimates $698K of expected transaction expenses after 2024-10-31, which may or may not fall in the tested period. It moves only the agreement's reading, which stays far under the limit. [verified: Ex 99.2, Note 5(b); timing inferred]
 - Nu Aire's EBITDA for the exact four quarters the agreement names. We use its audited year to 2024-09-30, one month off. [inferred]

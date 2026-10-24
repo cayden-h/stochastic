@@ -7,6 +7,17 @@ import { API_URL } from "@/lib/api";
 export function Gate({ children }: { children: React.ReactNode }) {
   const { error, kase, loading } = useDeal();
   if (loading) return <div className="mx-auto max-w-[960px] py-12 text-muted">Loading the deal.</div>;
+  if (error && kase) {
+    // The API dropped after the first load: say so instead of leaving a stale screen that looks live.
+    return (
+      <>
+        <p role="status" className="sticky top-0 z-10 bg-escalation-tint px-4 py-2 text-center font-semibold text-escalation">
+          Reconnecting to the gateway at {API_URL}. The screen below is the last state it sent.
+        </p>
+        {children}
+      </>
+    );
+  }
   if (error && !kase) {
     return (
       <div className="mx-auto max-w-[960px] py-12">

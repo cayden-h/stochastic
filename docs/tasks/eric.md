@@ -23,7 +23,7 @@ On 2026-10-24 at 08:20 Cayden moved Eric's open tasks to Cayden and Tri. The lis
 2. (Tri) **Wording for the compliance certificate** (Tri builds the route, his task 2). Find what Ex 10.1 says the compliance certificate must contain, and the test period and delivery deadline. Write the sections and the fixed wording into `docs/devpost/certificate.md`, with the exhibit and section for each and quotes under 15 words. About 1 hour.
 3. (Tri) **Check the two inferred inputs again.** The pitch rests on them.
    - The Statesville cash rent ($1,970K): is the 10-K obligations-table figure right for the test period? Write the source, or a better figure, into `evals/fixture_check.md`.
-   - Transaction costs ($698K expected, kept at zero): does the 8-K/A or Ex 10.1 say whether they count in the test period? Applying them would put the whole-line reading under 2.50x, so the answer matters.
+   - Transaction costs ($698K expected, kept at zero): does the 8-K/A or Ex 10.1 say whether they count in the test period? Before 2026-10-24 evening, applying them would have put the whole-line reading under 2.50x; now they move only the agreement's reading (see the note at the end).
    - Give any change to Tri; the tools recompute, and Cayden updates the pitch words.
 4. (Cayden) **The honest-limits card and a one-page summary**, printable, for the table: what is real, what is inferred, what is cut (purchase accounting, the five-month fiscal year gap), and the four tracks. Base it on `demo-script.md` section 6 and the real-versus-simulated list.
 5. (Everyone) **Answer three judge questions without notes** on the filings, Note 2, and the brief (`demo-script.md` section 8).
@@ -158,3 +158,11 @@ Pitch line we can defend: "Each agent can only see its own tools (Droid `restric
 ### Not in scope
 
 - Forking Droid sessions per what-if option, and `QuestionHandler`. We decided not to build these for now.
+
+## Changed on 2026-10-24 evening (Cayden's agent, commits 0e3829f and 3938ca9 on `cayden/risk-fixes`)
+
+Nothing in `data/`, `scripts/`, or the fixture changed.
+The whole-line reading is now computed as filed, debt over reported EBITDA: 2.84x instead of 2.54x, with $3,470K of EBITDA to spare, so the inferred rent and the $698K transaction costs no longer move it (D18 in `decisions.md`).
+`evals/fixture_check.md` has a note at the top saying its earlier whole-line figures used covenant EBITDA.
+The scripted Mapper's option a label is now "The whole line counts" (no amount), and it tags operating leases `na`, because the gateway now refuses a `not_debt` tag that no controller answer made.
+Your Anthropic run is credited in the docs: one full run and about 50 Mapper trials, not on the demo laptop.

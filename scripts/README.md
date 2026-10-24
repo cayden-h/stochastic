@@ -13,3 +13,4 @@ Helper scripts. Owner: Eric (data pulls) and Cayden (agent probes).
 | `droid_rewind_live_check.py` | Runs the demo deal on Droid, forces the gateway to refuse the Mapper's result, and checks Factory's session records: the old session holds the refused turn, the successor the retry uses does not. Spends Factory credits. |
 | `droid_probe.py` | Lists the models our Factory key can run and makes one `run()` call with structured output in an empty directory. Answers "can Droid run Claude?" |
 | `record_run.py` | Runs the whole deal on a chosen backend and saves each agent's output to `backend/recordings/`, the replay fallback for the demo. |
+| `run_unseen_deal.py` | Runs the whole deal with a QuickBooks trial balance as the target, in memory, on `AGENT_BACKEND`, and prints the flags, mappings and verdict. For a judge's own scenario. The live Droid run on the sample company is in `evals/unseen-input-quickbooks.md`. |

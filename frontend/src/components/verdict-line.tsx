@@ -9,9 +9,11 @@ import { Button, Mono, Shape, Verdict } from "./ui";
  * Approve is live only while the approval item is PROPOSED. Every figure names its tool run.
  */
 export function VerdictLine({
-  verdict, runIds, busy, onApprove, onReject,
+  verdict, runIds, busy, onApprove, onReject, asFiled,
 }: {
   verdict: VerdictShape; runIds: Record<string, string>; busy: boolean; onApprove: () => void; onReject: () => void;
+  /** The whole-line reading from the answered covenant flag, so the comparison stays on screen after the answer. */
+  asFiled?: { leverage: number; ok: boolean; run_id: string | null } | null;
 }) {
   const over = verdict.verdict === "over_limit";
   const review = verdict.review?.verdict ?? null;
@@ -24,6 +26,7 @@ export function VerdictLine({
         </h2>
         <Verdict kind={over ? "over_limit" : "ok"} />
         {review ? <Verdict kind={review} /> : <Verdict kind="waiting" word="Reviewer pending" />}
+
         <span className="flex-1" />
         {verdict.posted ? (
           <span className="flex items-center gap-2 font-semibold text-clear"><Shape kind="check" />Approved and posted to the record.</span>
@@ -37,18 +40,29 @@ export function VerdictLine({
         ) : null}
       </div>
 
+      {asFiled ? (
+        <p className="-mt-2 text-muted">
+          Read as filed, counting the whole financing line:{" "}
+          <span className={`font-semibold tabular-nums ${asFiled.ok ? "text-ink" : "text-denied"}`}>
+            {fmtX(asFiled.leverage)}, {asFiled.ok ? "under the limit" : "over the limit"}
+          </span>
+          . The agreement&apos;s definition gives {fmtX(verdict.leverage)}.{" "}
+          {asFiled.run_id ? <Mono>{asFiled.run_id}</Mono> : null}
+        </p>
+      ) : null}
+
       <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Figure label={verdict.debt_term} value={fmtK(verdict.debt)} run={runIds.covenant_debt} />
         <Figure label="Covenant EBITDA" value={fmtK(verdict.ebitda)} run={runIds.ebitda} />
         <Figure
-          label="Room under the limit"
+          label="Room (turns of EBITDA)"
           value={over ? `Over by ${fmtX(-verdict.headroom_turns)}` : fmtX(verdict.headroom_turns)}
           run={runIds.leverage}
           tone={over ? "text-denied" : undefined}
         />
         <Figure
-          label="Debt capacity for the next deal"
-          value={verdict.debt_capacity == null ? "Not run" : over ? "None" : `about ${fmtM(verdict.debt_capacity)}`}
+          label="Covenant headroom"
+          value={verdict.debt_capacity == null ? "Not run" : over ? "None" : `${fmtM(verdict.debt_capacity)} of debt`}
           run={verdict.debt_capacity_run_id ?? undefined}
           sub={verdict.debt_capacity == null || over ? undefined : fmtK(verdict.debt_capacity)}
         />

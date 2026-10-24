@@ -1,5 +1,7 @@
 # Fixture check against the filings (2026-10-24)
 
+Note, 2026-10-24 evening: figures here from before that evening computed the whole-line reading on covenant EBITDA (2.54x); it is now computed as filed, over reported EBITDA (2.84x, D18 in `docs/decisions.md`).
+
 Checked by Eric against `backend/app/db/fixtures/kewaunee.py` at commit d6a909e.
 Filings pulled with `scripts/fetch_filings.py` into `data/raw/` (git-ignored).
 Tags: [verified] means the filing text shows it. [inferred] means judgment.

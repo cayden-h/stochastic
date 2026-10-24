@@ -4,14 +4,21 @@ export type Stage = "new" | "awaiting_flag" | "mapped" | "flags_answered" | "awa
 export type Backend = "scripted" | "anthropic" | "droid" | "replay" | string;
 
 export interface Evidence { quote: string; page: number | null; document_id: string | null }
-export interface Option { id: string; label: string; effect: string; run_id: string | null; added_by?: string | null }
+export interface Option {
+  id: string; label: string; effect: string; run_id: string | null; added_by?: string | null;
+  // Covenant flags only, read by the gateway from the option's limit_test run.
+  leverage?: number | null; ok?: boolean | null; basis?: "covenant" | "as_filed" | null;
+}
 
 export interface Brief {
   lender: string; agreement_ref: string; limit: number; limit_section: string; limit_wording: string;
   debt_term: string; debt_definition: string; debt_excludes: string[]; ebitda_definition: string;
 }
 
-export interface Deal { id: string; name: string; platform: string; target: string; stage: Stage; brief: Brief }
+export interface Deal {
+  id: string; name: string; platform: string; target: string; stage: Stage; brief: Brief;
+  ebitda_basis?: "covenant" | "as_filed";
+}
 
 export interface SourceLine {
   id: string; company: string; line: string; section: "balance_sheet" | "income_statement" | "cash_flow";
@@ -44,6 +51,7 @@ export interface Result {
 export interface Verdict {
   leverage: number; limit: number; verdict: "ok" | "over_limit"; headroom_turns: number;
   ebitda: number; debt: number; debt_term: string; debt_capacity: number | null; debt_capacity_run_id: string | null;
+  naive_debt?: number; naive_ebitda?: number; naive_leverage?: number; naive_flip_addback?: number; sensitivity_run_id?: string;
   review: { verdict: "pass" | "needs_attention"; reasons: string[]; run_ids: string[] } | null;
   tie_out_ok: boolean; backend: Backend; approval_item: string | null; approval_state: State | null; posted: boolean;
 }

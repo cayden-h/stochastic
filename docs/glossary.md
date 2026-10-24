@@ -213,7 +213,7 @@ Example: no Kewaunee and Nu Aire intercompany amount is in the research files, s
 
 A leverage ratio is debt divided by EBITDA.
 It shows how many years of EBITDA it would take to repay the debt.
-A naive ratio uses the plain numbers, such as all debt-like lines.
+A naive ratio uses the plain numbers as filed: all debt-like lines over reported EBITDA, with none of the agreement's adjustments.
 A covenant ratio uses the credit agreement's own definitions of debt and EBITDA.
 The two can differ a lot. [verified: source file, `STOCHASTIC.md` section 11]
 
@@ -221,8 +221,8 @@ In Stochastic: the verdict line shows the covenant ratio next to the limit. Tri 
 
 Example: a deliberately naive numerator would add all of "financing liability", which is $70,885K pro forma. [verified: filing figures, naive use is our construction]
 The covenant numerator excludes the seller notes and the Statesville lease. [verified: filing, Ex 10.1]
-We have not computed either ratio yet. [verified: source file]
-The expectation that the covenant ratio is well under 2.50x and the naive one is much closer is [inferred].
+Computed on 2026-10-24: the covenant ratio is 0.76x ($21,633K over covenant EBITDA $28,379K), and the naive ratio as filed is 2.84x ($71,955K over reported EBITDA $25,312K), over the 2.50x limit. [verified: `test_the_demo_run_beat_by_beat`]
+The naive debt adds $1,070K of short-term borrowings and finance leases that count in every reading. [verified: fixture]
 
 ## Maker-checker
 

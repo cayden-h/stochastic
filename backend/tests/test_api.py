@@ -291,16 +291,17 @@ def test_upload_rejects_non_finite_brief_figures(path, value):
 
 
 def test_verdict_sensitivity_from_limit_test_run():
-    # Whole-line debt 71,955 (flag option a) / 28,378.845 = 2.536. Flip add-back 71,955 / 2.5 - 28,378.845 = 403.155.
-    # Flip rent 1,970 - 403.155 = 1,566.845.
+    # Whole-line reading as filed: debt 71,955 (flag option a) / reported EBITDA 25,312 = 2.843.
+    # Flip: 71,955 / 2.5 - 25,312 = 3,470: EBITDA would have to rise that much for the as-filed reading to pass.
     c = TestClient(create_app())
     body = full_run(c)
     CaseResponse.model_validate(body)
     v = body["verdict"]
     assert v["naive_debt"] == pytest.approx(71955.0, abs=0.001)
-    assert v["naive_leverage"] == pytest.approx(2.536, abs=0.0005)
-    assert v["naive_flip_addback"] == pytest.approx(403.155, abs=0.001)
-    assert v["naive_flip_rent"] == pytest.approx(1566.845, abs=0.001)
+    assert v["naive_ebitda"] == pytest.approx(25312.0, abs=0.5)
+    assert v["naive_leverage"] == pytest.approx(2.843, abs=0.0005)
+    assert v["naive_flip_addback"] == pytest.approx(71955.0 / 2.5 - v["naive_ebitda"], abs=0.001)
+    assert "naive_flip_rent" not in v
     run = c.get(f"/runs/{v['sensitivity_run_id']}").json()
     assert run["tool"] == "limit_test" and run["inputs"]["sensitivity"] is True
     assert run["inputs"]["leverage_run_id"] == body["result"]["run_ids_by_tool"]["leverage"]

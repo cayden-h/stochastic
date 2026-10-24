@@ -21,8 +21,9 @@ def _call_tool(gw: Gateway, actor: str, deal_id: str):
 def _run(gw: Gateway, role: Role, inp, deal_id: str, item_id: str, backend: str | None,
          rewind_to: str | None = None):
     """Run a role with its saved session, so a backend that can resume (Droid) continues the same conversation."""
+    extra = {"rewind_to": rewind_to} if rewind_to else {}  # only a retry after a refusal asks for a rewind
     return run_agent(role, inp, _call_tool(gw, role.actor, deal_id), session=gw.store.sessions.get(role.name),
-                     backend=backend, rewind_to=rewind_to)
+                     backend=backend, **extra)
 
 
 def _refused_turn(gw: Gateway, role: Role, run) -> str | None:
@@ -34,6 +35,39 @@ def _refused_turn(gw: Gateway, role: Role, run) -> str | None:
     if ok.get("resumed") and saved and ok.get("session_id") == saved.session_id:
         return ok.get("turn_message_id")
     return None
+
+
+def _store_or_fall_back(gw: Gateway, role: Role, inp, deal_id: str, item_id: str, backend: str | None, store_fn,
+                        log: list[str], retry_with_reason: bool = False):
+    """Run the role and hand its result to the gateway. If the gateway refuses it, the refusal is already in the
+    audit log; the Mapper first retries once with the reason, then the scripted backend makes the result, so a
+    refused model result costs one more run instead of failing the deal on stage. The scripted result goes
+    through the same checks."""
+    run = _run(gw, role, inp, deal_id, item_id, backend)
+    try:
+        return run, store_fn(run)
+    except Invalid as error:
+        log.append(f"{role.name} result refused on {run.backend}: {error.message}")
+        if retry_with_reason and run.backend != "scripted":
+            # The agent forgets its refused answer (rewind) but still learns why it was refused (previous_refusal).
+            rewind_to = _refused_turn(gw, role, run)
+            inp = inp.model_copy(update={"previous_refusal": error.message})
+            run = _run(gw, role, inp, deal_id, item_id, backend, rewind_to=rewind_to)
+            ok = next((a for a in reversed(run.attempts) if a.get("ok")), {})
+            if ok.get("rewound"):
+                log.append(f"{role.name} session rewound before the retry: {ok.get('rewound_from_session')} "
+                           f"-> {ok.get('session_id')}")
+            elif rewind_to:
+                log.append(f"{role.name} session not rewound: {ok.get('rewind_error') or 'the retry ran on ' + run.backend}")
+            try:
+                return run, store_fn(run)
+            except Invalid as again:
+                log.append(f"{role.name} result refused again on {run.backend}: {again.message}")
+        if run.backend == "scripted":
+            raise
+    run = _run(gw, role, inp, deal_id, item_id, "scripted")
+    log.append(f"{role.name} fell back to scripted after the refusal")
+    return run, store_fn(run)
 
 
 def _remember(gw: Gateway, role: Role, run, item_id: str, summary: str) -> None:
@@ -63,22 +97,9 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
                               platform_lines=store.lines(deal_id, deal.platform), brief=deal.brief,
                               policies=store.role_policies(MAPPER_ROLE.actor),
                               session=store.sessions.get(MAPPER_ROLE.name))
-            run = _run(gw, MAPPER_ROLE, inp, deal_id, item.id, backend)
-            try:
-                gw.store_mapping(MAPPER_ROLE.actor, item.id, run.output)
-            except Invalid as error:  # the gateway logged the refusal; one retry with the reason, then fail as before
-                log.append(f"mapper result refused on {run.backend}: {error.message}")
-                # The agent forgets its refused answer (rewind) but still learns why it was refused (previous_refusal).
-                rewind_to = _refused_turn(gw, MAPPER_ROLE, run)
-                inp = inp.model_copy(update={"previous_refusal": error.message})
-                run = _run(gw, MAPPER_ROLE, inp, deal_id, item.id, backend, rewind_to=rewind_to)
-                ok = next((a for a in reversed(run.attempts) if a.get("ok")), {})
-                if ok.get("rewound"):
-                    log.append(f"mapper session rewound before the retry: {ok.get('rewound_from_session')} "
-                               f"-> {ok.get('session_id')}")
-                elif rewind_to:
-                    log.append(f"mapper session not rewound: {ok.get('rewind_error') or 'the retry ran on ' + run.backend}")
-                gw.store_mapping(MAPPER_ROLE.actor, item.id, run.output)
+            run, _ = _store_or_fall_back(gw, MAPPER_ROLE, inp, deal_id, item.id, backend,
+                                         lambda r: gw.store_mapping(MAPPER_ROLE.actor, item.id, r.output), log,
+                                         retry_with_reason=True)
             _remember(gw, MAPPER_ROLE, run, item.id,
                       f"mapped {len(run.output.mappings)} lines, {len(run.output.flags)} flags")
             log.append(f"mapper ran on {run.backend}")
@@ -91,8 +112,9 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
                                 target_lines=store.lines(deal_id, deal.target),
                                 mappings=[m for m in store.deal_mappings(deal_id) if not m.flagged or m.approved_by],
                                 brief=deal.brief, session=store.sessions.get(PREPARER_ROLE.name))
-            run = _run(gw, PREPARER_ROLE, inp, deal_id, item.id, backend)
-            result = gw.store_result(PREPARER_ROLE.actor, item.id, run.output, backend=run.backend)
+            run, result = _store_or_fall_back(
+                gw, PREPARER_ROLE, inp, deal_id, item.id, backend,
+                lambda r: gw.store_result(PREPARER_ROLE.actor, item.id, r.output, backend=r.backend), log)
             _remember(gw, PREPARER_ROLE, run, item.id, f"result {result.id}: leverage {result.leverage:.2f}x")
             log.append(f"preparer ran on {run.backend}: leverage {result.leverage:.2f}x")
             continue
@@ -106,8 +128,8 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
                                 run_ids=result.run_ids, consolidate_run_id=result.run_ids_by_tool.get("consolidate"),
                                 leverage_run_id=result.run_ids_by_tool.get("leverage"),
                                 session=store.sessions.get(REVIEWER_ROLE.name))
-            run = _run(gw, REVIEWER_ROLE, inp, deal_id, item.id, backend)
-            gw.store_review(REVIEWER_ROLE.actor, item.id, run.output)
+            run, _ = _store_or_fall_back(gw, REVIEWER_ROLE, inp, deal_id, item.id, backend,
+                                         lambda r: gw.store_review(REVIEWER_ROLE.actor, item.id, r.output), log)
             _remember(gw, REVIEWER_ROLE, run, item.id, f"{run.output.verdict} on {result.id}")
             log.append(f"reviewer ran on {run.backend}: {run.output.verdict}")
             continue

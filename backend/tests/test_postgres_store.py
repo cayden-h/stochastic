@@ -124,6 +124,50 @@ def test_the_writer_reconnects_after_the_connection_drops(schema):
     again.close()
 
 
+def test_the_record_reads_in_sql_and_survives_the_columnstore(schema):
+    store = open_store(schema)
+    gw = Gateway(store)
+    seed(store, gw)
+    run_to_posted(gw)
+    assert store.flush()
+    with psycopg.connect(URL, autocommit=True, options=f"-c search_path={schema},public") as conn:
+        run = conn.execute("SELECT posted, stage, verdict, flags, answers, seconds FROM ledger_runs").fetchone()
+        assert run[:2] == (True, "posted") and run[2] and run[3] >= 1 and run[4] == run[3] and run[5] >= 0
+        tests = conn.execute("SELECT debt, ebitda, leverage FROM covenant_runs WHERE NOT naive").fetchall()
+        assert tests and all(d and e and abs(float(d) / float(e) - float(lev)) < 0.001 for d, e, lev in tests)
+        assert conn.execute("SELECT runs FROM run_stats").fetchone() == (1,)
+        assert conn.execute("SELECT sum(rows) FROM audit_activity").fetchone()[0] == len(store.audit)
+        top = conn.execute("SELECT search_text FROM record ORDER BY search_text <@> 'lease' LIMIT 1").fetchone()[0]
+        assert "lease" in top.lower()
+        # Turn the whole audit log columnar now, as the policy does after a day, then keep writing to it.
+        conn.execute("SELECT compress_chunk(c) FROM show_chunks('audit_log') c")
+        assert conn.execute("SELECT bool_and(is_compressed) FROM timescaledb_information.chunks "
+                            "WHERE hypertable_schema = %s AND hypertable_name = 'audit_log'", (schema,)).fetchone()[0]
+    with gw.lock:
+        store.reset_deals(keep_memory=True)
+        seed(store, gw)
+    advance(gw, DEAL_ID, backend="scripted")
+    assert store.flush() and store.status()["last_error"] is None
+    rows = len(store.audit)
+    store.close()
+    again = open_store(schema)  # the migration runs again on a columnar audit log
+    assert again.ledger == 2 and len(again.audit) == rows and Gateway(again).verify_chain()
+    again.close()
+    with psycopg.connect(URL, options=f"-c search_path={schema},public") as conn:
+        with pytest.raises(psycopg.errors.RaiseException, match="append only"):
+            conn.execute("DELETE FROM audit_log WHERE ledger = 1")
+
+
+def test_a_failing_analytics_script_leaves_the_store_on_postgres(schema, monkeypatch):
+    import app.db.postgres as pg
+    monkeypatch.setattr(pg, "ANALYTICS_SQL", "SELECT no_such_function();")
+    store = open_store(schema)
+    assert store.kind == "postgres" and "no_such_function" in store.status()["analytics_error"]
+    seed(store, Gateway(store))
+    assert store.flush() and store.status()["last_error"] is None
+    store.close()
+
+
 def test_a_second_process_cannot_write_the_same_schema(schema):
     from app.db.postgres import SchemaInUse
     store = open_store(schema)

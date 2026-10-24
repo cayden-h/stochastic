@@ -80,7 +80,7 @@ class MemoryStore:
         return [r for r in self.results.values() if r.deal_id == deal_id]
 
     def role_policies(self, role: str) -> list[Policy]:
-        return [p for p in self.policies.values() if p.role == role]
+        return [p for p in self.policies.values() if p.role == role and not p.retired_by]
 
     def latest_result(self, deal_id: str) -> Result | None:
         rs = self.deal_results(deal_id)

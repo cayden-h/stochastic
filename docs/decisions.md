@@ -410,3 +410,26 @@ Limits: a fork takes 33 to 35 s, so it never blocks the flag; the options and ef
 
 Evidence: `backend/tests/test_whatif_forks.py` (lifecycle, answer before ready, failure, one slot, cleanup, and an opt-in round trip against Tiger that passed on 2026-10-24); the live browser run at 08:53 in `agents.md` section 9.
 
+
+## D18. The whole-line reading is as filed, and the gateway enforces what the prompts only asked
+
+Date: 2026-10-24, evening. Decided by Cayden after a six-part risk review of the project (finance, live demo, track fit, claims, agent design, UI).
+
+Context: the review found two kinds of problem.
+The finance review found that option a counted the Statesville financing as debt while still deducting its rent from EBITDA, which mixes two readings: made consistent it is 2.37x, under the limit, and as built it was over by only $403K of EBITDA. [verified: arithmetic]
+The agent-design review reproduced, against the real gateway, a Mapper that excluded the financing lines itself (0.04x, Reviewer pass), a Preparer result that cited a what-if run (0.76x stored after the controller chose 2.54x) or passed raw numbers to leverage (0.01x), a Reviewer pass with no runs that went straight to POSTED, and a reversed answer that stayed live as a policy for the next deal.
+
+Decision:
+1. The whole-line option is computed as filed: balance sheet debt over reported EBITDA, with no add-back and no rent deduction. On the demo deal that is $71,955K over $25,312K, 2.84x, over the limit, and it needs $3,470K more EBITDA to pass. Choosing it puts the deal on the as-filed basis (`Deal.ebitda_basis`), so the result is the same 2.84x the card showed and approval is refused. The other options keep covenant EBITDA (0.76x and 1.56x).
+2. A model's `not_debt` tag is refused unless it cites a live policy learned on that company's line.
+3. A result must cite the Preparer's own runs made after the last answer: non-naive debt, the deal's EBITDA basis, a leverage run that divides exactly those two, and rows equal to the consolidate run. Agents call `leverage` with run ids only.
+4. The gateway reads the Reviewer's pass from its `tie_out` and `limit_test` runs on this result.
+5. Policies are scoped to the company, and a reversal retires the policies a flag taught.
+6. A refused model result is retried once with the reason (Mapper), then made by the scripted backend under the same checks, so a refusal does not end the run on stage.
+7. Demo hardening from the same review: the pinned replay is a first run that raises the flag, `/dev/reset?keep_memory=false` is the reset between judges, the reset refuses during a run and frees the fork slot, and `DROID_TIMEOUT` defaults to 90 s (75 in the demo `.env`).
+
+Why: "the gateway, not the prompt, enforces it" is the pitch, and each of these was true only in the prompt. The as-filed reading removes the thin margin without changing the agreement's reading.
+
+Not changed: the test period. Each company's latest fiscal year stands in for the agreement's trailing twelve months to the closing quarter; that rebuild is the next step, said out loud.
+
+Evidence: `backend/tests/test_gateway_guards.py` (one test per attack), `backend/tests/test_demo_reset.py`, `backend/tests/test_mapper_retry.py`, `test_the_demo_run_beat_by_beat`; commits 0e3829f and 3938ca9.

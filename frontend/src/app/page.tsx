@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CombinedTable } from "@/components/combined-table";
 import { FlagCard } from "@/components/flag-card";
 import { Mappings } from "@/components/mappings";
@@ -9,7 +9,42 @@ import { Button, Mono, Shape } from "@/components/ui";
 import { VerdictLine } from "@/components/verdict-line";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
-import { fmtX, isLearned, isLearnedTag, plural } from "@/lib/format";
+import { fmtX, learnedPolicies, plural } from "@/lib/format";
+import type { Stage } from "@/lib/types";
+
+/** The three agents in order, and which stage means each one is working. */
+const STEPS: { role: string; working: string[]; done: string[] }[] = [
+  { role: "Mapper", working: ["mapping"], done: ["awaiting_flag", "mapped", "flags_answered", "preparing", "awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
+  { role: "Preparer", working: ["mapped", "flags_answered", "preparing"], done: ["awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
+  { role: "Reviewer", working: ["awaiting_review"], done: ["awaiting_approval", "needs_attention", "posted"] },
+];
+
+/** While the agents run (30 to 60 s on a live model), show who is working and for how long, from the stage.
+ * Keyed by the stage, so the clock restarts when the next agent starts. */
+function Progress({ stage }: { stage: Stage }) {
+  const [since] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const seconds = Math.max(0, Math.round((now - since) / 1000));
+  return (
+    <ol className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-chip border border-hairline bg-card px-4 py-3" aria-live="polite">
+      {STEPS.map((s) => {
+        const done = s.done.includes(stage);
+        const working = !done && s.working.includes(stage);
+        return (
+          <li key={s.role} className={`flex items-center gap-2 font-semibold ${done ? "text-clear" : working ? "text-ink" : "text-muted"}`}>
+            <Shape kind={done ? "check" : "circle"} size={12} />
+            {s.role}
+            {working ? <span className="tabular-nums text-muted">working, {seconds} s</span> : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 /**
  * The case: one screen from one read, GET /deals/{id}/case.
@@ -25,8 +60,19 @@ export default function CaseScreen() {
   const open = flags.filter((f) => open_flags.includes(f.id));
   const answered = flags.filter((f) => f.answer);
   const runIds = result?.run_ids_by_tool ?? {};
-  const learned = mappings.filter(isLearned).length + source_lines.filter(isLearnedTag).length;
+  const applied = learnedPolicies(mappings, source_lines);
+  const learned = applied.size;
+  const learnedLines = mappings.filter((m) => m.policy_id).length + source_lines.filter((l) => l.covenant_policy_id).length;
+  const earlierAnswers = new Set(policies.filter((p) => applied.has(p.id)).map((p) => p.learned_from)).size;
   const noFlagThisTime = Boolean(verdict) && answered.length === 0 && learned > 0;
+  // The whole-line reading as filed, from the answered covenant flag: the comparison stays on screen after the answer.
+  const covenantFlag = answered.find((f) => f.payload.kind === "covenant_tag");
+  const asFiledOpt = covenantFlag?.options.find((o) => o.basis === "as_filed" && o.leverage != null);
+  const asFiled = asFiledOpt && deal.ebitda_basis !== "as_filed"
+    ? { leverage: asFiledOpt.leverage!, ok: Boolean(asFiledOpt.ok), run_id: asFiledOpt.run_id } : null;
+  const failed = stage === "run_failed";
+  const idle = stage === "new" || failed;
+  const working = !idle && !open.length && (!verdict || !verdict.review);
 
   async function act(fn: () => Promise<unknown>) {
     setBusy(true); setNote(null);
@@ -35,16 +81,18 @@ export default function CaseScreen() {
   }
 
   const headline =
-    stage === "new" ? (policies.length ? "Run again. The Mapper now applies what you decided." : "Two sets of books. One lender's limit.")
+    failed ? "The run stopped before it finished."
+    : stage === "new" ? (policies.length ? "Run again. The Mapper now applies what you decided." : "Two sets of books. One lender's limit.")
     : open.length ? `${open.length === 1 ? "One line needs" : `${open.length} lines need`} your answer.`
     : verdict ? `${verdict.verdict === "ok" ? "Under" : "Over"} the limit at ${fmtX(verdict.leverage)}.${noFlagThisTime ? " No flag this time." : ""}`
     : "The agents are working.";
 
   const sub =
-    stage === "new" ? `${deal.platform} acquires ${deal.target}. The limit is ${deal.brief.debt_term} below ${fmtX(deal.brief.limit)}, ${deal.brief.limit_section} of the ${deal.brief.lender} agreement.`
+    failed ? "Nothing was posted. Run again to continue from where it stopped; the log has the reason."
+    : stage === "new" ? `${deal.platform} acquires ${deal.target}. The limit is ${deal.brief.debt_term} below ${fmtX(deal.brief.limit)}, ${deal.brief.limit_section} of the ${deal.brief.lender} agreement.`
     : open.length ? "The Mapper stopped on what it must not decide alone. Each option shows its effect, computed by the tools."
     : verdict?.posted ? "Approved and posted. The answer you gave is now a policy the Mapper applies next time."
-    : noFlagThisTime ? `The Mapper applied ${learned} ${learned === 1 ? "policy" : "policies"} from your earlier answers and asked nothing. Code combined the books and tested the limit again.`
+    : noFlagThisTime ? `The Mapper applied ${earlierAnswers === 1 ? "your earlier answer" : `your ${earlierAnswers} earlier answers`} to ${plural(learnedLines, "line")} and asked nothing. Code combined the books and tested the limit again.`
     : verdict ? "Code combined the books and tested the limit. The Reviewer re-ran the checks. Your approval posts it."
     : "Mapping, combining, and testing the limit. The screen updates on its own.";
 
@@ -57,16 +105,18 @@ export default function CaseScreen() {
 
       {note ? <p role="alert" className="rounded-chip bg-denied-tint px-4 py-3 font-semibold text-denied">{note}</p> : null}
 
-      {stage === "new" ? (
+      {idle ? (
         <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <Button kind="primary" disabled={busy} onClick={() => act(() => api.start(deal.id))}>
-            {policies.length ? "Run again" : "Run the deal"}
+            {policies.length || failed ? "Run again" : "Run the deal"}
           </Button>
           <span className="text-muted">
             {plural(source_lines.filter((l) => l.company === deal.platform).length, `${deal.platform} line`)}, {plural(source_lines.filter((l) => l.company === deal.target).length, `${deal.target} line`)}, from public filings.
           </span>
         </div>
       ) : null}
+
+      {working ? <Progress key={stage} stage={stage} /> : null}
 
       {open.map((f) => (
         <FlagCard
@@ -83,6 +133,7 @@ export default function CaseScreen() {
         <VerdictLine
           verdict={verdict}
           runIds={runIds}
+          asFiled={asFiled}
           busy={busy}
           onApprove={() => act(() => api.approve(verdict.approval_item!))}
           onReject={() => act(() => api.reject(verdict.approval_item!, "Rejected by the controller."))}
@@ -117,7 +168,10 @@ export default function CaseScreen() {
         </Link>
         <span className="hidden flex-1 lg:block" />
         {verdict?.posted ? (
-          <Button kind="link" className="text-left sm:whitespace-nowrap" disabled={busy} onClick={() => act(() => api.reset())}>Reset the deal, keep what was learned</Button>
+          <Button kind="link" className="text-left sm:whitespace-nowrap" disabled={busy} onClick={() => act(() => api.reset(true))}>Run it again with what was learned</Button>
+        ) : null}
+        {stage !== "new" || policies.length ? (
+          <Button kind="link" className="text-left sm:whitespace-nowrap" disabled={busy} onClick={() => act(() => api.reset(false))}>Fresh deal, clear memory</Button>
         ) : null}
         <Mono>Figures from public SEC filings. Code does the math; a human approves. Not advice.</Mono>
       </footer>
