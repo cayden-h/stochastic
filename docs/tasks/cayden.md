@@ -154,7 +154,8 @@ In `backend/app/gateway/gateway.py`:
 Done when: the tests pass, and the demo beat in `design/review-companion.md` section 9 runs through the API with curl.
 
 Status (2026-10-24 night, branch `cayden/edits`): the gateway side is built, and `backend/tests/test_edits.py` passes.
-Four figure tests skip with "needs T1 edit-aware tools" and run by themselves when Tri's T1 lands; until then an edit is refused with 503.
+Six figure tests skip with "needs T1 edit-aware tools" and run by themselves when Tri's T1 lands; until then an edit is refused with 503.
+Deviation on remap: the edit carries the new mapping, and `store_mapping` is not used, so the agents' `Mapping` is unchanged and a revert is lossless. The console must overlay `edits[]` on the mapping view.
 The Preparer offers a learned adjustment on a later deal as a flag (apply or skip); applying it is an amount edit through the same recompute.
 Open: the curl run of the demo beat waits on T2.
 
