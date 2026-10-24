@@ -116,6 +116,8 @@ class Deal(BaseModel):
     target: str  # company name of the acquired company
     stage: str = "new"
     brief: Brief
+    # "covenant" (the agreement's EBITDA) unless the controller chose the as-filed whole-line reading on a flag.
+    ebitda_basis: Literal["covenant", "as_filed"] = "covenant"
     situation: str = "PE add-on integration"
 
 
@@ -201,6 +203,8 @@ class Policy(BaseModel):
     approved_by: str
     learned_from: str  # the flag work item id
     deal_id: str
+    company: str | None = None  # the company whose line it was learned on; it applies to that company's lines only
+    retired_by: str | None = None  # the reversal item that withdrew it; a retired policy is never applied
     at: datetime = Field(default_factory=now)
     times_applied: int = 0
 

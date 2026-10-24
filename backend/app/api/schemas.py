@@ -35,12 +35,13 @@ class Verdict(BaseModel):
     debt_term: str
     debt_capacity: float | None = None  # read from the Reviewer's limit_test run, never computed in the route
     debt_capacity_run_id: str | None = None
-    # Sensitivity, from a limit_test run the gateway makes for a passed result: the whole-line reading of debt,
-    # its ratio, and the EBITDA add-back and rent deduction at which it reaches the limit. Never computed in the route.
+    # Sensitivity, from a limit_test run the gateway makes for a passed result: the whole-line reading as filed
+    # (balance sheet debt over reported EBITDA), its ratio, and the EBITDA increase at which it reaches the limit.
+    # Never computed in the route.
     naive_debt: float | None = None
+    naive_ebitda: float | None = None
     naive_leverage: float | None = None
     naive_flip_addback: float | None = None
-    naive_flip_rent: float | None = None
     sensitivity_run_id: str | None = None
     review: Review | None = None
     tie_out_ok: bool | None = None
@@ -53,7 +54,7 @@ class Verdict(BaseModel):
     def _drop_unset_sensitivity(self, handler):
         """With no sensitivity run (no covenant flag to read the whole-line debt from), the five keys are absent."""
         out = handler(self)
-        for key in ("naive_debt", "naive_leverage", "naive_flip_addback", "naive_flip_rent", "sensitivity_run_id"):
+        for key in ("naive_debt", "naive_ebitda", "naive_leverage", "naive_flip_addback", "sensitivity_run_id"):
             if key not in self.model_fields_set:
                 out.pop(key, None)
         return out

@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")  # keys stay in the repo-root .env, which git ignores
@@ -56,15 +56,23 @@ def create_app() -> FastAPI:
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins),
                        allow_methods=["*"], allow_headers=["*"])
     app.include_router(build_router(gateway))
+    app.state.gateway = gateway
 
     @app.post("/dev/reset")
     def reset(keep_memory: bool = True):
         """Demo helper: reseed the deal. Agent memory (policies, sessions) is kept unless keep_memory=false,
-        so a second run shows the Mapper applying what the controller taught it."""
+        so a second run shows the Mapper applying what the controller taught it. Between judges, use
+        keep_memory=false so the next judge sees the flag. Refused while a run is in flight, because the run
+        would keep writing into the new deal; the fork slot is freed."""
+        if gateway.running:
+            raise HTTPException(409, "a run is in progress; wait for it to finish, then reset")
         with gateway.lock:
             store.reset_deals(keep_memory=keep_memory)
             seed(store, gateway)
-        return {"ok": True, "policies": len(store.policies), "sessions": len(store.sessions)}
+            if gateway.forks:
+                gateway.forks.reset()
+        return {"ok": True, "keep_memory": keep_memory, "policies": len(store.policies),
+                "sessions": len(store.sessions)}
 
     return app
 

@@ -105,13 +105,13 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
     mappings: list[MappingProposal] = []
     flags: list[FlagProposal] = []
     tags: list[LineTag] = []
-    mapping_policies = {p.pattern: p for p in inp.policies if p.kind == "mapping"}
-    tag_policies = {p.pattern: p for p in inp.policies if p.kind == "covenant_tag"}
+    mapping_policies = {(p.company, p.pattern): p for p in inp.policies if p.kind == "mapping"}
+    tag_policies = {(p.company, p.pattern): p for p in inp.policies if p.kind == "covenant_tag"}
 
     for t in inp.target_lines:
         key = t.line.strip().lower()
         names = _platform_names(inp, t.section)
-        pol = mapping_policies.get(key)
+        pol = mapping_policies.get((t.company, key)) or mapping_policies.get((None, key))
         if pol:
             mappings.append(MappingProposal(target_line_id=t.id, platform_line=pol.decision or None, confidence=0.98,
                                             reason=f"Policy {pol.id}: {pol.approved_by} decided this on {pol.learned_from}",
@@ -170,7 +170,7 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
         if line.section != "balance_sheet":
             continue
         key = line.line.strip().lower()
-        pol = tag_policies.get(key)
+        pol = tag_policies.get((line.company, key)) or tag_policies.get((None, key))
         if pol:
             tags.append(LineTag(line_id=line.id, tag=pol.decision, note=f"Policy {pol.id} from {pol.approved_by}",
                                 policy_id=pol.id))
@@ -224,7 +224,7 @@ def _tag_rule(line: str, note: str | None = None) -> tuple[str, str]:
     if "financing lease" in n or "finance lease" in n:
         return "debt", "Finance leases count under the definition"
     if "operating lease" in n or "lease liability - operating" in n:
-        return "not_debt", "Operating leases are not borrowed money"
+        return "na", "Operating leases are not borrowed money"
     if "notes payable" in n or "term loan" in n or "line of credit" in n or "revolv" in n:
         return "debt", "Borrowed money"
     return "na", ""

@@ -100,7 +100,7 @@ async def _run(role: Role, inp: BaseModel, call_tool, session_id: str | None, se
     config = SessionConfig(mcp_servers=[server] if names else [], restrict_tools=restrict or ["none"],
                            autonomy=Autonomy.HIGH, system_prompt=role.system)
     prompt = f"Work item input (JSON):\n{inp.model_dump_json()}\nReturn the typed result."
-    timeout = float(os.getenv("DROID_TIMEOUT", "240"))
+    timeout = float(os.getenv("DROID_TIMEOUT", "90"))  # measured Mapper runs take 47 to 64 s; a hang must not stall the stage
     model = role_model("DROID_MODEL", role.name)
     effort = role_reasoning("DROID", role.name)
     key = setup_key(role, model, effort, restrict)

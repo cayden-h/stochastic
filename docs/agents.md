@@ -86,7 +86,7 @@ Settings (all in `.env`, read by `backend/app/agents/settings.py`):
 | `DROID_MODEL` | `claude-haiku-5-5` | Model for Droid runs |
 | `DROID_MODEL_MAPPER`, `DROID_MODEL_PREPARER`, `DROID_MODEL_REVIEWER` | unset (`DROID_MODEL_MAPPER=claude-sonnet-5-5` on the demo laptop) | Per-role override; the Mapper runs on Sonnet 5.5 for the demo (section 9, 08:30) |
 | `ANTHROPIC_MODEL` and the per-role forms | `claude-haiku-5-5` | Same for the Anthropic backend |
-| `DROID_TIMEOUT` | 240 seconds | Per run |
+| `DROID_TIMEOUT` | 90 seconds (75 in the demo .env) | Per run; the measured Mapper takes 47 to 64 s |
 | `DROID_RESTRICT_TOOLS` | unset | Override the allowlist. The default (tool names with and without the `MCP:stochastic/` prefix) worked on 2026-10-24. |
 | `RECORD_RUNS` | `1` | Record model runs to `recordings/latest/` (git-ignored), so a live run never replaces the pinned replay; `force` (used by `scripts/record_run.py`) writes the pinned `recordings/<role>.json`; `0` records nothing |
 

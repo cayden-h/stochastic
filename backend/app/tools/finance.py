@@ -146,13 +146,16 @@ TAXES = ("income tax (benefit) expense", "income tax expense", "provision for in
 DA = ("depreciation and amortization", "depreciation", "amortization")
 
 
-def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], brief: Brief) -> dict:
+def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], brief: Brief,
+           as_filed: bool = False) -> dict:
     """Covenant EBITDA, built the way the agreement defines it.
 
     Base, per company: net income plus interest expense less interest income plus income taxes plus depreciation
     and amortization (Ex 10.1 Addendum I).
     Then each add-back from the brief is applied up to its cap, and each deduction is subtracted.
     The brief holds the agreement's own definitions, so this function never guesses them.
+    as_filed=True stops at the base: reported EBITDA from the filed statements, with no add-back or deduction.
+    That is the reading of someone who has not read the agreement, and it pairs with the whole-line debt figure.
     Expense lines are stored as positive amounts; a tax benefit is stored as a negative amount.
     """
     parts = []
@@ -177,20 +180,20 @@ def ebitda(platform_lines: list[SourceLine], target_lines: list[SourceLine], bri
         base += sub
     addbacks = []
     total_add = 0.0
-    for a in brief.ebitda_addbacks:
+    for a in ([] if as_filed else brief.ebitda_addbacks):
         applied = min(a.amount, a.cap) if a.cap is not None else a.amount
         addbacks.append({"name": a.name, "amount": a.amount, "cap": a.cap, "applied": round(applied, 3),
                          "source_ref": a.source_ref, "inferred": a.inferred})
         total_add += applied
     deductions = []
     total_ded = 0.0
-    for d in brief.ebitda_deductions:
+    for d in ([] if as_filed else brief.ebitda_deductions):
         deductions.append({"name": d.name, "amount": d.amount, "source_ref": d.source_ref, "inferred": d.inferred})
         total_ded += d.amount
     value = base + total_add - total_ded
     return {"ebitda": round(value, 3), "base": round(base, 3), "addbacks_total": round(total_add, 3),
             "deductions_total": round(total_ded, 3), "parts": parts, "addbacks": addbacks,
-            "deductions": deductions, "unit": THOUSANDS}
+            "deductions": deductions, "basis": "as_filed" if as_filed else "covenant", "unit": THOUSANDS}
 
 
 # Borrowed money must be tagged debt, not_debt, or unclear. An 'na' on one of these names is a missed tag.
@@ -251,7 +254,7 @@ def leverage(debt: float, ebitda_value: float) -> dict:
 
 def limit_test(leverage_value: float, limit: float, wording: str = "less than", ebitda_value: float | None = None,
                debt: float | None = None, naive_debt: float | None = None,
-               rent_deduction: float | None = None) -> dict:
+               rent_deduction: float | None = None, naive_ebitda: float | None = None) -> dict:
     """Test the ratio against the covenant. 'less than' means the ratio must be strictly below the limit.
     Debt capacity (room for the next deal) is reported when EBITDA and debt are given.
 
@@ -259,10 +262,12 @@ def limit_test(leverage_value: float, limit: float, wording: str = "less than", 
     naive_flip_addback, the EBITDA add-back at which the naive reading reaches the limit (positive means that much
     more EBITDA is needed; zero or negative means it already passes). With rent_deduction also given,
     naive_flip_rent is the rent deduction at which the naive reading reaches the limit; it is left out when it would
-    be below zero, since no rent change can then flip the verdict. naive_ok is tested on the unrounded naive ratio,
+    be below zero, since no rent change can then flip the verdict. naive_ebitda, when given, is the EBITDA the naive
+    reading divides by (reported EBITDA, as filed); without it the naive reading uses ebitda_value. naive_ok is tested on the unrounded naive ratio,
     while ok is tested on the leverage as given (rounded to 3 places by the leverage tool), so the two can disagree
     for a ratio within 0.0005 of the limit."""
-    given = [leverage_value, limit] + [v for v in (ebitda_value, debt, naive_debt, rent_deduction) if v is not None]
+    given = [leverage_value, limit] + [v for v in (ebitda_value, debt, naive_debt, rent_deduction, naive_ebitda)
+                                       if v is not None]
     if not all(math.isfinite(v) for v in given):
         raise ValueError("limit_test inputs must be finite numbers")
 
@@ -274,14 +279,17 @@ def limit_test(leverage_value: float, limit: float, wording: str = "less than", 
            "headroom_turns": round(limit - leverage_value, 3), "wording": wording}
     if ebitda_value is not None and debt is not None:
         out["debt_capacity"] = round(limit * ebitda_value - debt, 3)
-    if naive_debt is not None and ebitda_value is not None:
-        if ebitda_value <= 0:
+    naive_eb = naive_ebitda if naive_ebitda is not None else ebitda_value
+    if naive_debt is not None and naive_eb is not None:
+        if naive_eb <= 0:
             raise ValueError("ebitda must be positive")
         if limit <= 0:
             raise ValueError("limit must be positive")
-        flip = round(naive_debt / limit - ebitda_value, 3)
-        out.update({"naive_debt": round(naive_debt, 3), "naive_leverage": round(naive_debt / ebitda_value, 3),
-                    "naive_ok": passes(naive_debt / ebitda_value), "naive_flip_addback": flip})
+        flip = round(naive_debt / limit - naive_eb, 3)
+        out.update({"naive_debt": round(naive_debt, 3), "naive_leverage": round(naive_debt / naive_eb, 3),
+                    "naive_ok": passes(naive_debt / naive_eb), "naive_flip_addback": flip})
+        if naive_ebitda is not None:
+            out["naive_ebitda"] = round(naive_ebitda, 3)
         if rent_deduction is not None and round(rent_deduction - flip, 3) >= 0:
             out["naive_flip_rent"] = round(rent_deduction - flip, 3)
     return out
@@ -304,9 +312,10 @@ TOOL_DESCRIPTIONS = {
     "ebitda": "Compute covenant EBITDA from the statement lines and the brief's add-backs and deductions. No arguments.",
     "covenant_debt": "Compute the covenant's debt figure from the covenant tags on balance sheet lines. "
                      "Arguments: naive (bool, default false) counts unclear lines as debt.",
-    "leverage": "Divide debt by EBITDA. Arguments: debt_run_id and ebitda_run_id (preferred) or debt and ebitda values.",
+    "leverage": "Divide debt by EBITDA. Arguments: debt_run_id and ebitda_run_id (the run ids of your covenant_debt and "
+                "ebitda runs). Numbers are not accepted.",
     "limit_test": "Test leverage against the lender's limit from the brief. Arguments: leverage_run_id or leverage. "
                   "Optional sensitivity: naive_debt_run_id (a covenant_debt run with the whole-line reading) and "
-                  "ebitda_run_id (its rent deduction) add naive_leverage, naive_ok, naive_flip_addback (the EBITDA "
-                  "add-back at which the whole-line reading reaches the limit), and naive_flip_rent.",
+                  "naive_ebitda_run_id (an as-filed ebitda run) add naive_leverage, naive_ok, and naive_flip_addback "
+                  "(the EBITDA at which the as-filed reading reaches the limit).",
 }

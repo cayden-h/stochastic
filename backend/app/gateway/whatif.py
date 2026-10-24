@@ -64,6 +64,18 @@ class WhatIfForks:
     def status(self) -> dict:
         return {"enabled": True, "active_flag": self.active, **({"cleanup": self.cleanup} if self.cleanup else {})}
 
+    def reset(self) -> None:
+        """Free the fork slot on /dev/reset. A flag left open by the last judge would otherwise hold it, and every
+        later flag would show "one fork at a time" until the API restarted. Ready forks are deleted in the
+        background; one still being created is deleted by clean_leftovers on the next start."""
+        with self._lock:
+            forks = list(self._forks.values())
+            self.active = None
+            self._forks.clear()
+            self._answered.clear()
+        for fork in forks:
+            self.spawn(lambda f=fork: self._delete_quietly(f))
+
     def clean_leftovers(self) -> None:
         """Delete forks a crashed process left behind, so the slot is free. Runs in the background at start."""
         def work():

@@ -120,6 +120,7 @@ class Gateway:
         self.lock = threading.RLock()  # background runs and requests write through one gateway
         self._depth = 0
         self.forks = None  # WhatIfForks when STORE=postgres and FORKS=tiger (app/gateway/whatif.py)
+        self.running: set[str] = set()  # deal ids with a background run in flight, shared with the API routes
 
     # ------------------------------------------------------------------ audit log
     def _log(self, deal_id: str, actor: str, action: str, result: str, target: str | None = None,
@@ -241,18 +242,32 @@ class Gateway:
                     raise ValueError("tie_out needs rows or run_id")
                 outputs = fn(rows)
             elif name == "ebitda":
-                outputs = fn(platform_lines, target_lines, deal.brief)
+                # The deal's basis decides: as filed only after the controller chose the whole-line reading.
+                # The system's what-ifs may ask for the as-filed figure explicitly.
+                as_filed = deal.ebitda_basis == "as_filed" or (actor == SYSTEM and bool(inputs.get("as_filed")))
+                inputs["as_filed"] = as_filed
+                outputs = fn(platform_lines, target_lines, deal.brief, as_filed=as_filed)
             elif name == "covenant_debt":
                 outputs = fn(platform_lines, target_lines, deal.brief, naive=bool(inputs.get("naive", False)))
             elif name == "leverage":
+                # An agent passes run ids only, so its ratio always divides two tool outputs. The system may pass
+                # values (the API's /tools route for people checking a figure by hand runs as the system).
+                if actor != SYSTEM and (inputs.get("debt") is not None or inputs.get("ebitda") is not None):
+                    raise ValueError("leverage takes debt_run_id and ebitda_run_id, not numbers")
                 debt = inputs.get("debt")
                 eb = inputs.get("ebitda")
                 if inputs.get("debt_run_id"):
-                    debt = self._run(deal_id, inputs["debt_run_id"]).outputs["debt"]
+                    drun = self._run(deal_id, inputs["debt_run_id"])
+                    if drun.tool != "covenant_debt":
+                        raise ValueError("debt_run_id must name a covenant_debt run")
+                    debt = drun.outputs["debt"]
                 if inputs.get("ebitda_run_id"):
-                    eb = self._run(deal_id, inputs["ebitda_run_id"]).outputs["ebitda"]
+                    erun = self._run(deal_id, inputs["ebitda_run_id"])
+                    if erun.tool != "ebitda":
+                        raise ValueError("ebitda_run_id must name an ebitda run")
+                    eb = erun.outputs["ebitda"]
                 if debt is None or eb is None:
-                    raise ValueError("leverage needs debt and ebitda, by value or by run id")
+                    raise ValueError("leverage needs debt_run_id and ebitda_run_id")
                 outputs = fn(float(debt), float(eb))
             elif name == "limit_test":
                 lev = inputs.get("leverage")
@@ -268,6 +283,12 @@ class Gateway:
                     if nrun.tool != "covenant_debt":
                         raise ValueError("naive_debt_run_id must name a covenant_debt run")
                     naive = nrun.outputs["debt"]
+                naive_eb = None
+                if inputs.get("naive_ebitda_run_id"):
+                    nerun = self._run(deal_id, inputs["naive_ebitda_run_id"])
+                    if nerun.tool != "ebitda":
+                        raise ValueError("naive_ebitda_run_id must name an ebitda run")
+                    naive_eb = nerun.outputs["ebitda"]
                 if inputs.get("ebitda_run_id"):
                     erun = self._run(deal_id, inputs["ebitda_run_id"])
                     if erun.tool != "ebitda":
@@ -277,7 +298,7 @@ class Gateway:
                              if re.search(r"\brent(al)?\b", d["name"], re.I)]
                     rent = sum(rents) if rents else None
                 outputs = fn(float(lev), deal.brief.limit, ebitda_value=eb, debt=debt, naive_debt=naive,
-                             rent_deduction=rent)
+                             rent_deduction=rent, naive_ebitda=naive_eb)
             else:
                 raise ValueError(f"no argument binding for {name}")
         except ValueError as error:
@@ -319,14 +340,14 @@ class Gateway:
                         platform_line_id=pl.id if pl else None, target_line=t.line,
                         platform_line=pl.line if pl else p.platform_line, confidence=p.confidence,
                         reason=p.reason, flagged=t.id in flagged_ids)
-            m.policy_id = self._cited_policy(p.policy_id, "mapping", m.platform_line)
+            m.policy_id = self._cited_policy(p.policy_id, "mapping", m.platform_line, t)
             self.store.mappings[m.id] = m
             stored.append(m)
         for tag in out.tags:
             line = self.store.source_lines[tag.line_id]
             line.covenant_tag = tag.tag
             line.covenant_note = tag.note or None
-            line.covenant_policy_id = self._cited_policy(tag.policy_id, "covenant_tag", tag.tag)
+            line.covenant_policy_id = self._cited_policy(tag.policy_id, "covenant_tag", tag.tag, line)
             if line.covenant_policy_id:
                 self.note_policy_applied(line.covenant_policy_id, deal.id, line.line)
         for m in stored:
@@ -352,6 +373,12 @@ class Gateway:
             line = self.store.source_lines.get(tag.line_id)
             if line is None or line.deal_id != deal.id:
                 raise Invalid(f"tag names unknown line {tag.line_id}")
+            # An exclusion lowers the debt figure, so only the controller may make one: by answering a flag now,
+            # or by an earlier answer the Mapper cites as a policy for this company's line. The prompt says the
+            # same, but the gateway is what enforces it, also against text injected into a line name.
+            if tag.tag == "not_debt" and not self._cited_policy(tag.policy_id, "covenant_tag", "not_debt", line):
+                raise Invalid(f"tag not_debt on {line.line} ({tag.line_id}) is the controller's call: tag it unclear "
+                              f"and put it in the covenant flag, or cite the policy that decided it")
         for flag in out.flags:
             self._check_flag_resolves(flag)
 
@@ -412,8 +439,18 @@ class Gateway:
                               label="Count every flagged line as debt, with no exclusions (the gateway's baseline)")
         return flag.model_copy(update={"options": [*flag.options, baseline]})
 
+    @staticmethod
+    def _whole_line(flag: FlagProposal | WorkItem, tags: dict[str, str]) -> bool:
+        """The option that counts every flagged line as debt: the reading of someone who has not read the agreement."""
+        line_ids = flag.line_ids if isinstance(flag, FlagProposal) else flag.payload.get("line_ids", [])
+        return bool(line_ids) and all(tags.get(lid) == "debt" for lid in line_ids)
+
     def _flag_effect(self, deal: Deal, flag: FlagProposal, opt) -> tuple[str, str | None]:
-        """What-if for one option, run by the system through the same tools. Tags are restored afterwards."""
+        """What-if for one option, run by the system through the same tools. Tags are restored afterwards.
+
+        The whole-line option is computed as filed: balance sheet debt over reported EBITDA, with none of the
+        agreement's add-backs or its rent deduction. Counting the Statesville financing as debt while still
+        subtracting its rent would mix two readings, so that option is one reading from end to end."""
         lines = {lid: self.store.source_lines[lid] for lid in flag.line_ids if lid in self.store.source_lines}
         saved = {lid: (l.covenant_tag, l.covenant_note) for lid, l in lines.items()}
         try:
@@ -422,16 +459,22 @@ class Gateway:
                     if lid in lines:
                         lines[lid].covenant_tag = tag
                 # Any other unclear line is counted as debt for the what-if, so the figure is a ceiling.
+                as_filed = self._whole_line(flag, opt.tags)
                 debt = self.run_tool(SYSTEM, deal.id, "covenant_debt", {"naive": True, "what_if": opt.id})
-                eb = self.run_tool(SYSTEM, deal.id, "ebitda", {"what_if": opt.id})
+                eb = self.run_tool(SYSTEM, deal.id, "ebitda", {"what_if": opt.id, "as_filed": as_filed})
                 lev = self.run_tool(SYSTEM, deal.id, "leverage", {"debt_run_id": debt.run_id, "ebitda_run_id": eb.run_id})
                 test = self.run_tool(SYSTEM, deal.id, "limit_test", {"leverage_run_id": lev.run_id})
                 verdict = "OK" if test.outputs["ok"] else "Over the limit"
                 # Format from the unrounded ratio: the tool rounds to 3 places, and rounding that again to 2
                 # showed 2.6148 as 2.62x while the verdict line said 2.61x.
                 ratio = lev.outputs["debt"] / lev.outputs["ebitda"]
-                effect = (f"{deal.brief.debt_term} {_fmt(debt.outputs['debt'])}K. Leverage {ratio:.2f}x "
-                          f"against {deal.brief.limit:.2f}x. {verdict}.")
+                if as_filed:
+                    effect = (f"As filed: debt {_fmt(debt.outputs['debt'])}K over reported EBITDA "
+                              f"{_fmt(eb.outputs['ebitda'])}K. Leverage {ratio:.2f}x against {deal.brief.limit:.2f}x. "
+                              f"{verdict}.")
+                else:
+                    effect = (f"{deal.brief.debt_term} {_fmt(debt.outputs['debt'])}K. Leverage {ratio:.2f}x "
+                              f"against {deal.brief.limit:.2f}x. {verdict}.")
                 return effect, test.run_id
             if flag.kind == "mapping":
                 parts = []
@@ -484,12 +527,19 @@ class Gateway:
         kind = item.payload.get("kind")
         label = next((o.label for o in item.options if o.id == option_id), option_id)
         if kind == "covenant_tag":
+            deal = self._deal(item.deal_id)
+            basis = "as_filed" if self._whole_line(item, action.get("tags", {})) else "covenant"
+            if basis != deal.ebitda_basis:
+                deal.ebitda_basis = basis
+                self._log(item.deal_id, SYSTEM, "basis", "ALLOWED", deal.id,
+                          reason="EBITDA as filed: the controller chose the whole-line reading" if basis == "as_filed"
+                          else "EBITDA under the agreement's definition")
             for lid, tag in action.get("tags", {}).items():
                 line = self.store.source_lines.get(lid)
                 if line is not None:
                     line.covenant_tag = tag
                     line.covenant_note = f"decided by {actor} on flag {item.id}"
-                    self._learn(MAPPER, "covenant_tag", line.line, tag, label, actor, item)
+                    self._learn(MAPPER, "covenant_tag", line.line, tag, label, actor, item, line.company)
         elif kind == "mapping":
             deal = self._deal(item.deal_id)
             per_line = action.get("mappings") or {}
@@ -502,7 +552,7 @@ class Gateway:
                     m.platform_line_id = pl.id if pl else None
                     m.approved_by = actor
                     m.flagged = True
-                    self._learn(MAPPER, "mapping", t.line, (pl.line if pl else ref) or "", label, actor, item)
+                    self._learn(MAPPER, "mapping", t.line, (pl.line if pl else ref) or "", label, actor, item, t.company)
 
     def _platform_line(self, deal: Deal, section: str, ref: str | None) -> SourceLine | None:
         """Find a platform line by id or by name (case-insensitive) within a section."""
@@ -520,26 +570,34 @@ class Gateway:
                 return l
         return None
 
-    def _learn(self, role: str, kind: str, pattern: str, decision: str, label: str, actor: str, item: WorkItem) -> Policy:
-        """The controller's answer becomes a policy the agent applies next time. The gateway is the writer."""
+    def _learn(self, role: str, kind: str, pattern: str, decision: str, label: str, actor: str, item: WorkItem,
+               company: str | None = None) -> Policy:
+        """The controller's answer becomes a policy the agent applies next time. The gateway is the writer.
+        A policy is scoped to the company whose line it was learned on, so the same line name at another company
+        is asked again instead of inheriting this answer."""
         key = pattern.strip().lower()
         for p in self.store.policies.values():
-            if p.role == role and p.kind == kind and p.pattern == key:
+            if p.role == role and p.kind == kind and p.pattern == key and p.company == company and not p.retired_by:
                 p.decision, p.approved_by, p.learned_from, p.reason = decision, actor, item.id, label
                 self._log(item.deal_id, SYSTEM, "policy:update", "ALLOWED", p.id, reason=f"{key} -> {decision}")
                 return p
         policy = Policy(id=self.store.next_id("p"), role=role, kind=kind, pattern=key, decision=decision,
                         reason=f"{actor} chose '{label}' on flag {item.id}", approved_by=actor,
-                        learned_from=item.id, deal_id=item.deal_id)
+                        learned_from=item.id, deal_id=item.deal_id, company=company)
         self.store.policies[policy.id] = policy
         self._log(item.deal_id, SYSTEM, "policy:learn", "ALLOWED", policy.id, reason=f"{key} -> {decision}")
         return policy
 
-    def _cited_policy(self, policy_id: str | None, kind: str, decision: str | None) -> str | None:
-        """A policy id an agent cites counts only if that policy exists, is of this kind, and decided the same thing.
-        The model's own wording never marks a line as learned; the gateway does, from the policy record."""
+    def _cited_policy(self, policy_id: str | None, kind: str, decision: str | None,
+                      line: SourceLine | None = None) -> str | None:
+        """A policy id an agent cites counts only if that policy exists, is live, is of this kind, decided the same
+        thing, and was learned on this line name at this company. The model's own wording never marks a line as
+        learned; the gateway does, from the policy record."""
         p = self.store.policies.get(policy_id) if policy_id else None
-        if not p or p.kind != kind or (decision or "").strip().lower() != p.decision.strip().lower():
+        if not p or p.retired_by or p.kind != kind or (decision or "").strip().lower() != p.decision.strip().lower():
+            return None
+        if line is not None and (p.pattern != line.line.strip().lower()
+                                 or (p.company is not None and p.company != line.company)):
             return None
         return p.id
 
@@ -636,6 +694,10 @@ class Gateway:
         self._log(item.deal_id, actor, "reverse", "ALLOWED", item.id, reason=reason)
         self._log(item.deal_id, SYSTEM, "post", "ALLOWED", rev.id, reason=f"reverses {item.id}")
         if item.type == "flag":
+            for p in self.store.policies.values():  # a reversed answer must not be applied to the next deal
+                if p.learned_from == item.id and not p.retired_by:
+                    p.retired_by = rev.id
+                    self._log(item.deal_id, SYSTEM, "policy:retire", "ALLOWED", p.id, reason=f"reversed by {rev.id}")
             self._deal(item.deal_id).stage = "awaiting_flag"
         return rev
 
@@ -660,14 +722,6 @@ class Gateway:
             if run is None or run.deal_id != deal.id:
                 self._deny(Invalid(f"run id {rid} does not exist for this deal"), deal.id, actor,
                            "propose:prepare_result", item.id)
-        def produced(tool: str, key: str, value: float) -> bool:
-            return any(r.tool == tool and abs(float(r.outputs.get(key, float("nan"))) - value) < 1e-6
-                       for r in runs.values() if r)
-        for tool, key, value in (("ebitda", "ebitda", out.ebitda), ("covenant_debt", "debt", out.debt),
-                                 ("leverage", "leverage", out.leverage)):
-            if not produced(tool, key, value):
-                self._deny(Invalid(f"{key} {value} was not produced by a {tool} run in run_ids"), deal.id, actor,
-                           "propose:prepare_result", item.id)
         if abs(out.limit - deal.brief.limit) > 1e-9:
             self._deny(Invalid("limit must come from the brief"), deal.id, actor, "propose:prepare_result", item.id)
         test = finance.limit_test(out.leverage, deal.brief.limit)
@@ -680,9 +734,13 @@ class Gateway:
                            "propose:prepare_result", item.id)
         for tool in ("consolidate", "ebitda", "covenant_debt", "leverage"):  # fill from run_ids when not named
             if tool not in by_tool:
-                rid = next((r for r in out.run_ids if r in runs and runs[r] and runs[r].tool == tool), None)
+                rid = next((r for r in reversed(out.run_ids) if r in runs and runs[r] and runs[r].tool == tool), None)
                 if rid:
                     by_tool[tool] = rid
+        try:
+            self._check_provenance(deal, actor, out, by_tool)
+        except Invalid as error:
+            self._deny(error, deal.id, actor, "propose:prepare_result", item.id)
         result = Result(id=self.store.next_id("r"), deal_id=deal.id, work_item_id=item.id, rows=out.rows,
                         ebitda=out.ebitda, debt=out.debt, leverage=out.leverage, limit=out.limit,
                         verdict=test["verdict"], headroom_turns=test["headroom_turns"], run_ids=out.run_ids,
@@ -694,6 +752,71 @@ class Gateway:
                   reason=f"result {result.id}: leverage {out.leverage:.2f}x against {out.limit:.2f}x")
         deal.stage = "awaiting_review"
         return result
+
+    def _last_answer_at(self, deal_id: str):
+        return next((r.at for r in reversed(self.store.audit)
+                     if r.deal_id == deal_id and r.action == "answer" and r.result == "ALLOWED"), None)
+
+    def _check_provenance(self, deal: Deal, actor: str, out: PreparerOutput, by_tool: dict[str, str]) -> None:
+        """Every figure in the result is the output of the Preparer's own runs, chained by run id.
+
+        A run of the right tool is not enough: the gateway's what-ifs for options the controller did not pick are
+        covenant_debt runs too. So the debt run must be the Preparer's, under the agreement's reading (not naive),
+        made after the last flag answer; the leverage run must divide exactly that debt run by that ebitda run; and
+        the rows must be the consolidate run's rows."""
+        missing = [t for t in ("consolidate", "ebitda", "covenant_debt", "leverage") if t not in by_tool]
+        if missing:
+            raise Invalid(f"the result names no {', '.join(missing)} run; list each run id in its named field")
+        named = {t: self.store.tool_runs[rid] for t, rid in by_tool.items()}
+        after = self._last_answer_at(deal.id)
+        for tool, run in named.items():
+            if run.actor != actor:
+                raise Invalid(f"{tool} run {run.run_id} was made by {run.actor}, not by {actor}")
+            if run.inputs.get("what_if"):
+                raise Invalid(f"{tool} run {run.run_id} is a what-if for a flag option, not the deal's figure")
+            if after is not None and run.at < after:
+                raise Invalid(f"{tool} run {run.run_id} was made before the last flag answer; run it again")
+        debt, eb, lev, cons = named["covenant_debt"], named["ebitda"], named["leverage"], named["consolidate"]
+        if debt.inputs.get("naive"):
+            raise Invalid(f"covenant_debt run {debt.run_id} is the naive reading; the result needs naive=false")
+        if bool(eb.inputs.get("as_filed")) != (deal.ebitda_basis == "as_filed"):
+            raise Invalid(f"ebitda run {eb.run_id} is not on the deal's basis ({deal.ebitda_basis})")
+        if lev.inputs.get("debt_run_id") != debt.run_id or lev.inputs.get("ebitda_run_id") != eb.run_id:
+            raise Invalid(f"leverage run {lev.run_id} must divide covenant_debt run {debt.run_id} by ebitda run "
+                          f"{eb.run_id}")
+        for key, value, run, out_key in (("ebitda", out.ebitda, eb, "ebitda"), ("debt", out.debt, debt, "debt"),
+                                         ("leverage", out.leverage, lev, "leverage")):
+            if abs(float(run.outputs.get(out_key, float("nan"))) - value) >= 1e-6:
+                raise Invalid(f"{key} {value} is not the output of {run.tool} run {run.run_id}")
+        expected = cons.outputs.get("rows", [])
+        got = {(r.section, r.line): r for r in out.rows}
+        if len(got) != len(expected) or len(out.rows) != len(expected):
+            raise Invalid(f"rows must be the {len(expected)} rows of consolidate run {cons.run_id}")
+        for e in expected:
+            r = got.get((e["section"], e["line"]))
+            if (r is None or r.run_id != cons.run_id
+                    or any(abs(getattr(r, k) - e[k]) >= 1e-6 for k in ("platform", "target", "combined"))):
+                raise Invalid(f"row {e['line']} does not match consolidate run {cons.run_id}")
+
+    def _check_review(self, deal: Deal, result: Result, out: ReviewerOutput) -> tuple[ToolRun | None, ToolRun | None]:
+        """The gateway reads the Reviewer's checks itself. A pass needs a tie_out run on this result's consolidate run
+        and a limit_test run on its leverage run, both made for this deal and both ok."""
+        for rid in out.run_ids:
+            run = self.store.tool_runs.get(rid)
+            if run is None or run.deal_id != deal.id:
+                raise Invalid(f"run id {rid} does not exist for this deal")
+        cited = [self.store.tool_runs[r] for r in out.run_ids]
+        cons, lev = result.run_ids_by_tool.get("consolidate"), result.run_ids_by_tool.get("leverage")
+        tie = next((r for r in reversed(cited) if r.tool == "tie_out" and r.inputs.get("run_id") == cons), None)
+        test = next((r for r in reversed(cited) if r.tool == "limit_test" and r.inputs.get("leverage_run_id") == lev),
+                    None)
+        if out.verdict == "pass":
+            if tie is None or test is None:
+                raise Invalid(f"a pass must cite a tie_out run on {cons} and a limit_test run on {lev}")
+            failed = [f"{r.tool} {r.run_id}" for r in (tie, test) if not r.outputs.get("ok")]
+            if failed:
+                raise Invalid(f"a pass cannot stand on failed checks: {', '.join(failed)}")
+        return tie, test
 
     @_writes
     def store_review(self, actor: str, item_id: str, out: ReviewerOutput) -> WorkItem:
@@ -707,11 +830,11 @@ class Gateway:
         result = self.store.results.get(item.payload.get("result_id", ""))
         if result is None:
             raise Invalid("review item has no result")
-        for rid in out.run_ids:
-            if rid not in self.store.tool_runs:
-                self._deny(Invalid(f"run id {rid} does not exist"), deal.id, actor, "propose:review_result", item.id)
+        try:
+            tie, _ = self._check_review(deal, result, out)
+        except Invalid as error:
+            self._deny(error, deal.id, actor, "propose:review_result", item.id)
         result.review = Review(verdict=out.verdict, reasons=out.reasons, run_ids=out.run_ids)
-        tie = next((self.store.tool_runs[r] for r in out.run_ids if self.store.tool_runs[r].tool == "tie_out"), None)
         if tie is not None:
             result.tie_out_ok = bool(tie.outputs.get("ok"))
         item.state = State.PROPOSED
