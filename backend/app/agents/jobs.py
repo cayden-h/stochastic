@@ -9,7 +9,7 @@ from __future__ import annotations
 from app.agents.roles import MAPPER_ROLE, PREPARER_ROLE, REVIEWER_ROLE, Role
 from app.agents.runner import run_agent
 from app.core.models import MapperInput, PreparerInput, ReviewerInput, State
-from app.gateway.gateway import Gateway
+from app.gateway.gateway import Gateway, Invalid
 
 
 def _call_tool(gw: Gateway, actor: str, deal_id: str):
@@ -46,7 +46,13 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
                               policies=store.role_policies(MAPPER_ROLE.actor),
                               session=store.sessions.get(MAPPER_ROLE.name))
             run = _run(gw, MAPPER_ROLE, inp, deal_id, item.id, backend)
-            gw.store_mapping(MAPPER_ROLE.actor, item.id, run.output)
+            try:
+                gw.store_mapping(MAPPER_ROLE.actor, item.id, run.output)
+            except Invalid as error:  # the gateway logged the refusal; one retry with the reason, then fail as before
+                log.append(f"mapper result refused on {run.backend}: {error.message}")
+                inp = inp.model_copy(update={"previous_refusal": error.message})
+                run = _run(gw, MAPPER_ROLE, inp, deal_id, item.id, backend)
+                gw.store_mapping(MAPPER_ROLE.actor, item.id, run.output)
             gw.update_session(MAPPER_ROLE.name, run.backend, item.id,
                               f"mapped {len(run.output.mappings)} lines, {len(run.output.flags)} flags",
                               next((a.get("session_id") for a in run.attempts if a.get("session_id")), None))

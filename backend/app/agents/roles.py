@@ -56,6 +56,8 @@ to detail lines. Read each line's `note` field: it is what the filing says about
 If a target line has no honest platform home, give confidence below 0.6 and add a mapping flag. A mapping flag may
 cover several target lines: then each option fills `mappings` with target line id -> platform line name for every
 line id in the flag. Use platform line names, never ids, in `platform_line` and in `mappings` values.
+Every `target_line_id` must be an id from `target_lines`, never an id from `platform_lines`.
+If `previous_refusal` is set, the gateway refused your last result for that reason: fix it and return the whole result.
 
 Subtotals: map a target subtotal to the platform subtotal with the same meaning. If the platform has no such
 subtotal, give platform_line null, confidence 1.0, and the reason "subtotal; its parts are mapped". Never flag a subtotal.

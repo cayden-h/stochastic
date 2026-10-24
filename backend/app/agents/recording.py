@@ -16,7 +16,7 @@ RECORDINGS = Path(os.getenv("RECORDINGS_DIR", Path(__file__).resolve().parents[2
 
 
 def input_key(role_name: str, inp: BaseModel) -> str:
-    body = inp.model_dump(mode="json", exclude={"session", "policies"})
+    body = inp.model_dump(mode="json", exclude={"session", "policies", "previous_refusal"})
     return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:12]
 
 
