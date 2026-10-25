@@ -7,7 +7,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import type { Backend } from "./support/backend";
 import { expect, open, readCase, test } from "./support/fixtures";
-import { NUAIRE_GA, bubble, editAmount, flagOptions, handoff, nav, reviewVerdict } from "./support/flows";
+import { NUAIRE_GA, bubble, editAmount, expectCleanCase, flagOptions, handoff, nav, reviewVerdict } from "./support/flows";
 
 interface DealRow { deal_id: string; platform: string; target: string; stage: string; data_source?: string; note?: string; updated_at?: string }
 
@@ -151,6 +151,8 @@ test("run the demo: the notification, Decide, Learned, Ready, then Review and Ma
   await expect(handoff(page)).toBeVisible({ timeout: 30_000 });
   expect((Date.now() - answered) / 1000).toBeLessThan(12);
   await shot("ready");
+  // The Case is clean: the pipeline and the figure tiles, no conversation or verdict sentence, the books hidden.
+  await expectCleanCase(page);
 
   // Review: the sidebar stays, two tabs, and Back to case works.
   await page.getByRole("link", { name: "Review the books" }).click();

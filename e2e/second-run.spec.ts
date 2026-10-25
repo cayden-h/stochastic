@@ -23,7 +23,6 @@ test("run it again with what was learned, then a fresh deal", async ({ page, bac
   // No questions this time: the hand-off comes straight through, with the Learned chips.
   await expect(handoff(page)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("The Mapper is asking you")).toHaveCount(0);
-  await expect(page.getByText(/No flag this time\. The Mapper applied your (earlier answer|\d+ earlier answers) to \d+ lines?/)).toBeVisible();
   // Nothing is unsure on the second run: no question is open, and the lines a policy placed are not unsure (37 is the
   // 53 target lines less the 16 totals, which are not counted).
   await expect(page.getByRole("link", { name: /^Mapping 37 placed Learned 37 sure · 0 unsure · \d+ lines? learned$/ })).toBeVisible();

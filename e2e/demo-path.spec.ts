@@ -4,7 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, open, readCase, test } from "./support/fixtures";
 import {
-  NUAIRE_GA, answerSuggested, begin, bubble, centre, companion, editAmount, handoff, nav, reviewVerdict,
+  NUAIRE_GA, answerSuggested, begin, bubble, centre, companion, editAmount, expectCleanCase, expectOneIconSource, handoff, nav,
+  reviewVerdict,
 } from "./support/flows";
 import { readWorkbook } from "./support/xlsx";
 
@@ -47,13 +48,13 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
   await expect(page.getByRole("button", { name: /Kewaunee Scientific.*Not started/ })).toBeVisible();
   await shot("dashboard");
 
-  // Begin: the Case opens and the run plays live, the Mapper first.
+  // The demo deal's Case, Run the deal: the run plays live, the Mapper first. The Case shows the pipeline, not the
+  // conversation (that is on the Agents and Log pages).
   await begin(page);
   const pipeline = page.getByRole("list", { name: "The agents' progress" });
   await expect(pipeline).toBeVisible();
   await expect(pipeline.getByRole("listitem").filter({ hasText: "Mapper" })).toContainText(/Working|Mapping/i);
-  const conversation = page.getByRole("region", { name: "The process" });
-  await expect(conversation.getByText("Map the 53 lines of Nu Aire to Kewaunee")).toBeVisible();
+  await expect(page.getByRole("main").getByText("Map the 53 lines of Nu Aire to Kewaunee")).toHaveCount(0);
   await shot("case-live");
 
   // Mapping fills line by line while the Mapper works.
@@ -113,7 +114,15 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
   await shot("case-resumed");
   await expect(handoff(page)).toBeVisible({ timeout: 60_000 });
   await expect(page.getByRole("link", { name: "Review the books" })).toBeVisible();
+  await expectCleanCase(page);
   await shot("case-handoff");
+
+  // Agents: the rows under the house and the timeline draw the same characters as the Case, the Mapper's teal star.
+  await nav(page, "Agents").click();
+  await expect(page.getByText("Agent timeline")).toBeVisible();
+  await expect.poll(() => expectOneIconSource(page), { timeout: 30_000 }).toBeGreaterThan(1);
+  await shot("agents-icons");
+  await nav(page, "Case").click();
 
   // Log: the audit rows, and the conversation toggle.
   await page.getByRole("main").getByRole("link", { name: "See the log" }).click();
@@ -121,6 +130,7 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
   const view = page.getByRole("group", { name: "What the log shows" });
   await expect(view).toBeVisible();
   await expect(page.getByText(/chain/i).first()).toBeVisible();
+  expect(await expectOneIconSource(page)).toBeGreaterThan(0);
   await shot("log-audit");
   await view.getByRole("button", { name: /Conversation/ }).click();
   await expect(page.getByText("Ready for your approval").first()).toBeVisible();

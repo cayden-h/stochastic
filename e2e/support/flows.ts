@@ -13,12 +13,87 @@ export function flagOptions(page: Page): Locator {
   return page.getByRole("main").getByRole("button", { name: /^[a-e]\. / });
 }
 
-/** Dashboard -> Begin -> the Case page. */
+/** The demo deal, the one the gateway's fixture seeds (backend/app/db/fixtures/kewaunee.py). */
+export const DEMO_DEAL = "d_kequ_nuaire";
+
+/** Dashboard -> the demo deal's row -> the Case page -> Run the deal, at the gateway's own pace (DEMO_PACE).
+ * The Dashboard has no Begin: its buttons are Run the demo (pace "demo") and Upload (Begin there is pace "factory"). */
 export async function begin(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
-  await page.getByRole("button", { name: "Begin", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Begin", exact: true })).toHaveCount(0);
+  await page.locator(`[data-deal="${DEMO_DEAL}"]`).click();
   await expect(page).toHaveURL(/\/case$/);
   await expect(page.getByRole("heading", { name: "Case", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "Run the deal", exact: true }).click();
+}
+
+/** The Case's Combined books toggle: the books start hidden behind Show combined books. */
+/** The Case after the Reviewer's hand-off: the flag card, the pipeline, and the limit check's four figure tiles. No
+ * conversation, no verdict sentence (the leverage against the limit, the as-filed reading, Download final files: those
+ * are on Review), and the combined books hidden until Show combined books. */
+export async function expectCleanCase(page: Page): Promise<void> {
+  const main = page.getByRole("main");
+  const figures = main.getByRole("region", { name: "The limit check" });
+  await expect(figures).toBeVisible();
+  for (const label of ["Senior Funded Bank Debt", "Covenant EBITDA", "Room (turns of EBITDA)", "Covenant headroom"]) {
+    await expect(figures.getByText(label, { exact: true })).toBeVisible();
+  }
+  await expect(figures.getByText("21,633K", { exact: true })).toBeVisible();
+  await expect(figures.getByText(/^\d+\.\d\d×$/)).toBeVisible();
+  await expect(figures.getByText(/^\$\d+\.\dM of debt$/)).toBeVisible();
+  await expect(main.getByText(/× against \d/)).toHaveCount(0);
+  await expect(main.getByText(/Read as filed/)).toHaveCount(0);
+  await expect(main.getByText(/Download final files/)).toHaveCount(0);
+  await expect(main.getByText("Reviewer pass", { exact: true })).toHaveCount(0);
+  await expect(main.getByText(/^Conversation$/i)).toHaveCount(0);
+  await expect(main.getByRole("list", { name: "The agents' progress" })).toBeVisible();
+  // The books start hidden; the toggle shows them and hides them again.
+  await expect(main.getByText("Balance sheet", { exact: true })).toHaveCount(0);
+  await booksToggle(page).click();
+  await expect(main.getByText("Balance sheet", { exact: true })).toBeVisible();
+  await expect(booksToggle(page, true)).toHaveAttribute("aria-expanded", "true");
+  await booksToggle(page, true).click();
+  await expect(main.getByText("Balance sheet", { exact: true })).toHaveCount(0);
+  await expect(booksToggle(page)).toHaveAttribute("aria-expanded", "false");
+}
+
+/** Every agent character on the page is drawn from the one v3 file for its role, served as it is (not through
+ * /_next/image), and the Mapper's is the teal star. Returns how many Mapper characters the page shows. */
+export async function expectOneIconSource(page: Page): Promise<number> {
+  const imgs = page.getByRole("main").locator("img[data-agent]");
+  await expect(imgs.first()).toBeVisible();
+  const all = await imgs.evaluateAll((els) => els.map((e) => ({ role: e.getAttribute("data-agent"), src: e.getAttribute("src") })));
+  for (const { role, src } of all) expect(src).toBe(`/v3/agent-${role!.replace("_", "-")}.png`);
+  // No agent art from anywhere else: no optimizer URL and no other file.
+  const others = await page.locator("img").evaluateAll((els) => els.map((e) => e.getAttribute("src") ?? "").filter((s) => /agent|_next\/image/.test(s) && !/^\/v3\/agent-/.test(s)));
+  expect(others).toEqual([]);
+  return all.filter((a) => a.role === "mapper").length;
+}
+
+export function booksToggle(page: Page, shown = false): Locator {
+  return page.getByRole("button", { name: shown ? "Hide combined books" : "Show combined books" });
+}
+
+/**
+ * Watches the Upload modal's run request and returns the body it sent, so a test can check Begin asks for pace
+ * "factory". A gateway from before the Factory pace (its /openapi.json does not list "factory") would refuse it with a
+ * 422, so on such a gateway the request goes on without the pace and runs at DEMO_PACE: the console's request is still
+ * the one checked. The newer gateway gets the request unchanged.
+ */
+export async function watchRunBody(page: Page, backendUrl: string): Promise<{ body: () => Record<string, unknown> | null; factoryKnown: boolean }> {
+  const spec = await (await fetch(`${backendUrl}/openapi.json`)).text();
+  const factoryKnown = spec.includes('"factory"');
+  let sent: Record<string, unknown> | null = null;
+  await page.route(/\/deals\/[^/]+\/run$/, async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+    sent ??= body;
+    if (factoryKnown || body.pace !== "factory") return route.fallback();
+    const { pace: _pace, ...rest } = body;
+    void _pace;
+    return route.fallback({ postData: JSON.stringify(rest) });
+  });
+  return { body: () => sent, factoryKnown };
 }
 
 /** Answers the open flag with its Suggested option and waits until that flag has left the card. */
