@@ -18,6 +18,16 @@ class BackendStatus(BaseModel):
     anthropic_key: bool
     factory_key: bool
     last_runs: list[dict]
+    # The recording the demo paces ("demo", "factory") replay: name, model, backend, recorded_at (recording.json).
+    demo_recording: dict | None = None
+
+
+class MemoryCounts(BaseModel):
+    """The sidebar's learning counters, across every deal in the record (GET /memory/counts, and /health)."""
+    human_answers: int  # flags a human answered, plus the earlier answers behind each live policy
+    policies: int  # live policies (not retired)
+    edits: int  # the controller's edits saved with a reason (status "reasoned")
+    by_deal: dict[str, dict[str, int]] = {}  # the same three counts per deal id
 
 
 class AuditSummary(BaseModel):
@@ -204,6 +214,7 @@ class HealthResponse(BaseModel):
     backend: BackendStatus
     store: StoreStatus
     running: bool = False  # a job is running for some deal in this process now
+    memory_counts: MemoryCounts | None = None
 
 
 class DealCreated(BaseModel):

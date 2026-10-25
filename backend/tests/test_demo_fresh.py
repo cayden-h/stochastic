@@ -1,4 +1,4 @@
-"""The demo laptop's "Run the demo": the 15-second run is always scripted, and a fresh reset clears the demo's memory.
+"""The demo laptop's "Run the demo": the 15-second run never makes a live call, and a fresh reset clears the memory.
 
 Found on 2026-10-24 by running the installed app. The laptop's .env says AGENT_BACKEND=droid, so a pace "demo" run
 went to live Droid (about 45 s to the questions, on Factory credits) instead of the paced scripted run. And three
@@ -17,7 +17,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 import app.main as app_main  # noqa: E402
-from app.agents import pace  # noqa: E402
+from app.agents import pace, runner  # noqa: E402
 from app.agents.backends import droid_backend  # noqa: E402
 from app.db.fixtures.kewaunee import BRIEF, DEAL_ID, PLATFORM, TARGET  # noqa: E402
 from app.main import create_app  # noqa: E402
@@ -54,7 +54,9 @@ def answer_all(c, deal_id, auto_advance=True):
 
 
 def test_a_demo_pace_run_never_calls_droid_and_reaches_the_questions(droid_configured):
+    """Since 2026-10-25 the demo replays the recorded Claude Haiku 5.5 run (test_demo_replay.py), not the rules."""
     calls, clock = droid_configured
+    runner.LAST_RUNS.clear()
     c = TestClient(create_app())
     r = c.post(f"/deals/{DEAL_ID}/run", json={"sync": False, "pace": "demo"})
     assert r.status_code == 200
@@ -67,9 +69,10 @@ def test_a_demo_pace_run_never_calls_droid_and_reaches_the_questions(droid_confi
     assert calls == []
     status = c.get("/health").json()["backend"]
     runs = [r for r in status["last_runs"] if r["role"] != "runner"]
-    assert runs and all(r["backend"] == "scripted" and r["asked"] == "scripted" for r in runs)
-    assert all([a["backend"] for a in r["attempts"]] == ["scripted"] for r in runs)  # no fallback chain
-    assert c.get(f"/deals/{DEAL_ID}/case").json()["verdict"]["backend"] == "scripted"
+    assert [r["role"] for r in runs] == ["mapper", "preparer", "reviewer"]
+    assert all(r["backend"] == "replay" and r["asked"] == "replay" for r in runs)
+    assert all([a["backend"] for a in r["attempts"]] == ["replay"] for r in runs)  # no fallback chain
+    assert c.get(f"/deals/{DEAL_ID}/case").json()["verdict"]["backend"] == "replay"
 
 
 def test_a_demo_pace_run_with_an_explicit_backend_uses_that_backend(droid_configured):

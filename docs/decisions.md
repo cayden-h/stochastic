@@ -530,3 +530,35 @@ Open: the walk was traced from a stock reference image (Alamy) that Cayden suppl
 License it, or replace it with our own seeded walk, before any public brand use.
 
 Design: `design/brand.md`.
+
+## D22. Demo modes: Hyphenate 15 s and Factory 30 s replay the recorded Haiku 5.5 run; counters are real
+
+Date: 2026-10-25.
+Decided by Cayden.
+
+Context: pace `demo` ran the scripted rules, so the sidebar's model card read "Scripted rules, no model" during the demo, and the Edits counter read 0 or 1 because only one seeded case had a reasoned edit.
+Cayden asked that the model card say Claude Haiku 5.5, that a second, slower Factory beat exist for an uploaded deal, and that the sidebar show four edits.
+Each had to be made true, not labeled.
+
+Decision:
+1. Pace `demo` (Run the demo, the Hyphenate beat) and a new pace `factory` (Upload then Begin, the Factory beat) replay `backend/recordings/haiku-5-5-run2/`, the live Droid run of the demo deal with Claude Haiku 5.5 (committed 2026-10-24 03:40 PDT).
+   The Mapper's typed output is the model's; the Preparer and the Reviewer re-run the recorded tool sequence, so every figure is a fresh tool run.
+2. `factory` doubles every `demo` wait and streams the mappings over 10 s: about 14 s to the questions and 14 s after the last answer.
+3. The replay applies only to the recorded statements (a content hash of the lines, so an upload of the same Kewaunee and Nu Aire files qualifies, with the line ids translated) and only when no earlier memory covers the deal.
+   Otherwise the pace runs the scripted rules, the run says so, and the card reads "Scripted rules".
+4. `last_runs` entries carry `model`, `recorded`, and `recording`, and `/health` and `/case` carry `backend.demo_recording`, so the card can say "Claude Haiku 5.5 · recorded run".
+5. The seeded cases hold four reasoned edits made through the gateway, each citing its filing note or the QuickBooks export, and `GET /memory/counts` (also on `/health`) counts human answers, live policies, and reasoned edits across all deals.
+
+Why:
+- The questions on screen are the ones a real model wrote, so naming the model is true, and "recorded" says it is not a live call. [verified: `backend/tests/test_demo_replay.py`]
+- A replay never waits on the network or on Factory credits, so both beats keep their timings on stage. [verified: measured on uvicorn, `docs/agents.md` section 7a]
+- Counters computed from the record cannot drift from what the pages show. [verified: `backend/tests/test_demo_cases.py`]
+
+Rejected:
+- Labeling the scripted output as Haiku 5.5, which would be false.
+- Replaying onto any upload: the recording maps named lines; on other statements it would be wrong, so other uploads run the rules and say so.
+- Replaying after memory is kept: the recording was made with no memory, so it would ask what the agents have already learned.
+- The Anthropic Haiku 5.5 recording, which asks three questions instead of the beat's two.
+- An edit on Mama's and Crown I: the gateway refuses amount edits on subtotals and balance sheet detail lines, and no Crown I line has a sourced change that fits.
+
+Design: `architecture/gateway-and-api.md` ("Demo pace", "Seeded cases"), `agents.md` section 7a, `demo-script.md`.

@@ -1,6 +1,7 @@
 """App entry point. Run: uvicorn app.main:app --reload --port 8000"""
 import logging
 import os
+import sys
 import shutil
 import threading
 from pathlib import Path
@@ -42,8 +43,10 @@ def open_store() -> MemoryStore:
 
 def demo_cases_wanted() -> bool:
     """DEMO_CASES (default on) seeds the Dashboard's four cases after startup. Under pytest it is off unless a test
-    asks (create_app(demo_cases=True)), so the suite's deal ids and counters stay as they were."""
-    if os.getenv("PYTEST_CURRENT_TEST"):
+    asks (create_app(demo_cases=True)), so the suite's deal ids and counters stay as they were. The module-level `app`
+    is built while pytest collects, before PYTEST_CURRENT_TEST is set, so a loaded pytest counts too: its background
+    seeding thread used to run the cases' scripted agents into the middle of a later test's `last_runs`."""
+    if os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
         return False
     return (os.getenv("DEMO_CASES") or "1").strip().lower() not in ("0", "off", "false", "no")
 

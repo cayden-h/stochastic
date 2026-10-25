@@ -20,6 +20,7 @@ Only the extracted line values, the Brief, and the source references are committ
 | `backend/app/db/fixtures/sstk_envato.py` | Shutterstock acquires Envato, 2024-07-22 | `data/raw/sstk_envato/` |
 | `backend/app/db/fixtures/cases.py` (`d_dlh_craigs`) | Sample: DLH's next add-on, the QuickBooks Online sample company | `scripts/samples/qbo/` (committed) |
 
+The seeded cases also hold four reasoned controller edits, each citing its source in the reason: two on DLH and GRSi (Ex 99.3 note 3b, Ex 99.2 Note 1) and two on the sample (the QuickBooks account list in `scripts/samples/qbo/account_list.xlsx`); see `docs/architecture/gateway-and-api.md`, "Seeded cases".
 Values the filings do not give are marked inferred in the fixtures, and each fixture's `test_period_note` says what the Brief schema could not hold (step-downs, cash netting, a second covenant).
 The raw files were fetched with the `SEC_USER_AGENT` from `.env` on 2026-10-24 and stay out of git.
 

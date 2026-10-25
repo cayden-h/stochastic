@@ -26,6 +26,9 @@ The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 (recor
 Status on 2026-10-24 evening: 167 tests pass offline and 176 with Tiger. The whole-line reading is computed as filed (2.84x), and the gateway guards against model-made exclusions, borrowed run ids, and unbacked review passes (D18). [verified: `backend/tests/test_gateway_guards.py`]
 The console still implements the earlier workflow. Josie is rebuilding it against `GET /deals/{id}/case`.
 Status on 2026-10-24 night: a 15-second demo pace (`"pace": "demo"` on Run: 6.25 s to the questions, 6.64 s from the answer to the approval, measured), a `notify` event for each question, a learn message with the policy id after each answer, and four more Dashboard cases seeded through the real pipeline: three real deals from their filings (DLH and GRSi, Mama's Creations and Crown I, Shutterstock and Envato) and one QuickBooks sample. [verified: `backend/tests/test_demo_pace.py`, `backend/tests/test_demo_cases.py`; details in `architecture/gateway-and-api.md` and `demo-script.md`]
+Status on 2026-10-25 (D22): two demo modes, both replaying the recorded Claude Haiku 5.5 Droid run of the demo deal (`backend/recordings/haiku-5-5-run2/`) instead of the scripted rules, so the model card truthfully reads "Claude Haiku 5.5 · recorded run".
+The Hyphenate beat is "Run the demo" (`"pace": "demo"`: 6.2 s to the questions, 7.2 s from the last answer to the approval, measured), and the Factory beat is Upload then Begin (`"pace": "factory"`: 14.2 s and 14.5 s).
+The live demo deal plus the four seeded cases make five deals; the seeded cases hold four reasoned controller edits, each citing its source, and `GET /memory/counts` gives the sidebar's counters (human answers, live policies, reasoned edits) across all deals. [verified: `backend/tests/test_demo_replay.py`, `backend/tests/test_demo_cases.py`]
 
 ## 2. The pitch rules
 
@@ -252,6 +255,7 @@ The whole screen comes from `GET /deals/{id}/case`. [verified: `architecture/gat
 Press Run. The Mapper maps 54 lines and stops on one flag. The controller picks the covenant reading. Code combines the books and tests the limit. The verdict line shows 0.76x against 2.50x, Reviewer pass. The controller approves and the gateway posts.
 If time allows, reset and run again: no flag, because the Mapper learned.
 The agent text is hardcoded, recorded, or scripted, and we say which. The gateway, tools, and log run for real.
+Since 2026-10-25 the demo's agent text is the recorded Claude Haiku 5.5 run, replayed (D22).
 
 ### The 1:30 pitch outline
 
