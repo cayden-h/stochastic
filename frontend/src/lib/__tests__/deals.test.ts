@@ -24,6 +24,10 @@ test("the older full Deal row still reads, with no verdict, time, or source", ()
   assert.equal(row.data_source, null);
 });
 
+test("an uploaded deal reads as an upload", () => {
+  assert.equal(toSummary({ deal_id: "d_up", platform: "A", target: "B", stage: "new", data_source: "upload" }).data_source, "upload");
+});
+
 test("an unknown data source is not shown as sample or filings", () => {
   assert.equal(toSummary({ deal_id: "d_x", platform: "A", target: "B", stage: "new", data_source: "other" as never }).data_source, null);
 });

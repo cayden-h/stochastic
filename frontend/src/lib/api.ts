@@ -56,7 +56,7 @@ export function toSummary(d: DealRow): DealSummary {
     name: d.name ?? `${platform} acquires ${target}`,
     verdict: v && typeof v.leverage === "number" ? { leverage: v.leverage, limit: v.limit, verdict: v.verdict } : null,
     updated_at: d.updated_at ?? null,
-    data_source: d.data_source === "sample" || d.data_source === "filings" ? d.data_source : null,
+    data_source: d.data_source === "sample" || d.data_source === "filings" || d.data_source === "upload" ? d.data_source : null,
     note: d.note ?? null,
   };
 }

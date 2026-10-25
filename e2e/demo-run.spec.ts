@@ -106,7 +106,7 @@ test("run the demo: the notification, Decide, Learned, Ready, then Review and Ma
   test.setTimeout(120_000);
   await open(page, "/");
   // Start from another case, so the demo also switches the current deal.
-  const other = (await deals(backend)).find((d) => d.data_source === "sample");
+  const other = (await deals(backend)).find((d) => d.deal_id !== "d_kequ_nuaire");
   if (other) {
     await page.locator(`[data-deal="${other.deal_id}"]`).click();
     await expect(page).toHaveURL(/\/case$/);
@@ -115,7 +115,8 @@ test("run the demo: the notification, Decide, Learned, Ready, then Review and Ma
   await page.getByRole("button", { name: "Run the demo" }).click();
   const started = Date.now();
   await expect(page).toHaveURL(/\/case$/);
-  const demo = (await deals(backend)).find((d) => d.data_source === "filings") ?? (await deals(backend))[0];
+  // The demo deal is the fixture's (backend/app/db/fixtures/kewaunee.py), the one deal the reset reseeds.
+  const demo = (await deals(backend)).find((d) => d.deal_id === "d_kequ_nuaire")!;
   await expect(page.getByRole("complementary").getByText(`${demo.platform} · ${demo.target}`, { exact: true })).toBeVisible();
 
   // The question arrives as a toast with the agent, the question, and Decide, and the Case item gets a badge.

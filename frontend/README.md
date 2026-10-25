@@ -67,15 +67,15 @@ In Electron a question also fires a native macOS notification through `window.st
 
 - The Dashboard lists every case from `GET /deals`.
   A row opens its case: it becomes the current deal (kept for a reload of the window), and every page reads it.
-  A case with `data_source: "sample"` shows a Sample data tag, with the note as its tooltip; its Case and Source panel say the figures are not from a filing.
+  A case with `data_source: "sample"` shows a Sample data tag (a deal from the filings or an upload shows none), with the note as its tooltip; its Case and Source panel say the figures are not from a filing.
   The stat cards count across every case; Policies learned is the store's own count.
-- Run the demo resets with memory cleared (`POST /dev/reset?keep_memory=false`), makes the deal with `data_source: "filings"` current (the first deal if none), runs it with `"pace": "demo"`, and opens the Case.
+- Run the demo resets with memory cleared (`POST /dev/reset?keep_memory=false`, which reseeds only the demo deal and returns `kept_deals`), makes the deal it reseeded current, runs it with `"pace": "demo"`, and opens the Case.
   Begin runs the current case at its normal pace.
 - A `notify` event (`{id, deal_id, at, kind, item_id, from, title, body}`) shows a toast at the top right of every page: the agent's character, the title, the question, Decide, and Later.
   One question shows at a time, with how many more wait.
   Decide opens the Case on that flag card and moves the focus to it; the deal's later questions then get no toast on its Case, since the card shows them.
   A question already answered drops out, and the stream's replay of an open question on connect is not news, so it gets no toast (the sidebar's Case badge counts the open questions).
-- A `conversation` message with `policy_id` ("Learned p_007: ...") shows a Learned toast for 6 s, "The Mapper learned p_007: ...", with how many more came with it, and the sidebar's Policies counter pulses.
+- A `conversation` message with `policy_id` ("Learned p_007: ...") shows a Learned toast for 6 s, in the agent's words ("The Mapper learned p_006: ..." or "The Mapper learned p_001 to p_005 (...): ..."), with how many more came with it, and the sidebar's Policies counter pulses.
 - The flag card shows the decision, each option's reading, its effect sentence with its figures and run id, and "What happens next".
 
 ## The live run

@@ -54,11 +54,13 @@ If it is not in `~/Library/Caches/ms-playwright`, run `npx playwright install ch
 ## Timings
 
 Measured on 2026-10-24 on an Apple Silicon Mac, the last three of six green runs in a row: 3.0, 2.9 and 2.8 minutes for the whole suite, including the console build (about 10 seconds).
+On 2026-10-25, with the demo run and the Mapping tab added, two green runs in a row took 3.8 and 3.9 minutes.
 
 | Spec | Time per run |
 | --- | --- |
 | `agreement.spec.ts` | 4.5 s |
-| `review-branches.spec.ts` | 4 to 6 s per test, 4 tests |
+| `review-branches.spec.ts` | 4 to 6 s per test, 5 tests |
+| `demo-run.spec.ts` | 7 s (the five cases) and 21 s (the demo, at pace demo) |
 | `second-run.spec.ts` | 4.6 s |
 | `agents-3d.spec.ts` | 54 s (paced) |
 | `demo-path.spec.ts` | 51 s (paced) |

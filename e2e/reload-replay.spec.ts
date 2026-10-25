@@ -28,6 +28,6 @@ test("a reload mid-run replays the conversation and keeps following the run", as
   // And the page keeps following the live run.
   await expect(page.getByText("The Mapper is asking you")).toBeVisible({ timeout: 40_000 });
   expect(await count()).toBeGreaterThan(before.length);
-  await expect(process.getByText(/Where does the target's 'Certificates of Deposit' belong/)).toBeVisible();
+  await expect(process.getByText(/Where does Nu Aire's 'Certificates of Deposit' \(991K\) go on Kewaunee's chart of accounts/)).toBeVisible();
   await shot("asking-after-reload");
 });
