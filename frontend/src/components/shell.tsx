@@ -7,9 +7,18 @@ import { Sidebar, themeOf } from "./sidebar";
 
 const WASH = { teal: "wash-teal", blue: "wash-blue", violet: "wash-violet" } as const;
 
-/** The v3 window: the sidebar on the left and the page on the right, over the page's tint. Only the page scrolls. */
+/** The v3 window: the sidebar on the left and the page on the right, over the page's tint. Only the page scrolls.
+ * Review (V3-7) is the exception: a full-window workbook with its own title bar and ribbon, and no sidebar. */
 export function Shell({ children }: { children: ReactNode }) {
-  const theme = themeOf(usePathname());
+  const path = usePathname();
+  const theme = themeOf(path);
+  if (path.startsWith("/review")) {
+    return (
+      <div className="flex h-screen w-full flex-col overflow-hidden bg-white">
+        <Gate>{children}</Gate>
+      </div>
+    );
+  }
   return (
     <div className={`flex h-screen w-full overflow-hidden ${WASH[theme]}`}>
       <Sidebar />

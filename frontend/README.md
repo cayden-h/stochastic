@@ -1,7 +1,8 @@
 # frontend
 
 The console. Next.js, React, TypeScript, and Tailwind.
-Five pages on `GET /deals/{id}/case`, built from the Figma Hi-fi v3 frames (V3-1 to V3-6), each in a 240 px sidebar shell.
+Six pages on `GET /deals/{id}/case`, built from the Figma Hi-fi v3 frames (V3-1 to V3-7).
+Every page but Review sits in a 240 px sidebar shell; Review is a full-window workbook with its own title bar and ribbon.
 The design notes are in `docs/design/README.md`.
 
 ## Screens
@@ -10,21 +11,23 @@ The design notes are in `docs/design/README.md`.
 | --- | --- | --- |
 | `/` | Dashboard (V3-1) | See every case with its stage, verdict, and last update; Begin runs the deal |
 | (modal) | New deal (V3-2) | Load two statement CSVs and a Brief JSON or the credit agreement as text (`POST /deals`), then run |
-| `/case` | Case (V3-3) | Watch the run live, answer the flags, read the verdict, edit the books, approve, download |
-| `/mapping` | Mapping (V3-4) | Where each target line went and how sure the Mapper was, line by line as it happens: All, Unsure, By policy, Edited; remap a line |
+| `/case` | Case (V3-3) | Watch the run live, answer the flags, read the verdict and the read-only books; "Review the books" after the Reviewer's hand-off |
+| `/review` | Review (V3-7) | The combined books as a workbook: change an amount or remap a line, give each edit a reason to the Reviewer companion, approve or reject, download the final files |
+| `/mapping` | Mapping (V3-4) | Where each target line went and how sure the Mapper was, line by line as it happens: All, Unsure, By policy, Edited (read-only) |
 | `/agents` | Agents (V3-6) | The Agent House plays the conversation live, with the timeline beside it |
 | `/log` | Log (V3-5) | Prove what happened: the audit rows, or the conversation |
 | (slide-over) | Source | Show the exact quote and the document behind a flag |
 
 ## Routes the console uses
 
-Reads: `GET /deals` (the Dashboard rows and the current deal), `GET /deals/{id}/case`, `GET /health` (the backend badge), `GET /deals/{id}/audit`, `GET /deals/{id}/conversation` (the history, on load), and `GET /deals/{id}/stream` for `stage`, `audit`, `conversation`, and `mapping` events.
+Reads: `GET /deals` (the Dashboard rows and the current deal), `GET /deals/{id}/case`, `GET /health` (the backend badge), `GET /deals/{id}/audit`, `GET /deals/{id}/conversation` (the history, on load), and `GET /deals/{id}/runs` (the Review page reads the agents' own leverage run for its "was" figures), and `GET /deals/{id}/stream` for `stage`, `audit`, `edit`, `conversation`, and `mapping` events.
 Writes: `POST /deals` (the upload), `POST /deals/{id}/run` (always `{"sync": false}`: the console follows the run on the stream), `POST /work-items/{id}/answer`, `POST /work-items/{id}/hold`, `POST /work-items/{id}/approve`, `POST /work-items/{id}/reject`, and `POST /dev/reset` for the second-run moment.
 Review edits (D19, Tri's T2): `POST /deals/{id}/edits`, `POST /edits/{id}/reason`, and `DELETE /edits/{id}`; `/case` carries `edits` and `adjustments`.
 The Brief Reader (D20, Tri's T4): `POST /deals` with `agreement_txt`, `POST /deals/{id}/brief/amounts` (`field`, `value`, `source_ref`), and `POST /deals/{id}/brief/approve`; `/case` carries `brief_draft`.
 After approval, Download final files reads `GET /deals/{id}/export.xlsx` (Tri's T3) and `GET /deals/{id}/certificate`.
 Every write carries `X-Actor: human:controller`.
 The console computes no number. Every figure comes from a tool run and shows its run id.
+The one exception is the Change column on Case and Review, which shows an edit's own new value minus its old value.
 
 ## Run
 
@@ -38,6 +41,11 @@ The console reads `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`).
 On another port, also set the backend's `CORS_ORIGINS`, for example `CORS_ORIGINS=http://localhost:3010`.
 
 In the Electron window (`titleBarStyle: hiddenInset`), the layout detects Electron from the user agent and moves the sidebar's brand row below the traffic lights. Page headers and the brand row are drag regions; their buttons and links are not.
+On Review the title bar is the drag region, 44 px in a browser and 52 px in Electron so it clears the traffic lights.
+
+## Tests
+
+`npm run lint`, `npx tsc --noEmit`, `npm run build`, and `npm run test:lib` (node's test runner on `src/lib/__tests__`: the conversation reducers and the Review workbook rows).
 
 ## What the screen shows
 

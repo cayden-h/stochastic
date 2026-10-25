@@ -45,6 +45,8 @@ export const api = {
   health: () => get<Health>("/health"),
   audit: (id: string) => get<AuditResponse>(`/deals/${id}/audit`),
   run: (runId: string) => get<ToolRun>(`/runs/${runId}`),
+  /** Every tool run of the deal, oldest first. The Review page reads the agents' own leverage run from it. */
+  runs: (id: string) => get<ToolRun[]>(`/deals/${id}/runs`),
   conversation: (id: string) => get<ConversationMessage[]>(`/deals/${id}/conversation`),
   // The run goes in the background ({"sync": false}): a paced run takes about 23 s, and the console follows it on the
   // stream instead of waiting on the request.

@@ -3,7 +3,6 @@ import { DM_Sans, IBM_Plex_Mono, Instrument_Serif, Public_Sans } from "next/font
 import "./globals.css";
 import { DealProvider } from "@/lib/deal-context";
 import { EditProvider } from "@/lib/edit-context";
-import { Companion } from "@/components/companion";
 import { SourcePanel, SourceProvider } from "@/components/source";
 import { Shell } from "@/components/shell";
 import { LaunchSplash } from "@/components/launch-splash";
@@ -12,7 +11,7 @@ import { LaunchSplash } from "@/components/launch-splash";
 // IBM Plex Mono for ids and counts, Public Sans for button labels.
 const dmSans = DM_Sans({ subsets: ["latin"], axes: ["opsz"], variable: "--font-dm-sans" });
 const instrumentSerif = Instrument_Serif({ subsets: ["latin"], weight: "400", variable: "--font-instrument-serif" });
-const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400"], variable: "--font-plex-mono" });
+const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "600"], variable: "--font-plex-mono" });
 const publicSans = Public_Sans({ subsets: ["latin"], weight: ["600"], variable: "--font-public-sans" });
 
 export const metadata: Metadata = {
@@ -20,7 +19,8 @@ export const metadata: Metadata = {
   description: "Merge an add-on company into the platform, flag the lines a human must decide, and test the lender limit.",
 };
 
-// In the Electron window (titleBarStyle hiddenInset) the sidebar leaves room for the traffic lights. Set before paint.
+// In the Electron window (titleBarStyle hiddenInset) the sidebar and the Review title bar leave room for the traffic
+// lights. Set before paint.
 const ELECTRON = `if (/Electron\\//.test(navigator.userAgent)) document.documentElement.dataset.electron = "";`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -40,7 +40,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Shell>{children}</Shell>
               <SourcePanel />
             </SourceProvider>
-            <Companion />
           </EditProvider>
           <LaunchSplash />
         </DealProvider>

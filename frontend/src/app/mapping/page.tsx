@@ -3,10 +3,9 @@
 import { useState } from "react";
 import { type MappingFilter, Mappings, editOf, isUnsure } from "@/components/mappings";
 import { Page } from "@/components/shell";
-import { Button, PageHeader } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
-import { canEdit } from "@/lib/edits";
 import { plural } from "@/lib/format";
 
 const FILTERS: { key: MappingFilter; label: string }[] = [
@@ -17,10 +16,10 @@ const FILTERS: { key: MappingFilter; label: string }[] = [
 ];
 
 /** V3-4: where each target line went, how sure the Mapper was, which lines an earlier answer settled, and which
- * lines the controller remapped. While the result waits for approval, the Platform line is where remaps happen. */
+ * lines the controller remapped. Read-only: remaps are made on the Review page (V3-7.7). */
 export default function MappingScreen() {
   const { kase, mappings, liveMappings, starting } = useDeal();
-  const { edits, error, clearError } = useEdits();
+  const { edits } = useEdits();
   const [filter, setFilter] = useState<MappingFilter>("all");
   if (!kase) return null;
   const { source_lines, stage } = kase;
@@ -28,7 +27,6 @@ export default function MappingScreen() {
   const unsure = mappings.filter(isUnsure).length;
   const byId = new Map(source_lines.map((l) => [l.id, l]));
   const edited = mappings.filter((m) => editOf(byId.get(m.target_line_id), edits)).length;
-  const editable = canEdit(kase);
   return (
     <Page>
       {/* The title, the counts, and the filters stay on screen while the rows arrive below them. The wash is the
@@ -40,13 +38,6 @@ export default function MappingScreen() {
             {plural(mappings.length, "line")} &middot; {mappings.length - unsure} sure &middot; {unsure} unsure{edited ? ` · ${edited} edited` : ""}
           </span>
         </PageHeader>
-
-        {error ? (
-          <p role="alert" className="flex items-center gap-[12px] rounded-[8px] bg-denied-tint px-[12px] py-[8px] font-semibold text-denied">
-            <span className="flex-1">The remap was not saved: {error}</span>
-            <Button kind="link" className="text-[13px] text-denied" onClick={clearError}>Dismiss</Button>
-          </p>
-        ) : null}
 
         <div className="flex items-center gap-[8px]" role="group" aria-label="Filter the mappings">
           {FILTERS.map((f) => {
@@ -65,11 +56,10 @@ export default function MappingScreen() {
             );
           })}
           <span className="flex-1" />
-          {editable ? <span className="text-[13px] text-slate">Pick a platform line to remap a target line.</span> : null}
         </div>
       </div>
 
-      <Mappings key={filter} mappings={mappings} lines={source_lines} filter={filter} platform={kase.deal.platform} editable={editable} received={liveMappings.received} live={live} />
+      <Mappings key={filter} mappings={mappings} lines={source_lines} filter={filter} received={liveMappings.received} live={live} />
     </Page>
   );
 }

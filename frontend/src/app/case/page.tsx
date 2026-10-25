@@ -8,12 +8,11 @@ import { Page } from "@/components/shell";
 import { Avatar, Button, Card, Label, Mono, PageHeader, Shape, Tag } from "@/components/ui";
 import { VerdictLine } from "@/components/verdict-line";
 import { BriefCard } from "@/components/brief-card";
-import { DownloadFinal, YourEdits } from "@/components/your-edits";
 import { AskingBanner, Conversation, Pipeline } from "@/components/process-flow";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
-import { canEdit, isAdjustmentFlag } from "@/lib/edits";
+import { isAdjustmentFlag } from "@/lib/edits";
 import { canStart, fmtX, isBriefStage, learnedPolicies, plural } from "@/lib/format";
 import { isReadyForApproval } from "@/lib/conversation";
 
@@ -30,7 +29,8 @@ function CaseTile({ href, label, value, sub, children }: { href: string; label: 
 
 /**
  * V3-3, the case: one screen from one read, GET /deals/{id}/case.
- * Run, answer the flags, read the verdict, approve. Mapping, Review and Log are tiles on the right.
+ * Run, answer the flags, read the verdict. The books are read-only here: editing, the reasons, approval, and the final
+ * files are on the Review page (V3-7), which the Reviewer's hand-off opens. Mapping, Review and Log are tiles.
  */
 export default function CaseScreen() {
   const { kase, refresh, messages, received, agentStates, startRun, starting, reset, running, mappings: liveRows } = useDeal();
@@ -86,10 +86,10 @@ export default function CaseScreen() {
   const handoff = messages.findLast(isReadyForApproval) ?? null;
   const review = verdict?.review?.verdict ?? null;
   const over = verdict?.verdict === "over_limit";
-  // The controller's edits (D19). Approval is refused while one has no reason (check 5e).
+  // The controller's edits (D19), made on the Review page. Approval there is refused while one has no reason (check 5e).
   const edits = editsCtx.edits;
   const unreasoned = edits.filter((e) => e.status === "needs_reason").length;
-  const canApprove = verdict?.approval_state === "PROPOSED" && review === "pass" && !over && !unreasoned && !openAdjustments.length;
+  const reviewReady = verdict?.approval_state === "PROPOSED" && review === "pass" && !over && !openAdjustments.length;
 
   // The lines an open flag is about, by name, so the combined books can show them in amber.
   const flaggedIds = new Set(open.flatMap((f) => (Array.isArray(f.payload.line_ids) ? (f.payload.line_ids as string[]) : [])));
@@ -112,11 +112,10 @@ export default function CaseScreen() {
   const sub =
     verdict?.posted && edits.length ? "Approved with your edits. The reasons are now policies for the next add-on."
     : verdict?.posted ? "Posted to the record. The answer you gave is now a policy the Mapper applies next time."
-    : edits.length && unreasoned && !editsCtx.asking ? `${plural(unreasoned, "edit")} ${unreasoned === 1 ? "needs" : "need"} a reason before you can approve.`
-    : edits.length && unreasoned ? `Code recomputed the books with your ${edits.length === 1 ? "edit" : "edits"}. Give a reason and approve.`
-    : edits.length ? `Code recomputed the books with your ${edits.length === 1 ? "edit" : "edits"}. The Reviewer re-ran the checks. Your approval posts it.`
+    : edits.length && unreasoned ? `${plural(unreasoned, "edit")} ${unreasoned === 1 ? "needs" : "need"} a reason on the Review page before you can approve.`
+    : edits.length ? `Code recomputed the books with your ${edits.length === 1 ? "edit" : "edits"}. The Reviewer re-ran the checks. Approve on the Review page.`
     : noFlagThisTime ? `No flag this time. The Mapper applied ${earlierAnswers === 1 ? "your earlier answer" : `your ${earlierAnswers} earlier answers`} to ${plural(learnedLines, "line")} and asked nothing. Code combined the books and tested the limit again.`
-    : verdict ? "Code combined the books and tested the limit. The Reviewer re-ran the checks. Your approval posts it."
+    : verdict ? "Code combined the books and tested the limit. The Reviewer re-ran the checks. Review the books, then approve."
     : null;
 
   return (
@@ -128,30 +127,17 @@ export default function CaseScreen() {
           </Button>
         ) : briefing ? null : verdict?.posted ? (
           <span className="flex min-h-11 items-center gap-[6px] text-[14px] font-semibold text-clear"><Shape kind="check" size={12} />Approved and posted</span>
+        ) : reviewReady ? (
+          // V3-3 keeps Approve in the header; approval itself happens on the Review page, after the books are read.
+          <Link href="/review" className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-chip bg-forest px-[18px] py-[10px] font-ui text-[14px] leading-[28px] font-semibold text-paper transition-colors duration-150 hover:bg-forest-deep">
+            Review and approve
+          </Link>
         ) : (
-          <>
-            {verdict?.approval_state === "PROPOSED" ? (
-              <Button kind="link" disabled={busy} onClick={() => act(() => api.reject(verdict.approval_item!, "Rejected by the controller."))}>Reject</Button>
-            ) : null}
-            <Button
-              kind="primary"
-              disabled={busy || !canApprove}
-              title={unreasoned ? "Give each edit a reason first" : undefined}
-              onClick={() => act(() => api.approve(verdict!.approval_item!))}
-            >
-              Approve
-            </Button>
-          </>
+          <Button kind="primary" disabled title="Approval opens on the Review page after the Reviewer's pass">Review and approve</Button>
         )}
       </PageHeader>
 
       {note ? <p role="alert" className="rounded-[8px] bg-denied-tint px-[12px] py-[8px] font-semibold text-denied">{note}</p> : null}
-      {editsCtx.error ? (
-        <p role="alert" className="flex items-center gap-[12px] rounded-[8px] bg-denied-tint px-[12px] py-[8px] font-semibold text-denied">
-          <span className="flex-1">The edit was not saved: {editsCtx.error}</span>
-          <Button kind="link" className="text-[13px] text-denied" onClick={editsCtx.clearError}>Dismiss</Button>
-        </p>
-      ) : null}
 
       <div className="flex w-full items-start gap-[20px]">
         <div className="flex min-w-0 flex-1 flex-col gap-[20px]">
@@ -227,13 +213,13 @@ export default function CaseScreen() {
                   {noFlagThisTime ? <><Tag tone="agent">Learned</Tag>{" "}</> : null}{sub}
                 </>
               ) : null}
-              action={verdict.posted ? <DownloadFinal deal={deal} /> : null}
+              action={verdict.posted ? (
+                <Link href="/review" className="text-[14px] font-semibold text-forest underline-offset-4 hover:underline">Download final files on Review</Link>
+              ) : null}
             />
           ) : open.length ? (
             <WaitingVerdict text={open.length === 1 ? "Verdict waits on the flag." : `Verdict waits on ${open.length} flags.`} limit={deal.brief?.limit} />
           ) : null}
-
-          {verdict ? <YourEdits locked={!canEdit(kase)} /> : null}
 
           {result ? (
             <CombinedTable result={result} flagged={flaggedNames} kase={kase} />

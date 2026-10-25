@@ -3,7 +3,15 @@
 Status: proposed design, 2026-10-24 evening. Decision D19 in `docs/decisions.md`.
 Owner: Josie (screens and Figma), Cayden (desktop shell, companion, edit endpoints), Tri (recompute and export).
 Read `design/README.md` first: every color, font, and radius here is an existing token.
-The base screens are Hi-fi v3 in Figma (`design/README.md` has the frame links). This spec adds to V3-3 Case and V3-4 Mapping.
+The base screens are Hi-fi v3 in Figma (`design/README.md` has the frame links).
+
+Update, 2026-10-24 night: editing moved to its own page.
+The Review page (`/review`, Figma section "Review flow (D19)", frames V3-7.1 to V3-7.8) holds every edit, the reason bubble, Your edits, Approve and Reject, and Download final files.
+It is a full-window workbook with no sidebar: a title bar, a ribbon (Review, Combined, Mapping, Log), a formula bar, the sheet (A line, B platform, C target, D combined, E change), the verdict and Your edits strips, and the sheet tabs (Combined, Edits, Audit).
+The Case (V3-3) is read-only: flags, verdict, read-only combined books, conversation, and pipeline; after the Reviewer's hand-off, "Review the books" is its primary action, and the header's Approve is a link, "Review and approve".
+Mapping (V3-4) is read-only too; a remap is made from the line cell's menu on Review (V3-7.7a and 7.7b).
+The companion is the Reviewer (`frontend/public/agents/reviewer-avatar.png`, 26 px) and lives on the Review page only.
+Where the sections below say V3-3, V3-4, or the agent-blue dot, the Review page and the Reviewer now stand in their place.
 
 ## 1. What changes
 
@@ -52,7 +60,7 @@ Edits are limited to what feeds the books, so the math stays in code and every n
 
 | Cell | Editable | How |
 | --- | --- | --- |
-| Line (target lines) | On V3-4 Mapping | The Platform line cell is a dropdown of the platform's lines. Picking one remaps the target line. |
+| Line (target lines) | On Review | The line cell opens a menu of the platform's lines (V3-7.7a). Picking one remaps the target line; it keeps its place on the sheet and shows where it goes now. |
 | Platform amount | Yes | Click, type, Enter. |
 | Target amount | Yes | Click, type, Enter. |
 | Combined | No | Always computed. Shows the change from the agents' value. |
@@ -126,9 +134,9 @@ In the product, Claude suggests them from the line, the change, the filing notes
 
 ### Look
 
-- A 14px circle in `agent` (#274C77) with a 2px white ring and a soft shadow, at 70% opacity while idle.
-- No face, no blob. It should read as part of the console, not as a mascot.
-- While it is asking, it is 100% opacity with a slow 1.6s pulse ring in `agent-tint`.
+- The Reviewer's avatar (violet centre with a ring of circles), 26px, at 70% opacity while idle.
+- While it is asking, it is 100% opacity and sits in a 40px `reviewer-tint` (#ECE5F6) ring that breathes over 1.6s.
+- The learned note is a white pill with violet (`reviewer`, #6A4C9C) text beside it.
 
 ### Movement
 
@@ -147,13 +155,13 @@ In the product, Claude suggests them from the line, the change, the filing notes
 | Noticing | An edit was just saved | Glides to the cell in about 250ms |
 | Asking | Bubble open | Parked at the bubble, pulse ring |
 | Learned | After Save | One-line note beside it for 4s, then idle |
-| Waiting | An edit has no reason | A small `escalation-bar` dot on the companion. Clicking it reopens the bubble for the oldest edit without a reason |
+| Waiting | An edit has no reason | A small violet (`reviewer`) dot on the companion. Clicking it reopens the bubble for the oldest edit without a reason |
 
 The companion is pointer-transparent (`pointer-events: none`), except for the waiting dot and the bubble.
 
 ## 7. Your edits section
 
-Placed under the verdict line, styled like the existing "Answered" section.
+On Review: a strip under the verdict strip, one 36px row per edit, with "Give a reason" (when the bubble is closed) and "Undo" on the right.
 
 - Label: "Your edits (2)" in the uppercase 14px label style.
 - One row per edit: a check or a waiting dot, the line, `old → new` in mono, the reason (truncated, full text on hover), and the policy id in mono if one was made.
@@ -167,7 +175,8 @@ What the agents learn:
 
 ## 8. Download final files
 
-After approval, the verdict line shows a primary button, "Download final files", which opens the macOS save dialog for a folder.
+After approval, the Review ribbon shows a primary button, "Download final files", which opens the macOS save dialog for a folder (`window.stochastic.saveFiles`); in a browser the two files download.
+Before approval, with edits, it shows disabled with "after approval" beside it.
 It writes two files:
 
 - `Kewaunee + Nu Aire combined books.xlsx`

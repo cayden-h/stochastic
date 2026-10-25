@@ -62,7 +62,7 @@ If a judge gives a second minute, the memory moment: reset, run again, no flag, 
 ## 2. The 30-second live demo, beat by beat
 
 Rules:
-- The console opens on the Dashboard (`/`); the demo runs on the Case page (`/case`): the flag card, the verdict line, and the combined books, with Mapping, Review, and Log tiles on the right. [verified: `frontend/README.md`]
+- The console opens on the Dashboard (`/`); the run plays on the Case page (`/case`): the flag card, the verdict line, and the read-only combined books, with Mapping, Review, and Log tiles on the right. Editing, approval, and the final files are on the Review page (`/review`), opened by "Review the books" after the Reviewer's hand-off. [verified: `frontend/README.md`]
 - The presenter does not read numbers aloud unless they are final. See section 4.
 - Do not stage a denied action. Show a DENIED row only if a judge asks to see the log. [verified: `STOCHASTIC.md`, section 9]
 
@@ -83,7 +83,8 @@ The beats below are the original plan; Cayden times the real version with a stop
 | 3. Flag | 1:42 - 1:50 | The "Lender definition question" card appears for "Financing liability". Each option shows its ratio in large type with Over the limit or OK; the filing evidence is folded under the options. | "It stopped on the line it must not decide alone. Financing liability holds a sale-leaseback, the new bank debt, and seller notes. Which parts are covenant debt?" | The question and options are the Mapper's. Each ratio and effect comes from a gateway tool run. The flag work item and its state NEEDS_INFO are real gateway state. |
 | 4. Answer | 1:50 - 1:55 | The controller clicks Approve on one option, or Change. | "The controller decides. Not the model." | The answer call is real. The gateway logs it. |
 | 5. Combine and test | 1:55 - 2:00 | The verdict line shows 0.76x against 2.50x with OK and Reviewer pass, and under it "read as filed, counting the whole financing line: 2.84x, over the limit". | "Code adds the books and tests the lender's limit. That is the verdict." | The Preparer's tool calls, the math, the tie-out, and the limit test run for real. The gateway checks that every figure is the Preparer's own run and reads the Reviewer's pass from its checks. |
-| 6. Close | after 2:00 if asked | The presenter clicks the Log tile on the Case page (or Log in the sidebar). | "Every step is here, and each row is chained to the one before." | Real. The chain check is real. |
+| 6. Review | after the hand-off | The Reviewer hands off. On the Case, "Review the books" opens the Review page: the combined books as a workbook, the Reviewer avatar trailing the cursor. Click Nu Aire's General and Administrative (6,163), type 5663, Enter. The verdict reads 0.75x, the Reviewer glides to the cell and asks why. Press 1, then Enter: "Learned: allowed add-back, for the next add-on." Approve, then Download final files. | "The controller can change the books. Code recomputes every total, and the Reviewer asks why once. The reason becomes a policy for the next add-on." | Real. The edit, the recompute, the reason, the approval, and the workbook (amber cell with its note) all go through the gateway. The reason chips are hardcoded for the demo deal. |
+| 7. Close | after 2:00 if asked | The presenter clicks Log in the Review ribbon (or the Log tile on the Case). | "Every step is here, and each row is chained to the one before." | Real. The chain check is real. |
 
 What runs for real: the gateway (state changes, maker-checker, permissions), the math tools (consolidation, EBITDA, leverage, limit test), the tie-out check, and the audit log with its hash chain. [verified: `STOCHASTIC.md`, section 2]
 What the model writes: the mappings, the flag question, and the option labels, on the backend the model card names.
@@ -105,7 +106,7 @@ What the room sees, with the times measured on 2026-10-24 (scripted, `DEMO_PACE=
 - 19 to 23 s: the Gateway checks and accepts the mappings, then the Mapper asks the controller two questions, 1.5 s apart. The flag cards open.
 - The controller answers. The conversation shows each answer going back to the Mapper and the policies it taught.
 - 0 to 12 s after the last answer: the Mapper hands off to the Preparer, the Preparer's four tool runs arrive about 1 s apart with their figures, the Preparer reports the draft books (leverage 0.76x against 2.50x, with the run id), the Gateway confirms every figure traces to a run, the Reviewer checks the tie-out and the limit test, and hands off: "Ready for your approval".
-- After: open the Log for the audit rows, then the Review page for the books and the edits.
+- After: "Review the books" on the Case opens the Review page (`/review`): edit, give the reason, approve, download (beat 6 below).
 
 `DEMO_PACE=0.5` plays it twice as fast; `DEMO_PACE=2` twice as slow.
 Every line of the conversation is written by the gateway when the thing happens, from the record (see `architecture/gateway-and-api.md`, "Live events").
@@ -115,7 +116,7 @@ The pace on replay is honest to say: "the recorded run's text, played at reading
 ### Who clicks what
 
 - Presenter: speaks only.
-- Driver: presses Run, clicks Approve or Change, opens the log link.
+- Driver: presses Run, answers the flags, opens Review, makes the edit and gives the reason, clicks Approve and Download final files, opens the log link.
 - Backup driver: holds the recorded-run switch and watches the clock.
 
 ## 3. The data on screen
