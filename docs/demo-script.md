@@ -151,9 +151,9 @@ Since D23 (2026-10-25) the demo deal starts from the credit agreement, and the h
 1. Run the demo: the Brief Reader reads the agreement extract (2.4 s), and the Verifier checks every field against it (1.6 s): "Brief verified: 22 of 22 checks passed; noted, not tested: 1 item the Brief cannot hold".
    The amounts come from the books with their sources (pension 4,019, stock compensation 1,018, rent 1,970 inferred, two capped costs at 0).
 2. Touchpoint 1: the Case shows the Brief card with "22 of 22 checks passed"; Show the checks lists each field with its quote, section, and pass mark. One click, Approve the Brief and map; nothing to type.
-3. The Mapper (the recorded Haiku 5.5 run) asks its two questions together, about 3.4 s after the approval, with one notification: "The Mapper needs 2 decisions".
+3. The Mapper (the recorded Haiku 5.5 run) asks its two questions together, about 4 s after the approval, with one notification: "The Mapper needs 2 decisions".
 4. Touchpoint 2: answer both on the Case. The Mapper says what it learned, and the rest runs to "Ready for your approval" about 7 s later.
-Measured on uvicorn on 2026-10-25 (memory store, the cases seeded, agent time only): 4.2 s to the verified Brief, 3.4 s from the approval to the questions, 7.3 s from the last answer to Ready, about 15 s in all; at the factory pace about 30 s.
+Measured on uvicorn on 2026-10-25 (memory store, the cases seeded, agent time only): 4.2 s to the verified Brief, 4.0 s from the approval to the questions, 7.3 s from the last answer to Ready, 15.5 s in all; at the factory pace 8.2 s, 7.9 s, and 14.4 s, 30.5 s in all.
 Say: "It read the contract, code checked every quote and number, you approved the Brief once, it asked you once, and it finished."
 The text below predates D23 and describes the Mapper part of the run.
 

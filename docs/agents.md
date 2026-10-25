@@ -86,7 +86,7 @@ Before, pace `demo` forced the scripted backend, and the model card said "Script
 
 | Pace | Where | Backend | To the questions | Last answer to approval |
 | --- | --- | --- | --- | --- |
-| `demo` | Run the demo (the Hyphenate beat, about 15 s) | the Brief Reader on the rules, then the replay of `haiku-5-5-run2`, forced | read and verify 4.2 s measured to the Brief approval, then 3.4 s to the questions (D23) | 7.3 s measured (6.6 s fake clock) |
+| `demo` | Run the demo (the Hyphenate beat, about 15 s) | the Brief Reader on the rules, then the replay of `haiku-5-5-run2`, forced | read and verify 4.2 s measured to the Brief approval, then 4.0 s to the questions (D23) | 7.3 s measured (6.6 s fake clock) |
 | `factory` | Upload then Begin (the Factory beat, about 30 s) | the same, forced | twice the demo's waits | 14.4 s measured (13.2 s) |
 | `human` | `DEMO_PACE=1` timings | `AGENT_BACKEND` and its fallback chain | 20.1 s (scripted) | 12.1 s (scripted) |
 | `off` | no waits | `AGENT_BACKEND` and its fallback chain | the backend's own time | the backend's own time |
