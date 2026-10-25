@@ -274,7 +274,9 @@ Should (if the schedule holds):
 - The second-run memory moment on stage.
 - A downloadable draft compliance certificate.
 - The Mac desktop app (Electron), the editable review table, the companion, and Download final files (D19). The demo beat is in `design/review-companion.md` section 9.
-- The logo and the launch splash (D21): the circle and the name, centered on a transparent background, until the whole app has loaded. Built in `cayden/launch-mark`. Spec: `design/brand.md`.
+- The logo and the launch splash (D21): the circle and the name, centered on a transparent background, until the whole app has loaded.
+  Built in `cayden/launch-mark`.
+  Spec: `design/brand.md`.
 - The Brief Reader, stage 1 (D20): the role, the gateway's quote and number checks, brief approval before mapping, the scripted fallback, and the tests. When to build it against the 8pm freeze is open. Design: `architecture/brief-reader.md`.
 - Tiger Cloud Postgres in place of the memory store. Built on 2026-10-24 as a write-through store (`backend/app/db/postgres.py`).
 
@@ -405,7 +407,10 @@ All paths are inside `docs/`.
 - `glossary.md`: finance and product terms in plain language.
 - `decisions.md`: the dated decision log and the open decisions.
 - `architecture/`: parts, agents and work items, gateway and API, data model, repo structure.
-- `design/`: Figma links, tokens, and UI rules. `design/brand.md` holds the logo and the launch splash (D21). The mockups predate the reframe to PE add-on integration. Josie updates them.
+- `design/`: Figma links, tokens, and UI rules.
+  `design/brand.md` holds the logo and the launch splash (D21).
+  The mockups predate the reframe to PE add-on integration.
+  Josie updates them.
 - `research/ma-workflow-research.md`: the three M&A users, pain, time, and existing products.
 - `research/post-close-deliverables.md`: what a PE finance team gets after an add-on closes.
 - `research/real-deal-candidates.md`: the real deal, with EDGAR links.

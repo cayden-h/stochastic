@@ -10,7 +10,8 @@ On quit it stops both, so nothing stays on ports 8000 or 3000.
 The splash is specified in `docs/design/brand.md` section 4.
 1. A frameless, transparent window (360 by 420, centered on the screen) shows `splash.html`: only the circle mark and the name "stochastic".
    It draws once, then holds the finished mark.
-2. The backend and the console start. In dev mode the app waits for the running `next dev` instead.
+2. The backend and the console start.
+   In dev mode the app waits for the running `next dev` instead.
 3. The main window loads the console while hidden.
 4. When `GET /health` answers, the page has loaded, the console has read the deal (it calls `window.stochastic.appReady()`, or 8 seconds pass), and the splash has been up at least 2.1 seconds, the main window shows and the splash fades out.
 5. If a step fails, the error window opens and the splash closes.
@@ -54,10 +55,13 @@ npm run open                    # opens it, the same as a double-click in Finder
 
 The packaged app shows "Stochastic" in the menu bar, the Dock, and Cmd+Tab.
 It does not bundle Python or the console: it runs `backend/` and `frontend/` from this repo, whose path is written into the app at package time.
-So package it on the laptop that runs the demo, and package again if the repo moves. `STOCHASTIC_ROOT=/path/to/repo` overrides the path.
+So package it on the laptop that runs the demo, and package again if the repo moves.
+`STOCHASTIC_ROOT=/path/to/repo` overrides the path.
 Opened from Finder, the app takes its PATH from your login shell, so `node` and `droid` are found the same as in a terminal.
 Its output goes to `~/Library/Logs/Stochastic/desktop.log`.
-The app is not signed. It opens on the Mac that built it. Copied to another Mac, Gatekeeper will likely block it until you allow it under System Settings, Privacy and Security, Open Anyway (not tried).
+The app is not signed.
+It opens on the Mac that built it.
+Copied to another Mac, Gatekeeper will likely block it until you allow it under System Settings, Privacy and Security, Open Anyway (not tried).
 You can drag `Stochastic.app` into `/Applications`.
 
 ## Dev mode
@@ -106,5 +110,8 @@ Links to other sites open in the default browser, not in the app window.
 
 ## Known limits
 
-- Run from source (`npm run desktop`), the bold app name in the menu bar and the Dock label say "Electron", because they come from Electron's own app bundle. Use the packaged app for the demo.
-- The app icon is the Stochastic mark (`docs/design/brand.md`). The source is `assets/icon.svg`; `npm run icon` renders `assets/icon.png` (the Dock icon when run from source) and `assets/icon.icns` (the packaged app's icon). Package again after changing it.
+- Run from source (`npm run desktop`), the bold app name in the menu bar and the Dock label say "Electron", because they come from Electron's own app bundle.
+  Use the packaged app for the demo.
+- The app icon is the Stochastic mark (`docs/design/brand.md`).
+  The source is `assets/icon.svg`; `npm run icon` renders `assets/icon.png` (the Dock icon when run from source) and `assets/icon.icns` (the packaged app's icon).
+  Package again after changing it.

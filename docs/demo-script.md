@@ -62,7 +62,8 @@ If a judge gives a second minute, the memory moment: reset, run again, no flag, 
 ## 2. The 30-second live demo, beat by beat
 
 Rules:
-- The console opens on the Dashboard (`/`); the run plays on the Case page (`/case`): the flag card, the verdict line, and the read-only combined books, with Mapping, Review, and Log tiles on the right. Editing, approval, and the final files are on the Review page (`/review`), opened by "Review the books" after the Reviewer's hand-off. [verified: `frontend/README.md`]
+- The console opens on the Dashboard (`/`); the run plays on the Case page (`/case`): the flag card, the verdict line, and the read-only combined books, with Mapping, Review, and Log tiles on the right.
+  Editing, approval, and the final files are on the Review page (`/review`), opened by "Review the books" after the Reviewer's hand-off. [verified: `frontend/README.md`]
 - The presenter does not read numbers aloud unless they are final. See section 4.
 - Do not stage a denied action. Show a DENIED row only if a judge asks to see the log. [verified: `STOCHASTIC.md`, section 9]
 
@@ -103,8 +104,10 @@ AGENT_BACKEND=replay DEMO_PACE=1 .venv/bin/uvicorn app.main:app --port 8000
 What the room sees, with the times measured on 2026-10-24 (scripted, `DEMO_PACE=1`):
 - 0 s, Run: the Gateway hands the Mapper its work item, and 2.5 s later the Mapper proposes 53 mappings and 2 questions.
 - 3 to 19 s: the mapping view fills line by line, about 0.3 s per line (`mapping` events).
-- 19 to 23 s: the Gateway checks and accepts the mappings, then the Mapper asks the controller two questions, 1.5 s apart. The flag cards open.
-- The controller answers. The conversation shows each answer going back to the Mapper and the policies it taught.
+- 19 to 23 s: the Gateway checks and accepts the mappings, then the Mapper asks the controller two questions, 1.5 s apart.
+  The flag cards open.
+- The controller answers.
+  The conversation shows each answer going back to the Mapper and the policies it taught.
 - 0 to 12 s after the last answer: the Mapper hands off to the Preparer, the Preparer's four tool runs arrive about 1 s apart with their figures, the Preparer reports the draft books (leverage 0.76x against 2.50x, with the run id), the Gateway confirms every figure traces to a run, the Reviewer checks the tie-out and the limit test, and hands off: "Ready for your approval".
 - After: "Review the books" on the Case opens the Review page (`/review`): edit, give the reason, approve, download (beat 6 below).
 

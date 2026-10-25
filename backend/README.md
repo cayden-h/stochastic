@@ -23,7 +23,8 @@ The current code implements an earlier workflow and is being updated per `docs/T
 .venv/bin/python -m pytest -q
 ```
 
-The normal run uses the memory store and never touches the network. The Tiger tests skip unless `TEST_DATABASE_URL` is set: 357 pass offline with 14 skipped (verified on 2026-10-24).
+The normal run uses the memory store and never touches the network.
+The Tiger tests skip unless `TEST_DATABASE_URL` is set: 357 pass offline with 14 skipped (verified on 2026-10-24).
 To run them against Tiger Cloud, use your own schema so you do not take the demo schema's advisory lock:
 
 ```
@@ -31,7 +32,8 @@ set -a; . ../.env; set +a
 TEST_DATABASE_URL="$DATABASE_URL" DB_SCHEMA=stochastic_<you> .venv/bin/python -m pytest -q
 ```
 
-Run this before every merge that touches the store, the gateway, or the API. Expect 368 passed and 3 skipped (verified against Tiger Cloud on 2026-10-24), and about 75 seconds.
+Run this before every merge that touches the store, the gateway, or the API.
+Expect 368 passed and 3 skipped (verified against Tiger Cloud on 2026-10-24), and about 75 seconds.
 
 ## Status
 

@@ -17,10 +17,13 @@ Every screen is 1440 by 900, with a 240 px sidebar (deal, Dashboard, Case, Revie
 | V3-7.N Review | The Review workbook flow (section "Review flow (D19)") | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=670-44 |
 
 Josie's teal pass (2026-10-24 evening) changed the whole look, and the console follows it:
-- One teal, #0F6674, for the brand, headings, body text, labels, figures, and the primary button. Surfaces and borders are pale teal, #DCEFF1. Empty values are #7A8A8C.
+- One teal, #0F6674, for the brand, headings, body text, labels, figures, and the primary button.
+  Surfaces and borders are pale teal, #DCEFF1.
+  Empty values are #7A8A8C.
 - Each agent has its own character and tint: the Mapper a teal star (#DCEFF1, #0F6674), the Preparer a blue flower (#E2E9F7, #2E55A3), the Reviewer a violet character (#ECE5F6, #6A4C9C), and the Brief Reader a plum character.
 - The page wash is the page's agent tint: teal for Dashboard, Mapping, Agents, and Review, blue for the Case, violet for the Log.
-- The frames put the page's character in the brand row. The console keeps the Stochastic mark there (`brand.md`) and puts the page's character 24 px to the right of the page title instead.
+- The frames put the page's character in the brand row.
+  The console keeps the Stochastic mark there (`brand.md`) and puts the page's character 24 px to the right of the page title instead.
 
 The Agents page builds the frame's 3D layer from its Figma Make code (`frontend/src/components/agent-house/`).
 The four characters are rigged and animated in Blender (`art/blender/README.md`), and the page plays the deal's conversation through them live: the speaker talks or asks, a note flies to the listener, and every agent settles where the record says it is.

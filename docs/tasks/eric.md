@@ -188,7 +188,10 @@ Spec: `design/review-companion.md` section 11.
 - `desktop/README.md`: install, `npm run desktop`, dev mode, and how to quit cleanly.
 Done when: `npm run desktop` on the demo laptop opens the console with no browser chrome, the full demo runs inside it, and quitting leaves no process on ports 8000 or 3000.
 
-Added on top of E1 on 2026-10-24 evening (Cayden's agent, branch `cayden/launch-mark`, D21): the launch splash now lives in your folder, in `desktop/splash.html`, opened by `createSplash` in `desktop/main.js` before the main window. The main window now shows only after the console calls `window.stochastic.appReady()` (new in `preload.js`). The app icon is the mark, in `desktop/assets/` (`npm run icon`). The spec is `design/brand.md` section 4.
+Added on top of E1 on 2026-10-24 evening (Cayden's agent, branch `cayden/launch-mark`, D21): the launch splash now lives in your folder, in `desktop/splash.html`, opened by `createSplash` in `desktop/main.js` before the main window.
+The main window now shows only after the console calls `window.stochastic.appReady()` (new in `preload.js`).
+The app icon is the mark, in `desktop/assets/` (`npm run icon`).
+The spec is `design/brand.md` section 4.
 
 ### E2. The demo edit figure (about 1 hour)
 

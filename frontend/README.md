@@ -74,7 +74,8 @@ The agent state rules: a `handoff` to an agent sets it working and the sender do
   After the Reviewer's hand-off a card offers "Review the books" (`/review`) and "See the log".
 - The Mapping page adds each row as its `mapping` event arrives, highlights the newest for about a second, and keeps the counts and filters on screen.
 - The Log highlights rows that arrive while it is open and has a Conversation view (`/log?view=conversation`).
-- With `DEMO_PACE=1` the paced Mapper holds the gateway lock for about 16 s. Run, Upload, and the reset links stay disabled while an agent works, so no write waits on the lock.
+- With `DEMO_PACE=1` the paced Mapper holds the gateway lock for about 16 s.
+  Run, Upload, and the reset links stay disabled while an agent works, so no write waits on the lock.
   A reset in the second after the Reviewer's hand-off (the run is still finishing) is retried until the gateway takes it.
 
 ## The companion
