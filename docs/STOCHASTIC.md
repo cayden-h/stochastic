@@ -1,6 +1,6 @@
 # Stochastic: reference for Claude
 
-Last updated: 2026-10-24, evening (D20: a fourth agent, the Brief Reader, decided and not built).
+Last updated: 2026-10-25 (D23: the demo starts from the agreement, a code verifier checks the Brief, two human touchpoints).
 Read this file first in any session about Stochastic.
 It holds the main features, the architecture, and the scope.
 If this file and a PDF or an older note disagree, this file is correct.
@@ -10,9 +10,8 @@ Claims are tagged [verified] when a source file or a filing shows them, and [inf
 Stochastic merges the books of a newly acquired company into the books of the platform company that bought it.
 It flags the few lines that need a human, and then checks the combined result against the lender's limit.
 It is built for private equity buy-and-build firms, which keep buying add-on companies.
-Three stateful agents do the repeatable work, code does all the math, and a human controller approves.
-A fourth agent, the Brief Reader, will read the credit agreement into the brief (D20).
-It is decided and not built; today a person writes the brief.
+Four stateful agents do the repeatable work, code does all the math, and a human controller approves.
+The Brief Reader reads the credit agreement into the Brief (D20), code verifies every field against the agreement (D23), and the Mapper, the Preparer, and the Reviewer do the books.
 What the controller decides once, the agents keep: the next run and the next deal start with that memory.
 Every step goes in an audit log.
 
@@ -23,13 +22,22 @@ Both are archived in `planning-notes.md` and `research/`.
 They are roadmap ideas only.
 The product is the integration workflow in this file.
 
+Current status on 2026-10-25, from the code on `main`:
+- The demo deal starts from the agreement extract; the Brief Reader drafts the Brief, the verifier passes 22 of 22 checks, and the controller approves it in one click.
+  Then the Mapper's one escalation (two questions together) is the only other human step, and the Preparer and the Reviewer finish. [verified: `backend/tests/test_brief_verifier.py`, `e2e/demo-run.spec.ts`]
+- Run the demo (pace `demo`) takes about 15 s of agent time and Upload then Begin (pace `factory`) about 30 s; both replay the recorded Claude Haiku 5.5 run (`backend/recordings/haiku-5-5-run2/`) for the Mapper, the Preparer, and the Reviewer, and the Brief Reader runs on the scripted rules (D22, D23).
+- Five cases: the live demo deal and four seeded cases built through the real pipeline (three real deals from their filings and one QuickBooks sample); they rebuild when their fixtures change (`seed_version`). [verified: `backend/tests/test_demo_cases.py`]
+- The console runs in the browser and as a Mac app with a launch splash (D19, D21): Dashboard, Case, Mapping, Agents (the 3D Agent House), Log, and Review, live on the gateway's event stream.
+- Backend tests: 435 pass offline with 18 skipped, verified 2026-10-25; 448 pass against Tiger Cloud (PR #35, schema `stochastic_cayden_verify`, 2026-10-25).
+
+The dated notes below record how the build got here.
+
 Build status on 2026-10-24, 02:30: the backend runs the whole deal end to end on the real filing figures through the gateway, the tools, and the audit log, on the scripted backend. [verified: `backend/tests/test_trust_rules.py`, 103 tests pass]
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 (recorded in `backend/recordings/`).
 The Anthropic backend ran later on Eric's key (one full recorded run, about 50 Mapper trials); the demo laptop has no key, so it is not in the stage fallback chain. [verified: `evals/README.md`]
 Status on 2026-10-24 evening: 167 tests pass offline and 176 with Tiger.
 The whole-line reading is computed as filed (2.84x), and the gateway guards against model-made exclusions, borrowed run ids, and unbacked review passes (D18). [verified: `backend/tests/test_gateway_guards.py`]
-The console still implements the earlier workflow.
-Josie is rebuilding it against `GET /deals/{id}/case`.
+At that point the console still implemented the earlier workflow; it was rebuilt on `GET /deals/{id}/case` the same day.
 Status on 2026-10-24 night: a 15-second demo pace (`"pace": "demo"` on Run: 6.25 s to the questions, 6.64 s from the answer to the approval, measured), a `notify` event for each question, a learn message with the policy id after each answer, and four more Dashboard cases seeded through the real pipeline: three real deals from their filings (DLH and GRSi, Mama's Creations and Crown I, Shutterstock and Envato) and one QuickBooks sample. [verified: `backend/tests/test_demo_pace.py`, `backend/tests/test_demo_cases.py`; details in `architecture/gateway-and-api.md` and `demo-script.md`]
 Status on 2026-10-25 (D23): the demo deal starts from the credit agreement text; the Brief Reader drafts the Brief, a code verifier checks every field (22 of 22 on the demo deal) and fills the amounts from the books with their sources, and the controller approves the Brief in one click; then the Mapper's one escalation (two questions together) is the only other human step. [verified: `backend/tests/test_brief_verifier.py`, `e2e/demo-run.spec.ts`]
 Status on 2026-10-25 (D22): two demo modes, both replaying the recorded Claude Haiku 5.5 Droid run of the demo deal (`backend/recordings/haiku-5-5-run2/`) instead of the scripted rules, so the model card truthfully reads "Claude Haiku 5.5 · recorded run".
@@ -76,22 +84,30 @@ There is no after-close monitoring and no ongoing consolidation in the MVP.
 
 ## 4. The workflow
 
-1. **Upload.** The user adds the platform's statement file, the target's statement file, and a short brief that states the lender's limit.
-   Planned (D20): the user adds the credit agreement instead, the Brief Reader drafts the brief with a quote for every field, and the controller approves it before mapping starts.
-   A brief already approved for the same agreement is reused.
+1. **Upload.** The user adds the platform's statement file, the target's statement file, and the credit agreement as text (or a Brief as JSON).
+   The Brief Reader drafts the Brief with a quote for every field, the verifier checks each field against the agreement and fills the adjustment amounts from the books, and the controller approves it before mapping starts (D20, D23).
+   A Brief already approved for the same agreement is reused.
 2. **Map.** The Mapper matches each target line to a platform line, with a confidence and a reason.
 3. **Flag.** Lines the Mapper cannot place with confidence go to the human.
    The human approves a mapping or changes it.
-4. **Combine and test.** The Preparer calls code tools that add the books, remove intercompany amounts, compute combined EBITDA, and compute leverage.
+4. **Combine and test.** The Preparer calls code tools that add the books, compute combined EBITDA, and compute leverage (intercompany eliminations are cut, section 13).
    The Reviewer checks that the totals tie and tests leverage against the limit.
-5. **Review and edit.** The controller can remap a line or change an amount in the combined table.
-   Code recomputes at once.
+5. **Review and edit.** On the Review page the controller can remap a line or change an amount in the combined books.
+   Code recomputes at once, subtotals included.
    A companion asks why, and the reason teaches the agents for the next add-on (D19).
 6. **Approve and download.** The controller approves the result, which is refused while an edit has no reason.
    The gateway posts it and writes the log.
    The controller downloads the final workbook and certificate, with every edit and reason in them.
 
-The user sees one screen with a flag card, an editable combined table, and one verdict line, in a Mac desktop app.
+The user works in a Mac desktop app (or the browser) with six pages in the sidebar, in this order:
+- **Dashboard:** every case with its stage, verdict, and last update, plus Upload and Run the demo.
+  There is no Begin button here; Begin is in the Upload modal.
+- **Case:** the Brief card with its verification, the question cards, the live pipeline, and figure tiles (leverage, review, and tiles that open Mapping, Review, and Log).
+  It is read-only: no conversation, no editing, and the combined books are hidden behind Show combined books.
+- **Mapping:** where each target line went, with confidence and the lines a policy settled; read-only.
+- **Agents:** the 3D Agent House (the agents modelled and animated in Blender) and the agents' conversation, live.
+- **Log:** the audit log with Verify, or the conversation.
+- **Review:** the books to edit, with two tabs (Review and Mapping), the Reviewer companion that follows the cursor and asks why, Approve, and Download final files.
 
 ## 5. Main features
 1. **Mapping with confidence.** Each target line gets a platform line, a confidence, and a short reason.
@@ -117,8 +133,7 @@ The user sees one screen with a flag card, an editable combined table, and one v
 The system has four parts.
 
 - **People and files.** The console, the two data files, and the brief.
-- **Agents.** Three stateful agents and a plain job runner.
-  A fourth, the Brief Reader, is planned (D20).
+- **Agents.** Four stateful agents (Brief Reader, Mapper, Preparer, Reviewer) and a plain job runner.
 - **The gateway.** It is the only writer.
   It checks permissions, enforces work-item states, runs the tools, writes the log, and writes the agents' memory.
 - **The store.** In memory for every read, written through to Postgres on Tiger Cloud when `STORE=postgres`.
@@ -127,6 +142,7 @@ The system has four parts.
   When the Mapper raises a covenant flag, the gateway forks the ledger on Tiger Cloud (a zero-copy fork, about 35 s) and writes every option's what-if into the fork, never into the live record; the controller's answer keeps one option in the ledger and deletes the fork with the alternatives. [verified: `backend/app/gateway/whatif.py`, live on 2026-10-24 09:00]
 
 Code tools hold all the math: consolidation, tie-out, EBITDA, covenant debt, leverage, and the limit test. [verified: `backend/app/tools/finance.py`]
+The Brief verifier is code too, not a model. [verified: `backend/app/core/verifier.py`]
 Agents call tools through the gateway.
 They do not talk to each other.
 A job runner moves work items from one agent to the next.
@@ -134,15 +150,16 @@ The runner is code, not a model. [verified: `backend/app/agents/jobs.py`]
 The console talks only to the gateway.
 
 The agent layer uses one function, `run_agent(role, item)`, with four backends. [verified: `backend/app/agents/runner.py`]
-The Factory Droid Python SDK is the stage path: one session per role, Mapper on Claude Sonnet 5.5, Preparer and Reviewer on Haiku 5.5.
-The Anthropic API backend ran on a teammate's key; with no key on the demo laptop it is not in the stage chain.
-The scripted backend is deterministic rules with no model, the stage fallback and the reference answer.
+The Factory Droid Python SDK is the live model path: one session per role, Claude Haiku 5.5 by default, with the Mapper on Sonnet 5.5 in `.env.example` (`DROID_MODEL_MAPPER`).
+The demo paces do not call a live model: they replay the recorded Haiku 5.5 run (D22).
+The Anthropic API backend ran on a teammate's key; with no key on the demo laptop it is not in the fallback chain.
+The scripted backend is deterministic rules with no model, the default fallback (`AGENT_FALLBACK=scripted`) and the reference answer.
 If the gateway refuses a model's result, the Mapper retries once with the reason and then the scripted backend makes the result under the same checks.
 The replay backend plays recorded outputs from `backend/recordings/`.
 `AGENT_BACKEND` picks the backend, `AGENT_FALLBACK` lists the fallbacks, and every result says which backend produced it.
 The details are in `architecture/`.
 
-## 7. The three agents
+## 7. The agents
 Each agent is stateful.
 It receives one work item with all its inputs, plus its own session and the policies it learned, and returns one typed result.
 The state lives in the store, not in a process, so a restart loses nothing and the same role can run many items in turn or in parallel.
@@ -156,7 +173,7 @@ Agents never write to the store and never talk to each other.
 
 The human controller answers flags and approves the final result.
 
-Planned, not built (D20): a fourth role runs before the Mapper.
+The fourth role, the Brief Reader (D20), runs before the Mapper.
 
 | Agent | Real-team role | Gets | Returns | Keeps | Never |
 | --- | --- | --- | --- | --- | --- |
@@ -165,7 +182,7 @@ Planned, not built (D20): a fourth role runs before the Mapper.
 Why it is separate from the Mapper: the agreement is read once per loan and the books on every deal, and the agent that applies the definition of debt must not also write it.
 The gateway refuses a quote that is not in the agreement and a number that is not in its quote.
 The controller approves the brief, and mapping is refused until then.
-Adjustment amounts come from the books, not the agreement, so the reader flags them and the controller enters them.
+Adjustment amounts come from the books, not the agreement; the verifier fills them from the deal's book amounts with their sources, so the controller types nothing (D23).
 Design: `architecture/brief-reader.md`.
 Research: `research/brief-reader.md`.
 
@@ -179,25 +196,26 @@ Memory, in detail. [verified: `backend/app/gateway/gateway.py`, `_learn`]
   The reset is refused while a run is going and frees the fork slot. [verified: `test_demo_reset.py`]
 - A policy applies only to the company whose line it was learned on, and a reversal retires the policies the flag taught. [verified: `test_gateway_guards.py`]
 - Policies are per role and per line name.
-  Confidence calibration and cross-deal statistics are roadmap.
+  A policy learned on one deal applies on the next deal of the same company: the seeded QuickBooks sample case reuses DLH's answer from the DLH and GRSi case. [verified: `backend/app/db/fixtures/cases.py`]
+- `GET /memory/counts` (also on `/health`) counts human answers, live policies, and reasoned edits across all deals, for the sidebar's counters.
+  Confidence calibration is roadmap.
 
 ## 8. Human moments
-There are two, plus one that shows memory.
+In the demo there are two touchpoints (D23), plus the final approval and one moment that shows memory.
 
+- **Brief approval.** The controller approves the Brief the Brief Reader drafted, after the verifier shows every check passed (22 of 22 on the demo deal), in one click on the Case.
 - **Flag.** A line is unclear, and the human chooses how to treat it.
   Each option shows the leverage it gives, computed by the tools.
-- **Approval.** The controller approves the combined result before it posts.
+  In the demo the Mapper's one escalation asks two questions together, after one notification.
+- **Approval.** The controller approves the combined result on the Review page before it posts.
   The gateway refuses until the Reviewer verdict is pass.
 - **Second run.** After a reset, the same deal runs with no flag, because the Mapper applies what the controller decided.
   The audit log shows `policy:apply`.
 
-Planned (D20): a third moment comes first.
-The controller approves the brief the Brief Reader drafted, field by field with its quotes, before mapping starts.
-
 If the Reviewer finds a tie-out error or a breach of the limit, the approval item opens as needs-attention with the reasons.
 An earlier design had six escalation points (E1 to E6).
 They are archived.
-Two are enough for this workflow.
+The touchpoints above are enough for this workflow.
 
 ## 9. Work items and gateway rules
 
@@ -224,15 +242,15 @@ A denied row is shown only if a judge asks to see the log.
 Inputs for the demo:
 - A statement file for the platform (CSV), built from the acquirer's filings.
 - A statement file for the target (CSV), built from the target's audited statements.
-- A short brief: the lender's limit and the covenant's definition of debt and EBITDA.
+- The credit agreement as text: for the demo deal, verbatim extracts of Ex 10.1 in `data/brief/kewaunee_ex101_extract.txt` (D23).
+  The Brief Reader turns it into the Brief: the lender's limit and the covenant's definition of debt and EBITDA.
 
-The brief is written by hand today, and the PNC brief is the only one. [verified: `backend/app/db/fixtures/kewaunee.py`]
-`POST /deals` accepts any brief as JSON, and nothing in the math names PNC, so another agreement with one debt-to-EBITDA covenant works if a person writes its brief. [verified: `backend/app/api/routes.py`]
+`POST /deals` accepts the agreement as a `.txt` upload or a Brief as JSON, and nothing in the math names PNC, so another agreement with one debt-to-EBITDA covenant works. [verified: `backend/app/api/routes.py`]
+The seeded cases' Briefs are written from their filings. [verified: `backend/app/db/fixtures/`]
 The schema does not hold step-downs, cash netting, percent-of-EBITDA caps, pro forma acquisitions, or a second covenant, and `ebitda()` always subtracts interest income, which two of four real agreements do not. [verified: `research/brief-reader.md` section 3]
-The Brief Reader (D20) and its stage 2 schema address this.
+The Brief Reader's stage 2 schema (D20) addresses this; today what the schema cannot hold is noted on the verification report (for the demo deal, the Fixed Charge Coverage covenant in 4.8(b)).
 
-Tables (a design proposal, and the first prototype keeps them in memory):
-- `deal`, `source_line`, `mapping`, `work_item`, `result`, `audit_log`.
+Tables: the store keeps the record in memory and writes it through to Postgres on Tiger Cloud with `STORE=postgres` (`backend/app/db/postgres.py`; design in `architecture/data-model.md`).
 
 The rule "vectors find, tables decide" still holds, but the MVP has no vector search.
 Public data is cached before the demo.
@@ -303,33 +321,35 @@ The verdict changes with the controller's answer, so the moment holds. [verified
 
 A second, smaller flag asks where Nu Aire's "Certificates of Deposit" belong (cash equivalents or other assets).
 It shows a mapping flag next to the covenant flag.
-It can be turned off by raising the Mapper's threshold if the 30 seconds are tight.
+In the recorded Haiku 5.5 run that the demo replays, this question covers six Nu Aire lines led by the certificates of deposit, and both questions arrive together as one escalation (D23).
 
-### The output screen
+### The output screens
 
-One screen, three parts:
-1. The flag card, with the question, the evidence, and the options with their computed effects.
-2. A combined table of platform, target, and combined, in USD thousands.
+The demo lives on the Case page, with the pages listed in section 4 one click away:
+1. The Brief card with its verification card ("22 of 22 checks passed") and Approve the Brief and map.
+2. The question cards, with the question, the evidence, and the options with their computed effects.
+3. The live pipeline, and figure tiles: combined leverage against the 2.50x limit, OK or Over the limit, with the room left, and the review state.
+4. The combined books of platform, target, and combined, in USD thousands, hidden behind Show combined books.
    The balance sheet balances: combined total assets $182,456K.
-   The console shows about ten rows and can expand.
-3. One verdict line: combined leverage against the 2.50x limit, OK or Over the limit, with the room left.
 
-The audit log is a small link.
-There is no other screen in the demo.
-The whole screen comes from `GET /deals/{id}/case`. [verified: `architecture/gateway-and-api.md`]
+The Reviewer's hand-off opens the Review page, where the controller edits, approves, and downloads the final files.
+Every page reads `GET /deals/{id}/case` and follows the run on `GET /deals/{id}/stream`. [verified: `architecture/gateway-and-api.md`]
 
-### The 30-second run
+### The 15-second run
 
-Press Run.
-The Mapper maps 54 lines and stops on one flag.
-The controller picks the covenant reading.
+Press Run the demo on the Dashboard.
+It resets the demo deal with memory cleared and runs it at pace `demo`.
+The Brief Reader reads the agreement extract and the verifier checks the Brief: 22 of 22.
+The controller approves the Brief in one click.
+The Mapper maps 54 lines and asks two questions in one escalation, after one notification.
+The controller answers both.
 Code combines the books and tests the limit.
-The verdict line shows 0.76x against 2.50x, Reviewer pass.
-The controller approves and the gateway posts.
-If time allows, reset and run again: no flag, because the Mapper learned.
-The agent text is hardcoded, recorded, or scripted, and we say which.
+The tiles show 0.76x against 2.50x, Reviewer pass.
+The controller approves on the Review page and the gateway posts.
+About 15.5 s of agent time in all, measured on uvicorn (D23); the Factory beat (Upload, then Begin in the modal) doubles every wait, about 30 s.
+If time allows, run it again with what was learned: no question, because the Mapper learned.
+The agent text is the recorded Claude Haiku 5.5 run, replayed (D22), and the Brief Reader's is the scripted rules; we say so.
 The gateway, tools, and log run for real.
-Since 2026-10-25 the demo's agent text is the recorded Claude Haiku 5.5 run, replayed (D22).
 
 ### The 1:30 pitch outline
 
@@ -347,55 +367,64 @@ Since 2026-10-25 the demo's agent text is the recorded Claude Haiku 5.5 run, rep
 
 ## 13. MVP scope
 Must (the demo does not work without these).
-Status on 2026-10-24, 02:30:
+Status on 2026-10-25 (the notes on items 1 to 8 were first written on 2026-10-24, 02:30):
 1. The two input files and the brief for the Kewaunee and Nu Aire deal, built from the filings.
    Done as a fixture.
    Eric moves it to CSVs and checks every figure against the filings.
 2. The Mapper, with a typed output, running through `run_agent`.
    Done on the scripted backend, live on Droid, and on the Anthropic API with a teammate's key.
 3. Consolidation, EBITDA, and leverage tools, with tests that use the real figures.
-   Done. Tri reviews and extends.
+   Done.
+   Tri reviews and extends.
 4. The gateway with work-item states, maker-checker, run-id checks, the audit log, and agent memory.
    Done.
 5. The Preparer and the Reviewer, with real tool calls.
    Done on the scripted backend.
-6. The console screen: flag card, verdict line, combined table, mapping, log link, on `GET /deals/{id}/case`.
-   Done 2026-10-24, with the backend badge and the second-run moment.
+6. The console on `GET /deals/{id}/case`.
+   Done 2026-10-24, then rebuilt to Figma Hi-fi v3 with the six pages of section 4, the model card, and the second-run moment.
 7. A recorded run and a backend switch, so the demo survives a failure.
    Done (`backend/recordings/`, `AGENT_BACKEND=replay`).
-   The default recording is the Sonnet 5.5 Droid first run of 2026-10-24, which raises the covenant flag. [verified: `test_demo_reset.py`]
+   `AGENT_BACKEND=replay` plays the Sonnet 5.5 Droid first run of 2026-10-24, which raises the covenant flag. [verified: `test_demo_reset.py`]
+   The demo paces replay the Haiku 5.5 run in `backend/recordings/haiku-5-5-run2/` instead (D22).
 8. Track proofs: at least one agent runs with `AGENT_BACKEND=droid` (Factory): done, all three ran.
    The Figma file on screen in the pitch (Figma): open.
 
-Should (if the schedule holds):
+Should (if the schedule holds), with status:
 - A live Anthropic-backed or Droid-backed agent call in the demo.
+  Not on stage: the demo paces replay a recorded live run (D22), and a live run is the backup in `demo-script.md`.
 - An answer-key score for the mapping against Note 2 (Eric).
+  Done (`evals/`).
 - The second-run memory moment on stage.
+  Done: "Run it again with what was learned" on the Case.
 - A downloadable draft compliance certificate.
+  Done, with the workbook, behind Download final files on the Review page.
 - The Mac desktop app (Electron), the editable review table, the companion, and Download final files (D19).
+  Done (`desktop/`, the Review page).
   The demo beat is in `design/review-companion.md` section 9.
 - The logo and the launch splash (D21): the circle and the name, centered on a transparent background, until the whole app has loaded.
-  Built in `cayden/launch-mark`.
+  Done.
   Spec: `design/brand.md`.
 - The Brief Reader, stage 1 (D20): the role, the gateway's quote and number checks, brief approval before mapping, the scripted fallback, and the tests.
-  When to build it against the 8pm freeze is open.
+  Done, with the code verifier of D23.
   Design: `architecture/brief-reader.md`.
 - Tiger Cloud Postgres in place of the memory store.
   Built on 2026-10-24 as a write-through store (`backend/app/db/postgres.py`).
+  A restart reloads the record, and a run that was going when the API stopped ends as `run_failed` with Run again.
 
 Cut (do not build this weekend):
 - Purchase accounting beyond a "provisional" label.
   The combined table is historical plus target; the pro forma adjustments are not applied.
 - Intercompany schedules and eliminations.
-- Other situations, other deals, arbitrary uploads, accounts, login, mobile.
+- Other situations, accounts, login, mobile.
+  Other deals are seeded cases and uploads, not a general product.
 - The Brief Reader's stage 2: several covenants, step-downs, cash netting, percent caps, pro forma acquisitions, and the EBITDA base as data (D20).
 - Plan search, Monte Carlo, and rejection-to-policy.
   These belong to the earlier framing.
 - A live SEC call on stage.
 - A staged denied-action demo.
 
-## 14. Tech stack (proposed)
-- Frontend: Next.js, React, TypeScript, Tailwind, inside an Electron window as a Mac desktop app (D19).
+## 14. Tech stack
+- Frontend: Next.js, React, TypeScript, Tailwind, and three.js for the Agent House, inside an Electron window as a Mac desktop app (D19).
   Josie leads the design.
 - Backend: Python 3.12, FastAPI, Pydantic.
   The gateway, tools, agents, and tests are in Python. [verified]
@@ -466,8 +495,8 @@ Tiger Data:
 - The learning shows in SQL: in `ledger_runs`, a run with agent memory cleared raises 2 flags, and the next run with memory kept raises 0 and applies 6 policies. [verified: ledgers 19 to 23]
 - The Tiger MCP queries the demo database (password saved with `tiger db save-password` on 2026-10-24), so Claude can answer questions about the ledger live.
 - The team board in Figma (Schocastic, `technologies` page) has two rows of Tiger cards for this: SQL Editor captures of these views, and two console captures (`design/README.md`).
-- Show it in the pitch: the "Tiger Cloud" badge, the fork line on the flag card, then the `ledger` and `audit_log` tables in SQL after a restart, then `ledger_runs` and one BM25 search.
-- Open: whether forks for comparing two flag answers are worth building this weekend (see `sponsors/tiger-data.md`).
+- Show it in the pitch: "Tiger Cloud" on the sidebar's model card, the fork line on the flag card, then the `ledger` and `audit_log` tables in SQL after a restart, then `ledger_runs` and one BM25 search.
+- Forks are built (D17); the fork slot is freed by a reset (see `sponsors/tiger-data.md`).
 Cal Hacks has not confirmed that one project can opt into several sponsor tracks.
 Ask at kickoff.
 
@@ -525,27 +554,27 @@ Do not lead the pitch with ingestion.
 - Does a former-banker or controller reviewer count as the human seat?
 - Is the Statesville cash rent deduction ($1,970K, from the 10-K obligations table) the right figure for the test period?
   It is inferred.
-- When to build the Brief Reader's stage 1, and on which model (D20).
-  The open points are in `architecture/brief-reader.md` section 12.
+- Closed on 2026-10-25: the Brief Reader's stage 1 is built (D20, D23); in the demo it runs on the scripted rules.
+  The open points for stage 2 are in `architecture/brief-reader.md` section 12.
 
 ## 19. Where to find more
 
 All paths are inside `docs/`.
 
-- The UI: the `Hi-fi - v3` page in Figma (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-2). The `Technologies Used` page in the same file is for the pitch.
+- The UI: the `Hi-fi - v3` page in Figma (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-2).
+  The `Technologies Used` page in the same file is for the pitch.
   Frame links are in `design/README.md`.
 
 - `TASKS.md`: who builds what.
   `tasks/` holds one file per person, with branches and owned folders.
 - `agents.md`: the agent layer in detail: roles, rules, flags, memory, backends, settings, the run log.
-- `demo-script.md`: the 2:00 plan, the 30-second demo beat by beat, the failure plan, and judge Q&A prep.
+- `demo-script.md`: the 2:00 plan, the 30-second demo beat by beat, the 15-second and Factory demos, the failure plan, and judge Q&A prep.
 - `glossary.md`: finance and product terms in plain language.
 - `decisions.md`: the dated decision log and the open decisions.
-- `architecture/`: parts, agents and work items, gateway and API, data model, repo structure.
+- `architecture/`: parts, agents and work items, gateway and API, data model, the Brief Reader, repo structure.
 - `design/`: Figma links, tokens, and UI rules.
-  `design/brand.md` holds the logo and the launch splash (D21).
-  The mockups predate the reframe to PE add-on integration.
-  Josie updates them.
+  `design/brand.md` holds the logo and the launch splash (D21), and `design/review-companion.md` the Review page and its companion (D19).
+- `devpost/`: the Devpost text, the one-pager, and the images.
 - `research/ma-workflow-research.md`: the three M&A users, pain, time, and existing products.
 - `research/post-close-deliverables.md`: what a PE finance team gets after an add-on closes.
 - `research/real-deal-candidates.md`: the real deal, with EDGAR links.

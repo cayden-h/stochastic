@@ -2,10 +2,12 @@
 
 Update, 2026-10-24 evening: the items in "What to add" are done, except judge-supplied input through a screen (the `POST /deals` route exists).
 A later six-part risk review changed the moment: the whole-line reading is now computed as filed, 2.84x, with $3,470K of EBITDA to spare, and the gateway enforces the exclusion, provenance, and review rules (D18 in `decisions.md`).
+Update, 2026-10-25: judge-supplied input now has a screen (Upload on the Dashboard), and two items in "What not to add" were built after all: Postgres on Tiger Cloud and four more seeded deals.
 The figures below are as written at 02:30.
 
 Written by Cayden's agent after reading every doc in `docs/`, the research, the sponsor notes, and the code, and after building the backend end to end.
-Tags: [verified] means a file, a filing, or a test shows it. [inferred] means judgment.
+Tags: [verified] means a file, a filing, or a test shows it.
+[inferred] means judgment.
 
 ## Is this a good problem?
 
@@ -35,7 +37,8 @@ Caveats:
 
 ## Is the solution right?
 
-Mostly. Three design points were strengthened today:
+Mostly.
+Three design points were strengthened today:
 
 1. Stateful agents.
    The original design said stateless, which the Hyphenate workshop lists as a weak signal ("memory that ends with the context window").

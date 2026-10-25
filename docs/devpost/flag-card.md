@@ -86,6 +86,9 @@ Their figures below were computed at the time, before the EBITDA definition item
   The 1.76x matches PNC plus the Statesville lease, without the seller notes. [inferred: arithmetic]
 - Haiku 5.5, 2026-10-24, 04:30: 0.77x (the agreement), 0.74x (short-term borrowings also excluded), and 2.57x (all counted). [verified: `docs/agents.md`, run log]
 
+The demo beats replay a third run, Haiku 5.5 at 03:40 (`backend/recordings/haiku-5-5-run2/`, D22).
+Its covenant flag covers six lines and offers the agreement's reading, every line counted, and the agreement's reading with the short-term overdraft and loan arrangements also excluded; the gateway computes each effect with the tools when it is replayed. [verified: `backend/recordings/haiku-5-5-run2/mapper.json`]
+The same run asks a second question, where six Nu Aire lines led by the certificates of deposit belong, and both are answered together (D23).
 So the middle option on screen depends on which run is shown.
 Read the card on screen before the pitch.
 

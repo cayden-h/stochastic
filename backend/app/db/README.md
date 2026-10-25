@@ -22,6 +22,8 @@ How the Postgres store works:
 
 Tables (schema `stochastic` by default): `ledger`, `record` (one JSONB body per Pydantic model, by ledger, kind, and id), `id_counter`, `audit_log` (hypertable), and the views `current_work_items` and `current_audit_log`.
 Tests: `TEST_DATABASE_URL=<url> .venv/bin/python -m pytest -q tests/test_postgres_store.py` works in a throwaway schema and drops it.
+`loader.py` parses and checks the `POST /deals` uploads, and `forks.py` makes the Tiger Cloud forks that hold a covenant flag's what-ifs.
 `fixtures/kewaunee.py` loads the demo deal from the public filings: Kewaunee's 10-Q and 10-K lines, Nu Aire's audited lines, the closing financing from the pro forma, and the brief from the PNC loan agreement.
+`fixtures/cases.py` seeds the four other Dashboard cases (DLH and GRSi, Mama's Creations and Crown I, Shutterstock and Envato, and the DLH and Craig's sample) after startup, and rebuilds a seeded case when its fixtures change (`seed_version`).
 Agent memory (`policies`, `sessions`) survives `POST /dev/reset` unless `keep_memory=false`.
 The table design is in `docs/architecture/data-model.md`.

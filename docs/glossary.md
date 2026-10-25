@@ -68,7 +68,7 @@ If someone edits an old row, the later fingerprints no longer match.
 
 In Stochastic: the gateway writes one row for every action, including denied ones.
 Each row is chained to the previous row. [verified: source file, `STOCHASTIC.md` section 9]
-The demo shows the log as a small link.
+The Log page shows it, with a Verify button that walks the chain. [verified: `frontend/src/app/log/page.tsx`]
 A denied row is shown only if a judge asks.
 
 ## Brief and Brief Reader
@@ -76,9 +76,9 @@ A denied row is shown only if a judge asks.
 The brief holds the lender's terms that the math needs: the limit, its wording, the defined debt term and what it excludes, and the EBITDA add-backs and deductions with their caps.
 Each term names the section of the credit agreement it comes from.
 
-In Stochastic: a person writes the brief today, and the PNC brief is the only one. [verified: `backend/app/db/fixtures/kewaunee.py`]
-The Brief Reader is a planned fourth agent that drafts the brief from the agreement, with a verbatim quote for every field.
-Code checks each quote, and the controller approves the brief before mapping starts. [verified: `decisions.md` D20; not built]
+In Stochastic: the Brief Reader is the fourth agent; it drafts the brief from the agreement, with a verbatim quote for every field.
+Code checks each quote, a verifier then checks every field against the agreement (22 checks on the demo deal), and the controller approves the brief before mapping starts. [verified: `decisions.md` D20 and D23, `backend/app/core/verifier.py`]
+A Brief can still be sent as JSON instead of an agreement. [verified: `backend/app/api/routes.py`]
 
 Example: PNC's limit is "less than 2.50 to 1.00" in Section 4.8(a) of Ex 10.1. [verified: filing]
 The amounts of the add-backs, such as the $4,019K pension charge, come from the 10-K, not the agreement. [verified: source file]
@@ -119,7 +119,7 @@ An officer states that the company meets the covenants, and shows the calculatio
 Credit agreements set when it is due.
 The samples found put it 45 to 60 days after quarter end. [verified: snippets, terms vary per deal; Aleph figure is self-reported]
 
-In Stochastic: a downloadable draft certificate is a "should" item, not a "must". [verified: source file, `STOCHASTIC.md` section 13]
+In Stochastic: a draft certificate downloads with the workbook from the Review page after approval (Download final files). [verified: `backend/app/api/certificate.py`, `frontend/src/app/review/page.tsx`]
 A human officer would sign it.
 We never call our output advice.
 
@@ -131,7 +131,7 @@ A covenant is a promise a borrower makes to a lender.
 A financial covenant sets a limit, such as a maximum debt-to-EBITDA ratio.
 The lender tests it on a schedule, often every quarter.
 
-In Stochastic: the verdict line shows combined leverage next to the covenant limit. [verified: source file, `STOCHASTIC.md` section 12]
+In Stochastic: the Case's leverage tile and the Review page show combined leverage next to the covenant limit. [verified: source file, `STOCHASTIC.md` section 12]
 
 Example: Kewaunee's Section 4.8(a) requires "Senior Funded Bank Debt to EBITDA of less than 2.50 to 1.00". [verified: filing, Ex 10.1]
 Section 4.8(b) requires a fixed charge coverage ratio of at least 1.20 to 1. [verified: filing]
@@ -193,7 +193,7 @@ Example facts [verified: filing, as cited in `real-deal-candidates.md`]:
 - Pro forma total is $3,750K current plus $67,135K long-term.
 
 So one line holds both the sale-leaseback and the acquisition financing.
-How much of it counts as covenant debt changes the leverage result. [inferred: not computed yet]
+How much of it counts as covenant debt changes the leverage result: 0.76x, 1.56x, or 2.84x as filed. [verified: `STOCHASTIC.md` section 12]
 
 ## Fixed charge coverage ratio
 
@@ -213,7 +213,7 @@ A flag is a line that the system will not decide alone.
 The Mapper cannot place it with confidence, so it goes to a human with both options and the effect on the result.
 Precision comes before recall: an unsure mapping becomes a flag. [verified: source file, `STOCHASTIC.md` section 11]
 
-In Stochastic: the flag card on the one screen has Approve and Change buttons.
+In Stochastic: the flag card on the Case page shows each option with its computed leverage, marks the suggested one, and has "Not sure. Hold this item." [verified: `frontend/src/components/flag-card.tsx`]
 
 Example: the "Financing liability" line.
 See that entry.
@@ -233,8 +233,7 @@ Intercompany amounts are money flows between two companies in the same group.
 Examples are a loan or an invoice between the platform and the target.
 In combined books they must be removed, or the group counts them twice.
 
-In Stochastic: the MVP has one seeded example at most.
-Full eliminations are cut. [verified: source file, `STOCHASTIC.md` section 13]
+In Stochastic: the tools do no eliminations; they are cut. [verified: `backend/app/tools/finance.py`, `STOCHASTIC.md` section 13]
 Research calls intercompany identification a common silent failure, from vendor sources (self-reported). [verified: source file, `ma-workflow-research.md`]
 
 Example: no Kewaunee and Nu Aire intercompany amount is in the research files, so any example in the demo is seeded and labeled. [inferred]
@@ -247,7 +246,7 @@ A naive ratio uses the plain numbers as filed: all debt-like lines over reported
 A covenant ratio uses the credit agreement's own definitions of debt and EBITDA.
 The two can differ a lot. [verified: source file, `STOCHASTIC.md` section 11]
 
-In Stochastic: the verdict line shows the covenant ratio next to the limit.
+In Stochastic: the Case's figure tile and the Review page show the covenant ratio next to the limit.
 Tri also computes the naive ratio to show the gap. [verified: source file, `TASKS.md`]
 
 Example: a deliberately naive numerator would add all of "financing liability", which is $70,885K pro forma. [verified: filing figures, naive use is our construction]
@@ -350,7 +349,7 @@ Every number in a result carries the run id of the run that made it.
 That lets anyone trace a number back to the exact calculation.
 
 In Stochastic: gateway rule 4 says every number carries a run id from the math code. [verified: source file, `STOCHASTIC.md` section 9]
-The current gateway has a gap: it does not yet check the run id on numbers. [verified: source file, `TASKS.md`]
+The gateway refuses a result whose EBITDA, debt, or leverage was not produced by a tool run in its run ids. [verified: `backend/tests/test_trust_rules.py`]
 
 ## Senior Funded Bank Debt
 
@@ -371,7 +370,7 @@ It gets one work item with all inputs, returns one typed result, and stops.
 State lives in the store.
 Because it has no memory, the same agent can run many times in parallel.
 
-In Stochastic: Mapper, Preparer, and Reviewer are stateful.
+In Stochastic: the Brief Reader, Mapper, Preparer, and Reviewer are stateful.
 Each keeps a session, and the Mapper applies the policies the gateway wrote from the controller's answers.
 A plain job runner, which is code and not a model, moves items between them. [verified: `STOCHASTIC.md` sections 6 and 7, 2026-10-24]
 
@@ -394,11 +393,11 @@ A seller note is a loan from the seller to the buyer, used to pay part of the pr
 "Subordinated" means it is repaid after the senior lenders.
 Credit agreements often leave it out of senior debt.
 
-In Stochastic: it is a possible second flag. [verified: source file, `STOCHASTIC.md` section 13 "Should"]
+In Stochastic: whether the seller notes count is option c of the covenant flag on "Financing liability" (1.56x). [verified: `STOCHASTIC.md` section 12]
 
 Example: Kewaunee issued $23M of 8% subordinated seller notes for Nu Aire. [verified: filing]
 The other funding was a $15M PNC term loan and a $20M PNC revolver. [verified: filing]
-The revolver amount drawn at close is not stated in the pages the research read. [verified: source file]
+The revolver draw at close, $5,563K, is in Ex 99.2 Note 4(h). [verified: `backend/app/db/fixtures/kewaunee.py`]
 
 ## Trial balance
 

@@ -30,7 +30,7 @@ After approval, Download final files reads `GET /deals/{id}/export.xlsx` (Tri's 
 Every write carries `X-Actor: human:controller`.
 The console computes no number.
 Every figure comes from a tool run and shows its run id.
-The one exception is the Change column on Case and Review, which shows an edit's own new value minus its old value.
+The one exception is the Change column on the Review page, which shows an edit's own new value minus its old value.
 
 ## Run
 
@@ -49,7 +49,7 @@ In Electron a question also fires a native macOS notification through `window.st
 
 ## Tests
 
-`npm run lint`, `npx tsc --noEmit`, `npm run build`, and `npm run test:lib` (node's test runner on `src/lib/__tests__`: the conversation reducers, the Review workbook rows, and the `GET /deals` rows).
+`npm run lint`, `npx tsc --noEmit`, `npm run build`, and `npm run test:lib` (node's test runner on `src/lib/__tests__`: the conversation reducers, the Review workbook rows, the `GET /deals` rows, and the model names in `format.ts`).
 
 ## What the screen shows
 
@@ -66,13 +66,13 @@ In Electron a question also fires a native macOS notification through `window.st
 - The Case shows, top to bottom: the flag card (or the Brief card), the pipeline, the limit check's four figure tiles (the covenant debt, Covenant EBITDA, Room in turns of EBITDA, and Covenant headroom in dollars of debt, each with its run id), and the combined books, hidden until Show combined books.
   The Case has no conversation (it is on the Agents and Log pages) and no verdict sentence: the leverage against the limit, the as-filed reading, approval, and Download final files are on the Review page.
   Over the limit, or a Reviewer that needs attention, adds its reasons under the tiles.
-  Approve is live only when `approval_state` is `PROPOSED` and the Reviewer passed.
-- While the result waits for approval, the platform and target amounts in Combined books are editable (click, type, Enter; Esc cancels; Tab moves on).
+  The Case's books are read-only.
+- On the Review page, while the result waits for approval, the platform and target amounts are editable (click, type, Enter; Esc cancels; Tab moves on).
   A row that gathers several target lines opens to show them, because an edit names one source line.
-  The Combined cell shows the change from the agents' value, taken from the edits' own old and new values.
+  The Change column shows the change from the agents' value, taken from the edits' own old and new values.
 - A change of more than half the agents' value asks for confirmation in the bubble before it is sent.
-- Your edits sits under the verdict: a click scrolls to the cell and flashes it, and Undo reverts the edit.
-  Approve stays off while an edit has no reason.
+- Your edits sits under the verdict on the Review page: a click scrolls to the cell and flashes it, and Undo reverts the edit.
+- Approve, on the Review page, is live only when `approval_state` is `PROPOSED`, the Reviewer passed, no question is open, and every edit has a reason.
 - After approval, Download final files calls `window.stochastic.saveFiles([{url, name}])` in the Electron window (Eric's preload), and downloads both files in a browser.
 - An adjustment flag (a learned adjustment the Preparer offers on a later deal) shows as "Learned adjustment" with apply and skip.
 - On a deal made from agreement text, the Case opens on the Brief card before mapping: every field with the quote it came from, the open questions on the Brief, the EBITDA adjustment amounts to enter from the books with their source, and "Approve the Brief and map".
@@ -110,7 +110,7 @@ the message list (ordered by id, the stream's replay deduplicated, a reset detec
 The agent state rules: a `handoff` to an agent sets it working and the sender done; a `question` to the controller sets the sender asking until the `answer` with the same `item_id`; a `message`, `check`, or `refusal` shows the speaker talking for 1.8 s, then working.
 
 - Run the demo, the Upload modal's Begin, and the Case's Run start the run with `{"sync": false}` and open the Case at once.
-- The Case shows the pipeline (Brief Reader, Mapper, Preparer, Reviewer, You) with each agent's state.
+- The Case shows the pipeline (Brief Reader, then the Verifier on a deal read from an agreement, Mapper, Preparer, Reviewer, You) with each agent's state.
   The conversation, newest at the bottom, is on the Log page's Conversation view and on the Agents page.
   A question opens its flag card with "The Mapper is asking you" and the pipeline shows the Mapper waiting on You.
   After the Reviewer's hand-off a card offers "Review the books" (`/review`) and "See the log".
@@ -128,7 +128,7 @@ The agent state rules: a `handoff` to an agent sets it working and the sender do
 
 ## The companion
 
-`src/components/companion.tsx` is a 14 px agent-blue mark that trails the cursor about 48 px below and to the right, on the spring from Squeek's `halo.js` (credited in the file).
+`src/components/companion.tsx` is the Reviewer, a 26 px avatar that trails the cursor about 49 px below and to the right, on the spring from Squeek's `halo.js` (credited in the file).
 It shows only where editing happens: on the Review page, on both of its tabs.
 It fades to 40% and parks at the edge when the cursor leaves the window.
 When an edit is saved, it glides to the cell (250 ms) and opens the reason bubble: chips (keys 1 to 3), a typed reason, the remember box, Later (Esc) and Save reason (Enter).

@@ -218,6 +218,7 @@ Spec: `design/review-companion.md` section 11.
   The macOS app icon is a simple mark from Josie.
 - `desktop/README.md`: install, `npm run desktop`, dev mode, and how to quit cleanly.
 Done when: `npm run desktop` on the demo laptop opens the console with no browser chrome, the full demo runs inside it, and quitting leaves no process on ports 8000 or 3000.
+Built as `desktop/main.js` and `desktop/preload.js` (no TypeScript), on Electron 45; `desktop/README.md` is the reference.
 
 Added on top of E1 on 2026-10-24 evening (Cayden's agent, branch `cayden/launch-mark`, D21): the launch splash now lives in your folder, in `desktop/splash.html`, opened by `createSplash` in `desktop/main.js` before the main window.
 The main window now shows only after the console calls `window.stochastic.appReady()` (new in `preload.js`).
@@ -239,3 +240,6 @@ The spec is `design/brand.md` section 4.
 - `backend/tests/fixtures/agreement_synthetic.txt` (ask Tri, it is his folder): a short synthetic agreement with one leverage covenant, two definitions, and one add-back cap.
   It feeds the tests.
 - `evals/brief_key/`: the hand-written Briefs for PNC and Kewaunee, and Noble Roman's (`architecture/brief-reader.md` section 9), field by field with sections, and a scorer that reports right, wrong, and flagged counts.
+
+Status on 2026-10-25: `data/brief/kewaunee_quotes.json` was written by Cayden's agent (`cayden.md`, C3), and `agreement_synthetic.txt` and `evals/brief_key/` were never added.
+The tests use `backend/tests/fixtures/kewaunee_ex101_excerpt.txt` and agreements written inside the tests, and the demo deal reads `data/brief/kewaunee_ex101_extract.txt` (D23).

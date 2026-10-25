@@ -3,6 +3,7 @@
 Owner: Eric.
 Checked 2026-10-24 against the filings in `data/raw/`.
 The brief is the third input to Stochastic, next to the two statement files.
+Since D20 the Brief Reader drafts it from the credit agreement, a code verifier checks every field (D23), and the controller approves it; the demo deal starts from a committed extract of Ex 10.1 (`data/brief/kewaunee_ex101_extract.txt`).
 It states the lender's limit and the agreement's own definitions of debt and EBITDA, so the tools test the limit the way the lender does.
 This file holds it as short prose for the Devpost, and as text for one slide.
 Tags: [verified] means a filing or a test shows it.

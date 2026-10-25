@@ -43,6 +43,10 @@ From the risk review's UI pass; please check the look on your screen and change 
   `src/components/mappings.tsx`: "in a mapping question" instead of "flagged".
 - `src/lib/api.ts` (`reset(keepMemory)`), `src/lib/types.ts` (new option, deal, and sensitivity fields), `next.config.ts` (`devIndicators: false`).
 
+Later changes to these files: `top-bar.tsx` was removed with the Hi-fi v3 shell (PR #18), and the backend badge is now the sidebar's model card (`src/components/sidebar.tsx`).
+`verdict-line.tsx` was removed on 2026-10-25 (PR #33): the Case shows the figure tiles (`src/components/verdict-figures.tsx`), and the leverage against the limit is on the Review page.
+The progress row and the reset links are on the Case (`src/app/case/page.tsx`); `src/app/page.tsx` is now the Dashboard.
+
 ## Build phase 2: D19 and D20 (2026-10-24 night)
 
 Josie stays on Figma.

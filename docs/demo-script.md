@@ -1,6 +1,6 @@
 # Demo script: the 2:00 pitch
 
-Last updated: 2026-10-25: the two demo beats replay the recorded Claude Haiku 5.5 run (D22), and the seeded cases hold four reasoned edits.
+Last updated: 2026-10-25: the demo starts from the agreement extract with the Verifier and two human touchpoints (D23), the two demo beats replay the recorded Claude Haiku 5.5 run (D22), and the seeded cases hold four reasoned edits.
 Before that: 2026-10-24, evening.
 The figures below are computed by the tools on the fixture and tested.
 The failure switch was rehearsed (section 5).
@@ -69,13 +69,12 @@ If a judge gives a second minute, the memory moment: reset, run again, no flag, 
 
 ## 2. The 30-second live demo, beat by beat
 
-There are two demo beats, both one click on the Dashboard, both hard-coded paces:
+There are two demo beats, both started from the Dashboard, both hard-coded paces:
 - The Hyphenate demo: "Run the demo" resets the demo deal with memory cleared and runs it with `"pace": "demo"`, about 15 s of agent time.
 - The Factory demo: Upload, choose the two statement CSVs and the Brief or the agreement, then Begin.
-  Begin resets with memory cleared, creates the deal and runs it with `{"sync": false, "pace": "factory"}`, about 30 s of agent time (twice the demo), and opens its Case.
-  Begin first resets with memory cleared, so the uploaded deal's questions are asked. [verified: `e2e/agreement.spec.ts`]
+  Begin resets with memory cleared, so the uploaded deal's questions are asked, creates the deal, runs it with `{"sync": false, "pace": "factory"}`, about 30 s of agent time (twice the demo), and opens its Case. [verified: `e2e/agreement.spec.ts`, `e2e/factory-upload.spec.ts`]
 
-The click path: Dashboard, Run the demo, the Case (the notification, Decide, answer both flags, the pipeline moves on, the figure tiles appear), Review the books, the edit and its reason, Approve, Download final files on Review; then Agents and Log if a judge asks.
+The click path: Dashboard, Run the demo, the Case (the verified Brief, Approve the Brief and map, the notification, Decide, answer both flags, the pipeline moves on, the figure tiles appear), Review the books, the edit and its reason, Approve, Download final files on Review; then Agents and Log if a judge asks.
 The Dashboard has no Begin button any more.
 
 Rules:
@@ -101,7 +100,7 @@ Measured on live Droid on 2026-10-24 08:30 (Mapper Sonnet 5.5, Preparer and Revi
   It also retires the policies earlier uploads of the same companies learned.
   The plain reset keeps memory, and the next judge would see no flag.
   The reset is refused while a run is going (409) and frees the fork slot.
-- The console shows a progress row while the agents work: which agent, and for how many seconds.
+- The Case's pipeline shows which agent is working while the agents work, and for how many seconds.
 
 The two demo beats (2026-10-25, D22), both on the recorded Claude Haiku 5.5 run, replayed:
 - The Hyphenate beat, about 15 s: on the Dashboard, "Run the demo" resets the demo deal with memory cleared and runs it with `"pace": "demo"`.
@@ -112,7 +111,7 @@ The Mapper's mappings, tags, questions, and options are the typed output Claude 
 The Preparer and the Reviewer re-run the recorded tool sequence, so their figures are live too.
 It is not a live model call, and the card does not say it is; the gateway, the math, and the log are live. [verified: `backend/recordings/haiku-5-5-run2/recording.json`, `agents.md` section 7a]
 When the recording does not fit (other statements, or memory kept from an earlier run), the same pace runs the scripted rules and the card says "Scripted rules"; the Mapper's first message says why.
-For the Factory beat to ask its questions, the upload must come after a fresh reset (Run the demo does one), or the policies learned on the demo deal cover the uploaded Kewaunee and Nu Aire lines, and the run asks nothing.
+For the Factory beat to ask its questions, the upload must come after a fresh reset, or the policies learned on the demo deal cover the uploaded Kewaunee and Nu Aire lines, and the run asks nothing.
 The reset with memory cleared also retires every policy that covers Kewaunee or Nu Aire, even one learned on an earlier upload of the same companies, so the run always asks both questions. [verified: `test_demo_fresh.py`]
 Uploads from an earlier session are hidden from the Dashboard, not deleted; a deal uploaded during the demo still shows.
 About 6 s after the click (14 s on the Factory beat), the Mapper's questions arrive as a notification at the top right (a native macOS one too, in the Mac app); Decide opens its flag card.
@@ -125,8 +124,8 @@ The beats below are the original plan; Cayden times the real version with a stop
 
 | Beat | Time | On-screen state | Presenter says | Hardcoded or real |
 | --- | --- | --- | --- | --- |
-| 1. Start | 1:30 - 1:35 | Console is open on the Dashboard. The Kewaunee Scientific case reads "Not started". Upload shows the two statement files and the brief already loaded. | "Two statement files and a short brief with the lender's limit." | The files and brief are real data from filings. The load is real. |
-| 2. Run | 1:35 - 1:42 | Press Run the demo (or open the case and press Run the deal). The Case page opens, and a progress row shows the Mapper working, with its seconds. | "The Mapper matches each Nu Aire line to a Kewaunee line." | The mapping call goes through `run_agent` on the backend the sidebar's model card names (live Droid on stage). The confidences come from the typed output. |
+| 1. Start | 1:30 - 1:35 | Console is open on the Dashboard. The Kewaunee Scientific case reads "Not started". | "Two statement files and the lender's credit agreement." | The statements and the agreement extract are real data from filings. The load is real. |
+| 2. Run | 1:35 - 1:42 | Press Run the demo. The Case page opens: the Brief Reader reads the agreement, the Verifier passes 22 of 22 checks, and the controller clicks Approve the Brief and map. The pipeline shows the Mapper working, with its seconds. | "It read the contract, and code checked every quote. Now the Mapper matches each Nu Aire line to a Kewaunee line." | The checks are code. The mapping is the recorded Claude Haiku 5.5 run, replayed through `run_agent` and checked again by the gateway; the sidebar's model card says "recorded run". The confidences come from the typed output. |
 | 3. Flag | 1:42 - 1:50 | The "Lender definition question" card appears for "Financing liability". Each option shows its ratio in large type with Over the limit or OK; the filing evidence is folded under the options. | "It stopped on the line it must not decide alone. Financing liability holds a sale-leaseback, the new bank debt, and seller notes. Which parts are covenant debt?" | The question and options are the Mapper's. Each ratio and effect comes from a gateway tool run. The flag work item and its state NEEDS_INFO are real gateway state. |
 | 4. Answer | 1:50 - 1:55 | The controller clicks Approve on one option, or Change. | "The controller decides. Not the model." | The answer call is real. The gateway logs it. |
 | 5. Combine and test | 1:55 - 2:00 | The Case shows the four figure tiles: Senior Funded Bank Debt 21,633K, Covenant EBITDA, Room 1.74x, and Covenant headroom of about $49M of debt, each with its run id. The combined books stay hidden until Show combined books; Review shows 0.76x of 2.50x. | "Code adds the books and tests the lender's limit. That is the verdict." | The Preparer's tool calls, the math, the tie-out, and the limit test run for real. The gateway checks that every figure is the Preparer's own run and reads the Reviewer's pass from its checks. |
@@ -190,7 +189,7 @@ Measured on uvicorn on 2026-10-25 at 00:05 (replay of the recorded Haiku 5.5 run
 - 0 s, Run: the Gateway hands the Mapper its work item.
 - 0 to 1.2 s: the Mapper works.
 - 1.2 to 5.2 s: the 53 mappings stream into the mapping view.
-- 6.2 s: the Mapper asks both questions, and the stream sends a `notify` event for each ("The Mapper needs your decision"), which the console shows as a notification.
+- 6.2 s: the Mapper asks both questions, and the stream sends one `notify` event for the questions asked together ("The Mapper needs 2 decisions" today; at the time of this measurement, one per question), which the console shows as a notification.
 - The controller answers.
   At once, the Mapper tells the controller what it learned, with the policy id, and the Mapper hands the books to the Preparer.
 - 7.2 s after the last answer: the Preparer's four tool runs, the Reviewer's two checks, and "Ready for your approval: result r_001, leverage 0.76x against 2.50x".
@@ -221,7 +220,7 @@ The gateway compares the uploaded lines with the recorded ones by a content hash
 Any other upload runs the scripted rules at the same pace, and the card says "Scripted rules".
 Measured on uvicorn on 2026-10-25: 14.29 s to the two questions, 14.48 s from the last answer to "Ready for your approval", 28.8 s in all (on the demo deal itself: 14.23 s and 14.46 s). [verified: `test_demo_replay.py` gives 14.0 s and 13.3 s on a fake clock]
 The same texts as above, at twice the waits.
-Run it after a fresh reset; with the demo deal's answers kept, the learned policies cover the same lines, and the run would apply them and ask nothing (scripted, and it says so).
+Begin does the fresh reset itself; with the demo deal's answers kept, the learned policies would cover the same lines, and the run would apply them and ask nothing (scripted, and it says so).
 
 ### The other four cases on the Dashboard
 
@@ -287,6 +286,7 @@ The flag is Kewaunee's "Financing liability" line. [verified: fixture]
 It holds the Statesville sale-leaseback ($27,782K), the new PNC term loan and revolver ($20,563K), and the 8% seller notes ($22,540K).
 The credit agreement's Senior Funded Bank Debt excludes the capital lease on 2700 West Front Street and excludes subordinated debt. [verified: Ex 10.1]
 So the card asks which parts count.
+The options below are the scripted rules' wording; the recorded Haiku 5.5 run that the demo paces replay words them its own way, with the same 0.76x and 2.84x readings and a third at 0.73x (section 2).
 
 The card shows (all from the API, nothing typed by hand):
 - The question, in one sentence.
@@ -301,7 +301,7 @@ The card shows (all from the API, nothing typed by hand):
 | c. PNC debt and the seller notes count | Senior Funded Bank Debt 44,173K. Leverage 1.56x against 2.50x. | OK |
 
 A second, smaller flag asks where Nu Aire's Certificates of Deposit ($991K) belong.
-Answer it with the default (cash equivalents) in one click, or raise the Mapper threshold to drop it.
+On the scripted rules its default is cash equivalents; in the replayed run it is a question about six lines, and its default leaves the certificates unmapped and listed (section 2).
 
 ### Two outcomes
 
@@ -416,7 +416,7 @@ The presenter must say this in the proof part, in these words or close to them:
 A few things are not real, so you know what you are looking at.
 The statement lines come from public filings, not from the companies' internal books.
 Account-level detail is not public, so we do not claim it.
-The agent text comes from the backend the model card names: live Claude through Droid, or our scripted fallback if that fails. The gateway, the math, and the audit log are real.
+The agent text comes from the backend the model card names: in the demo, a recorded Claude Haiku 5.5 run, replayed, or our scripted rules if the recording does not fit. The gateway, the math, and the audit log are real.
 The two companies have different fiscal years, April and September, so the combined income statement adds two different years and does not match the filed pro forma.
 Two inputs are our estimates: the Statesville rent we deduct, and transaction costs, which we set to zero.
 And the filing says its own reclassification table, Note 2, is preliminary.
@@ -492,7 +492,7 @@ If we do not know, say so.
 | 6a | How is this different from Hebbia, Chronograph, Datarails, or Numeric? | Those tools either read the credit agreement or combine the books. Stochastic does both in one gated workflow: every number carries a tool run id, the agent stops when a line's covenant treatment is ambiguous, and the controller's answer becomes a policy. [inferred] |
 | 6 | Why not Excel plus a consolidation tool? | Consolidation tools add books after the mapping is done. The mapping is the slow, error-prone part, and it needs a human for the unclear lines. We also test the covenant with its own definitions and log who decided what. Excel has no maker-checker. [inferred] |
 | 7 | What does the model do and what does code do? | The model proposes mappings with a confidence and a reason, decides which lines it must not decide alone, and writes the flag question and the readings. Code does all the math and computes the effect of each reading. The gateway refuses a number no tool run produced. [verified: `STOCHASTIC.md`, section 11; `test_model_made_number_is_refused_even_with_real_run_ids`] |
-| 8 | What is simulated? | Nothing on the agent path is hardcoded: on stage the agents run live on Claude through Droid, and the model card says if the scripted fallback ran instead. Account-level detail is not public, so we do not claim it. The gateway, the math, and the audit log are real. |
+| 8 | What is simulated? | Nothing on the agent path is hardcoded: in the demo the Mapper's output is a recorded Claude Haiku 5.5 run through Droid, replayed and checked again by the gateway, and the model card says so (or says "Scripted rules" when the recording does not fit). Account-level detail is not public, so we do not claim it. The gateway, the math, and the audit log are real. |
 | 9 | What if the live model fails or says something wrong? | `run_agent` has four backends (droid, anthropic, replay, scripted). A failed run falls back to scripted rules, and the model card says so. A wrong result is refused by the gateway: a model cannot exclude a line itself, cite another run's number, or pass a review without the checks. |
 | 10 | What stops the agent from approving its own work? | The gateway. The preparer of an item cannot approve it, and no agent has the approve permission. A forbidden action is denied and logged. |
 | 11 | How do you know the mapping is right? | We check it against Note 2 in the filing, as an answer key for shape, not to the dollar. Note 2 is preliminary, and the fiscal years differ. Unsure lines become flags. Precision comes before recall. |
@@ -502,12 +502,12 @@ If we do not know, say so.
 | 14a | What test period did you use? | We used each company's latest fiscal year; the agreement tests the last twelve months to the closing quarter, which is next. |
 | 15 | Does covenant EBITDA match the pro forma EBITDA? | No. Covenant EBITDA is a defined term with capped add-backs, so it is a negotiated number, not the pro forma operating profit. [verified: `research/real-deal-candidates.md`] |
 | 16 | Does it work for other deals or other situations? | Not yet. Other deals and situations are roadmap. We built one workflow deep. [verified: `STOCHASTIC.md`, section 2] |
-| 16a | What about a different lender or loan agreement? | The lender's terms live in the brief, not the code, and `POST /deals` takes any brief. Today a person writes it once per agreement, and we have tested one. The next agent reads it from the contract: it only points at quotes, code checks every quote and number, and the controller approves the brief. Sponsor-style terms such as step-downs and cash netting are not in the schema yet, so they would become questions. [verified: `architecture/brief-reader.md`] |
+| 16a | What about a different lender or loan agreement? | The lender's terms live in the brief, not the code, and `POST /deals` takes any brief. The Brief Reader drafts it from the contract: it only points at quotes, the Verifier checks every quote and number in code (22 checks on the demo extract), and the controller approves the brief. We have tested one agreement. Sponsor-style terms such as step-downs and cash netting are not in the schema yet, so they would become questions. [verified: `architecture/brief-reader.md`] |
 | 17 | What would you build next? | Purchase accounting with a provisional label, intercompany eliminations, a second deal to show the policies carrying over, confidence calibration from the answer key, and the trailing-twelve-month test period. Learning from corrections is built as policies; backtesting them is not. |
 | 18 | Is this advice? | No. It produces a mapped, combined set of books and a limit check that a human approves. |
 | 19 | Who is the user? | A portfolio controller or a PE associate who owns the integration, right after an add-on closes. [inferred: no practitioner has checked this] |
 | 20 | How long does it take today without this? | One vendor playbook says about 12 weeks for a full integration (self-reported, Aleph). The compliance certificate is due 45 to 60 days after quarter end in the samples we found. We do not claim a speedup we have not measured. |
-| 21 | Where do the Factory and Droid parts fit? | Each agent runs as a Droid session with only our gateway tools allowed, an empty working directory, and a typed result. On stage the Mapper is Claude Sonnet 5.5 and the Preparer and Reviewer are Claude Haiku 5.5, through Droid; the pinned replay is the Sonnet 5.5 run. We say "built with the Droid SDK" only about runs that went through it; the sidebar's model card shows it. [verified: `agents.md`, run log] |
+| 21 | Where do the Factory and Droid parts fit? | Each agent runs as a Droid session with only our gateway tools allowed, an empty working directory, and a typed result. The demo replays a recorded Claude Haiku 5.5 run through Droid (`haiku-5-5-run2`); a live Droid run uses Sonnet 5.5 for the Mapper and Haiku 5.5 for the Preparer and Reviewer, and plain `AGENT_BACKEND=replay` reads the pinned Sonnet 5.5 run. We say "built with the Droid SDK" only about runs that went through it; the sidebar's model card shows it. [verified: `agents.md`, run log] |
 | 22 | Did you use real company data? | We used public SEC filings. We did not use any private or internal data. The demo makes no live SEC calls. |
 
 ## 9. Table-side checklist: judging Sunday 10:30am to 12:30pm
@@ -561,6 +561,7 @@ After judging:
 AGENT_BACKEND=droid      the Factory run; say "built with the Droid SDK" only for this
 AGENT_BACKEND=anthropic  Claude with tool use; needs ANTHROPIC_API_KEY, which the demo laptop does not have
 AGENT_BACKEND=replay     recorded outputs from backend/recordings/ (the Sonnet 5.5 run), tools re-run
+(pace demo or factory)   replays backend/recordings/haiku-5-5-run2/ whatever AGENT_BACKEND says
 AGENT_BACKEND=scripted   deterministic rules, no model, no network
 ```
 

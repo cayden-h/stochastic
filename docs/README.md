@@ -9,12 +9,13 @@ It is the product reference.
 | `TASKS.md` | Who builds what, the shared contract, the order of work, and risks |
 | `agents.md` | The agent layer: roles, rules, flags, memory, backends, settings, how to run and read a run, the run log |
 | `tasks/` | One task file per person, with branches and owned folders, and the rules for parallel work |
-| `demo-script.md` | The 2:00 plan, the 30-second demo beat by beat, the computed figures, the failure plan, and judge Q&A prep |
+| `demo-script.md` | The 2:00 plan, the 30-second demo beat by beat, the 15-second and Factory demos, the computed figures, the failure plan, and judge Q&A prep |
 | `review.md` | The 2026-10-24 review: is the problem good, is the solution right, what to add |
 | `glossary.md` | Finance and product terms in plain language, with examples from the Kewaunee deal |
 | `decisions.md` | The dated decision log and the open decisions |
-| `architecture/` | How we build it: parts, agents, work items, gateway, API, data model, repo conventions |
-| `design/` | UI and UX research, the design system, and the screen set |
+| `architecture/` | How we build it: parts, agents, work items, gateway, API, data model, the Brief Reader, repo conventions |
+| `design/` | UI and UX research, the design system, the screen set, the brand and launch splash, and the review companion |
+| `devpost/` | The Devpost text, the one-pager, the card write-ups, and the images |
 | `research/ma-workflow-research.md` | The three M&A users, pain, time, and existing products |
 | `research/post-close-deliverables.md` | What a PE finance team gets after an add-on closes |
 | `research/real-deal-candidates.md` | The real deal (Kewaunee and Nu Aire), with EDGAR links |

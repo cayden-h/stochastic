@@ -1,6 +1,7 @@
 # Tasks: who builds what
 
 Last updated: 2026-10-24, night (build phase 2: D19 and D20).
+The current state of `main` is in `STOCHASTIC.md` section 1 and in `tasks/cayden.md`; the sections below are the plan as it was written, with done marks.
 The product and scope are in `STOCHASTIC.md`.
 This file only splits the work.
 Josie owns UI and UX only.
@@ -48,7 +49,13 @@ Then, on deal 2, the Mapper cites the policy (`design/review-companion.md` secti
 
 ## State of the build
 
-The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.76x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 115 tests pass. [verified: `backend/tests/`]
+On `main` on 2026-10-25, every item in the "Not yet done" line below is done except the rehearsals, the Devpost submission, and the demo video: Tiger forks, the certificate (`backend/app/api/certificate.py`), the sensitivity figures, the timeline route, and an Anthropic run (`backend/recordings/anthropic-haiku-5-5/`).
+The backend has 435 tests passing offline with 18 skipped (verified 2026-10-25), and 448 passing against Tiger Cloud (PR #35, 2026-10-25).
+The two demo paces replay the recorded Claude Haiku 5.5 run (`backend/recordings/haiku-5-5-run2/`, D22); the replay backend on its own still reads the pinned Sonnet 5.5 run.
+The rest of this section is as of 2026-10-24 morning.
+
+The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.76x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run.
+115 tests pass. [verified: `backend/tests/`]
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded.
 Not yet run live: the Anthropic backend (no key in `.env`).
 Done 2026-10-24 and merged to `main`: the Note 2 answer key and Mapper score (Eric), the Devpost text (Eric), the recorded model runs (Sonnet 5.5 is the default replay), the tool guardrails, typed case, stage events, and CSV upload (Tri).
@@ -221,5 +228,5 @@ Inputs for the design:
   Rehearse the 2:00 on it with the stopwatch.
 - The Tiger service is on the free shared tier and can pause when idle.
   If it cannot be reached, the API starts in memory and `/health` says why; wake it before judging.
-- A Droid run from the console overwrites `backend/recordings/*.json`.
-  Check `git status` before committing, and move a new run into its own folder instead of replacing the default replay.
+- A live run from the console writes to `backend/recordings/latest/` (git-ignored), so it never replaces a pinned recording.
+  Promote a run by copying it into its own folder after scoring it.

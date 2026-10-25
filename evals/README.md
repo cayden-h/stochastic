@@ -53,9 +53,9 @@ Both recorded Droid runs were scored without a key, by replaying the Mapper's re
 
 | Recording | Model (requested) | `note2` | `note2_total` | All scored |
 | --- | --- | --- | --- | --- |
-| `backend/recordings/` (the default replay; a copy is in `sonnet-5-5/`) | Claude Sonnet 5.5 | 23 of 23 | 10 of 10 | 33 of 33 |
+| `backend/recordings/` (the pinned replay for plain `AGENT_BACKEND=replay`; a copy is in `sonnet-5-5/`) | Claude Sonnet 5.5 | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/haiku-5-5/` | Claude Haiku 5.5 (04:30) | 23 of 23 | 10 of 10 | 33 of 33 |
-| `backend/recordings/haiku-5-5-run2/` | Claude Haiku 5.5 (evening, after the settle-every-line rule) | 23 of 23 | 10 of 10 | 33 of 33 |
+| `backend/recordings/haiku-5-5-run2/` | Claude Haiku 5.5 (evening, after the settle-every-line rule; what the demo paces replay since 2026-10-25) | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/droid-console-0751/` | Droid run from the console on 2026-10-24 at 07:51 (model not stored in the recording; the backend default was Haiku 5.5) | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/anthropic-haiku-5-5/` | Claude Haiku 5.5 on the Anthropic backend (the first Anthropic run) | 22 of 23 | 10 of 10 | 32 of 33 |
 
@@ -73,7 +73,8 @@ The score covers the line-to-line mapping only, not the covenant tags. [verified
 
 Why the Haiku run is not the default: its Mapper tagged "Short-term borrowings" unclear and put it in the financing liability flag, but the default option left it unclear, so after the controller's answer the Preparer refused with "covenant tag is unclear for: Short-term borrowings". [verified: replay run of `score_mapper.py`, 2026-10-24]
 Since 2026-10-24 the gateway rejects any covenant flag whose option leaves a flagged line unsettled, so a Mapper output like that fails at the Mapper step and the runner falls back. [verified: `test_flag_option_that_leaves_a_line_unclear_is_refused`]
-The Sonnet recording runs through and is the default replay.
+The Sonnet recording runs through and is the pinned replay for plain `AGENT_BACKEND=replay`.
+The demo paces (`demo` and `factory`) replay `haiku-5-5-run2/` instead, which also runs through (D22). [verified: `backend/app/agents/demo_replay.py`]
 The Mapper is scored on what it proposed before any human answer; the default flag answers changed no mappings in this run.
 
 ## Mapper consistency on the Anthropic backend (2026-10-24)

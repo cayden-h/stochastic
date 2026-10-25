@@ -6,7 +6,7 @@ The current reference is `STOCHASTIC.md`.
 
 Status: the team is set on this project (Cayden, 2026-10-23).
 Open design choices are listed under "Decisions" below.
-Track: Hyphenate, "The Hyphenated Enterprise: Autonomous Systems for Finance" (see `../sponsors/hyphenate.md`).
+Track: Hyphenate, "The Hyphenated Enterprise: Autonomous Systems for Finance" (see `sponsors/hyphenate.md`).
 The short reference for Claude, with the main features, architecture, and scope, is `STOCHASTIC.md`.
 Read it first.
 Raw pasted notes are in `raw-notes.md`.
@@ -83,7 +83,7 @@ Mapping to the five hard parts (agent judgment, inferred):
 - Explainable: every number and clause traces to a source.
 
 Open question: does deal structuring count as a corner of a finance team?
-The brief asks for "one corner of its finance team, a few seats that work closely together", lists sample workflows (Cash and Treasury and FP&A are the closest), and says "or one not listed". [verified: `../sponsors/hyphenate.md`]
+The brief asks for "one corner of its finance team, a few seats that work closely together", lists sample workflows (Cash and Treasury and FP&A are the closest), and says "or one not listed". [verified: `sponsors/hyphenate.md`]
 The "CFO-office" label that appeared in earlier notes came from Hyphenate's product description, not from the track rules.
 This idea is closest to treasury and capital planning, but it is deal structuring, not back-office operations.
 Ask at the 7pm Friday workshop.
@@ -108,7 +108,7 @@ The Hyphenate online workshop deck and transcript are analyzed in `hyphenate-wor
 Short version: build a system of work (work items as a state machine, a gateway that is the only writer, an append-only diff log, learned policies from precedents), not a calculator with agents on top.
 The main gaps for Stochastic are no learning source, no self-improvement loop, no time dimension, and no answer key.
 The seat question was settled on 2026-10-23: one live deal worked from start to approval, with events during the deal and no after-close monitoring (see "Decisions" below).
-Slack sponsor findings that touch this idea (CRS, Microsoft) are in `../sponsors/slack-channel-notes.md`.
+Slack sponsor findings that touch this idea (CRS, Microsoft) are in `sponsors/slack-channel-notes.md`.
 
 ## Four added capabilities and borrower-side framing (ChatGPT input, 2026-10-23)
 
@@ -169,18 +169,18 @@ Our read (inferred):
 
 ## Research results (2026-10-23)
 
-Six research agents wrote findings under `deep-problems/`.
+Six research agents wrote findings under `research/deep-problems/`.
 All were written by agents from web sources and a few EDGAR fetches.
 Each claim is tagged verified or inferred in its file, and no practitioner has checked any of it.
 
 | File | Topic | Headline |
 | --- | --- | --- |
-| `deep-problems/01-clause-reading.md` | Reading credit agreements | Five real restaurant credit agreements fetched. The Potbelly agreement has three clauses that a cash-pay preferred raise would trip: a $2M debt basket, a $1.5M restricted payments basket, and an "Indebtedness" definition that counts Disqualified Capital Stock. |
-| `deep-problems/02-structure-search.md` | Searching debt and equity mixes | Enumerate a grid, filter to the best trade-offs, then simulate the shortlist. The demo trap is a plan that passes a 3.0x leverage test at 2.80x and fails at 3.20x once preferred counts as debt. Prices depend on leverage ahead of the tranche. Sources are mostly secondary. |
-| `deep-problems/03-monte-carlo.md` | Risk simulation | Quarterly, 5 years, a two-state recession regime, common random numbers across structures, and 14 closed-form tests as an answer key. No calibrated parameters yet, and the restaurant volatility must be computed from Census data. |
-| `deep-problems/04-approvals-and-memory.md` | Approvals and memory | Full Postgres schema, a nine-step rejection-to-policy loop, escalation rules, and five adversarial tests. No public source for how private-credit approvals work, so the path is built from adjacent sources. |
-| `deep-problems/05-edgar-data-plan.md` | Data plan | EDGAR endpoints tested (needs a User-Agent with a real contact email). Red Robin, Carrols, Papa John's, and BurgerFi are candidate bases. Build a fictional company by renaming, scaling, and shifting dates, with 8 planted traps and a JSON answer key. Bright Data and Apify: no for the core. A free NY Fed SOFR API works for live rates. |
-| `deep-problems/06-impact-and-novelty.md` | Adjacent problems and novelty | Contract extraction and covenant monitoring are crowded. Open areas: consent and waiver pathway planning, term sheet normalization, and term sheet versus credit agreement checks. |
+| `research/deep-problems/01-clause-reading.md` | Reading credit agreements | Five real restaurant credit agreements fetched. The Potbelly agreement has three clauses that a cash-pay preferred raise would trip: a $2M debt basket, a $1.5M restricted payments basket, and an "Indebtedness" definition that counts Disqualified Capital Stock. |
+| `research/deep-problems/02-structure-search.md` | Searching debt and equity mixes | Enumerate a grid, filter to the best trade-offs, then simulate the shortlist. The demo trap is a plan that passes a 3.0x leverage test at 2.80x and fails at 3.20x once preferred counts as debt. Prices depend on leverage ahead of the tranche. Sources are mostly secondary. |
+| `research/deep-problems/03-monte-carlo.md` | Risk simulation | Quarterly, 5 years, a two-state recession regime, common random numbers across structures, and 14 closed-form tests as an answer key. No calibrated parameters yet, and the restaurant volatility must be computed from Census data. |
+| `research/deep-problems/04-approvals-and-memory.md` | Approvals and memory | Full Postgres schema, a nine-step rejection-to-policy loop, escalation rules, and five adversarial tests. No public source for how private-credit approvals work, so the path is built from adjacent sources. |
+| `research/deep-problems/05-edgar-data-plan.md` | Data plan | EDGAR endpoints tested (needs a User-Agent with a real contact email). Red Robin, Carrols, Papa John's, and BurgerFi are candidate bases. Build a fictional company by renaming, scaling, and shifting dates, with 8 planted traps and a JSON answer key. Bright Data and Apify: no for the core. A free NY Fed SOFR API works for live rates. |
+| `research/deep-problems/06-impact-and-novelty.md` | Adjacent problems and novelty | Contract extraction and covenant monitoring are crowded. Open areas: consent and waiver pathway planning, term sheet normalization, and term sheet versus credit agreement checks. |
 
 Suggested additions to the core four (from file 06, not yet adopted):
 1. An answer-key test harness with planted traps.
@@ -202,7 +202,7 @@ Demo deal: a real, historical deal replayed from public documents (Cayden, 2026-
   Avista put in $130M of convertible preferred, and a Third Amendment to its SVB-led credit agreement is the answer key.
   Blocking clauses reported by the research agent: Sections 7.6(e), 7.6(g), and 7.2, plus the "Disqualified Stock" and "Consolidated Total Indebtedness" definitions.
   It is a healthy company, not a rescue.
-  Correction from `deep-problems/09-situation-profiles.md` (agent output, not independently checked): the "Disqualified Stock" definition only catches redemption by the holder within 91 days after loan maturity (Nov 5, 2026), so a 2031 redemption falls outside it.
+  Correction from `research/deep-problems/09-situation-profiles.md` (agent output, not independently checked): the "Disqualified Stock" definition only catches redemption by the holder within 91 days after loan maturity (Nov 5, 2026), so a 2031 redemption falls outside it.
   Whether the preferred counts as debt is therefore a real ambiguity and not a clear block, and it is a good escalation, not a clean trap.
   The same file says the plan's cash-pay dividend stays blocked even after the amendment.
 - Backup: Lifecore (formerly Landec), Jan 2023, a $38.75M PIK preferred with a waiver and Fourth Amendment.
@@ -210,7 +210,7 @@ Demo deal: a real, historical deal replayed from public documents (Cayden, 2026-
 - Limits: the target plan comes from the same announcement that reveals the deal, so the replay tests clause finding and re-planning, not inventing the deal.
   Run the no-documents baseline to check what the model already knows.
   Say "a reconstruction from public filings, not the lenders' internal views".
-- Source: `deep-problems/08-real-deal-candidates.md` (agent output, not independently checked).
+- Source: `research/deep-problems/08-real-deal-candidates.md` (agent output, not independently checked).
 
 Situation types the deal manager must recognize (Cayden's list of eight), and what each means for the build (agent judgment, inferred):
 
@@ -246,21 +246,21 @@ Design rules:
 
 ## Diagrams (2026-10-23)
 
-Four PDFs in `workflow/v2/` explain the architecture and the MVP in plain English.
+Four PDFs in `diagrams/` explain the architecture and the MVP in plain English.
 They are a design proposal, not final.
-The source is HTML and CSS, and `render.sh` rebuilds a PDF with headless Chrome.
+The source is HTML and CSS, and `diagrams/render.sh` rebuilds a PDF with headless Chrome.
 
 - `01-big-picture.pdf`: what Stochastic does, and the four-part architecture.
 - `02-deal-flowgraph.pdf`: a swimlane of one deal from start to finish, and the three loops (event, blocked plan, rejection).
 - `03-agents-and-data.pdf`: the six agents, the work-item states with the gateway rules, and the database tables.
 - `04-mvp-build-plan.pdf`: the Must, Should, and Cut lists, a proposed 3-minute demo script, and a six-phase build plan for four people.
 
-The older `workflow/stochastic-workflow.pdf` stays as the tech stack and tracks sheet.
+The older `diagrams/stochastic-workflow.pdf` stays as the tech stack and tracks sheet.
 
 ## Next steps
 
 - The demo deal is chosen (see "Demo deal and situation types" above).
-  Next: copy the covenant and basket language from the Organogenesis credit agreement and its Third Amendment into the answer key, following the replay protocol in `deep-problems/08-real-deal-candidates.md`.
+  Next: copy the covenant and basket language from the Organogenesis credit agreement and its Third Amendment into the answer key, following the replay protocol in `research/deep-problems/08-real-deal-candidates.md`.
 - Try the Business Wire copy of the Buyers Edge release for the preferred terms: https://www.businesswire.com/news/home/20240408441127/en/ (the Morgan Stanley and General Atlantic copies returned 403).
 - Find defensible Monte Carlo inputs (EBITDA volatility, rate paths), labeled as assumptions.
 - Check Hypercore and Ellis (`../private-credit-market.md`) and ask the booth for prior art.

@@ -1,7 +1,7 @@
 # Devpost draft
 
 Owner: Eric.
-Final pass of 2026-10-24, for submission by Sunday 9am.
+Final pass of 2026-10-24, for submission by Sunday 9am; brought in line with `main` on 2026-10-25.
 The sections below follow the Devpost form, in pitch order: the problem, then what Stochastic does, then the proof.
 Tags are for the reader: [verified] means a file, a filing, or a test in the repo shows it, and [inferred] means our judgment.
 Sponsor and vendor figures are marked self-reported.
@@ -25,13 +25,15 @@ One wrong mapping flows silently into every number after it. [inferred]
 
 Stochastic does the repeatable part of an add-on integration, asks a human about the rest, and remembers the answer.
 
-1. Inputs: the platform's statement lines, the target's statement lines, and a short brief with the lender's limit and its own definitions of debt and EBITDA.
-2. Map: a Mapper agent matches each target line to a platform line, with a confidence and a reason, and tags each balance sheet line as covenant debt or not.
-3. Flag: the Mapper stops on the lines it should not decide alone.
+1. Inputs: the platform's statement lines, the target's statement lines, and the credit agreement (or a Brief written by hand).
+2. Read and verify: a Brief Reader agent drafts the Brief (the lender's limit and its own definitions of debt and EBITDA) with a verbatim quote for every field.
+   A code verifier checks every quote, section, and number against the agreement, and the controller approves the Brief in one click. [verified: `backend/app/core/verifier.py`, `backend/tests/test_brief_verifier.py`]
+3. Map: a Mapper agent matches each target line to a platform line, with a confidence and a reason, and tags each balance sheet line as covenant debt or not.
+4. Flag: the Mapper stops on the lines it should not decide alone.
    Each flag carries the question, the filing evidence, and the effect of each answer on leverage, computed by code.
-4. Combine and test: a Preparer agent calls code tools that combine the books, tie them out, compute covenant EBITDA and debt, and test the limit.
+5. Combine and test: a Preparer agent calls code tools that combine the books, tie them out, compute covenant EBITDA and debt, and test the limit.
    A Reviewer agent re-runs the tie-out and the limit test.
-5. Approve: the controller approves, and only then does the gateway post the result.
+6. Review and approve: the controller can change an amount or remap a line on the Review page, gives each edit a reason, and approves; only then does the gateway post the result.
 
 The controller's answer to a flag becomes a policy, written by the gateway.
 On the next run the Mapper applies the policy and cites it instead of asking again. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
@@ -74,8 +76,9 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 
 ## How we built it
 
-- Three stateful agents, Mapper, Preparer, and Reviewer, each a role on a real finance team.
+- Four stateful agents, Brief Reader, Mapper, Preparer, and Reviewer, each a role on a real finance team.
   Each keeps a session and its policies in the store, not in a process. [verified: `docs/agents.md`, section 6]
+- A verifier, which is code and not a model, checks the Brief Reader's draft field by field: 22 checks on the demo deal, each one a line in the conversation and a row in the audit log. [verified: `backend/app/core/verifier.py`, `e2e/agreement.spec.ts`]
 - The agents never write to the record and never talk to each other.
   They call tools only through the gateway, and a plain job runner, which is code, moves work items between them. [verified: `backend/app/agents/jobs.py`]
 - The gateway is the only writer.
@@ -92,10 +95,10 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 - The record is readable in SQL on Tiger features: BM25 keyword search over every line, reason, flag, and policy (pg_textsearch), a real-time continuous aggregate of the audit log, a columnstore policy on the audit log, and run statistics from the TimescaleDB Toolkit.
   One view, `ledger_runs`, shows the learning: with agent memory cleared the Mapper asks 2 questions, and with memory kept it asks none and applies 6 policies. [verified: `test_the_record_reads_in_sql_and_survives_the_columnstore`, live ledgers 19 to 23]
 - Backend: Python 3.12, FastAPI, Pydantic, Uvicorn, pytest. [verified: `backend/pyproject.toml`]
-- Console: Next.js 16, React 19, TypeScript, Tailwind CSS 4. [verified: `frontend/package.json`]
-- Design: the Figma file "Stochastic - Reviewer Console" holds a `Tokens` variable collection, seven text styles, five components, and four screen frames. [verified: `docs/design/README.md`]
-  The console follows its tokens and rules: one look ("Paper and ink"), state shown by color plus word plus shape, and nothing smaller than 14px. [verified: `docs/design/README.md`]
-  The mockups were made for an earlier four-screen workflow, and their numbers are placeholders, not engine output. [verified: `docs/design/README.md`]
+- Console: Next.js 16, React 19, TypeScript, Tailwind CSS 4, and three.js for the 3D Agent House. [verified: `frontend/package.json`]
+- Desktop: a Mac app in Electron, with a launch splash, native notifications, and a folder picker for the final files. [verified: `desktop/package.json`, `desktop/README.md`]
+- The four agent characters are modelled, rigged, and animated in Blender, and the Agents page plays the deal's conversation through them live. [verified: `art/blender/README.md`]
+- Design: the console is built from the `Hi-fi - v3` frames in the team's Figma file (Schocastic): six pages in a 240 px sidebar shell, one teal palette, a character and a tint per agent, and state shown by color plus word plus shape. [verified: `docs/design/README.md`]
 
 ## Challenges we ran into
 
@@ -112,11 +115,13 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 
 ## Accomplishments that we're proud of
 
-- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 167 tests pass offline, 176 with Tiger Cloud]
+- The backend runs the whole deal end to end on the real filing figures, through the gateway, the tools, and the audit log. [verified: `backend/tests/`, 435 tests pass offline with 18 skipped (2026-10-25), and 448 pass with Tiger Cloud (PR #35, 2026-10-25)]
 - The flag is real.
   It comes from a real line in a real filing, and the answer moves the leverage verdict. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 - The whole deal ran through Factory Droid with our gateway tools, once with Claude Sonnet 5.5 and once with Claude Haiku 5.5 requested, and both passed review at 0.77x as computed then; the Sonnet recording replays at 0.76x today, after the EBITDA definition items were applied. [verified: `docs/agents.md`, run log]
 - After a reset, the same deal runs with no flag, because the Mapper applies the controller's policy, and the log shows `policy:apply`. [verified: `test_controller_answer_becomes_a_policy_and_the_mapper_applies_it`]
+- A policy carries to the next add-on: on the sample case, DLH's next add-on, the Mapper reuses the controller's answer from the DLH and GRSi case and asks only about the new company's own line. [verified: `backend/app/db/fixtures/cases.py`, `backend/tests/test_demo_cases.py`]
+- The sidebar counts what the agents learn from across every deal: human answers, policies, and reasoned edits (`GET /memory/counts`). [verified: `backend/tests/test_demo_cases.py`]
 
 ## What we learned
 
@@ -129,11 +134,8 @@ The score covers the line mapping, not the covenant tags. [verified: `evals/READ
 
 These are roadmap.
 None is built.
-- An upload screen and route for new deals.
-- A fourth agent, the Brief Reader, that drafts the brief from the credit agreement with a verbatim quote for every field, checked by code and approved by the controller.
 - A covenant schema for sponsor-style agreements: several covenants, step-downs, cash netting, percent-of-EBITDA caps, and pro forma acquisitions.
 - Purchase accounting with a provisional label, and intercompany eliminations.
-- A second deal, to show the policies carrying over.
 - Confidence calibration from the answer key.
 - Checking the NetSuite, Sage Intacct, Microsoft Dynamics 365, Epicor, and Infor layouts against real exports.
 - Live connectors that pull the trial balance from those systems instead of a file export.
@@ -167,8 +169,10 @@ Not real, or not claimed:
 - The statement lines come from public filings, not from the companies' internal books.
 - Account-level detail is not public, so we do not claim it.
   The demo maps statement lines, not trial balances.
-- The demo loads the deal from a fixture.
-  `POST /deals` accepts two statement CSVs and a brief, so a judge can try an unseen input through the API; the console has no upload screen. [verified: `backend/app/api/routes.py`, `test_upload_creates_deal_and_runs`]
+- The demo deal's statement lines load from a fixture, and its agreement is a committed extract of Ex 10.1 (`data/brief/kewaunee_ex101_extract.txt`, 3,434 characters); the full exhibit stays out of git. [verified: `backend/app/db/fixtures/kewaunee.py`, D23]
+  The console's Upload takes two statement CSVs and a Brief or the agreement text (`POST /deals`), so a judge can try an unseen input. [verified: `backend/app/api/routes.py`, `e2e/agreement.spec.ts`]
+- The Dashboard's other four cases are built from cached filings (DLH and GRSi, Mama's Creations and Crown I, Shutterstock and Envato) and one sample deal (DLH and Craig's), which is tagged Sample data. [verified: `backend/app/db/fixtures/cases.py`]
+- The reason chips offered on an edit are written per deal in code, not by a model. [verified: `backend/app/agents/backends/scripted.py`]
 - As an extra, the loader script reads a QuickBooks Online trial balance export with its Account List, so a private company with no filings could be an input.
   It is not used in the demo. [verified: `scripts/README.md`]
   It was checked against real exports from the QuickBooks Online test-drive demo company, and the loaded totals match that company's own Balance Sheet report. [verified: `scripts/test_load_lines.py`, `scripts/samples/qbo/`]
@@ -180,8 +184,12 @@ Not real, or not claimed:
   We wrote them from how those reports are usually laid out, tested them only on small files we made ourselves, and never ran them on a real export. [verified: `scripts/README.md`, `scripts/test_load_lines.py`]
 - Agent output comes from one of four backends (droid, anthropic, scripted, or replay), and the API names the backend on every result. [verified: `backend/app/agents/runner.py`]
 - Droid does not report which model served a run, so the model names above are what we requested. [verified: `docs/agents.md`, section 8]
-- The default replay is the Sonnet 5.5 first run, which raises the covenant flag and runs through. [verified: `backend/tests/test_demo_reset.py`]
-  The Haiku 5.5 run is kept in `backend/recordings/haiku-5-5/`; the gateway now rejects its Mapper output, because one option left "Short-term borrowings" unclear. [verified: `evals/README.md`, `test_flag_option_that_leaves_a_line_unclear_is_refused`]
+- The demo is a replay, and the model card says so ("Claude Haiku 5.5, recorded run").
+  Run the demo (about 15 s) and Upload then Begin (about 30 s) replay the live Droid run of the demo deal with Claude Haiku 5.5 requested (`backend/recordings/haiku-5-5-run2/`): the Mapper's output is the model's, and the Preparer and Reviewer re-run the recorded tool sequence, so every figure is a fresh tool run. [verified: `backend/app/agents/demo_replay.py`, `backend/tests/test_demo_replay.py`]
+  The Brief Reader runs on the scripted rules in the demo; a live Sonnet 5.5 read of the full Ex 10.1 is recorded but asks five questions of its own. [verified: D23]
+  The replay applies only to the demo deal's own statements with no earlier memory; any other deal runs the scripted rules, and the card says "Scripted rules". [verified: `backend/app/agents/demo_replay.py`]
+- The pinned replay (`AGENT_BACKEND=replay`) is the Sonnet 5.5 first run, which raises the covenant flag and runs through. [verified: `backend/tests/test_demo_reset.py`]
+  The Haiku 5.5 run of 04:30 is kept in `backend/recordings/haiku-5-5/`; the gateway now rejects its Mapper output, because one option left "Short-term borrowings" unclear. [verified: `evals/README.md`, `test_flag_option_that_leaves_a_line_unclear_is_refused`]
 - The fiscal years differ, April 30 and September 30, so the combined income statement adds two different years and does not match the filed pro forma.
 - The combined table is historical plus target.
   No purchase accounting is applied.
@@ -195,7 +203,7 @@ Not real, or not claimed:
 - The agreement's reading of the financing liability is our reading.
   No controller or lender has checked it. [inferred]
 - The agreement also has a fixed charge coverage test, Section 4.8(b).
-  We do not check it. [verified: Ex 10.1, Section 4.8(b)]
+  We do not check it; the verification report notes it. [verified: Ex 10.1, Section 4.8(b); D23]
 - No practitioner has used the tool yet. [verified]
 - Other deals and other situations are roadmap, not built.
 - The output is a combined set of books and a limit check that a human approves.
@@ -207,6 +215,7 @@ Claim nothing unconfirmed.
 - Hyphenate: select it on Devpost.
   One-line seat: "A portfolio controller at a PE-backed company, right after an add-on closes."
 - Factory: the agents ran through the Droid SDK on 2026-10-24, with Sonnet 5.5 and Haiku 5.5 requested. [verified: `docs/agents.md`, run log]
+  The Factory beat (Upload then Begin) replays one of those Droid runs, Haiku 5.5, and says "recorded run". [verified: `e2e/factory-upload.spec.ts`]
   Say "built with the Droid SDK" only about `droid` runs.
 - Figma: the console's design system and screen frames are in the Figma file.
   The team board (Schocastic) has a card per piece of evidence for each track, including Tiger Data. [verified: `docs/design/README.md`]
@@ -230,11 +239,11 @@ All four are from 2026-10-24, ledger 23. [verified]
 
 ## Open before submission
 
-- Done 2026-10-24: the one-screen console (flag card, verdict line, combined table, mapping, log link) is built against `GET /deals/{id}/case` and shows the backend badge from `GET /health`. [verified: `frontend/README.md`]
-- Josie: what was done in Figma and through the Figma MCP (`use_figma`), and is there a frame for the new one-screen console?
+- Done 2026-10-25: the console is six pages (Dashboard, Case, Mapping, Agents, Log, Review) in the Mac app, built from the Hi-fi v3 frames against `GET /deals/{id}/case`, and the sidebar's model card names the backend from `GET /health`. [verified: `frontend/README.md`]
+- Josie: what was done in Figma and through the Figma MCP (`use_figma`)?
   `docs/decisions.md` D11 says the design system was built through `use_figma`, but `docs/design/README.md` does not say so.
 - Cayden, on the day: which backend produced the run in the video and at the table.
-  Planned: `droid`, with the Mapper on Claude Sonnet 5.5 and the Preparer and Reviewer on Claude Haiku 5.5 (`agents.md` section 9, 08:30).
-  Confirm it from the badge, then write it into the list above.
+  Planned: the recorded Claude Haiku 5.5 run (pace `demo`, D22), which the model card names.
+  Confirm it from the card, then write it into the list above.
 - Done 2026-10-24: the EBITDA items are decided (stock compensation and the $4,019K pension figure applied, transaction costs kept at zero), and every leverage figure in this file, `flag-card.md`, and `brief.md` was updated.
 - Anyone, with a Cal Hacks organizer: can one project enter several sponsor tracks?

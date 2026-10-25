@@ -1,6 +1,6 @@
 # The agents: roles, settings, memory, backends, and how to run them
 
-Last updated: 2026-10-24, 05:10.
+Last updated: 2026-10-25.
 This is the reference for the agent layer in `backend/app/agents/`.
 `STOCHASTIC.md` holds the product; `architecture/agents-and-work-items.md` holds the contracts; this file holds how the agents are set up, run, read, and debugged.
 Claims are tagged [verified] when a test or a run shows them, and [inferred] when they are judgment.
@@ -71,6 +71,7 @@ Each option also carries its ratio, verdict, and basis, read from its `limit_tes
 
 On the demo deal the intended result is one covenant flag with three readings and one small mapping flag (certificates of deposit).
 The scripted backend produces that every time. [verified]
+The recorded Haiku 5.5 run that the demo paces replay asks the same two questions in its own words, as one escalation with two decisions (section 7a, D23).
 Model backends are judged against it in section 9.
 
 ## 6. Memory: why the agents are stateful
@@ -180,8 +181,8 @@ Reading a run:
 - `result.backend` says which backend produced the shown result.
 - `GET /deals/{id}/runs` lists every tool run; `GET /runs/{run_id}` shows one run's inputs and outputs.
   Every number on screen names one.
-- The audit log shows `propose:map_lines`, `ask:flag`, `tool:<name>`, `answer`, `policy:learn`, `policy:apply`, `session:turn`, `approve`, `post`, and any `DENIED` row with the reason.
-- `backend/recordings/<role>.json` is the default replay: the Sonnet 5.5 run of 2026-10-24, 03:30 (a copy stays in `backend/recordings/sonnet-5-5/`).
+- The audit log shows `propose:draft_brief`, `verify:brief_field`, `brief:amend`, `propose:map_lines`, `ask:flag`, `tool:<name>`, `answer`, `policy:learn`, `policy:apply`, `session:turn`, `approve`, `post`, `run:failed`, and any `DENIED` row with the reason.
+- `backend/recordings/<role>.json` is the pinned replay that plain `AGENT_BACKEND=replay` reads: the Sonnet 5.5 run of 2026-10-24, 03:30 (a copy stays in `backend/recordings/sonnet-5-5/`).
   `backend/recordings/haiku-5-5/` keeps the Haiku 5.5 run of 04:30, which the gateway now rejects at the Mapper step because its default option left "Short-term borrowings" unclear.
   `backend/recordings/haiku-5-5-run2/` is the Haiku 5.5 run committed on 2026-10-24 at 03:40, which passes the rule and replays through; since 2026-10-25 it is what the demo paces replay (section 7a).
   Replay a specific run with `RECORDINGS_DIR=$PWD/backend/recordings/<name>`.
@@ -260,6 +261,7 @@ Lessons written into the code after these runs:
   - A refused model result is retried once with the reason (Mapper), then made by the scripted backend under the same checks.
 - The pinned replay is the Sonnet 5.5 first run (`recordings/sonnet-5-5/`), so replay raises the covenant flag.
   The earlier pin was a run with memory and showed no flag. (`test_demo_reset.py`)
+  The demo paces replay `recordings/haiku-5-5-run2/` instead (section 7a).
 
 ## 10. Honest limits of the agent layer
 
@@ -272,5 +274,5 @@ Lessons written into the code after these runs:
   That is the point of the model backends.
 - The Mapper's flag quality depends on the model.
   The run log above is the evidence; say which run is on screen.
-- The brief is written by hand, and only the PNC brief exists.
-  The agents never read the credit agreement today; the Brief Reader (D20) is planned for that.
+- The Brief Reader (D20) reads the credit agreement and the verifier (D23) checks its draft in code, but in the demo paces the reader runs on the scripted rules, which know the PNC agreement's extract only.
+  A model read of a new agreement runs on `AGENT_BACKEND`, and the pinned Sonnet 5.5 read asks five questions of its own on the demo extract (D23).

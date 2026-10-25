@@ -1,8 +1,8 @@
 # data
 
 Cached public filings go here, such as the Kewaunee and Nu Aire filings, and the two input CSV files built from them.
-The folder contents are git-ignored.
-Only this file is tracked.
+The folder contents are git-ignored, except this file and `data/brief/`.
+`data/brief/` holds the demo's agreement extract (`kewaunee_ex101_extract.txt`, the passages of the PNC agreement, Ex 10.1, that the demo run starts from) and `kewaunee_quotes.json` (the quote for each field of the demo Brief, which the scripted Brief Reader returns).
 
 Rules:
 - Cache everything before the demo.
@@ -48,8 +48,8 @@ Upload one UTF-8 CSV per company, each with a header row, at most 2,000 data row
 An optional `covenant_tag` column pre-tags a line as `debt`, `not_debt`, `unclear`, or `na` (the default).
 The scripted Mapper re-tags every balance-sheet line by name, so a `covenant_tag` in the CSV is a hint, not a guarantee.
 It tags as debt any line whose name contains "borrowings", "financing lease", "finance lease", "notes payable", "term loan", "line of credit", or "revolv".
-It tags "operating lease" and "lease liability - operating" as not debt, and "financing liability" as unclear (one flag).
-Any other balance-sheet name, such as "Long-term debt", is tagged `na`, and the covenant debt guardrail then raises and `POST /deals/{id}/run` returns 500.
+It tags "operating lease" and "lease liability - operating" as `na` with the note that operating leases are not borrowed money, and "financing liability" as unclear (one flag).
+Any other balance-sheet name, such as "Long-term debt", is tagged `na`, and the covenant debt guardrail then raises: a `"sync": true` run returns 500, and the console's background run ends at stage `run_failed` with the error.
 Name borrowings with one of the recognized phrases.
 The `ebitda` tool needs a net income line in `income_statement` and a D&A line in `cash_flow`, for each company.
 Net income names: "net earnings", "net income", "net income (loss)", "net earnings (loss)".

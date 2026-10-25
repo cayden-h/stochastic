@@ -143,6 +143,7 @@ A step needs a judgment that the three agents cannot make.
 Also revisit if the job runner grows decision logic.
 That would be a sign it needs a model.
 Revisited in D20: a fourth role, the Brief Reader, reads the credit agreement.
+Superseded in part by D12: the agents are stateful.
 
 ## D6. Demo scope: two minutes, one simple screen
 
@@ -170,6 +171,7 @@ Revisit if:
 The time limit changes.
 Also revisit if the live agent call proves reliable in rehearsal.
 Then we can show it live.
+Superseded in part by D19 and D22: the console grew into six pages in a Mac app, and the demo's agent text is a recorded Claude Haiku 5.5 run.
 
 ## D7. Input is two statement files plus a short brief
 
@@ -256,6 +258,7 @@ Revisit if:
 `list_models()` shows Droid cannot run Claude models on our key.
 That decides the backend. [verified: `TASKS.md`]
 Also revisit if the Python SDK does not qualify for the "Building with the Droid SDK" prize.
+Superseded in part by D14: one function with four backends.
 
 ## D10. Team split and per-person branches
 
@@ -314,6 +317,7 @@ Revisit if:
 The Figma prompts, when read on the Live Site, ask for something we cannot show.
 Our team has no Figma Agent access, so only Best Design and Most Creative remain realistic.
 A Hyphenate mentor says the sponsor tracks cost too much attention.
+Superseded in part by D15: Tiger Data became a target track.
 
 ---
 
@@ -366,6 +370,7 @@ Rejected:
 Revisit if:
 Eric's check of the figures against the filings finds a different depreciation, rent, or financing figure.
 The tools recompute; only the fixture changes.
+Superseded in part by D18: the whole-line reading is computed as filed, 2.84x.
 
 ## D14. One backend function, four backends, and the result says which ran
 
@@ -444,6 +449,7 @@ Decision:
    Anthropic returns to the chain only with a key.
 
 Evidence: `agents.md` section 9, rows 08:06 to 08:33; tests `test_covenant_flag_always_shows_the_count_everything_reading`, `test_learned_lines_are_marked_by_the_gateway_not_by_the_model_wording`, `test_second_run_while_one_is_in_progress_is_refused`.
+Superseded in part by D18 (the whole-line reading is 2.84x as filed) and D22 (the demo paces replay a recorded Claude Haiku 5.5 run, Mapper included).
 
 ## D17. A covenant flag's what-ifs live in a Tiger fork
 
@@ -579,6 +585,7 @@ Not changed: the math in `backend/app/tools/finance.py`, and the three existing 
 
 Not decided: when to build stage 1.
 The order of work in `TASKS.md` has a feature freeze on Saturday at 8pm.
+Superseded by D23: stage 1 is built, and the demo deal starts from the agreement.
 
 Design: `architecture/brief-reader.md`.
 Research: `research/brief-reader.md`.
@@ -648,6 +655,7 @@ Rejected:
 - An edit on Mama's and Crown I: the gateway refuses amount edits on subtotals and balance sheet detail lines, and no Crown I line has a sourced change that fits.
 
 Design: `architecture/gateway-and-api.md` ("Demo pace", "Seeded cases"), `agents.md` section 7a, `demo-script.md`.
+Superseded in part by D23: the demo starts from the agreement, so the current timings are in D23 item 7.
 
 ## D23. Demo starts from the agreement; a code verifier checks the Brief; two human touchpoints
 

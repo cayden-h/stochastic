@@ -2,8 +2,7 @@
 
 ## Folder map
 
-This matches the repo on 2026-10-23.
-Items marked (new) do not exist yet.
+This matches `main` on 2026-10-25.
 
 ```
 Stochastic/
@@ -14,58 +13,57 @@ Stochastic/
     README.md              Index of all docs
     STOCHASTIC.md          Product reference (read first)
     TASKS.md               Who builds what
-    planning-notes.md      Archive from earlier framings
-    hyphenate-workshop.md  Workshop blueprint and gaps
+    agents.md              Agent backends, models, recordings, and demo paces
+    decisions.md           Decision records
+    demo-script.md         The pitch and the demo beats
+    glossary.md, review.md, planning-notes.md, hyphenate-workshop.md
     architecture/          How we build it (this folder)
-    design/                UI and UX research
+    design/                Screens, brand, the review companion, and UI and UX research
+    devpost/               Devpost text, one-pager, images
+    tasks/                 One file per person
     research/              Sourced research (deep-problems/ is archive)
     diagrams/              HTML and PDF diagrams from the first framing (stale)
     sponsors/              Sponsor and track research
   backend/                 Python, FastAPI
     pyproject.toml
     app/
-      main.py              App entry, seeds the demo store
-      api/                 routes.py (thin routes)
-      gateway/             gateway.py (permissions, states, audit log)
-      agents/              Agent code goes here (README only today)
-      tools/               deal_math.py, quote_validator.py (the validator is from the earlier framing)
-      db/                  memory.py, fixtures/demo.py
-      core/                config.py, models.py
-    tests/                 test_trust_rules.py
+      main.py              App entry: builds the store and the gateway, seeds the demo deal and the Dashboard cases
+      api/                 routes.py, schemas.py, events.py (the SSE stream), export.py, certificate.py, errors.py, body_limit.py
+      gateway/             gateway.py (permissions, states, audit log), whatif.py (a flag's what-ifs in a Tiger fork)
+      agents/              runner.py, roles.py, jobs.py (the job runner), pace.py, demo_replay.py, recording.py, settings.py,
+                           backends/ (anthropic_backend.py, droid_backend.py, scripted.py)
+      tools/               finance.py (consolidation, EBITDA, debt, leverage, limit test), edits.py
+      db/                  memory.py, postgres.py, forks.py, loader.py, fixtures/ (kewaunee.py, cases.py, dlh_grsi.py,
+                           mamas_crown.py, sstk_envato.py)
+      core/                config.py, models.py, policies.py, agreement.py, verifier.py
+    recordings/            Committed agent runs that the replay backend and the demo paces play
+    tests/                 pytest, one file per area, plus fixtures/kewaunee_ex101_excerpt.txt
   frontend/                Next.js, React, TypeScript, Tailwind
-    src/app/               page.tsx (Dashboard), case/, mapping/, agents/, log/
-    src/components/        shell, sidebar, gate, flag-card, verdict-line, combined-table, mappings, upload-modal, source, audit-log, icons, ui
-    src/lib/               api.ts, types.ts, deal-context.tsx, format.ts
-  evals/                   README only (answer key and scoring, planned)
-  data/                    Cached public filings (git-ignored, README tracked)
-  scripts/                 README only (helper scripts, planned)
+    src/app/               page.tsx (Dashboard), case/, mapping/, agents/, log/, review/
+    src/components/        shell, sidebar, gate, launch-splash, stochastic-mark, brief-card, verification-card, flag-card,
+                           process-flow, verdict-figures, combined-table, mappings, review-mapping, workbook, your-edits,
+                           companion, upload-modal, source, audit-log, toasts, icons, ui, agent-house/
+    src/lib/               api.ts, types.ts, deal-context.tsx, edit-context.tsx, edits.ts, conversation.ts, workbook.ts,
+                           format.ts, desktop.ts, __tests__/
+    public/                agents/ (the Blender characters as .glb), v3/ (the page characters and brand art)
+  desktop/                 Electron shell: main.js, preload.js, splash.html, assets/ (icon, fonts)
+  e2e/                     Playwright specs for the browser and the Mac app
+  art/blender/             The agent models (.blend), build_agents.py, exported .glb in source/
+  evals/                   answer_key.csv, score_mapper.py, mapper_trials.py, notes
+  data/                    Cached public filings (git-ignored); data/brief/ (the agreement extract and quotes) is tracked
+  scripts/                 record_run.py, fetch_filings.py, load_lines.py, run_unseen_deal.py, demo.sh, Droid probes
 ```
 
 The frontend follows Figma Hi-fi v3: `/` is the Dashboard and `/case` the Case (`frontend/README.md`).
 
-## Where new agent code goes
+## Where code goes
 
-New code goes in `backend/app/agents/`:
-
-```
-backend/app/agents/
-  run_agent.py        run_agent(role, item) and the AGENT_BACKEND switch (new)
-  backends.py         The anthropic and droid backends (new)
-  roles.py            Role definitions: system prompt, tools, result type (new)
-  mapper.py           Mapper role (new)
-  preparer.py         Preparer role (new)
-  reviewer.py         Reviewer role (new)
-  runner.py           The job runner (new)
-  tools.py            @tool functions that call the gateway (new)
-```
-
-Other new code:
-
-- Math tools (consolidate, EBITDA, debt, leverage, limit test) go in `backend/app/tools/`.
-- New Pydantic models for source line, mapping, and result go in `backend/app/core/models.py`.
-- New routes go in `backend/app/api/routes.py`.
-- The Kewaunee fixture replaces the invented demo data in `backend/app/db/fixtures/`.
-- Droid and Anthropic SDK packages go in `backend/pyproject.toml`.
+- Agent code goes in `backend/app/agents/`: a role in `roles.py`, a backend in `backends/`, the job runner in `jobs.py`.
+- Math tools go in `backend/app/tools/`.
+- Pydantic models go in `backend/app/core/models.py`.
+- Routes go in `backend/app/api/routes.py`.
+- Fixtures and seeded cases go in `backend/app/db/fixtures/`.
+- Python packages go in `backend/pyproject.toml`.
 
 ## Conventions
 
@@ -74,16 +72,16 @@ Other new code:
 - **One writer.** Only `backend/app/gateway/` writes to the store.
   Agents, the runner, and routes call it.
 - **Pure tools.** A tool is a function with typed inputs and outputs and no side effects.
-- **Stateless agents.** An agent gets one work item and returns one typed result.
-  It keeps no memory.
+- **Stateful agents.** Each role keeps a session in the store, and the Mapper applies the policies the gateway wrote from the controller's answers.
+  An agent still calls tools only through the gateway and does not talk to other agents.
 - **Typed contracts.** Pydantic models define source lines, mappings, results, work items, and audit rows.
   The frontend types follow the same shapes.
 - **Fixtures.** Fixture data lives in `backend/app/db/fixtures/`.
-  The prototype runs on it.
+  The demo deal and the seeded Dashboard cases are built from it.
 - **No secrets in git.** Keys live in `.env`.
   `.env.example` lists the names.
-- **Tests for the trust rules.** Tests in `backend/tests/test_trust_rules.py` stay green.
-  Add tests for: the model never writes a number, an agent cannot approve its own item, a denied action is logged, and the tie-out check.
+- **Tests for the trust rules.** Tests in `backend/tests/` stay green, `test_trust_rules.py` first.
+  They cover: the model never writes a number, an agent cannot approve its own item, a denied action is logged, and the tie-out check.
 
 ## Naming
 
@@ -95,5 +93,4 @@ Other new code:
 ## Docs
 
 - Each code folder has a `README.md` that says what the folder holds.
-  Several still describe the earlier framing and need an update.
 - A decision that changes the design goes in `docs/STOCHASTIC.md` first, and then in the matching architecture file.

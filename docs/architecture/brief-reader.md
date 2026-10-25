@@ -1,18 +1,17 @@
 # The Brief Reader: a fourth agent that reads the credit agreement
 
-Last updated: 2026-10-24, evening.
-Status: decided (D20).
-Stage 1 is built in the gateway and the agents (2026-10-24); the routes are Tri's T4.
+Last updated: 2026-10-25.
+Status: decided (D20), and stage 1 is built: the gateway, the agents, and the routes (Tri's T4) on 2026-10-24, and the verifier (D23, section 6a) on 2026-10-25.
 The gateway functions are in `gateway-and-api.md`.
 Research: `research/brief-reader.md`.
 Claims are tagged [verified] when a file or a filing shows them, and [inferred] when they are our judgment.
 
 ## 1. Why
 
-Today a person writes the `Brief` by hand, and the only Brief is PNC's agreement with Kewaunee. [verified: `backend/app/db/fixtures/kewaunee.py`]
+Before the reader, a person wrote the `Brief` by hand, and the only Brief was PNC's agreement with Kewaunee. [verified: `backend/app/db/fixtures/kewaunee.py`]
 The code takes any Brief: `POST /deals` accepts one as JSON, and nothing in the math names PNC or 2.50. [verified: `backend/app/api/routes.py`, `POST /deals`]
-So Stochastic supports any agreement with a single debt-to-EBITDA covenant, if a person writes the Brief.
-It has been tested on one.
+So Stochastic supported any agreement with a single debt-to-EBITDA covenant, if a person wrote the Brief.
+It had been tested on one.
 The Brief Reader closes that gap: it reads the agreement and drafts the Brief, code checks every quote, and the controller approves it.
 
 ## 2. Why a separate role, not part of the Mapper
@@ -45,19 +44,19 @@ The agreement gives the terms: the limit, the wording, the defined debt term, wh
 It mostly does not give the amounts.
 In the Kewaunee Brief, pension 4,019 and stock compensation 1,018 come from the 10-K, the rent deduction 1,970 is inferred from the 10-K, and `closing_financing` comes from Ex 99.2 Note 4(h). [verified: `backend/app/db/fixtures/kewaunee.py`]
 So the Brief Reader returns each adjustment with its name, its cap, and amount 0, marked `inferred` and flagged "amount comes from the books".
-The controller enters the amount, with its source, before approving.
-Taking amounts from the books automatically is a later step.
+When the deal carries the book amounts, the verifier fills them with their sources (section 6a); otherwise the controller enters each amount, with its source, before approving (`POST /deals/{id}/brief/amounts`).
 
 ## 5. Flow
 
 1. The controller creates a deal with the two statement CSVs and the agreement text (a `.txt` file) instead of a Brief JSON.
-   Sending a Brief JSON still works and skips the reader, so the demo deal and the existing tests are unchanged.
+   Sending a Brief JSON still works and skips the reader.
+   The demo deal itself starts from the agreement extract (section 6a).
 2. Code indexes the text: the definitions (`"X" means` and `"X" shall mean`) and the section headings. [inferred: this regex index is how the research recommends handling defined terms]
 3. The job runner opens a `draft_brief` work item and runs the Brief Reader.
    It gets the section index, the definitions index, and the sections that mention a leverage ratio.
    It can ask for more through two read-only gateway tools, `get_section(id)` and `get_definition(term)`.
    It never gets the whole agreement in one prompt: the relevant text is about 8K to 30K characters out of 240K to 690K. [verified: `research/brief-reader.md` section 1]
-4. The gateway checks the draft (section 6).
+4. The gateway checks the draft (section 6), and the verifier then checks every field (section 6a).
    A failed check is refused and logged, the reader retries once with the reason, and then the scripted backend runs under the same checks, as the Mapper does today.
 5. Low-confidence fields, missing fields, and missing amounts open `brief_field` flags.
    The runner stops on open flags, as it does today.
@@ -111,7 +110,7 @@ For each adjustment amount:
 2. An amount other than 0 passes only with a source outside the agreement; 0 passes as "not applied".
 
 Each check is one `check` message and one `verify:brief_field` audit row (ALLOWED when it passed, DENIED when it failed).
-The report, `BriefVerification`, is stored on the draft item and returned on `/case` as `brief_verification`: `checks` (field, value, section, quote, ok, reason, checks), `passed`, `failed`, `filled`, `scope_notes`, `escalated`, and `auto_approved`.
+The report, `BriefVerification`, is stored on the draft item and returned on `/case` as `brief_verification`: `item_id`, `sha256`, `checks` (field, value, section, quote, ok, reason, checks), `passed`, `failed`, `filled`, `scope_notes`, `escalated`, and `at`.
 
 What happens next:
 - The draft's questions open only after the verifier ran, so the controller is asked only what is left: amounts the books do not give, low-confidence fields, the reader's own questions, and every failed check.
@@ -135,7 +134,7 @@ The pinned Sonnet 5.5 read of the full exhibit (`backend/recordings/brief_reader
 
 ## 7. Types and files
 
-Proposed, following the patterns already in the code. [inferred]
+Built as planned here, following the patterns already in the code; the verifier added `core/verifier.py` and `BriefVerification`. [verified: `backend/app/core/models.py`, `backend/app/agents/roles.py`]
 
 - `models.py`:
   - The actor `BRIEF_READER = "agent:brief_reader"` and the item type `draft_brief`.
@@ -156,13 +155,13 @@ Proposed, following the patterns already in the code. [inferred]
   A route for the controller to enter amounts.
   `/case` adds the draft and its citations.
 - `scripts/record_run.py` and `backend/recordings/brief_reader.json`.
-- Frontend (Josie): a Brief card at the start of the deal, with each field, its quote, its flags, and Approve.
-  The progress list adds the reader.
-  `page.tsx` reads `deal.brief` at stage `new` and must handle a missing Brief.
+- Frontend: the Brief card on the Case (`components/brief-card.tsx`), with each field, its quote, its flags, the verification card (`components/verification-card.tsx`), and Approve.
+  The pipeline (`components/process-flow.tsx`) shows the reader and the verifier.
+  The Case reads `deal.brief` at stage `new` and handles a missing Brief.
 
 ## 8. Tests
 
-New `backend/tests/test_brief_reader.py`, one test per rule:
+`backend/tests/test_brief_reader_gateway.py`, one test per rule (the routes are in `test_api_brief.py` and the verifier in `test_brief_verifier.py`):
 - A quote not in the text is refused, with a DENIED row.
 - A limit not in its quote (3.0 against a quote saying "2.50") is refused.
 - A required field with no quote and no flag is refused.
@@ -174,11 +173,12 @@ New `backend/tests/test_brief_reader.py`, one test per rule:
 - A refused draft is retried with the reason, then made by the scripted backend.
 - The scripted reader on the Kewaunee excerpt returns the fixture Brief.
 
-The test agreement is a short synthetic text or stitched excerpts under 15 words, because the cached filings stay out of git.
+The test agreement is a short synthetic text in the test file, or the stitched excerpts under 15 words in `backend/tests/fixtures/kewaunee_ex101_excerpt.txt`, because the cached filings stay out of git.
 
 ## 9. The answer key for Briefs
 
-`evals/brief_key/`: one hand-written Brief per agreement, field by field, with the section for each value.
+Not built yet: `evals/` has no Brief key.
+The plan is one hand-written Brief per agreement, field by field, with the section for each value.
 - PNC and Kewaunee: the fixture Brief.
 - Noble Roman's: a simple bank covenant, close to PNC, with a certificate worksheet in Annex A. [verified: `research/brief-reader.md` section 2.2]
 - Mayville Engineering: a bank covenant with a real add-on behind it.
@@ -220,12 +220,10 @@ It only points at quotes; code checks every quote and every number, and does all
 The controller approves the Brief before any deal is tested against it.
 Anything the schema cannot express becomes a question, not a guess."
 
-Until stage 1 is built and tested, say instead: "Today a person writes the Brief once per agreement, and the next agent we are building reads it from the contract."
-
 ## 12. Open questions
 
-- When to build stage 1.
-  The order of work in `TASKS.md` has a feature freeze on Saturday at 8pm, before judging. [verified: `TASKS.md`]
+- When to build stage 2.
+  Stage 1 is built; stage 2 is roadmap.
 - Which model runs the reader.
   Sonnet 5.5 on Droid drafted a Brief that passed every check on the full Ex 10.1, on the runner's retry after one refused three-word quote. [verified: `backend/recordings/brief_reader.json`, 2026-10-25]
 - Whether `DROID_TIMEOUT` is enough.

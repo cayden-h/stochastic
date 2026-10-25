@@ -1,8 +1,9 @@
 # e2e
 
 End-to-end tests over the whole demo path, in the browser and in the Mac app, with Playwright Test.
-They drive the real console against the real gateway API, on the scripted agents only.
-No live model runs: every backend the suite starts has `AGENT_BACKEND=scripted`, `AGENT_FALLBACK=scripted`, `STORE=memory`, and empty API keys.
+They drive the real console against the real gateway API, with no live model.
+Every backend the suite starts has `AGENT_BACKEND=scripted`, `AGENT_FALLBACK=scripted`, `STORE=memory`, and empty API keys.
+A run at pace `demo` or `factory` replays the recorded Claude Haiku 5.5 run (`backend/recordings/haiku-5-5-run2/`) whatever `AGENT_BACKEND` says, so `demo-run.spec.ts` and `factory-upload.spec.ts` show the recorded run; every other run is scripted.
 
 ## Run
 

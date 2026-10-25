@@ -294,6 +294,8 @@ Josie has no frame for it, and the Figma Components page has nothing named Brief
 - Tested headless through the dev shim over the real gateway: the full Ex 10.1 text, then the Brief card (one scope question, three amounts from the 10-K with their source, two kept at 0), approve, map, the two flags, 0.76x, the edit beat, approve, and download.
 Waiting on: T4 (the routes; the amounts body above is my assumption, so Tri should match it or tell me), and Josie's frame.
 
+Later: the editing, Your edits, approval, and Download final files moved to the Review page (PR #25, `/review`), and the Case became read-only (PR #33).
+
 Review fixes, 2026-10-24 night:
 - Adjustment flags: Apply waits for a PROPOSED approval item, approval waits for them, and they do not hold the progress row or the "no flag this time" note.
 - Until T2 puts `edits` on `/case`, the console keeps the edits the gateway returned, so an edit left for Later stays; `/case` wins by id.
@@ -314,6 +316,7 @@ Built 2026-10-24 night in `cayden/phase2-console`: `frontend/src/components/comp
 The bubble follows Josie's Reason popover (Figma 545:408) for looks and section 5 for behavior.
 The demo beat runs headless through the shim in about 3 seconds, from opening the income statement to approved, with Download in the browser.
 Waiting on: the run on the demo laptop, and T1 and T2 for the real routes.
+Later: the companion became the Reviewer's 26 px avatar, and it shows on the Review page only (PR #25 and #33).
 
 ## Live events (2026-10-24 night, `cayden/v3-live`)
 
@@ -342,3 +345,9 @@ Built, from Cayden's asks, against the backend contract of `cayden/demo2-backend
 - The "Always learning from" counters read `GET /health` `memory_counts` across deals, with the selected deal's counts as the fallback.
 - The Upload modal's Begin resets with memory cleared before it creates the deal, so the Factory beat always asks its questions.
 Built against the backend of PR #32 (merged): the `"factory"` pace, the recorded run's `model` and `recorded` on `last_runs`, and `memory_counts`.
+
+## Brief verification (D23, 2026-10-25, `cayden/demo-verify`)
+
+Built, merged in PR #35: the demo deal starts from `data/brief/kewaunee_ex101_extract.txt`, the code verifier (`backend/app/core/verifier.py`) checks the Brief (22 of 22 on the demo deal) and fills the book amounts, the controller approves the Brief in one click, and the Mapper's one escalation asks two decisions.
+Seeded cases rebuild when their fixtures change (`seed_version`, PR #34).
+Tests at merge: 435 offline with 18 skipped, 448 with Tiger.

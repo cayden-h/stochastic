@@ -4,7 +4,7 @@ Agents never chat with each other.
 Each agent receives one work item and returns one typed result through the gateway.
 Agents are stateful: each role keeps a session and the Mapper applies the policies the controller taught it.
 The state lives in the store, so it survives a restart, and a second deal starts with what the first one taught.
-This file describes the code in `backend/app/agents/` as of 2026-10-24.
+This file describes the code in `backend/app/agents/` as of 2026-10-25.
 
 ## Work-item types
 
@@ -16,7 +16,7 @@ This file describes the code in `backend/app/agents/` as of 2026-10-24.
 | `review_result` | Job runner | Check the draft. The Reviewer handles it. |
 | `approve_result` | Gateway, after the review | The controller approves the result before it posts. It is proposed by the Preparer, so maker-checker applies. |
 | `reverse:<type>` | Gateway, on a reversal | A new item linked to the original. |
-| `draft_brief` (planned, D20) | Job runner, before `map_lines`, when the deal has an agreement and no approved brief | Draft the brief from the credit agreement. The Brief Reader handles it, and the controller approves it. See `brief-reader.md`. |
+| `draft_brief` (D20) | Job runner, before `map_lines`, when the deal has an agreement and no approved brief | Draft the brief from the credit agreement. The Brief Reader handles it, the verifier checks it (D23), and the controller approves it. See `brief-reader.md`. |
 
 ## States
 
@@ -39,9 +39,10 @@ It is not a state.
 The gateway does not apply a denied action, and it writes a row to the audit log.
 The controller's answer to a flag is the approval of that flag, so an answered flag posts at once.
 
-## The three agent contracts
+## The agent contracts
 
 Types are in `backend/app/core/models.py`.
+The Brief Reader's contract (tools `get_section` and `get_definition`) is in `brief-reader.md`.
 
 ### Mapper (staff accountant)
 
@@ -72,19 +73,23 @@ Never: changes the draft.
 `backend/app/agents/jobs.py`, plain code.
 `advance(gw, deal_id)` does every step that needs no human, then stops:
 
-1. No `map_lines` yet: open one, run the Mapper, store the mapping.
+1. No approved Brief: open `draft_brief`, run the Brief Reader, and run the verifier on its draft.
+   Then stop: a failed check opens a `brief_field` flag, and a Brief whose every check passed waits for the controller's one-click approval.
+2. No `map_lines` yet: open one, run the Mapper, store the mapping.
    The gateway opens a flag per proposal.
-2. A flag is open: stop.
+3. A flag is open: stop.
    The console shows the flag card.
-3. Flags answered and no draft: open `prepare_result`, run the Preparer, store the result.
-4. Draft stored and no review: open `review_result`, run the Reviewer, store the verdict.
+4. Flags answered and no draft: open `prepare_result`, run the Preparer, store the result.
+5. Draft stored and no review: open `review_result`, run the Reviewer, store the verdict.
    The gateway opens `approve_result`.
-5. Waiting on the controller: stop.
+6. Waiting on the controller: stop.
 
 `POST /deals/{id}/run` calls it.
 Answering the last open flag calls it again in the background.
 The runner holds no state.
 It can run again at any time and finds the next thing to do.
+A run that stops on an error marks the deal `run_failed`, and so does a restart that finds a deal left mid-run, so the console offers Run again.
+A run's `pace` (`demo`, `factory`, `human`, `off`) only adds waits between steps (`backend/app/agents/pace.py`).
 
 ## Memory
 
@@ -92,18 +97,18 @@ It can run again at any time and finds the next thing to do.
 - `AgentSession`: role, backend, backend session id (Droid resumes it), turns, a short transcript.
 - The gateway writes both.
   `GET /agents/memory` reads them.
-  `POST /dev/reset` keeps them.
+  `POST /dev/reset` keeps them, and `POST /dev/reset?keep_memory=false` retires the policies that cover the demo deal.
 - The demo moment for memory: reset the deal, run again, and the Mapper asks nothing.
   The audit log shows `policy:apply` rows.
 
-## The two human moments
+## The human moments
 
 - **Flag.** A line is unclear.
   The console shows the question, the evidence, and the options with their computed effects.
   The controller chooses.
 - **Approval.** The controller approves the combined result before it posts.
   The gateway refuses until the Reviewer verdict is pass.
-- **Brief approval (planned, D20).** Before mapping, the controller approves the brief the Brief Reader drafted, with a quote for every field.
+- **Brief approval (D20, D23).** Before mapping, the controller approves the Brief the Brief Reader drafted, with a quote for every field and the verifier's checks.
   Mapping and the covenant tools are refused until then.
 
 If the Reviewer finds a tie-out error or a breach of the limit, `approve_result` opens as NEEDS_INFO with the reasons, and the controller rejects it or reverses a flag.

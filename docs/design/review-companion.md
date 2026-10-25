@@ -1,6 +1,7 @@
 # Review screen and companion
 
-Status: proposed design, 2026-10-24 evening.
+Status: built (D19), first proposed 2026-10-24 evening.
+The sections from 1 on are the original spec; the two updates below say where the build differs.
 Decision D19 in `docs/decisions.md`.
 Owner: Josie (screens and Figma), Cayden (desktop shell, companion, edit endpoints), Tri (recompute and export).
 Read `design/README.md` first: every color, font, and radius here is an existing token.
@@ -220,8 +221,8 @@ What the agents learn:
 
 ## 8. Download final files
 
-After approval, the Review ribbon shows a primary button, "Download final files", which opens the macOS save dialog for a folder (`window.stochastic.saveFiles`); in a browser the two files download.
-Before approval, with edits, it shows disabled with "after approval" beside it.
+After approval, the Review page's header shows a primary button, "Download final files", which opens the macOS dialog to choose a folder (`window.stochastic.saveFiles`); in a browser the two files download.
+Before approval it shows disabled ("The final files come after approval").
 It writes two files:
 
 - `Kewaunee + Nu Aire combined books.xlsx`
@@ -231,7 +232,7 @@ It writes two files:
   - An **Audit** sheet with the run ids behind every number.
 - `Compliance certificate (draft).md`, from `GET /deals/{id}/certificate`, with the edited figures and a line listing each edit and its reason.
 
-The button is not shown before approval, matching the certificate route's 409.
+Both files are behind the same 409 gate as the certificate route until approval.
 
 ## 9. The demo beat (about 10 seconds)
 
@@ -248,9 +249,9 @@ The edit should be a believable one-time cost, sourced from the Kewaunee or Nu A
 It does not need to cross the limit.
 The point of the beat is that the edit is recomputed by code, explained, and remembered.
 
-## 10. Backend contract (proposed)
+## 10. Backend contract
 
-These routes do not exist yet.
+Built as below; the exact shapes are in `../architecture/gateway-and-api.md`, section "Routes".
 
 - `POST /deals/{id}/edits` with `{"kind": "amount", "line": "...", "company": "...", "value": 9312}` or `{"kind": "remap", "line": "...", "company": "...", "platform_line": "..."}`.
   Returns the edit (`id`, `old`, `new`, `needs_reason: true`), the recomputed `verdict` and `result`, and `reasons` (the chips, hardcoded for the demo deal).
@@ -276,7 +277,7 @@ The gateway rules carry over: edits are recorded in the audit log as `human:cont
 - The brand row and each page header are drag regions (`-webkit-app-region: drag`); their buttons and links are `no-drag`.
 - The companion is part of the page (a React layer), not a separate OS window.
   It only needs to be aware of the cursor inside the app, so no click-through overlay is needed.
-- The save dialog for Download final files comes from Electron's `dialog.showSaveDialog`.
+- The folder dialog for Download final files comes from Electron's `dialog.showOpenDialog` (`desktop/main.js`).
 
 ## 12. Figma checklist for Josie
 

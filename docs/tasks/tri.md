@@ -97,7 +97,7 @@ Tests in `backend/tests/test_api_edits.py`: the demo beat end to end through the
 ### T3. The final files (about 2 hours)
 
 - `GET /deals/{id}/export.xlsx`, which returns 409 before approval.
-  Use `openpyxl` and add it to `backend/requirements.txt`.
+  Use `openpyxl` and add it to `backend/requirements.txt` (built: the backend has no `requirements.txt`, so `openpyxl` is in `backend/pyproject.toml`).
   Three sheets, from `review-companion.md` section 8:
   - **Combined**: the final values in platform order.
     Each edited cell has a light amber fill (`FBEBC8`) and a cell note with who, when, the old value, the reason, and the policy id.
@@ -118,11 +118,13 @@ Tests in `backend/tests/test_api_edits.py`: the demo beat end to end through the
   Use the synthetic agreement text from Eric (E3), never the cached filings.
 - Status (2026-10-24, verified by `backend/tests/test_api_brief.py`, 27 tests): the three routes and `brief_draft` on `/case` are in, the `stage` event carries `brief_status`, and only `human:controller` amends or approves the Brief.
   The gateway rule tests are Cayden's `test_brief_reader_gateway.py`; the route tests use a synthetic agreement written in the test and the Ex 10.1 excerpt in `backend/tests/fixtures/`, not Eric's E3 text, which is not in the repo yet.
+  `test_brief_reader.py` was never added; those two files cover section 8.
 
 ### T5. Keep the tests green
 
 Run the full suite and the Tiger tests on every merge (rule 5 in `tasks/README.md`).
 The count goes up from 176, so update it in `backend/README.md`.
+On 2026-10-25 it is 435 offline with 18 skipped, and 448 with Tiger (`backend/README.md`).
 
 ## Notes for Cayden (phase 2, from tri/tool/new)
 

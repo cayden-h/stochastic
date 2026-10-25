@@ -83,6 +83,17 @@ Gaps against what they said they want:
    Still to confirm with a Hyphenate mentor.
 7. Monte Carlo: dropped from the product.
 
+## Gap status on 2026-10-25 (inferred)
+
+1. Learning source: more closed.
+   A policy learned on one deal applies on the same company's next deal (the seeded QuickBooks sample case reuses the answer from DLH's earlier deal), and an edit in review with its reason teaches the agents (D19).
+2. Self-improvement loop: partly closed, as above; still not backtested.
+3. Limits in code: closed, and the Brief is checked in code too: every quote and number against the agreement (D23).
+4. Time dimension: still mostly open.
+   Five cases on the Dashboard, and the sidebar counts human answers, policies, and reasoned edits across all of them.
+5. Answer key: closed for the mapping (the Note 2 score in `evals/README.md`).
+6. Seat: unchanged.
+
 ## The seat choice (revised 2026-10-23)
 
 Revised the same day: Cayden asked why the system must track a company over quarters, and the answer is that it does not.

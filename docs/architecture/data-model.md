@@ -4,7 +4,7 @@ Tables hold exact facts.
 The rule "vectors find, tables decide" still holds, but the MVP has no vector search and no vector table.
 The table names below are a design proposal and can change in the build [inferred].
 The tables are `deal`, `source_line`, `mapping`, `work_item`, `result`, `tool_run`, `audit_log`, `policy`, and `agent_session`.
-The code is `backend/app/db/memory.py` and the Pydantic models in `backend/app/core/models.py` (2026-10-24).
+The code is `backend/app/db/memory.py`, `backend/app/db/postgres.py`, and the Pydantic models in `backend/app/core/models.py` (2026-10-25).
 The earlier framing had document, chunk, fact, clause, plan, and simulation tables.
 They are archived and are not used.
 
@@ -370,10 +370,9 @@ One row per role: `role`, `backend`, `session_id` (the Droid session to resume),
 
 ### 3.1 In-memory shape
 
-`backend/app/db/memory.py` holds `MemoryStore` today. [verified: previous version of this file]
-It has dictionaries for deals, items, plans, facts, and clauses, and a list for the audit log.
-The `plans`, `facts`, and `clauses` collections belong to the earlier framing and go away.
-The target shape is:
+`backend/app/db/memory.py` holds `MemoryStore`.
+The earlier framing's `plans`, `facts`, and `clauses` collections are gone.
+The shape in the code:
 
 ```python
 class MemoryStore:
@@ -383,12 +382,18 @@ class MemoryStore:
     items: dict[str, WorkItem]
     results: dict[str, Result]
     tool_runs: dict[str, ToolRun]
-    policies: dict[str, Policy]          # agent memory, kept across reset_deals()
-    sessions: dict[str, AgentSession]    # keyed by role
-    audit: list[AuditRow]                # append only, in order
+    edits: dict[str, Edit]                       # controller edits (D19)
+    agreements: dict[str, AgreementText]         # credit agreement text, per deal (D20)
+    policies: dict[str, Policy]                  # agent memory, kept across reset_deals()
+    adjustments: dict[str, LearnedAdjustment]    # agent memory, kept across reset_deals()
+    sessions: dict[str, AgentSession]            # keyed by role
+    approved_briefs: dict[str, ApprovedBrief]    # agent memory, by agreement hash
+    messages: dict[str, ConversationMessage]     # the deal's conversation, in order
+    audit: list[AuditRow]                        # append only, in order
 ```
 
-This is the shape in the code. [verified: `backend/app/db/memory.py`, 2026-10-24]
+This is the shape in the code. [verified: `backend/app/db/memory.py`, 2026-10-25]
+The table sections above predate the edits, the agreement, and the conversation; their models are in `backend/app/core/models.py` and their shapes in `gateway-and-api.md`.
 
 ### 3.2 Mapping to Postgres
 
@@ -415,13 +420,13 @@ Rules for the swap:
 ### 3.3 A fork to compare two answers
 
 Tiger Cloud can fork the database.
-A fork could hold the second answer to a flag, so the controller can compare two leverage results without touching the record.
-Approving applies the answer through the gateway.
-Free-tier fork limits are not confirmed. [inferred]
+Built on 2026-10-24: when the Mapper raises a covenant flag on the Postgres store with `FORKS=tiger`, the gateway forks the ledger and writes every option's what-if into the fork, never into the live record (`backend/app/gateway/whatif.py`, `backend/app/db/forks.py`).
+The controller's answer applies through the gateway, and the fork is then deleted with the other options.
+The free plan allows two services, so there is room for one fork at a time. [verified: `backend/app/db/forks.py`]
 
 ## 4. Indexes to add
 
-Only if the Postgres swap happens.
+This is the plan for the per-table design in section 2, which was not built: the Postgres store keeps one `record` table (a JSONB body per model, with its kind) and the `audit_log` hypertable (section 3.2).
 The memory store needs none.
 
 | Table | Index | Why |
@@ -515,7 +520,7 @@ Question: where does the combined "Net sales" number in `r_001` come from?
 
 1. **Result row.** `result r_001`, `rows[0]` is `{line: "Net sales", platform: 203755, target: PLACEHOLDER, combined: PLACEHOLDER, run_id: "run_021"}`.
 2. **Run id.** `run_021` names one call of the consolidation tool.
-   The tool run records its inputs: the ids of the source lines and the ids of the mappings it used. [inferred: the run record is not built yet]
+   The tool run (`GET /runs/{run_id}`) records its inputs and outputs. [verified: `ToolRun` in `backend/app/core/models.py`]
 3. **Platform input.** `source_line sl_003`: Kewaunee, Net sales, 2024-04-30, 203,755 (USD thousands), source `8-K/A Ex 99.2`. [verified figure]
 4. **Target input.** A Nu Aire revenue line, such as `sl_001` (Net revenues, 2024-09-30, 74,850,302 USD, source `8-K/A Ex 99.1`). [verified figure]
 5. **Mapping.** `mapping` joins the Nu Aire line to Kewaunee's Net sales line.
@@ -530,7 +535,7 @@ Question: where does the combined "Net sales" number in `r_001` come from?
 
 For the flagged line, the trace is longer:
 1. A combined debt number in `result.rows` has a run id from the debt tool.
-2. The debt tool's run record lists `sl_004` and `sl_005` (financing liability, $750K current and $27,032K long-term) and the flag answer `wi_003`. [inferred: not built]
+2. The debt tool's run record lists the financing liability lines it counted and excluded, by name and company ($750K current and $27,032K long-term), in its `included` and `excluded` outputs; it does not name the flag answer `wi_003`. [verified: `covenant_debt` in `backend/app/tools/finance.py`]
 3. `wi_003.answer` says which option the controller picked, and `audit_log` says who and when.
 4. The brief on `deal d_001` holds the definition of Senior Funded Bank Debt, from Ex 10.1.
 
