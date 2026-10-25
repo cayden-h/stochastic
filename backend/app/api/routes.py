@@ -391,8 +391,8 @@ def build_router(gw: Gateway) -> APIRouter:
         (brief_status "none") and the run starts with the Brief Reader, unless an approved Brief for the same
         agreement text is reused by its hash.
 
-        The console calls POST /deals/{id}/run next. /dev/reset reseeds only the demo deal, so uploaded deals
-        are lost on reset, which is fine for the demo.
+        The console calls POST /deals/{id}/run next. /dev/reset reseeds only the demo deal; an uploaded deal keeps
+        its record across a reset, like the seeded cases.
         """
         def require():  # a denial is audited, before any file is parsed; a write, so under the lock and committed
             with gw.lock:

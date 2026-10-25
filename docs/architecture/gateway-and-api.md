@@ -54,6 +54,7 @@ A forbidden action returns 403 and writes a DENIED row.
 5b. A Reviewer `pass` must cite a `tie_out` run on the result's consolidate run and a `limit_test` run on its leverage run, both for this deal and both ok.
     The gateway reads the pass from those runs.
 5c. A covenant flag option that counts every flagged line as debt is computed as filed (reported EBITDA, `ebitda` with `as_filed`); choosing it puts the deal on the as-filed basis, so the result matches the card.
+    The exception is a flag whose default is that option (the agreement itself counts every flagged line, as Mama's Creations' finance leases): that reading is the agreement's, so its EBITDA is the agreement's too.
     Each covenant option carries `leverage`, `ok`, and `basis` from its run chain.
 5d. Policies apply only to the company whose line they were learned on; reversing a flag retires the policies it taught (`policy:retire` rows).
 A `company` policy with no company applies to nothing.
@@ -91,7 +92,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | Method and path | Who | Purpose |
 | --- | --- | --- |
 | `GET /health` | any | `ok`, `chain_valid`, the backend status, and `running` (a job is running for some deal in this process) (typed response) |
-| `GET /deals` | any | List deals |
+| `GET /deals` | any | Every deal for the Dashboard, the live demo deal first, then the seeded cases ("Seeded cases" below) and uploads. Each is the `Deal` (`id`, `name`, `platform`, `target`, `stage`, `brief`, `brief_status`, `ebitda_basis`, `situation`, `data_source`, `note`) plus `deal_id` (same as `id`), `verdict` (`{"leverage", "limit", "verdict"}` from the latest result, or null before the Preparer ran), and `updated_at` (the time of the deal's latest audit row, ISO). `data_source` is `filings` (a real deal, every figure from a public filing), `sample` (a sample company's books, not a real deal), or `upload` (sent through `POST /deals`). `note` is one line for the card. |
 | `GET /deals/{id}` | any | One deal, with its brief |
 | `GET /deals/{id}/case` | any | The whole screen in one read (shape below; response model `CaseResponse`, visible at `/docs`) |
 | `GET /deals/{id}/source-lines?company=` | any | Statement lines, both companies or one |
@@ -110,7 +111,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, files `platform_csv` and `target_csv`, and exactly one of `brief` (a JSON string of the Brief; the reader is skipped) or `agreement_txt` (the credit agreement as a UTF-8 `.txt` file, same 2 MB limit; the deal starts with `brief_status` `none` and the run starts with the Brief Reader, unless an approved Brief for the same agreement hash is reused). Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}, "brief_status"}`. 422 when neither or both of `brief` and `agreement_txt` are sent, for an empty or non-UTF-8 agreement or a name not ending in `.txt`, and naming the file, row, and column for a bad CSV. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
 | `POST /deals/{id}/brief/amounts` | `human:controller` only | Set fields of the draft Brief (D20), most often an adjustment amount from the books with its source. Any draft field can be set by its path (the limit, the lender, the definitions, `debt_excludes[k]`, an adjustment's name, amount, or cap); only an amount needs a `source_ref`. Body `{"amounts": [{"field": "ebitda_addbacks[2].amount", "value": 698.0, "source_ref": "...", "inferred": false, "note": ""}]}` (a new adjustment is added by its `.name` at the next index). Every entry is checked first (path, index, type, source); a bad entry refuses the whole list with 422 naming `amounts[i]`, nothing applied, and a DENIED row. The entries are then applied in order through `gateway.amend_brief` under the gateway lock. The gateway cannot roll back: if it still refuses entry i, the 422 names `amounts[i]` and lists the earlier entries, which stay applied. Returns `{"brief", "brief_draft", "brief_status", "stage"}` (response model `BriefAmountsResponse`). 404 unknown deal; 422 for an empty list, a field path that is not `name[i].attr`, or a `value` that is a boolean, non-finite, too big for a float, 1e12 or more in size, or a number sent as text for an amount, a cap, or the limit (loc `amounts[i].value`, the message names the field path); 403 with a DENIED row for any actor but `human:controller` (an agent, `human:intern`), before any write; 409 when there is no draft or the Brief is approved. |
 | `POST /deals/{id}/brief/approve` | `human:controller` only | Approve the draft Brief through `gateway.approve_brief`; it is locked and the deal is back at stage `new`. The run does not continue by itself: the console calls `POST /deals/{id}/run` next. Returns the deal (response model `Deal`, `brief_status` `approved`, `stage` `new`). 404 unknown deal; 403 with a DENIED row for any actor but `human:controller`, or while a `brief_field` flag is open; 409 when there is no draft (a second approve, or a deal whose Brief came as JSON). |
-| `POST /deals/{id}/run` | human | Run the job runner until the deal waits on a human. Body `{"backend": "droid", "sync": true}` is optional. |
+| `POST /deals/{id}/run` | human | Run the job runner until the deal waits on a human. Body `{"backend": "droid", "sync": true, "pace": "demo"}` is optional. `pace` is `demo` (the 15-second demo), `human` (the `DEMO_PACE=1` timings), `off`, or null (follow `DEMO_PACE`); it overrides `DEMO_PACE` for this run and for the run the controller's answer continues, on the scripted and replay backends only (422 for another value). See "Demo pace". |
 | `POST /work-items/{id}/answer` | human | `{"option_id": "b"}`. Posts the flag and, if no flag is open, continues the run in the background. `?auto_advance=false` turns that off. |
 | `POST /work-items/{id}/approve` | human | Approve the result. The gateway posts it. |
 | `POST /work-items/{id}/reject` | human | `{"reason": "..."}` |
@@ -120,7 +121,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `POST /edits/{id}/reason` | human (controller) | `{"chip": 0}` or `{"text": "..."}`, with `"remember": true` by default. Returns the edit (`status` `reasoned`, plus `adjustment_id` or `policy_id` when remembered). 422 when both `chip` and `text` are missing, or for an unknown chip; 404 unknown edit; 409 when the edit already has a reason; 403 for any other actor. |
 | `DELETE /edits/{id}` | human (controller) | Undo an edit (marked `reverted`, never deleted; its policy or adjustment is retired) and recompute. Same shape as `POST /deals/{id}/edits`. 404 unknown edit; 409 when already reverted or outside the PROPOSED window; 403 for any other actor. |
 | `POST /tools/{name}` | agent | `{"deal_id": "...", "inputs": {}}`. Runs a math tool and returns the run. |
-| `POST /dev/reset?keep_memory=true` | dev | Reseed the deal. Agent memory is kept by default; `keep_memory=false` clears it (use it between judges). 409 while a run is in flight; frees the what-if fork slot. |
+| `POST /dev/reset?keep_memory=true` | dev | Reseed the live demo deal (`d_kequ_nuaire`) only. Agent memory is kept by default; `keep_memory=false` clears it (use it between judges). Every other deal (the seeded cases, uploads) keeps its whole record, its audit rows (chained again in the new ledger, `Gateway.rechain`), and the memory learned on it, in both modes; id counters keep counting, so no new id repeats a kept one. Returns `{"ok", "keep_memory", "policies" (live policies that cover the demo deal), "sessions", "kept_deals"}`. 409 while a run of the demo deal is in flight; frees the what-if fork slot. |
 
 ## The case shape
 
@@ -446,7 +447,7 @@ The scripted reader returns the fixture Brief with the verbatim quotes in `data/
 
 ## The stream
 
-`GET /deals/{id}/stream` sends six kinds of event: `audit`, `stage`, `run`, `edit`, `conversation`, and `mapping`.
+`GET /deals/{id}/stream` sends seven kinds of event: `audit`, `stage`, `run`, `edit`, `conversation`, `notify`, and `mapping`.
 It looks for new events every quarter second.
 On connect it sends everything the deal has so far (every audit row, the whole conversation, every stored mapping), then only what is new.
 Audit events are unchanged.
@@ -486,8 +487,11 @@ A `conversation` event is one message between the roles, sent as soon as the gat
 
 ```
 event: conversation
-data: {"id": "msg_002", "deal_id": "d_kequ_nuaire", "at": "<iso timestamp>", "from": "agent:mapper", "to": "system:gateway", "kind": "message", "text": "Proposing 53 mappings and 78 covenant tags, 2 questions for the controller", "item_id": "wi_001", "run_id": null, "line_id": null}
+data: {"id": "msg_002", "deal_id": "d_kequ_nuaire", "at": "<iso timestamp>", "from": "agent:mapper", "to": "system:gateway", "kind": "message", "text": "Proposing 53 mappings and 78 covenant tags, 2 questions for the controller", "item_id": "wi_001", "run_id": null, "line_id": null, "policy_id": null}
 ```
+
+`policy_id` names the policy a message is about, and is null otherwise.
+Today only the learn message sets it (below).
 
 `from` and `to` are one of `agent:brief_reader`, `agent:mapper`, `agent:preparer`, `agent:reviewer`, `system:gateway`, and `human:controller`.
 `kind` is one of these:
@@ -496,7 +500,7 @@ data: {"id": "msg_002", "deal_id": "d_kequ_nuaire", "at": "<iso timestamp>", "fr
 | --- | --- | --- |
 | `message` | A statement: a proposal, a tool run's figure, a learned policy, the agent's own reason | Gateway to Preparer: "leverage: 0.76x" (with `run_id`) |
 | `handoff` | Work passes to the next role | Mapper to Preparer: "Mappings posted: 53 lines ready to combine; the controller answered 2 questions" |
-| `question` | An escalation to the controller, always `to` `human:controller`, with the flag or approval item as `item_id` | Mapper to Controller: the flag's own question |
+| `question` | An escalation to the controller, always `to` `human:controller`, with the flag or approval item as `item_id` | Mapper to Controller: "Decision 1 of 2: ..." (shape below) |
 | `answer` | The controller's answer, always `from` `human:controller`, back to the agent that asked, with the same `item_id` | Controller to Mapper: "Option b: Only the PNC term loan and revolver count" |
 | `refusal` | The gateway refused a write, with its reason | Gateway to Mapper: "Refused: tag not_debt on ... is the controller's call: ..." |
 | `check` | A check that passed or found a problem | Reviewer to Preparer: "Tie-out passes (run_017), limit test passes (run_018): leverage 0.76x against 2.50x" |
@@ -505,7 +509,32 @@ data: {"id": "msg_002", "deal_id": "d_kequ_nuaire", "at": "<iso timestamp>", "fr
 `run_id` names the tool run a message's figures come from.
 Every figure in a message is formatted from the run it cites (or from runs that run is built on), and the only figure without a run is the Brief's limit (verified by `test_every_figure_in_a_message_equals_the_run_it_cites`).
 Leverage is written from the unrounded quotient of the run's debt and EBITDA, like the flag effects, so the conversation and the cards agree in the second decimal.
-Texts are one line, plain hyphens only, at most 300 characters; a model's reason is cut to fit.
+Texts are one line, plain hyphens only, at most 300 characters (700 for a Mapper question and a learn message); a model's reason is cut to fit.
+
+A Mapper question states exactly what is decided, each option with its effect, and what happens next, written by the gateway once the options' what-ifs ran:
+"Decision 1 of 2: " (or "Decision needed: " when it is the only one), the flag's own question, then each option: a covenant option with its leverage from its own run chain ("a) The whole line counts: leverage 2.84x as filed, over the 2.50x limit; b) Only the PNC term loan and revolver count: 0.76x, under; ..."), a mapping option with where the line would go ("a) Cash and cash equivalents; b) Other assets; c) Leave unmapped and list it"), then "Default b, the agreement's reading." for a covenant flag or "Debt, EBITDA, and leverage do not change with this answer." for a mapping flag, and "The Preparer waits for your answer." (or "for both answers", "for all N answers").
+Its figures are the options' runs, the flagged lines' filed amounts, and the Brief's limit (verified by `test_every_figure_in_a_message_equals_the_run_it_cites`).
+The flag item's `payload.next_step` holds the last sentence, and a mapping option's `effect` ends "No change to debt, EBITDA, or leverage."
+The flag's `question` stays the one line the notification shows.
+
+Right after each answer, the agent that asked tells the controller what it learned: a `message` from `agent:mapper` to `human:controller`, with the answer's item as `item_id` and the first policy it taught as `policy_id`.
+A covenant answer: "Learned p_001 to p_005 (Kewaunee, Senior Funded Bank Debt): 'Financing liability: PNC Revolving Credit Facility' and 'Financing liability: PNC Term Loan' count; 'Current portion of financing liability', ... do not count. Applying it now; 1 question still open (wi_003), and the Preparer starts once it is answered."
+A mapping answer: "Learned p_006: Nu Aire's 'Certificates of Deposit' goes to 'Cash and cash equivalents'. Applying it now, and to this line on later deals without asking. The Preparer is next."
+A flag answer's policies are company-scoped (D18): "later deals" means deals with this company's line.
+Then the run continues and the Mapper's hand-off to the Preparer follows.
+
+### Live events: notify
+
+A `notify` event comes with each question to the controller, for the console to show as a notification:
+
+```
+event: notify
+data: {"id": "msg_005", "deal_id": "d_kequ_nuaire", "at": "<iso timestamp>", "kind": "decision", "item_id": "wi_002", "from": "agent:mapper", "title": "The Mapper needs your decision", "body": "<the flag's one-line question>"}
+```
+
+`id` and `at` are the question message's, so the pair is unique even after a reset restarts the ids.
+`from` is the agent that asked (the title names it: Mapper, Preparer, Reviewer, Brief Reader, or Gateway), and `body` is the work item's `question`; the conversation message has the options.
+It is sent only while the item is still open (`NEEDS_INFO`), so a page that connects after the answer replays the question in the conversation but gets no notification.
 
 Where the messages come from.
 The gateway writes each one in the same write as the thing it describes, so a message is never ahead of the record and never says what did not happen:
@@ -517,8 +546,8 @@ The gateway writes each one in the same write as the thing it describes, so a me
 | The gateway accepts it | A `check` back to the agent: mappings and tags accepted, and how many a learned policy decided; every figure traced to its runs; citations checked |
 | The gateway refuses anything (`_deny`) | A `refusal` to the actor, with the refusal reason |
 | An agent's tool run (`run_tool`, `read_agreement`) | Gateway to the agent with the run's figure and `run_id`; the system's what-ifs and recomputes are summed up by the message that uses them instead |
-| A flag opens (Mapper, Brief Reader or Gateway, Preparer) or the Reviewer finds a problem | A `question` to the controller with the item id |
-| The controller answers, amends a Brief field, holds, rejects, or reverses | The `answer` (or a message) to the agent that asked; one message for the policies the answer taught |
+| A flag opens (Mapper, Brief Reader or Gateway, Preparer) or the Reviewer finds a problem | A `question` to the controller with the item id (and a `notify` event on the stream) |
+| The controller answers, amends a Brief field, holds, rejects, or reverses | The `answer` (or a message) to the agent that asked; then the agent's learn message to the controller, with `policy_id` |
 | The Reviewer's review is stored | Reviewer to Preparer `check`, then Reviewer to Controller: `handoff` "Ready for your approval" (pass) or a `question` (needs attention) |
 | The controller approves, edits, gives a reason, or undoes an edit | Controller to Gateway, then the Gateway's reply: posted, or "Recomputed after edit ..." |
 | The job runner retries a refused model result or falls back to scripted | Gateway to the agent, through `Gateway.note` |
@@ -545,11 +574,44 @@ A live model returns all its mappings at once, so they are sent in the order the
 
 ### Demo pace
 
-`DEMO_PACE` (default off) makes the job runner wait a little on the scripted and replay backends, so the demo plays at a speed people can follow (`backend/app/agents/pace.py`).
-`DEMO_PACE=1` is human speed; 0.5 halves each wait and 2 doubles it (capped at 5).
-The waits at `DEMO_PACE=1`: 2.5 s when an agent picks up its work item, 1.0 s before each tool call it makes, 0.3 s after each mapping is stored, 1.5 s before each question opens, and 1.0 s after a result is stored.
-On the demo deal that is about 22 s from Run to the two questions (53 mappings) and about 13 s from the last answer to "Ready for your approval" (Preparer 7.5 s, Reviewer 5.5 s), measured on uvicorn on 2026-10-24 as 23 s and 12 s.
-The waits are never inside the gateway's checks, a live model backend (`droid`, `anthropic`) gets none, and under pytest the pace is off unless a test turns it on.
+The job runner waits a little on the scripted and replay backends, so a demo run plays at a speed people can follow (`backend/app/agents/pace.py`).
+Two switches:
+- `"pace"` on `POST /deals/{id}/run`: `demo`, `human`, or `off` for that run and for the run the controller's answer continues (kept per deal in `Gateway.run_pace`).
+- `DEMO_PACE` (default off), for runs that ask no pace: a factor on the `human` profile; 1 is human speed, 0.5 halves each wait and 2 doubles it (capped at 5).
+
+| Wait | `human` | `demo` |
+| --- | --- | --- |
+| An agent picks up its work item | 2.5 s | 1.2 s |
+| Before each tool call it makes | 1.0 s | 0.6 s |
+| While the mappings are stored | 0.3 s after each | 4.0 s for the whole list |
+| Once, before the questions open | 1.5 s | 0.8 s |
+| After a result is stored | 1.0 s | 0.6 s |
+
+Measured on uvicorn on 2026-10-24 evening on the demo deal (scripted, memory store, agent time only):
+- `demo`: 6.25 s from Run to the two questions and 6.64 s from the last answer to "Ready for your approval", 12.9 s in all.
+- `human`: 20.1 s and 12.1 s.
+
+The waits are never inside the gateway's checks and never under its lock: `store_mapping` writes the checks, each mapping, and the questions as separate writes and waits between them, so an answer or a read is never kept waiting by the stream (verified by `test_demo_pace.py`, whose fake clock tries the lock during every wait).
+A live model backend (`droid`, `anthropic`) gets none, and under pytest the pace is off unless a test turns it on.
+If a Mapper run is cut off mid-write (a restart), the next Mapper result replaces its mappings (`mapping:discard`) and closes the cut-off item as REJECTED, so no target line is counted twice.
+
+### Seeded cases
+
+`backend/app/db/fixtures/cases.py` seeds four cases besides the live demo deal, in a background thread after startup, so `/health` answers at once.
+`DEMO_CASES` (default on; `0` turns it off) controls it; under pytest it is off unless a test asks (`create_app(demo_cases=True)`).
+Each case runs through the real pipeline on the scripted backend with no pace: the scripted Mapper reads the case's reference mapping (`DealPlan` in `backend/app/agents/backends/scripted.py`, with policies applied first), the Preparer and the Reviewer call the tools, and the controller's steps are the gateway calls the console makes.
+
+| Deal id | Case | `data_source` | Stage |
+| --- | --- | --- | --- |
+| `d_dlh_grsi` | DLH Holdings acquires GRSi | `filings` | `posted`, after the covenant answer and one reasoned remap edit (a platform policy for DLH) |
+| `d_mama_crown` | Mama's Creations acquires Crown I | `filings` | `awaiting_approval` |
+| `d_sstk_envato` | Shutterstock acquires Envato | `filings` | `awaiting_flag` (the IFRS 16 lease question) |
+| `d_dlh_craigs` | DLH acquires Craig's Design and Landscaping | `sample` | `posted`; the Mapper reuses DLH's prior-loan policy from `d_dlh_grsi` (`policy:apply`) |
+
+Seeding is idempotent: a case already in the store, such as one a Postgres ledger loaded, is never touched.
+While a case seeds, its deal id is in `Gateway.running`, so a Run on it gets 409.
+No case's policy or adjustment covers Kewaunee or Nu Aire (`assert_demo_deal_untouched`), so the live demo deal always asks its questions on a fresh run.
+The sources of each real case are in its fixture's header; the sample's platform lines are the posted `d_dlh_grsi` books, read from that case's consolidate run.
 
 ## Stages
 
