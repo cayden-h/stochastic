@@ -3,12 +3,15 @@
 Tables hold exact facts.
 The rule "vectors find, tables decide" still holds, but the MVP has no vector search and no vector table.
 The table names below are a design proposal and can change in the build [inferred].
-The tables are `deal`, `source_line`, `mapping`, `work_item`, `result`, `tool_run`, `audit_log`, `policy`, and `agent_session`. The code is `backend/app/db/memory.py` and the Pydantic models in `backend/app/core/models.py` (2026-10-24).
-The earlier framing had document, chunk, fact, clause, plan, and simulation tables. They are archived and are not used.
+The tables are `deal`, `source_line`, `mapping`, `work_item`, `result`, `tool_run`, `audit_log`, `policy`, and `agent_session`.
+The code is `backend/app/db/memory.py` and the Pydantic models in `backend/app/core/models.py` (2026-10-24).
+The earlier framing had document, chunk, fact, clause, plan, and simulation tables.
+They are archived and are not used.
 
 Tags: [verified] means a source file or filing shows it. [inferred] means it is our design judgment.
 All amounts in example rows are PLACEHOLDER unless the text says the figure is in `../research/real-deal-candidates.md`.
-The example rows use the Kewaunee Scientific and Nu Aire deal. The deal closed 2024-11-01 for $55M. [verified: `../research/real-deal-candidates.md`]
+The example rows use the Kewaunee Scientific and Nu Aire deal.
+The deal closed 2024-11-01 for $55M. [verified: `../research/real-deal-candidates.md`]
 
 ## 1. Overview
 
@@ -98,12 +101,14 @@ The links in the diagram are logical.
 
 ## 2. Tables
 
-Types are Postgres types. The memory store uses the matching Python types.
+Types are Postgres types.
+The memory store uses the matching Python types.
 "Gateway only" means only the gateway writes the table. [verified: `../STOCHASTIC.md`, section 9]
 
 ### 2.1 `deal`
 
-One row per add-on deal. The MVP has one row.
+One row per add-on deal.
+The MVP has one row.
 
 | Column | Type | Constraints | Meaning |
 | --- | --- | --- | --- |
@@ -112,7 +117,8 @@ One row per add-on deal. The MVP has one row.
 | `stage` | text | not null | Where the deal is in the workflow |
 | `brief` | text | not null | The lender's limit and the covenant definitions of debt and EBITDA |
 
-Note: the existing `Deal` model in `backend/app/core/models.py` also has a `situation` field from the earlier framing. Drop it, or keep it as free text. [inferred]
+Note: the existing `Deal` model in `backend/app/core/models.py` also has a `situation` field from the earlier framing.
+Drop it, or keep it as free text. [inferred]
 
 Example row:
 
@@ -125,7 +131,8 @@ The stage names are [inferred].
 
 ### 2.2 `source_line`
 
-One row per statement line of each company. Rows are never changed after load.
+One row per statement line of each company.
+Rows are never changed after load.
 
 | Column | Type | Constraints | Meaning |
 | --- | --- | --- | --- |
@@ -156,11 +163,13 @@ Example rows:
 
 The amounts in `sl_001` to `sl_005` are in the research file. [verified]
 The amount in `sl_006` is not in the research file.
-The cash flow figure does not fit the two sections cleanly. Add a `cash_flow` section if the build needs it. [inferred]
+The cash flow figure does not fit the two sections cleanly.
+Add a `cash_flow` section if the build needs it. [inferred]
 
 ### 2.3 `mapping`
 
-One row per target line. It says which platform line the target line goes to.
+One row per target line.
+It says which platform line the target line goes to.
 
 | Column | Type | Constraints | Meaning |
 | --- | --- | --- | --- |
@@ -175,8 +184,11 @@ One row per target line. It says which platform line the target line goes to.
 
 Rules:
 - A mapping with `flagged` true is not usable until `approved_by` is set. [verified: previous version of this file]
-- Check: `flagged` is false or `approved_by` is not null before the Preparer reads it. The gateway enforces this, not a database check. [inferred]
-- The existing API shape in `gateway-and-api.md` uses `target_line` and `platform_line` as names. The table stores ids. The API can join them. [inferred]
+- Check: `flagged` is false or `approved_by` is not null before the Preparer reads it.
+  The gateway enforces this, not a database check. [inferred]
+- The existing API shape in `gateway-and-api.md` uses `target_line` and `platform_line` as names.
+  The table stores ids.
+  The API can join them. [inferred]
 
 Example rows:
 
@@ -190,12 +202,16 @@ Example rows:
 
 The three Note 2 reclasses and the amounts $0.9M, $0.2M, and $0.3M are [verified: `../research/real-deal-candidates.md`].
 Note 2 is preliminary and the fiscal years differ, so it is an answer key for shape, not to the dollar. [verified]
-Confidence values are not in any source. They come from the Mapper at run time.
-For `m_005` the flagged line is on the platform side. The model needs a way to flag a platform line that holds two kinds of debt. A proposed way: the flag work item holds the `source_line` id in its payload, and `mapping` is not used for it. [inferred]
+Confidence values are not in any source.
+They come from the Mapper at run time.
+For `m_005` the flagged line is on the platform side.
+The model needs a way to flag a platform line that holds two kinds of debt.
+A proposed way: the flag work item holds the `source_line` id in its payload, and `mapping` is not used for it. [inferred]
 
 ### 2.4 `work_item`
 
-One row per unit of work or human question. Matches the existing `WorkItem` model, with `escalation` dropped. [verified: `models.py`]
+One row per unit of work or human question.
+Matches the existing `WorkItem` model, with `escalation` dropped. [verified: `models.py`]
 
 | Column | Type | Constraints | Meaning |
 | --- | --- | --- | --- |
@@ -214,8 +230,10 @@ One row per unit of work or human question. Matches the existing `WorkItem` mode
 | `created_at` | timestamptz | not null | |
 | `reverses_id` | text | null, foreign key to `work_item.id` | Proposed: the item this one reverses |
 
-The existing model also has an `escalation` field from the earlier framing. Drop it or leave it null. [verified: `models.py`, `gateway-and-api.md`]
-The main text of the previous version listed `evidence` inside the `payload` and not as a column. The existing model has `evidence` as its own field, so this version keeps it. [verified: `models.py`]
+The existing model also has an `escalation` field from the earlier framing.
+Drop it or leave it null. [verified: `models.py`, `gateway-and-api.md`]
+The main text of the previous version listed `evidence` inside the `payload` and not as a column.
+The existing model has `evidence` as its own field, so this version keeps it. [verified: `models.py`]
 
 Example row (the flag):
 
@@ -252,11 +270,13 @@ One row per combined result that a human can approve.
 | `run_ids` | jsonb | not null | List of math run ids |
 
 Rules:
-- Every `rows` entry has a `run_id`. The gateway rejects a number with no run id (422). [verified: `gateway-and-api.md`, a new check]
+- Every `rows` entry has a `run_id`.
+  The gateway rejects a number with no run id (422). [verified: `gateway-and-api.md`, a new check]
 - The `limit` comes from the brief, not from the model. 2.50x comes from Section 4.8(a) of the PNC credit agreement. [verified: `../research/real-deal-candidates.md`]
 - A result cannot be approved while `review.verdict` is `needs_attention`. [verified: `gateway-and-api.md`, a new check]
 
-Example row. The values are PLACEHOLDER because the leverage ratio is not computed yet. [verified: `../STOCHASTIC.md`, section 12]
+Example row.
+The values are PLACEHOLDER because the leverage ratio is not computed yet. [verified: `../STOCHASTIC.md`, section 12]
 
 ```json
 {
@@ -275,12 +295,15 @@ Example row. The values are PLACEHOLDER because the leverage ratio is not comput
 ```
 
 The platform value 203,755 is Kewaunee fiscal 2024 net sales in thousands. [verified]
-It is for the year to 2024-04-30, so it does not line up in time with the Nu Aire September year. See section 7.
-A real row would hold numbers, not the word PLACEHOLDER. The word is here only because the numbers are not computed.
+It is for the year to 2024-04-30, so it does not line up in time with the Nu Aire September year.
+See section 7.
+A real row would hold numbers, not the word PLACEHOLDER.
+The word is here only because the numbers are not computed.
 
 ### 2.6 `audit_log`
 
-One row per action, allowed or denied. Matches the existing `AuditRow` model. [verified: `models.py`]
+One row per action, allowed or denied.
+Matches the existing `AuditRow` model. [verified: `models.py`]
 
 | Column | Type | Constraints | Meaning |
 | --- | --- | --- | --- |
@@ -304,11 +327,14 @@ Example rows:
 | 41 | `human:controller` | `answer` | `wi_003` | ALLOWED | option chosen |
 | 42 | `agent:preparer` | `approve` | `wi_005` | DENIED | the proposer cannot approve its own item |
 
-Row 42 matches the example in `gateway-and-api.md`. The demo does not stage it. [verified: `../STOCHASTIC.md`, section 9]
+Row 42 matches the example in `gateway-and-api.md`.
+The demo does not stage it. [verified: `../STOCHASTIC.md`, section 9]
 
 ### 2.7 `tool_run`
 
-One row per math tool call. Every number on screen traces to one of these. Written by the gateway in `run_tool`.
+One row per math tool call.
+Every number on screen traces to one of these.
+Written by the gateway in `run_tool`.
 
 | Column | Type | Meaning |
 | --- | --- | --- |
@@ -322,7 +348,9 @@ One row per math tool call. Every number on screen traces to one of these. Writt
 
 ### 2.8 `policy` (agent memory)
 
-What an agent learned from the controller. Written by the gateway when a flag is answered. Survives a deal reset.
+What an agent learned from the controller.
+Written by the gateway when a flag is answered.
+Survives a deal reset.
 
 | Column | Type | Meaning |
 | --- | --- | --- |
@@ -375,10 +403,14 @@ This is the shape in the code. [verified: `backend/app/db/memory.py`, 2026-10-24
 
 Rules for the swap:
 - Postgres sits behind the same store interface, so the API does not change. [verified: previous version of this file]
-- Pydantic models stay the single definition of shape. The tables follow them. [inferred]
-- The gateway keeps the same logic. Only the store class changes. [inferred]
+- Pydantic models stay the single definition of shape.
+  The tables follow them. [inferred]
+- The gateway keeps the same logic.
+  Only the store class changes. [inferred]
 - Each gateway write becomes one transaction: the change and its audit row commit together, or neither does. [inferred, from the workshop: log "in the same commit as the change"; `../hyphenate-workshop.md`]
-- Built on 2026-10-24 as a write-through store: the memory store stays the working set, and a writer thread commits each gateway write with its audit rows in one transaction, behind the request. The tables are generic (`record` holds one JSONB body per model) rather than the per-table design in section 2, and `audit_log` is a TimescaleDB hypertable. Details in `../../backend/app/db/README.md`. [verified: `backend/tests/test_postgres_store.py`]
+- Built on 2026-10-24 as a write-through store: the memory store stays the working set, and a writer thread commits each gateway write with its audit rows in one transaction, behind the request.
+  The tables are generic (`record` holds one JSONB body per model) rather than the per-table design in section 2, and `audit_log` is a TimescaleDB hypertable.
+  Details in `../../backend/app/db/README.md`. [verified: `backend/tests/test_postgres_store.py`]
 
 ### 3.3 A fork to compare two answers
 
@@ -389,7 +421,8 @@ Free-tier fork limits are not confirmed. [inferred]
 
 ## 4. Indexes to add
 
-Only if the Postgres swap happens. The memory store needs none.
+Only if the Postgres swap happens.
+The memory store needs none.
 
 | Table | Index | Why |
 | --- | --- | --- |
@@ -406,7 +439,8 @@ Only if the Postgres swap happens. The memory store needs none.
 | `audit_log` | unique (`hash`) | Detects a copied row |
 | `audit_log` | (`result`) where `result` = 'DENIED' | Lists denied attempts |
 
-Do not add GIN indexes on JSONB for the MVP. The data is too small. [inferred]
+Do not add GIN indexes on JSONB for the MVP.
+The data is too small. [inferred]
 
 ## 5. The audit log: append-only and hash chain
 
@@ -443,24 +477,36 @@ The hashed body is a JSON object with these nine fields plus `prev_hash`:
 | `hash` | no | It is the output |
 
 The method:
-1. Build a dictionary of the nine fields. `evidence` is a list of dictionaries made with `model_dump()`.
+1. Build a dictionary of the nine fields.
+   `evidence` is a list of dictionaries made with `model_dump()`.
 2. Add `prev_hash`.
 3. Write it as JSON with sorted keys, converting non-JSON values (such as the time) with `str`.
 4. Take the SHA-256 of the UTF-8 bytes and write it as hex.
 
-What is not hashed: the work item `payload`, the result `rows`, and the state of any other table. The chain proves the order and content of the log. It does not hash the data tables. [verified: code]
+What is not hashed: the work item `payload`, the result `rows`, and the state of any other table.
+The chain proves the order and content of the log.
+It does not hash the data tables. [verified: code]
 To tie a log row to a data row, `target` holds the item or result id, and `evidence` holds quotes. [inferred]
 
 ### 5.3 Verification
 
-`verify_chain` walks the log from the first row. For each row it checks that `prev_hash` equals the last hash and that the stored `hash` equals a recomputed hash. A change in any past row breaks every row after it. [verified: code]
+`verify_chain` walks the log from the first row.
+For each row it checks that `prev_hash` equals the last hash and that the stored `hash` equals a recomputed hash.
+A change in any past row breaks every row after it. [verified: code]
 `GET /health` and `GET /deals/{id}/audit` report `chain_valid`. [verified: `gateway-and-api.md`]
 
 Notes from reading the code:
-- The chain is one chain for the whole log, across all deals. `id` is the length of the list plus one. The query for one deal reads a subset, but the check always walks the full chain. [verified: code]
-- In Postgres, taking `prev_hash` and `id` for a new row needs a lock or a serializable transaction, so two writers do not fork the chain. Use `SELECT ... FOR UPDATE` on the last row, or an advisory lock. [inferred]
-- The time `at` is hashed as a string. In Postgres, the string form must be stable when the row is read back (same timezone and precision), or the check fails. Store and hash the ISO form with microseconds in UTC. [inferred]
-- The hash is not signed. Someone who can rewrite the whole log can rebuild the chain. For a stronger guarantee, publish the last hash outside the database. [inferred]
+- The chain is one chain for the whole log, across all deals.
+  `id` is the length of the list plus one.
+  The query for one deal reads a subset, but the check always walks the full chain. [verified: code]
+- In Postgres, taking `prev_hash` and `id` for a new row needs a lock or a serializable transaction, so two writers do not fork the chain.
+  Use `SELECT ... FOR UPDATE` on the last row, or an advisory lock. [inferred]
+- The time `at` is hashed as a string.
+  In Postgres, the string form must be stable when the row is read back (same timezone and precision), or the check fails.
+  Store and hash the ISO form with microseconds in UTC. [inferred]
+- The hash is not signed.
+  Someone who can rewrite the whole log can rebuild the chain.
+  For a stronger guarantee, publish the last hash outside the database. [inferred]
 
 ## 6. How a result number traces back to source lines: a worked trace
 
@@ -468,14 +514,19 @@ The numbers in this trace are PLACEHOLDER unless a figure is in `../research/rea
 Question: where does the combined "Net sales" number in `r_001` come from?
 
 1. **Result row.** `result r_001`, `rows[0]` is `{line: "Net sales", platform: 203755, target: PLACEHOLDER, combined: PLACEHOLDER, run_id: "run_021"}`.
-2. **Run id.** `run_021` names one call of the consolidation tool. The tool run records its inputs: the ids of the source lines and the ids of the mappings it used. [inferred: the run record is not built yet]
+2. **Run id.** `run_021` names one call of the consolidation tool.
+   The tool run records its inputs: the ids of the source lines and the ids of the mappings it used. [inferred: the run record is not built yet]
 3. **Platform input.** `source_line sl_003`: Kewaunee, Net sales, 2024-04-30, 203,755 (USD thousands), source `8-K/A Ex 99.2`. [verified figure]
 4. **Target input.** A Nu Aire revenue line, such as `sl_001` (Net revenues, 2024-09-30, 74,850,302 USD, source `8-K/A Ex 99.1`). [verified figure]
-5. **Mapping.** `mapping` joins the Nu Aire line to Kewaunee's Net sales line. Its `confidence`, `reason`, and `approved_by` (null if it was not flagged) say how the match was made.
-6. **Unit step.** The tool converts USD to USD thousands before adding. The run record keeps the factor. [inferred]
-7. **Flag, if any.** If a mapping was flagged, the `work_item` of type `flag` holds the question, the options, and the answer, with the human's actor id. Net sales has no flag in this example.
+5. **Mapping.** `mapping` joins the Nu Aire line to Kewaunee's Net sales line.
+   Its `confidence`, `reason`, and `approved_by` (null if it was not flagged) say how the match was made.
+6. **Unit step.** The tool converts USD to USD thousands before adding.
+   The run record keeps the factor. [inferred]
+7. **Flag, if any.** If a mapping was flagged, the `work_item` of type `flag` holds the question, the options, and the answer, with the human's actor id.
+   Net sales has no flag in this example.
 8. **Log.** `audit_log` rows for these ids show who did each step and when: `agent:mapper` proposed, `human:controller` answered, `agent:preparer` proposed the result, `agent:reviewer` returned its verdict, `human:controller` approved, `system:gateway` posted.
-9. **Filing.** `source_ref` names the exhibit. The controller opens the filing and finds the line.
+9. **Filing.** `source_ref` names the exhibit.
+   The controller opens the filing and finds the line.
 
 For the flagged line, the trace is longer:
 1. A combined debt number in `result.rows` has a run id from the debt tool.
@@ -483,38 +534,56 @@ For the flagged line, the trace is longer:
 3. `wi_003.answer` says which option the controller picked, and `audit_log` says who and when.
 4. The brief on `deal d_001` holds the definition of Senior Funded Bank Debt, from Ex 10.1.
 
-The date mismatch shows up in the trace. The source lines for the two companies have different `period` values (April 2024 for Kewaunee's pro forma table, September 2024 for Nu Aire's audited statements). The trace makes this visible, and the demo says it out loud. [verified: `../research/real-deal-candidates.md`]
+The date mismatch shows up in the trace.
+The source lines for the two companies have different `period` values (April 2024 for Kewaunee's pro forma table, September 2024 for Nu Aire's audited statements).
+The trace makes this visible, and the demo says it out loud. [verified: `../research/real-deal-candidates.md`]
 
-A reverse trace works too: start from a filing exhibit, find `source_line.source_ref`, then the mappings that use the line, then the results whose run ids list it. This needs an index on the run record. [inferred]
+A reverse trace works too: start from a filing exhibit, find `source_line.source_ref`, then the mappings that use the line, then the results whose run ids list it.
+This needs an index on the run record. [inferred]
 
 ## 7. Retention and reversal
 
 Retention:
-- Keep every row of every table for the life of the deal. The system never deletes. [verified: `../STOCHASTIC.md`, section 9]
-- The `audit_log` is kept longer than any other table. If a legal or lender rule sets a period, it applies. The period is not known. [inferred]
-- The demo store is memory only, so a restart loses it. `POST /dev/reset` reseeds it. [verified: `gateway-and-api.md`]
-- Cached filings live in `data/` and stay out of git. Whether we may redistribute them is unresolved. [verified: `../STOCHASTIC.md`, section 10]
+- Keep every row of every table for the life of the deal.
+  The system never deletes. [verified: `../STOCHASTIC.md`, section 9]
+- The `audit_log` is kept longer than any other table.
+  If a legal or lender rule sets a period, it applies.
+  The period is not known. [inferred]
+- The demo store is memory only, so a restart loses it.
+  `POST /dev/reset` reseeds it. [verified: `gateway-and-api.md`]
+- Cached filings live in `data/` and stay out of git.
+  Whether we may redistribute them is unresolved. [verified: `../STOCHASTIC.md`, section 10]
 
 Reversal:
-- A reversal is a new `work_item` linked to the original by `reverses_id`. The original moves to REVERSED, and no row is deleted. [verified: `../STOCHASTIC.md`, section 9; `agents-and-work-items.md`]
+- A reversal is a new `work_item` linked to the original by `reverses_id`.
+  The original moves to REVERSED, and no row is deleted. [verified: `../STOCHASTIC.md`, section 9; `agents-and-work-items.md`]
 - The state path is `POSTED` to `REVERSED`, then the corrected item is posted. [verified: `agents-and-work-items.md`]
-- The old `result` row stays. A new `result` row holds the corrected numbers, with its own run ids.
-- The existing gateway has no reverse method. This is one of the four known gaps. [verified: `../TASKS.md`, Cayden task 4]
-- A wrong mapping is fixed the same way: a new `mapping` row version, and a new result. Proposed: add `superseded_by` on `mapping`, so the old row stays. [inferred]
+- The old `result` row stays.
+  A new `result` row holds the corrected numbers, with its own run ids.
+- The existing gateway has no reverse method.
+  This is one of the four known gaps. [verified: `../TASKS.md`, Cayden task 4]
+- A wrong mapping is fixed the same way: a new `mapping` row version, and a new result.
+  Proposed: add `superseded_by` on `mapping`, so the old row stays. [inferred]
 - A reversal writes its own audit row, linked to the original item id in `target`.
 
 ## 8. What is intentionally not stored
 
 - **Model reasoning and chat text.** We store the typed result, a short `reason`, and a short session transcript summary per role, not the model's full output. [verified: `../STOCHASTIC.md`, section 7]
-- **Numbers made by a model.** The model never writes a number into any table. Every number comes from a math tool run. [verified: `../STOCHASTIC.md`, section 11]
-- **Trial balances and account-level detail.** Public filings give statement lines, not accounts. Any account-level detail would be synthetic, so the demo does not claim it. [verified: `../research/real-deal-candidates.md`]
+- **Numbers made by a model.** The model never writes a number into any table.
+  Every number comes from a math tool run. [verified: `../STOCHASTIC.md`, section 11]
+- **Trial balances and account-level detail.** Public filings give statement lines, not accounts.
+  Any account-level detail would be synthetic, so the demo does not claim it. [verified: `../research/real-deal-candidates.md`]
 - **Vectors and embeddings.** The MVP has no vector search. [verified: `../STOCHASTIC.md`, section 10]
-- **The raw filings.** We keep the line values and a `source_ref`, not the HTML or PDF. Cached filings stay in `data/` and out of git. [verified: `../STOCHASTIC.md`, section 10]
-- **Credentials and keys.** `FACTORY_API_KEY` and the Anthropic key live in `.env` only. No table holds a secret. [verified: `../STOCHASTIC.md`, section 14]
-- **People and accounts.** There is no login, user table, or profile. An actor is a string like `human:controller`. [verified: `../STOCHASTIC.md`, section 13 cut list]
+- **The raw filings.** We keep the line values and a `source_ref`, not the HTML or PDF.
+  Cached filings stay in `data/` and out of git. [verified: `../STOCHASTIC.md`, section 10]
+- **Credentials and keys.** `FACTORY_API_KEY` and the Anthropic key live in `.env` only.
+  No table holds a secret. [verified: `../STOCHASTIC.md`, section 14]
+- **People and accounts.** There is no login, user table, or profile.
+  An actor is a string like `human:controller`. [verified: `../STOCHASTIC.md`, section 13 cut list]
 - **Other deals and other situations.** The tables could hold more deals, but the MVP loads one. [verified: cut list]
 - **Purchase accounting beyond a "provisional" label.** There is no purchase price allocation table. [verified: cut list]
-- **Intercompany schedules.** The MVP may seed one example. It has no schedule table. [verified: cut list]
+- **Intercompany schedules.** The MVP may seed one example.
+  It has no schedule table. [verified: cut list]
 - **Old framing tables.** Plan, fact, clause, document, chunk, and simulation tables are archived. [verified: previous version of this file]
 - **Live SEC responses.** The demo makes no live SEC calls, so no API response cache table is needed. [verified: `../STOCHASTIC.md`, section 10]
 - **Hash of data tables.** The hash chain covers the audit log only. [verified: code]

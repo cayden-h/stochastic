@@ -1,11 +1,14 @@
 # data
 
 Cached public filings go here, such as the Kewaunee and Nu Aire filings, and the two input CSV files built from them.
-The folder contents are git-ignored. Only this file is tracked.
+The folder contents are git-ignored.
+Only this file is tracked.
 
 Rules:
-- Cache everything before the demo. The demo makes no live SEC calls.
-- Send a real contact email in the SEC User-Agent. Do not exceed 10 requests per second.
+- Cache everything before the demo.
+  The demo makes no live SEC calls.
+- Send a real contact email in the SEC User-Agent.
+  Do not exceed 10 requests per second.
 - The SEC redistribution wording is unresolved, so do not publish the cached files.
 
 ## The Dashboard's seeded cases
@@ -26,9 +29,11 @@ The raw files were fetched with the `SEC_USER_AGENT` from `.env` on 2026-10-24 a
 
 ## CSV columns for POST /deals
 
-The API parses uploads with `backend/app/db/loader.py`. The export from `scripts/load_lines.py export` is in this format, with two extra columns (`company`, `note`) that the API ignores; `scripts/load_lines.py` is for exporting the fixture, checking the round-trip, and reading accounting-system exports, not for the API.
+The API parses uploads with `backend/app/db/loader.py`.
+The export from `scripts/load_lines.py export` is in this format, with two extra columns (`company`, `note`) that the API ignores; `scripts/load_lines.py` is for exporting the fixture, checking the round-trip, and reading accounting-system exports, not for the API.
 
-With the CSVs, send either `brief` (a JSON string of the Brief) or `agreement_txt`, exactly one. `agreement_txt` is the credit agreement as a UTF-8 `.txt` file of at most 2 MB.
+With the CSVs, send either `brief` (a JSON string of the Brief) or `agreement_txt`, exactly one.
+`agreement_txt` is the credit agreement as a UTF-8 `.txt` file of at most 2 MB.
 The Brief Reader drafts the Brief from it, and the controller enters the adjustment amounts from the books (`POST /deals/{id}/brief/amounts`), answers its flags, and approves it (`POST /deals/{id}/brief/approve`) before mapping starts.
 Use a synthetic agreement or excerpts in tests; the cached filings stay out of git.
 

@@ -4,7 +4,8 @@
 
 Stochastic is now a PE add-on integration tool.
 It merges the books of a newly acquired company into the platform company's books, flags the few lines a human must decide, and checks the combined result against the lender's limit.
-Three stateful agents do the work (Mapper, Preparer, Reviewer), code does all the math, and a controller approves. What the controller decides once, the agents keep.
+Three stateful agents do the work (Mapper, Preparer, Reviewer), code does all the math, and a controller approves.
+What the controller decides once, the agents keep.
 The demo uses a real public deal: Kewaunee Scientific buying Nu Aire. [verified: `../STOCHASTIC.md` section 12]
 
 ### How Hyphenate fits now
@@ -22,14 +23,17 @@ Questions to ask at the Friday 7pm workshop:
 ### Which old notes still apply
 
 - The official brief, the prize text, and the four judging questions still apply.
-- The judging notes below still apply. "Would you hire it" is still the make-or-break question.
+- The judging notes below still apply.
+  "Would you hire it" is still the make-or-break question.
 - Anything that describes plan search, Monte Carlo, forks for what-if plans, the eight situations, or the clause reader is from the earlier framing.
 - The earlier "special situations" idea is now roadmap only.
 
 ---
 
 - Prize: "The Hyphenated Enterprise: Autonomous Systems for Finance" - $8,000 / $5,000 / $3,000 for 1st to 3rd, plus an expedited, shortened interview for every member of the top 5 teams.
-- Status: **main track** (team decision 2026-10-15, reconfirmed 2026-10-23). The idea is now Stochastic, special-situations financing, see `../Stochastic/README.md`. Securitization (`../domains/securitization/`) is shelved.
+- Status: **main track** (team decision 2026-10-15, reconfirmed 2026-10-23).
+  The idea is now Stochastic, special-situations financing, see `../Stochastic/README.md`.
+  Securitization (`../domains/securitization/`) is shelved.
 - Brief read: 2026-10-15, full text pasted by the team from the organizers' document (Cal_Hacks_Hyphenate_Track).
 
 ## What they do
@@ -67,9 +71,12 @@ Revenue Accounting, Accounts Receivable, Cash and Treasury, Accounts Payable, Ac
 Each is only an outline; "the exceptions and judgment calls that make the work hard are yours to discover", including by finding the Hyphenate team at the booth.
 
 **How they judge: four questions for every submission.**
-1. Is it real enough? Realistic data, a messy problem, and proof that it works.
-2. Would you hire it? For which seats, and would it earn them: limited access, a clean record of its work, and knowing when to ask?
-3. Did we see something new? A company, problem, or approach not seen made autonomous before.
+1. Is it real enough?
+   Realistic data, a messy problem, and proof that it works.
+2. Would you hire it?
+   For which seats, and would it earn them: limited access, a clean record of its work, and knowing when to ask?
+3. Did we see something new?
+   A company, problem, or approach not seen made autonomous before.
 4. The moment: when it catches what others missed, recovers from something going wrong, or defends a decision when questioned.
 
 **What to submit.**
@@ -137,7 +144,8 @@ The git idea stays recorded in `../ideas.md` as a fallback, not the plan.
 3. **Revenue accounting for amended contracts.** Bundles, ramps, and mid-term amendments become revenue schedules that stay right when a deal changes; the demo changes a deal in June and the system restates March correctly and explains the difference.
 4. **Accruals agent.** Estimates costs for work done but not yet billed, confirms with vendors (a model plays the vendor), and reverses when the bill arrives.
 5. **Close and auditor mode.** Reconciliations and sign-offs for a month, then an auditor model asks for evidence on a random entry and the system reconstructs the full decision trail.
-6. **Cross-cutting layer.** A reusable "accountable agent runtime" with scoped credentials, segregation of duties, and an append-only decision ledger, demoed on one corner. The risk is looking like infrastructure with no company, so keep a concrete corner as the demo.
+6. **Cross-cutting layer.** A reusable "accountable agent runtime" with scoped credentials, segregation of duties, and an append-only decision ledger, demoed on one corner.
+   The risk is looking like infrastructure with no company, so keep a concrete corner as the demo.
 
 Pick the company first for memorability (the brief invites a Formula 1 team, festival, or colony) but keep its books strict.
 

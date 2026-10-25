@@ -16,7 +16,8 @@ Every amount in the fixture matches its filing. [verified]
 - Nu Aire balance sheet, income statement, and D&A $1,830,395: match Ex 99.1.
 - Brief: the 2.50x limit, Section 4.8(a), and both debt exclusions match Ex 10.1.
 
-The fixture leaves out one subtotal, "Total Kewaunee Scientific Corporation Stockholders' Equity" ($59,328K). It does not change any figure. [verified]
+The fixture leaves out one subtotal, "Total Kewaunee Scientific Corporation Stockholders' Equity" ($59,328K).
+It does not change any figure. [verified]
 
 ## Differences in how the EBITDA definition is applied
 
@@ -38,7 +39,9 @@ Three items differ from the fixture.
 
 ## Effect on leverage
 
-Covenant EBITDA today is $28,379K. All three items were applied on 2026-10-24: interest income is subtracted, the pension add-back is the $4,019K termination expense, and stock-based compensation of $1,018K is added back. The option debt figures are unchanged.
+Covenant EBITDA today is $28,379K.
+All three items were applied on 2026-10-24: interest income is subtracted, the pension add-back is the $4,019K termination expense, and stock-based compensation of $1,018K is added back.
+The option debt figures are unchanged.
 
 | Case | EBITDA | a. Whole line | b. PNC only | c. PNC plus seller notes |
 | --- | --- | --- | --- | --- |
@@ -49,13 +52,16 @@ Covenant EBITDA today is $28,379K. All three items were applied on 2026-10-24: i
 
 Option a stays over the 2.50x limit only while covenant EBITDA is below $28,782K. [verified: arithmetic]
 With all three changes, option a is still over the limit, with $403K of EBITDA to spare. [verified: arithmetic]
-Adding the $698K of expected transaction costs would put option a under the limit, and the verdict would no longer change with the controller's answer. We keep them at zero because Ex 99.2 Note 5(b) describes costs expected after 2024-10-31, outside the period of the statements in the fixture. [verified: Ex 99.2, Note 5(b); timing inferred]
+Adding the $698K of expected transaction costs would put option a under the limit, and the verdict would no longer change with the controller's answer.
+We keep them at zero because Ex 99.2 Note 5(b) describes costs expected after 2024-10-31, outside the period of the statements in the fixture. [verified: Ex 99.2, Note 5(b); timing inferred]
 
 ## Asks
 
-- Decided 2026-10-24 by Cayden: apply the stock compensation add-back and the $4,019K pension figure; keep transaction costs at zero. The brief in `backend/app/db/fixtures/kewaunee.py` carries both with their sources.
+- Decided 2026-10-24 by Cayden: apply the stock compensation add-back and the $4,019K pension figure; keep transaction costs at zero.
+  The brief in `backend/app/db/fixtures/kewaunee.py` carries both with their sources.
 - Done 2026-10-24: the EBITDA tool subtracts interest income (`test_ebitda_subtracts_interest_income`).
-- Everyone: the moment now rests on a thinner margin. Say the inferred inputs out loud, as `demo-script.md` already plans.
+- Everyone: the moment now rests on a thinner margin.
+  Say the inferred inputs out loud, as `demo-script.md` already plans.
 
 ## Sensitivity recheck (2026-10-24, Tri)
 

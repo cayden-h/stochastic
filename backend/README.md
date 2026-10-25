@@ -37,5 +37,6 @@ Expect 425 passed and 3 skipped (verified against Tiger Cloud on 2026-10-25, sch
 
 ## Status
 
-The gateway enforces the trust rules and writes a hash-chained audit log. The store is in memory by default; with `STORE=postgres` it writes through to Tiger Cloud and reloads the record on start.
+The gateway enforces the trust rules and writes a hash-chained audit log.
+The store is in memory by default; with `STORE=postgres` it writes through to Tiger Cloud and reloads the record on start.
 The writer is a background thread, so call the store's `flush()` (or wait for `/health` to show `pending: 0`) before you stop a process whose writes you want to keep.

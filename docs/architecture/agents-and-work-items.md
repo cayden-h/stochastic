@@ -34,7 +34,8 @@ stateDiagram-v2
     POSTED --> REVERSED: controller reverses
 ```
 
-A forbidden action is DENIED. It is not a state.
+A forbidden action is DENIED.
+It is not a state.
 The gateway does not apply a denied action, and it writes a row to the audit log.
 The controller's answer to a flag is the approval of that flag, so an answered flag posts at once.
 
@@ -46,15 +47,18 @@ Types are in `backend/app/core/models.py`.
 
 Input: `MapperInput` with the target lines, the platform lines, the brief, the policies it learned, and its session.
 Output: `MapperOutput` with `mappings` (target line id, platform line, confidence, reason, policy id), `tags` (a covenant tag for every balance sheet line), and `flags` (a question, evidence, options, and the tags or platform line each option applies).
-Tools: none. It only proposes.
-Never: guesses a low-confidence match or an unclear tag. Precision before recall.
+Tools: none.
+It only proposes.
+Never: guesses a low-confidence match or an unclear tag.
+Precision before recall.
 
 ### Preparer (senior accountant)
 
 Input: `PreparerInput` with both companies' lines, the usable mappings, the brief, and its session.
 Output: `PreparerOutput` with rows (each with the consolidate run id), ebitda, debt, leverage, limit, run ids.
 Tools: `consolidate`, `ebitda`, `covenant_debt`, `leverage`.
-Never: types a number of its own. The gateway refuses a value that no run produced.
+Never: types a number of its own.
+The gateway refuses a value that no run produced.
 
 ### Reviewer
 
@@ -68,27 +72,39 @@ Never: changes the draft.
 `backend/app/agents/jobs.py`, plain code.
 `advance(gw, deal_id)` does every step that needs no human, then stops:
 
-1. No `map_lines` yet: open one, run the Mapper, store the mapping. The gateway opens a flag per proposal.
-2. A flag is open: stop. The console shows the flag card.
+1. No `map_lines` yet: open one, run the Mapper, store the mapping.
+   The gateway opens a flag per proposal.
+2. A flag is open: stop.
+   The console shows the flag card.
 3. Flags answered and no draft: open `prepare_result`, run the Preparer, store the result.
-4. Draft stored and no review: open `review_result`, run the Reviewer, store the verdict. The gateway opens `approve_result`.
+4. Draft stored and no review: open `review_result`, run the Reviewer, store the verdict.
+   The gateway opens `approve_result`.
 5. Waiting on the controller: stop.
 
-`POST /deals/{id}/run` calls it. Answering the last open flag calls it again in the background.
-The runner holds no state. It can run again at any time and finds the next thing to do.
+`POST /deals/{id}/run` calls it.
+Answering the last open flag calls it again in the background.
+The runner holds no state.
+It can run again at any time and finds the next thing to do.
 
 ## Memory
 
 - `Policy`: role, kind (`covenant_tag` or `mapping`), the normalized line name, the decision, who approved it, the flag it came from, how many times it was applied.
 - `AgentSession`: role, backend, backend session id (Droid resumes it), turns, a short transcript.
-- The gateway writes both. `GET /agents/memory` reads them. `POST /dev/reset` keeps them.
-- The demo moment for memory: reset the deal, run again, and the Mapper asks nothing. The audit log shows `policy:apply` rows.
+- The gateway writes both.
+  `GET /agents/memory` reads them.
+  `POST /dev/reset` keeps them.
+- The demo moment for memory: reset the deal, run again, and the Mapper asks nothing.
+  The audit log shows `policy:apply` rows.
 
 ## The two human moments
 
-- **Flag.** A line is unclear. The console shows the question, the evidence, and the options with their computed effects. The controller chooses.
-- **Approval.** The controller approves the combined result before it posts. The gateway refuses until the Reviewer verdict is pass.
-- **Brief approval (planned, D20).** Before mapping, the controller approves the brief the Brief Reader drafted, with a quote for every field. Mapping and the covenant tools are refused until then.
+- **Flag.** A line is unclear.
+  The console shows the question, the evidence, and the options with their computed effects.
+  The controller chooses.
+- **Approval.** The controller approves the combined result before it posts.
+  The gateway refuses until the Reviewer verdict is pass.
+- **Brief approval (planned, D20).** Before mapping, the controller approves the brief the Brief Reader drafted, with a quote for every field.
+  Mapping and the covenant tools are refused until then.
 
 If the Reviewer finds a tie-out error or a breach of the limit, `approve_result` opens as NEEDS_INFO with the reasons, and the controller rejects it or reverses a flag.
 

@@ -18,7 +18,8 @@ Quotes are 15 words or fewer.
 - Our `ebitda()` hard-codes a base that subtracts interest income.
   Two of the four agreements below do not subtract it, and one is unclear. [verified: section 3]
 - Adjustment amounts mostly do not come from the agreement.
-  The agreement gives the name and the cap. The amount comes from the books. [verified: `backend/app/db/fixtures/kewaunee.py`, where pension 4,019 and stock compensation 1,018 come from the 10-K]
+  The agreement gives the name and the cap.
+  The amount comes from the books. [verified: `backend/app/db/fixtures/kewaunee.py`, where pension 4,019 and stock compensation 1,018 come from the 10-K]
 - Products that read credit agreements extract terms and link to the source.
   We found none that says the model is barred from producing numbers. [inferred: absence of evidence, not proof]
 - Model accuracy on long contracts is far from perfect, so code must check every quote and a person must approve. [verified: CUAD and ContractEval, section 4]
@@ -32,10 +33,15 @@ The text copies were fetched from EDGAR on 2026-10-24 and are not in git (the SE
 - Amended and Restated Credit Agreement, 2023-06-28, $250M revolver, Wells Fargo as agent. [verified: https://www.sec.gov/Archives/edgar/data/1766368/000155837023011571/tmb-20230628xex10.htm]
   The First Amendment (2025-06-26) raised it to $350M; the 10-Q says the other material terms "remained unchanged". [verified: 10-Q below]
 - Covenant, Section 9.15(a): "permit the Consolidated Total Leverage Ratio to be greater than 3.50 to 1.00". [verified]
-  No step-down. After an acquisition over $25M the limit steps up 0.50x for four quarters, at most 4.00x, at most twice. [verified]
-- Debt: all Indebtedness, excluding net hedge obligations. It includes earn-outs, capital leases, and letters of credit drawn or not. No cash netting. [verified]
-- EBITDA base: net income plus interest, taxes, and D&A. Interest income is not subtracted. [verified]
-- Add-backs include non-cash charges, restructuring, transaction costs "not to exceed $2,500,000 per Acquisition", and a fixed CEO transition amount. Several cash add-backs share a cap of 15% of EBITDA, measured before the add-backs. [verified]
+  No step-down.
+  After an acquisition over $25M the limit steps up 0.50x for four quarters, at most 4.00x, at most twice. [verified]
+- Debt: all Indebtedness, excluding net hedge obligations.
+  It includes earn-outs, capital leases, and letters of credit drawn or not.
+  No cash netting. [verified]
+- EBITDA base: net income plus interest, taxes, and D&A.
+  Interest income is not subtracted. [verified]
+- Add-backs include non-cash charges, restructuring, transaction costs "not to exceed $2,500,000 per Acquisition", and a fixed CEO transition amount.
+  Several cash add-backs share a cap of 15% of EBITDA, measured before the add-backs. [verified]
 - Acquired EBITDA counts as if the acquisition happened on the first day of the period. [verified]
 - Other covenants: interest coverage and a capex limit. [verified]
 - Answer key: the 10-Qs report the ratio before and after a real add-on. [verified: we read the 3.47 figure in the September 10-Q text]
@@ -46,22 +52,29 @@ The text copies were fetched from EDGAR on 2026-10-24 and are not in git (the SE
 ### 2.2 Noble Roman's: the closest to PNC
 
 - Credit Agreement, 2026-06-10, $6.9M term loan, Lake Forest Bank and Trust as sole lender, EX-10.3 to the Q2 2026 10-Q. [verified: https://www.sec.gov/Archives/edgar/data/709005/000165495426007523/nrom_ex103.htm]
-- Covenant, Section 7.10(b): "Permit the Senior Leverage Ratio at any time to exceed 2.30:1.00". No step-down. [verified]
+- Covenant, Section 7.10(b): "Permit the Senior Leverage Ratio at any time to exceed 2.30:1.00".
+  No step-down. [verified]
 - Debt: Consolidated Funded Indebtedness minus Subordinated Indebtedness (none at closing). [verified]
-- EBITDA base: net income plus interest, taxes, and D&A. Interest income is not subtracted. [verified]
-- Add-backs: non-cash items, non-recurring expenses as the lender allows, closing costs "not to exceed $250,000", and GAAP rent over cash rent. Deductions mirror them. [verified]
+- EBITDA base: net income plus interest, taxes, and D&A.
+  Interest income is not subtracted. [verified]
+- Add-backs: non-cash items, non-recurring expenses as the lender allows, closing costs "not to exceed $250,000", and GAAP rent over cash rent.
+  Deductions mirror them. [verified]
 - Test period: the last four fiscal quarters, first tested Q3 2026. [verified]
-- Annex A is a compliance-certificate worksheet that lists every line in order. It is a ready template for what a Brief should hold. [verified]
-- Answer key: none yet. The 10-Q says only "in compliance". [verified]
+- Annex A is a compliance-certificate worksheet that lists every line in order.
+  It is a ready template for what a Brief should hold. [verified]
+- Answer key: none yet.
+  The 10-Q says only "in compliance". [verified]
 
 ### 2.3 Portillo's: sponsor-style, a hard case
 
 - Credit Agreement, 2023-02-02, Fifth Third as agent, $300M and $100M facilities. [verified: https://www.sec.gov/Archives/edgar/data/1871509/000187150923000005/form8-k2223exhibit101.htm]
   A First Amendment exists; we did not read it. [verified that it exists]
 - Covenant, Section 7.11(a): a rent-adjusted net leverage ratio, 5.50x stepping down to 5.25x and then 5.00x. [verified]
-- Debt is net of all unrestricted cash, plus eight times cash rent. The denominator is EBITDAR. [verified]
+- Debt is net of all unrestricted cash, plus eight times cash rent.
+  The denominator is EBITDAR. [verified]
 - About 13 add-backs, with per-restaurant caps, a life-of-agreement cap of $10M on transaction costs, run-rate synergies, and one shared cap of 5.0% of EBITDA. [verified]
-- Answer key: none. The 10-Qs say only "in compliance". [verified]
+- Answer key: none.
+  The 10-Qs say only "in compliance". [verified]
 
 ### 2.4 Potbelly: private credit, now superseded
 
@@ -69,7 +82,8 @@ The text copies were fetched from EDGAR on 2026-10-24 and are not in git (the SE
 - Covenant, Section 8.01(d): total net leverage, stepping down quarterly from 1.60x to 1.00x. [verified]
 - Debt is net of cash up to $3,000,000. [verified]
 - EBITDA base subtracts interest income, like our `ebitda()`. [verified]
-- A 50% add-back of pre-opening costs, capped at $250,000 per period. An equity cure in 8.01(e). [verified]
+- A 50% add-back of pre-opening costs, capped at $250,000 per period.
+  An equity cure in 8.01(e). [verified]
 - Answer key: none found. [verified for Q1 2024]
 
 ## 3. What the Brief schema cannot express
@@ -101,7 +115,8 @@ So the quotes must be separate fields; "the field value appears in the agreement
 
 All vendor claims are self-reported.
 
-- **Hebbia** extracts covenants and terms into structured data with "sentence-level citation". No review step is described. [verified: https://www.hebbia.com/resources/credit-agreement-software]
+- **Hebbia** extracts covenants and terms into structured data with "sentence-level citation".
+  No review step is described. [verified: https://www.hebbia.com/resources/credit-agreement-software]
 - **9fin** tracks debt, lien, payment, and investment capacity, and caps on EBITDA adjustments, with "AI-powered covenant detection" and a trace to the source. [verified: search excerpt of https://9fin.com/insights/9fin-announces-launch-of-latest-enhancements-to-covenant-capacity-tool]
 - **Octus** (formerly Reorg) extracts "170+ data fields per instrument", "augmented by Octus' legal analysts". [verified: https://octus.com/company/news/octus-launches-deal-lens-and-covenantai/]
 - **Ontra Insight**: abstractions "created by AI and reviewed by Ontra trained specialists". [search snippet only]
@@ -113,19 +128,25 @@ Where a ratio is monitored, the vendor computes it from extracted fields.
 
 ### 4.2 Benchmarks
 
-- CUAD: 510 contracts, 41 clause types. The best model reached 44.0% precision at 80% recall. [verified: https://arxiv.org/abs/2103.06268]
-- ContractEval (2025, on CUAD): the best F1 was about 0.64. Failure modes: answering "no related clause" when one exists, and selecting too much text. [verified: https://arxiv.org/abs/2508.03080]
+- CUAD: 510 contracts, 41 clause types.
+  The best model reached 44.0% precision at 80% recall. [verified: https://arxiv.org/abs/2103.06268]
+- ContractEval (2025, on CUAD): the best F1 was about 0.64.
+  Failure modes: answering "no related clause" when one exists, and selecting too much text. [verified: https://arxiv.org/abs/2508.03080]
 - ContractNLI: exceptions and negation are a main difficulty. [verified: https://arxiv.org/abs/2110.01799]
 - Lost in the Middle: accuracy drops when the relevant text sits mid-context. [verified: https://arxiv.org/abs/2307.03172]
 - A citation-checking study: models catch 93% to 100% of wrong-case citations but only 37% to 61% of wrong pinpoints. [verified abstract: https://consensus.app/papers/details/45e292b7502f58f4a6596e661207c2c0/]
-  So a model should not check its own quotes. Code should.
-- CDMizer: an LLM fills a fixed schema for derivatives collateral agreements. It is the closest precedent for "fill a fixed formalism". [verified abstract: https://arxiv.org/abs/2510.23990]
+  So a model should not check its own quotes.
+  Code should.
+- CDMizer: an LLM fills a fixed schema for derivatives collateral agreements.
+  It is the closest precedent for "fill a fixed formalism". [verified abstract: https://arxiv.org/abs/2510.23990]
 - We found no peer-reviewed benchmark for covenant extraction from credit agreements. [verified: absence in our searches]
 
 ### 4.3 Pitfalls named by practitioners
 
 - Similar terms ("Consolidated", "Adjusted", "Pro Forma" EBITDA) get swapped. [verified: https://www.kore1.com/ai-read-credit-agreement-test/]
-- "Greater of" caps come back as the dollar floor only. Step-down tables come back as one row. Caps measured before or after the add-back get mixed. [verified: Kore1]
+- "Greater of" caps come back as the dollar floor only.
+  Step-down tables come back as one row.
+  Caps measured before or after the add-back get mixed. [verified: Kore1]
 - Amendments override the base agreement without saying so in the base text. [verified: Kore1]
 - Leverage debt is often narrower than the general debt definition: undrawn letters of credit, preferred equity, and earn-outs are often excluded. [verified: https://www.sidley.com/en/insights/newsupdates/2026/03/financial-covenants-in-private-credit-transactions]
 - Pro forma synergies and covenant holidays after acquisitions matter for add-on deals. [verified: Sidley]

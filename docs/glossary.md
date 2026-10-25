@@ -11,7 +11,8 @@ All deal facts come from `research/real-deal-candidates.md`, `research/post-clos
 
 - [verified: filing] means the fact is in a public filing that the research files cite.
 - [verified: source file] means a file in this repo states it, but it is not a filing.
-- [our usage] means the term describes how we use or design something in Stochastic. It is not an industry standard.
+- [our usage] means the term describes how we use or design something in Stochastic.
+  It is not an industry standard.
 - [inferred] means it is our judgment.
 - Numbers from vendors or authors are labeled self-reported.
 
@@ -49,12 +50,14 @@ It also adds Nu Aire's pro forma EBITDA for the four quarters ended 2024-10-31. 
 
 An add-on is a smaller company bought to join a company the buyer already owns.
 The buyer is the platform company.
-The new company is the target. See "Platform company versus target".
+The new company is the target.
+See "Platform company versus target".
 
 In Stochastic: one add-on deal is the whole scope of the product. [verified: source file, `STOCHASTIC.md` section 3]
 We cover the steps from two data files to the controller's approval.
 
-Example: Nu Aire is an add-on to Kewaunee. It closed on 2024-11-01 for $55M. [verified: filing]
+Example: Nu Aire is an add-on to Kewaunee.
+It closed on 2024-11-01 for $55M. [verified: filing]
 
 ## Audit log (hash chain)
 
@@ -63,8 +66,10 @@ A hash chain makes the log hard to change in secret.
 Each row stores a fingerprint (a hash) of the row before it.
 If someone edits an old row, the later fingerprints no longer match.
 
-In Stochastic: the gateway writes one row for every action, including denied ones. Each row is chained to the previous row. [verified: source file, `STOCHASTIC.md` section 9]
-The demo shows the log as a small link. A denied row is shown only if a judge asks.
+In Stochastic: the gateway writes one row for every action, including denied ones.
+Each row is chained to the previous row. [verified: source file, `STOCHASTIC.md` section 9]
+The demo shows the log as a small link.
+A denied row is shown only if a judge asks.
 
 ## Brief and Brief Reader
 
@@ -72,7 +77,8 @@ The brief holds the lender's terms that the math needs: the limit, its wording, 
 Each term names the section of the credit agreement it comes from.
 
 In Stochastic: a person writes the brief today, and the PNC brief is the only one. [verified: `backend/app/db/fixtures/kewaunee.py`]
-The Brief Reader is a planned fourth agent that drafts the brief from the agreement, with a verbatim quote for every field. Code checks each quote, and the controller approves the brief before mapping starts. [verified: `decisions.md` D20; not built]
+The Brief Reader is a planned fourth agent that drafts the brief from the agreement, with a verbatim quote for every field.
+Code checks each quote, and the controller approves the brief before mapping starts. [verified: `decisions.md` D20; not built]
 
 Example: PNC's limit is "less than 2.50 to 1.00" in Section 4.8(a) of Ex 10.1. [verified: filing]
 The amounts of the add-backs, such as the $4,019K pension charge, come from the 10-K, not the agreement. [verified: source file]
@@ -101,8 +107,10 @@ This is the trial balance of the platform and the target added together, after i
 It is the base for the lender's compliance pack.
 Each combined line must equal the platform line plus the target lines mapped to it.
 
-In Stochastic: code builds the combined table with columns platform, target, and combined. A tie-out check runs on it. [verified: source file, `STOCHASTIC.md` sections 11 and 12]
-Because the demo uses statement lines, our table is a combined statement table of about ten rows. It is not a full trial balance. [our usage]
+In Stochastic: code builds the combined table with columns platform, target, and combined.
+A tie-out check runs on it. [verified: source file, `STOCHASTIC.md` sections 11 and 12]
+Because the demo uses statement lines, our table is a combined statement table of about ten rows.
+It is not a full trial balance. [our usage]
 
 ## Compliance certificate
 
@@ -112,7 +120,8 @@ Credit agreements set when it is due.
 The samples found put it 45 to 60 days after quarter end. [verified: snippets, terms vary per deal; Aleph figure is self-reported]
 
 In Stochastic: a downloadable draft certificate is a "should" item, not a "must". [verified: source file, `STOCHASTIC.md` section 13]
-A human officer would sign it. We never call our output advice.
+A human officer would sign it.
+We never call our output advice.
 
 Example: the Kewaunee credit agreement requires an acquisition compliance certificate that shows pro forma covenant compliance. [verified: filing, Ex 10.1]
 
@@ -133,21 +142,25 @@ A credit agreement is the contract between a borrower and its lenders.
 It sets the loan terms, the covenants, the definitions, and what the borrower must report.
 Definitions in it, such as EBITDA, are negotiated for each deal.
 
-In Stochastic: the short brief carries the limit and the covenant's own definitions of debt and EBITDA. Code uses those definitions, not generic ones. [verified: source file, `STOCHASTIC.md` sections 10 and 11]
+In Stochastic: the short brief carries the limit and the covenant's own definitions of debt and EBITDA.
+Code uses those definitions, not generic ones. [verified: source file, `STOCHASTIC.md` sections 10 and 11]
 
-Example: Kewaunee's lender is PNC. The loan agreement is dated 2024-11-01 and is Ex 10.1 to the original 8-K. [verified: filing]
+Example: Kewaunee's lender is PNC.
+The loan agreement is dated 2024-11-01 and is Ex 10.1 to the original 8-K. [verified: filing]
 It is a bilateral loan agreement, so it is simpler than a typical sponsor-backed agreement. [verified: source file]
 
 ## D&A (depreciation and amortization)
 
 D&A is a non-cash cost that spreads the price of long-lived assets over their life.
-Depreciation covers physical assets. Amortization covers intangible assets.
+Depreciation covers physical assets.
+Amortization covers intangible assets.
 EBITDA adds D&A back to operating profit, so you need it to compute EBITDA.
 
 In Stochastic: the EBITDA tool needs D&A for both companies.
 
 Example: Nu Aire's D&A for the year to 2024-09-30 was $1,830,395. [verified: filing, Ex 99.1 cash flow statement]
-Kewaunee's D&A was not in the pages the research read. Tri must get it from the 10-K. [verified: source file, `STOCHASTIC.md` section 18]
+Kewaunee's D&A was not in the pages the research read.
+Tri must get it from the 10-K. [verified: source file, `STOCHASTIC.md` section 18]
 
 ## EBITDA and adjusted EBITDA
 
@@ -156,9 +169,11 @@ It is a common way to measure cash profit before financing and tax choices.
 Adjusted EBITDA adds more items (add-backs) and sometimes subtracts others.
 In a credit agreement, "EBITDA" is a defined term, so it can differ a lot from a simple EBITDA.
 
-In Stochastic: code computes the covenant version, with each add-back shown. The model never produces a number. [verified: source file, `STOCHASTIC.md` section 11]
+In Stochastic: code computes the covenant version, with each add-back shown.
+The model never produces a number. [verified: source file, `STOCHASTIC.md` section 11]
 
-Example: Kewaunee's covenant EBITDA is net income plus interest, taxes, D&A, plus add-backs. It then subtracts cash rent on the Statesville property. [verified: filing, Ex 10.1]
+Example: Kewaunee's covenant EBITDA is net income plus interest, taxes, D&A, plus add-backs.
+It then subtracts cash rent on the Statesville property. [verified: filing, Ex 10.1]
 So it is "a negotiated number, not the pro forma operating profit". [verified: source file]
 For comparison, the filed pro forma operating profit for the year to 2024-04-30 is $20,817K. [verified: filing, Ex 99.2]
 That figure is operating profit, not EBITDA.
@@ -168,7 +183,8 @@ That figure is operating profit, not EBITDA.
 This is a balance sheet line in Kewaunee's statements.
 In accounting terms, a financing liability is an obligation that is treated like borrowed money.
 
-In Stochastic: this is the one flagged line in the demo. The agent asks the controller which part of it is covenant debt. [verified: source file, `STOCHASTIC.md` section 12]
+In Stochastic: this is the one flagged line in the demo.
+The agent asks the controller which part of it is covenant debt. [verified: source file, `STOCHASTIC.md` section 12]
 
 Example facts [verified: filing, as cited in `real-deal-candidates.md`]:
 - At 2024-10-31, Kewaunee shows $750K current and $27,032K long-term.
@@ -185,7 +201,8 @@ This ratio asks if the company earns enough to pay its fixed costs, such as inte
 A higher number is safer.
 Each agreement defines "fixed charges" its own way.
 
-In Stochastic: it is not in the MVP math. The MVP tests leverage only. [inferred: from `STOCHASTIC.md` section 11]
+In Stochastic: it is not in the MVP math.
+The MVP tests leverage only. [inferred: from `STOCHASTIC.md` section 11]
 Adding it is a natural next step. [inferred]
 
 Example: Kewaunee must keep it at least 1.20 to 1 (Section 4.8(b)). [verified: filing]
@@ -198,7 +215,8 @@ Precision comes before recall: an unsure mapping becomes a flag. [verified: sour
 
 In Stochastic: the flag card on the one screen has Approve and Change buttons.
 
-Example: the "Financing liability" line. See that entry.
+Example: the "Financing liability" line.
+See that entry.
 
 ## Gateway
 
@@ -215,7 +233,8 @@ Intercompany amounts are money flows between two companies in the same group.
 Examples are a loan or an invoice between the platform and the target.
 In combined books they must be removed, or the group counts them twice.
 
-In Stochastic: the MVP has one seeded example at most. Full eliminations are cut. [verified: source file, `STOCHASTIC.md` section 13]
+In Stochastic: the MVP has one seeded example at most.
+Full eliminations are cut. [verified: source file, `STOCHASTIC.md` section 13]
 Research calls intercompany identification a common silent failure, from vendor sources (self-reported). [verified: source file, `ma-workflow-research.md`]
 
 Example: no Kewaunee and Nu Aire intercompany amount is in the research files, so any example in the demo is seeded and labeled. [inferred]
@@ -228,7 +247,8 @@ A naive ratio uses the plain numbers as filed: all debt-like lines over reported
 A covenant ratio uses the credit agreement's own definitions of debt and EBITDA.
 The two can differ a lot. [verified: source file, `STOCHASTIC.md` section 11]
 
-In Stochastic: the verdict line shows the covenant ratio next to the limit. Tri also computes the naive ratio to show the gap. [verified: source file, `TASKS.md`]
+In Stochastic: the verdict line shows the covenant ratio next to the limit.
+Tri also computes the naive ratio to show the gap. [verified: source file, `TASKS.md`]
 
 Example: a deliberately naive numerator would add all of "financing liability", which is $70,885K pro forma. [verified: filing figures, naive use is our construction]
 The covenant numerator excludes the seller notes and the Statesville lease. [verified: filing, Ex 10.1]
@@ -241,7 +261,10 @@ Maker-checker means the person or agent who prepares a result cannot be the one 
 A second party must check it.
 It is a standard control in finance.
 
-In Stochastic: the Preparer makes the draft. The Reviewer checks it. A human controller approves. The gateway enforces this. [verified: source file, `STOCHASTIC.md` sections 5 and 9]
+In Stochastic: the Preparer makes the draft.
+The Reviewer checks it.
+A human controller approves.
+The gateway enforces this. [verified: source file, `STOCHASTIC.md` sections 5 and 9]
 The mapping to real accounting roles is our design. [our usage]
 
 ## Mapping (confidence, tie-out)
@@ -265,7 +288,8 @@ The target is the company being bought.
 The target's lines are mapped into the platform's chart.
 
 In Stochastic: Kewaunee is the platform and Nu Aire is the target. [verified: source file]
-Kewaunee's fiscal year ends April 30. Nu Aire's ends September 30. [verified: filing]
+Kewaunee's fiscal year ends April 30.
+Nu Aire's ends September 30. [verified: filing]
 
 ## Portfolio controller
 
@@ -281,7 +305,8 @@ Pro forma means "as if".
 Pro forma numbers show how results would look if an event had happened earlier, such as if the acquisition had closed at the start of the period.
 They are estimates and not audited.
 
-In Stochastic: leverage is tested on a combined basis. We use the filed pro forma only as an answer key. [verified: source file, `STOCHASTIC.md` section 12]
+In Stochastic: leverage is tested on a combined basis.
+We use the filed pro forma only as an answer key. [verified: source file, `STOCHASTIC.md` section 12]
 
 Example: Kewaunee's pro forma statements call themselves "for illustrative purposes only". [verified: filing, as quoted in `real-deal-candidates.md`]
 
@@ -303,7 +328,8 @@ A quality of earnings (QoE) report is an accounting firm's review of a company's
 It tests if reported EBITDA is real and repeatable, and checks each add-back.
 It is usually done before a sale.
 
-In Stochastic: it is not built. It was the focus of an earlier framing (seller-side finance lead) that we did not choose. [verified: source file, `ma-workflow-research.md`]
+In Stochastic: it is not built.
+It was the focus of an earlier framing (seller-side finance lead) that we did not choose. [verified: source file, `ma-workflow-research.md`]
 Cost and time figures for QoE in the research are self-reported by firms that sell it.
 
 ## Regulation S-X Article 11
@@ -312,7 +338,8 @@ Regulation S-X is the SEC's rule book for financial statements.
 Article 11 sets how a public company shows pro forma financial information after a significant acquisition.
 The filing usually has columns for the buyer, the target, and adjustments.
 
-In Stochastic: Article 11 pro forma exhibits are why public deals work for the demo. They show the target's lines next to the buyer's. [verified: source file, `real-deal-candidates.md`]
+In Stochastic: Article 11 pro forma exhibits are why public deals work for the demo.
+They show the target's lines next to the buyer's. [verified: source file, `real-deal-candidates.md`]
 
 Example: Kewaunee's Ex 99.2 is the Article 11 pro forma, with a "Nu Aire, Inc. Reclassed" column. [verified: filing]
 
@@ -338,12 +365,15 @@ Which part of the financing liability line fits it is the open question for the 
 
 ## Stateless agent
 
-A stateless agent keeps no memory between jobs. A stateful agent does; Stochastic's agents are stateful.
+A stateless agent keeps no memory between jobs.
+A stateful agent does; Stochastic's agents are stateful.
 It gets one work item with all inputs, returns one typed result, and stops.
 State lives in the store.
 Because it has no memory, the same agent can run many times in parallel.
 
-In Stochastic: Mapper, Preparer, and Reviewer are stateful. Each keeps a session, and the Mapper applies the policies the gateway wrote from the controller's answers. A plain job runner, which is code and not a model, moves items between them. [verified: `STOCHASTIC.md` sections 6 and 7, 2026-10-24]
+In Stochastic: Mapper, Preparer, and Reviewer are stateful.
+Each keeps a session, and the Mapper applies the policies the gateway wrote from the controller's answers.
+A plain job runner, which is code and not a model, moves items between them. [verified: `STOCHASTIC.md` sections 6 and 7, 2026-10-24]
 
 ## Statement line versus account
 
@@ -352,9 +382,11 @@ A statement line is a row on a published financial statement, such as "Selling E
 Many accounts roll up into one statement line.
 Public filings give statement lines, not accounts. [verified: source file, `real-deal-candidates.md`]
 
-In Stochastic: the demo maps statement lines. Account-level detail would be synthetic, so we do not claim it. [verified: source file, `STOCHASTIC.md` section 12]
+In Stochastic: the demo maps statement lines.
+Account-level detail would be synthetic, so we do not claim it. [verified: source file, `STOCHASTIC.md` section 12]
 
-Example: Nu Aire's income statement has Selling Expense, General and Administrative, and Research and Development. Kewaunee shows one "Operating expenses" line. [verified: filing]
+Example: Nu Aire's income statement has Selling Expense, General and Administrative, and Research and Development.
+Kewaunee shows one "Operating expenses" line. [verified: filing]
 
 ## Subordinated seller notes
 
@@ -388,7 +420,9 @@ The states in `STOCHASTIC.md` section 9 [verified: source file]:
 - NEEDS_INFO: a human must answer or choose.
 - APPROVED: a human approved it.
 - POSTED: the gateway wrote it to the record.
-- REJECTED and REVERSED: end states. A reversal is a new item linked to the original, and nothing is deleted.
-- DENIED: a forbidden action. The gateway does not apply it, and it writes a row to the log.
+- REJECTED and REVERSED: end states.
+  A reversal is a new item linked to the original, and nothing is deleted.
+- DENIED: a forbidden action.
+  The gateway does not apply it, and it writes a row to the log.
 
 In Stochastic: a flag is a work item that waits in NEEDS_INFO until the controller answers.

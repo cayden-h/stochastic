@@ -55,7 +55,8 @@ Here's an example.
 You own a restaurant chain worth $200 million.
 You want to buy another restaurant chain for $100 million, but you don't have enough cash.
 So you need to raise $100 million.
-The obvious solution? Get a bank loan.
+The obvious solution?
+Get a bank loan.
 But there's a problem: the bank is only willing to lend you $50 million because it thinks lending any more would be too risky.
 Now what?
 

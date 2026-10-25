@@ -1,6 +1,7 @@
 # scripts
 
-Helper scripts. Owner: Eric (data pulls) and Cayden (agent probes).
+Helper scripts.
+Owner: Eric (data pulls) and Cayden (agent probes).
 
 | Script | What it does |
 | --- | --- |

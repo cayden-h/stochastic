@@ -29,11 +29,13 @@ The Hyphenate track is about corporate finance work.
 One platform looked like the biggest idea. [inferred]
 
 Rejected:
-Nothing yet. This was the starting point.
+Nothing yet.
+This was the starting point.
 
 Revisit if:
 Hyphenate judges ask for breadth over depth.
-We do not expect this. The workshop rewards a few roles done deep. [verified: `STOCHASTIC.md` section 2]
+We do not expect this.
+The workshop rewards a few roles done deep. [verified: `STOCHASTIC.md` section 2]
 Other situations stay as roadmap only.
 
 Status: replaced by D2.
@@ -54,12 +56,15 @@ The portfolio controller after an add-on (User A) was the least served and has a
 A defined deadline also exists: the compliance certificate is due 45 to 60 days after quarter end in the samples found. [verified: snippets, self-reported by Aleph]
 
 Rejected:
-- The banker as the user (User C). Too crowded, and a head-on fight with incumbents. [inferred]
-- The seller-side finance lead (User B). Partly covered by QoE tools, and the data is harder to fake. [inferred]
+- The banker as the user (User C).
+  Too crowded, and a head-on fight with incumbents. [inferred]
+- The seller-side finance lead (User B).
+  Partly covered by QoE tools, and the data is harder to fake. [inferred]
 
 Revisit if:
 A practitioner tells us the portfolio controller is not the owner of this work.
-Also revisit if Hyphenate says PE add-on integration is not a corner of a finance team. This is an open decision.
+Also revisit if Hyphenate says PE add-on integration is not a corner of a finance team.
+This is an open decision.
 
 ## D3. Different wedge from the closest prior work (VistaAI)
 
@@ -79,7 +84,8 @@ We differ in three ways:
 - We post through a gateway with maker-checker and an audit log.
 
 Rejected:
-- A pure data-ingestion and mapping pitch. It overlaps with VistaAI too much.
+- A pure data-ingestion and mapping pitch.
+  It overlaps with VistaAI too much.
 
 Revisit if:
 We learn that VistaAI, or another entry, also tests against a lender covenant.
@@ -103,7 +109,8 @@ Rejected:
 
 Revisit if:
 A judge or mentor says the control is not believable without a live denial.
-Hyphenate does want "a moment". Our moment is the flagged line that changes the verdict. [inferred]
+Hyphenate does want "a moment".
+Our moment is the flagged line that changes the verdict. [inferred]
 We could add a short denial only if that moment is weak.
 
 ## D5. Three small stateless agents and a plain job runner
@@ -117,7 +124,8 @@ Cut the six agents down to three small, stateless, replicable agents that mirror
 - Reviewer (reviewer)
 
 A plain job runner moves work items between them.
-There is no deal-manager agent. The runner is code, not a model. [verified: `STOCHASTIC.md` sections 6 and 7]
+There is no deal-manager agent.
+The runner is code, not a model. [verified: `STOCHASTIC.md` sections 6 and 7]
 
 Why:
 - Small stateless agents can run once per company or once per batch of lines.
@@ -132,7 +140,8 @@ Rejected:
 
 Revisit if:
 A step needs a judgment that the three agents cannot make.
-Also revisit if the job runner grows decision logic. That would be a sign it needs a model.
+Also revisit if the job runner grows decision logic.
+That would be a sign it needs a model.
 Revisited in D20: a fourth role, the Brief Reader, reads the credit agreement.
 
 ## D6. Demo scope: two minutes, one simple screen
@@ -153,7 +162,8 @@ Being honest about what is simulated builds trust. [inferred]
 
 Rejected:
 - Several screens, as in the older four-screen Figma mockups.
-- Live agent calls as a must-have. A live Droid-backed call is a "should" item.
+- Live agent calls as a must-have.
+  A live Droid-backed call is a "should" item.
 - A live SEC call on stage.
 
 Revisit if:
@@ -188,7 +198,8 @@ Revisited in D20: the Brief Reader drafts the brief from the agreement, and the 
 Date: 2026-10-23.
 
 Decision:
-The proof deal is Kewaunee Scientific buying Nu Aire. It closed on 2024-11-01 for $55M.
+The proof deal is Kewaunee Scientific buying Nu Aire.
+It closed on 2024-11-01 for $55M.
 It ranked first of five candidates.
 The flag is Kewaunee's "Financing liability" line. [verified: `research/real-deal-candidates.md`]
 
@@ -207,10 +218,14 @@ The credit agreement excludes the Statesville lease from covenant debt.
 So a human must say which part is covenant debt.
 
 Rejected:
-- DLH and GRSi (rank 2). It has a ready combined EBITDA answer key, but the deal is larger and no acquisition basket was found.
-- Mama's Creations and Crown I (rank 3). It has weak leverage drama.
-- Shutterstock and Envato (rank 4). It is about $250M and uses IFRS.
-- Standex (rank 5). It is too large, and its credit agreement was not retrieved.
+- DLH and GRSi (rank 2).
+  It has a ready combined EBITDA answer key, but the deal is larger and no acquisition basket was found.
+- Mama's Creations and Crown I (rank 3).
+  It has weak leverage drama.
+- Shutterstock and Envato (rank 4).
+  It is about $250M and uses IFRS.
+- Standex (rank 5).
+  It is too large, and its credit agreement was not retrieved.
 
 Revisit if:
 Tri computes the ratio and the verdict does not change with either treatment of the flag.
@@ -238,7 +253,8 @@ Rejected:
 - A2A.
 
 Revisit if:
-`list_models()` shows Droid cannot run Claude models on our key. That decides the backend. [verified: `TASKS.md`]
+`list_models()` shows Droid cannot run Claude models on our key.
+That decides the backend. [verified: `TASKS.md`]
 Also revisit if the Python SDK does not qualify for the "Building with the Droid SDK" prize.
 
 ## D10. Team split and per-person branches
@@ -286,10 +302,13 @@ The Figma MCP is already in use: the design system and four screens were built t
 The Figma prizes are five at $1,000 each (self-reported, from the pre-event guide and Devpost). [verified: `CalHacks/ideation/sponsors/figma.md`]
 
 Rejected:
-- Tiger Data as a target. The Postgres store is a Should item, and forks add little to a one-screen demo. [inferred]
+- Tiger Data as a target.
+  The Postgres store is a Should item, and forks add little to a one-screen demo. [inferred]
 - Microsoft, because it needs Microsoft products that we do not use. [inferred]
-- Chasing every sponsor. Stacking three prizes is already rare (22 of 1,324 winners for three or more). [verified]
-- An earlier note that skipped Figma as "no honest fit". That note predates the design work.
+- Chasing every sponsor.
+  Stacking three prizes is already rare (22 of 1,324 winners for three or more). [verified]
+- An earlier note that skipped Figma as "no honest fit".
+  That note predates the design work.
 
 Revisit if:
 The Figma prompts, when read on the Live Site, ask for something we cannot show.
@@ -314,18 +333,23 @@ Why:
 - The Droid SDK keeps sessions per role, so the backend supports it directly.
 
 Rejected:
-- Stateless one-shot agents (D5's wording). The runner, the roles, and the typed contracts stay the same; only the memory was added.
-- Memory inside the model's context only. It would not survive a restart or reach the audit log.
+- Stateless one-shot agents (D5's wording).
+  The runner, the roles, and the typed contracts stay the same; only the memory was added.
+- Memory inside the model's context only.
+  It would not survive a restart or reach the audit log.
 
 Revisit if:
-A judge reads the policy as the agent approving its own future work. The answer is that the controller approved the decision once, the gateway recorded it, and a reversal clears it.
+A judge reads the policy as the agent approving its own future work.
+The answer is that the controller approved the decision once, the gateway recorded it, and a reversal clears it.
 
 ## D13. The flag figures are computed, and the moment holds
 
 Date: 2026-10-24.
 
 Decision:
-Covenant EBITDA is $28,379K. Senior Funded Bank Debt under the agreement's reading is $21,633K, leverage 0.76x. Counting the whole financing liability line gives $71,955K and 2.54x, over the 2.50x limit. [verified: `backend/tests/test_trust_rules.py`]
+Covenant EBITDA is $28,379K.
+Senior Funded Bank Debt under the agreement's reading is $21,633K, leverage 0.76x.
+Counting the whole financing liability line gives $71,955K and 2.54x, over the 2.50x limit. [verified: `backend/tests/test_trust_rules.py`]
 The default option on the flag is the agreement's reading (b).
 Two inputs are inferred and are said out loud: the Statesville cash rent deduction ($1,970K from the 10-K obligations table) and transaction and integration costs applied as 0.
 
@@ -334,27 +358,34 @@ Why:
 - The verdict changes with the controller's answer, which is what the demo needs.
 
 Rejected:
-- Using the filed pro forma column for Nu Aire. The fiscal years differ, and the audited September year is the honest raw input.
-- Annualizing the six-month figures. It would be an invented number.
+- Using the filed pro forma column for Nu Aire.
+  The fiscal years differ, and the audited September year is the honest raw input.
+- Annualizing the six-month figures.
+  It would be an invented number.
 
 Revisit if:
-Eric's check of the figures against the filings finds a different depreciation, rent, or financing figure. The tools recompute; only the fixture changes.
+Eric's check of the figures against the filings finds a different depreciation, rent, or financing figure.
+The tools recompute; only the fixture changes.
 
 ## D14. One backend function, four backends, and the result says which ran
 
 Date: 2026-10-24.
 
 Decision:
-`run_agent` tries `AGENT_BACKEND` and falls back along `AGENT_FALLBACK` (default `anthropic,scripted` until 2026-10-24 08:00, `scripted` since, because no Anthropic key exists). The `replay` backend plays recorded outputs; the Preparer and Reviewer re-run their tools on replay so the run ids are real. Every result carries `backend`. [verified: `backend/app/agents/runner.py`]
+`run_agent` tries `AGENT_BACKEND` and falls back along `AGENT_FALLBACK` (default `anthropic,scripted` until 2026-10-24 08:00, `scripted` since, because no Anthropic key exists).
+The `replay` backend plays recorded outputs; the Preparer and Reviewer re-run their tools on replay so the run ids are real.
+Every result carries `backend`. [verified: `backend/app/agents/runner.py`]
 
 Why:
 The pitch must be honest about which runs went through Droid, and the demo must survive any backend failing.
 
 Rejected:
-- Hiding the fallback. The console shows the backend status from `GET /health`.
+- Hiding the fallback.
+  The console shows the backend status from `GET /health`.
 
 Revisit if:
-Factory's rubric requires the TypeScript SDK. Then a small Node runner behind the same function is the swap.
+Factory's rubric requires the TypeScript SDK.
+Then a small Node runner behind the same function is the swap.
 
 ## D15. Tiger Data becomes a target track
 
@@ -378,124 +409,179 @@ Cal Hacks says one project cannot opt into this many sponsor tracks.
 These come from `STOCHASTIC.md` section 18.
 They are not decided yet.
 
-1. Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask a Hyphenate mentor on Saturday.
-2. Which part of Kewaunee's financing liability counts as covenant debt? All three readings are computed (D13). A practitioner should confirm the default.
-3. Kewaunee's depreciation ($3,125K, 10-K) and the revolver draw ($5,563K, Ex 99.2 Note 4(h)) are now loaded. Eric re-checks them against the filings.
-4. Can Droid run Claude models on our key? Install the `droid` CLI and run `scripts/droid_probe.py`.
+1. Does PE add-on integration count as a corner of a finance team for Hyphenate?
+   Ask a Hyphenate mentor on Saturday.
+2. Which part of Kewaunee's financing liability counts as covenant debt?
+   All three readings are computed (D13).
+   A practitioner should confirm the default.
+3. Kewaunee's depreciation ($3,125K, 10-K) and the revolver draw ($5,563K, Ex 99.2 Note 4(h)) are now loaded.
+   Eric re-checks them against the filings.
+4. Can Droid run Claude models on our key?
+   Install the `droid` CLI and run `scripts/droid_probe.py`.
 5. Does the Python Droid SDK qualify for "Building with the Droid SDK" when the tools call our own gateway?
 6. Does the SEC allow us to redistribute the cached filings?
 7. Does a former-banker or controller reviewer count as the human seat?
 
 ## D16. The gateway owns the moment and the memory mark; Sonnet runs the demo Mapper
 
-Date: 2026-10-24, 08:30. Decided by Cayden's agent during the live end-to-end tests, under Cayden's goal to finish his task list.
+Date: 2026-10-24, 08:30.
+Decided by Cayden's agent during the live end-to-end tests, under Cayden's goal to finish his task list.
 
-Context: live Droid runs on Haiku 5.5 showed three things the scripted runs hid. One run offered three readings of the financing liability, all under the limit, so the 2.54x moment did not appear. The model's mapping reasons read "Controller policy maps ...", so the console's Learned chip (which looked for "Policy" at the start of the reason) never showed. A second run with memory raised a new flag on lines the first run had not asked about.
+Context: live Droid runs on Haiku 5.5 showed three things the scripted runs hid.
+One run offered three readings of the financing liability, all under the limit, so the 2.54x moment did not appear.
+The model's mapping reasons read "Controller policy maps ...", so the console's Learned chip (which looked for "Policy" at the start of the reason) never showed.
+A second run with memory raised a new flag on lines the first run had not asked about.
 
 Decision:
-1. Every covenant flag shows the count-everything reading. When the Mapper does not offer it, the gateway adds it, computed by the same tools and labelled as the gateway's. The controller always sees what the exclusions are worth, and the trust story is unchanged: the gateway adds an option, it never removes or edits one.
-2. The gateway marks a learned line from the policy record (`policy_id`), and only when the cited policy decided the same thing. No model wording decides what the console calls learned.
-3. The demo Mapper runs on Sonnet 5.5 (`DROID_MODEL_MAPPER`); the Preparer and Reviewer stay on Haiku 5.5. Sonnet held both moments in two trials of two; Haiku in one of two and zero of one.
-4. The default fallback is `scripted`. Anthropic returns to the chain only with a key.
+1. Every covenant flag shows the count-everything reading.
+   When the Mapper does not offer it, the gateway adds it, computed by the same tools and labelled as the gateway's.
+   The controller always sees what the exclusions are worth, and the trust story is unchanged: the gateway adds an option, it never removes or edits one.
+2. The gateway marks a learned line from the policy record (`policy_id`), and only when the cited policy decided the same thing.
+   No model wording decides what the console calls learned.
+3. The demo Mapper runs on Sonnet 5.5 (`DROID_MODEL_MAPPER`); the Preparer and Reviewer stay on Haiku 5.5.
+   Sonnet held both moments in two trials of two; Haiku in one of two and zero of one.
+4. The default fallback is `scripted`.
+   Anthropic returns to the chain only with a key.
 
 Evidence: `agents.md` section 9, rows 08:06 to 08:33; tests `test_covenant_flag_always_shows_the_count_everything_reading`, `test_learned_lines_are_marked_by_the_gateway_not_by_the_model_wording`, `test_second_run_while_one_is_in_progress_is_refused`.
 
 ## D17. A covenant flag's what-ifs live in a Tiger fork
 
-Date: 2026-10-24, 09:00. Cayden chose to delete the paused `larp-city` service (backed up first) to free the free plan's second service slot.
+Date: 2026-10-24, 09:00.
+Cayden chose to delete the paused `larp-city` service (backed up first) to free the free plan's second service slot.
 
-Decision: when the Mapper raises a covenant flag, the gateway forks the ledger on Tiger Cloud in the background and writes each option's what-if (tags, effect, tool outputs, run id) into a `what_if` table in the fork. The live record never holds a hypothetical. The controller's answer keeps one option in the ledger, and the gateway deletes the fork with the alternatives, which frees the slot. Each step is a gateway write: `fork:create`, `fork:ready`, `fork:delete` (or `fork:failed`, `fork:skip`) in the hash-chained log, and the fork state on the flag.
+Decision: when the Mapper raises a covenant flag, the gateway forks the ledger on Tiger Cloud in the background and writes each option's what-if (tags, effect, tool outputs, run id) into a `what_if` table in the fork.
+The live record never holds a hypothetical.
+The controller's answer keeps one option in the ledger, and the gateway deletes the fork with the alternatives, which frees the slot.
+Each step is a gateway write: `fork:create`, `fork:ready`, `fork:delete` (or `fork:failed`, `fork:skip`) in the hash-chained log, and the fork state on the flag.
 
-Why: a plain Postgres store does not stand out for Tiger Data, and forks are what Tiger Data pushes (`sponsors/tiger-data.md`). The fit is honest: a what-if is exactly a copy of the ledger that may be thrown away.
+Why: a plain Postgres store does not stand out for Tiger Data, and forks are what Tiger Data pushes (`sponsors/tiger-data.md`).
+The fit is honest: a what-if is exactly a copy of the ledger that may be thrown away.
 
-Limits: a fork takes 33 to 35 s, so it never blocks the flag; the options and effects are computed in process as before. The free plan allows one fork beside the main service, so a second covenant flag while a fork is open gets none and says so. A fork left by a crash is deleted on the next start (`FORK_PREFIX`).
+Limits: a fork takes 33 to 35 s, so it never blocks the flag; the options and effects are computed in process as before.
+The free plan allows one fork beside the main service, so a second covenant flag while a fork is open gets none and says so.
+A fork left by a crash is deleted on the next start (`FORK_PREFIX`).
 
 Evidence: `backend/tests/test_whatif_forks.py` (lifecycle, answer before ready, failure, one slot, cleanup, and an opt-in round trip against Tiger that passed on 2026-10-24); the live browser run at 08:53 in `agents.md` section 9.
 
 
 ## D18. The whole-line reading is as filed, and the gateway enforces what the prompts only asked
 
-Date: 2026-10-24, evening. Decided by Cayden after a six-part risk review of the project (finance, live demo, track fit, claims, agent design, UI).
+Date: 2026-10-24, evening.
+Decided by Cayden after a six-part risk review of the project (finance, live demo, track fit, claims, agent design, UI).
 
 Context: the review found two kinds of problem.
 The finance review found that option a counted the Statesville financing as debt while still deducting its rent from EBITDA, which mixes two readings: made consistent it is 2.37x, under the limit, and as built it was over by only $403K of EBITDA. [verified: arithmetic]
 The agent-design review reproduced, against the real gateway, a Mapper that excluded the financing lines itself (0.04x, Reviewer pass), a Preparer result that cited a what-if run (0.76x stored after the controller chose 2.54x) or passed raw numbers to leverage (0.01x), a Reviewer pass with no runs that went straight to POSTED, and a reversed answer that stayed live as a policy for the next deal.
 
 Decision:
-1. The whole-line option is computed as filed: balance sheet debt over reported EBITDA, with no add-back and no rent deduction. On the demo deal that is $71,955K over $25,312K, 2.84x, over the limit, and it needs $3,470K more EBITDA to pass. Choosing it puts the deal on the as-filed basis (`Deal.ebitda_basis`), so the result is the same 2.84x the card showed and approval is refused. The other options keep covenant EBITDA (0.76x and 1.56x).
+1. The whole-line option is computed as filed: balance sheet debt over reported EBITDA, with no add-back and no rent deduction.
+   On the demo deal that is $71,955K over $25,312K, 2.84x, over the limit, and it needs $3,470K more EBITDA to pass.
+   Choosing it puts the deal on the as-filed basis (`Deal.ebitda_basis`), so the result is the same 2.84x the card showed and approval is refused.
+   The other options keep covenant EBITDA (0.76x and 1.56x).
 2. A model's `not_debt` tag is refused unless it cites a live policy learned on that company's line.
-3. A result must cite the Preparer's own runs made after the last answer: non-naive debt, the deal's EBITDA basis, a leverage run that divides exactly those two, and rows equal to the consolidate run. Agents call `leverage` with run ids only.
+3. A result must cite the Preparer's own runs made after the last answer: non-naive debt, the deal's EBITDA basis, a leverage run that divides exactly those two, and rows equal to the consolidate run.
+   Agents call `leverage` with run ids only.
 4. The gateway reads the Reviewer's pass from its `tie_out` and `limit_test` runs on this result.
 5. Policies are scoped to the company, and a reversal retires the policies a flag taught.
 6. A refused model result is retried once with the reason (Mapper), then made by the scripted backend under the same checks, so a refusal does not end the run on stage.
 7. Demo hardening from the same review: the pinned replay is a first run that raises the flag, `/dev/reset?keep_memory=false` is the reset between judges, the reset refuses during a run and frees the fork slot, and `DROID_TIMEOUT` defaults to 90 s (75 in the demo `.env`).
 
-Why: "the gateway, not the prompt, enforces it" is the pitch, and each of these was true only in the prompt. The as-filed reading removes the thin margin without changing the agreement's reading.
+Why: "the gateway, not the prompt, enforces it" is the pitch, and each of these was true only in the prompt.
+The as-filed reading removes the thin margin without changing the agreement's reading.
 
-Not changed: the test period. Each company's latest fiscal year stands in for the agreement's trailing twelve months to the closing quarter; that rebuild is the next step, said out loud.
+Not changed: the test period.
+Each company's latest fiscal year stands in for the agreement's trailing twelve months to the closing quarter; that rebuild is the next step, said out loud.
 
 Evidence: `backend/tests/test_gateway_guards.py` (one test per attack), `backend/tests/test_demo_reset.py`, `backend/tests/test_mapper_retry.py`, `test_the_demo_run_beat_by_beat`; commits 0e3829f and 3938ca9.
 
 ## D19. A Mac desktop app, with edits in review that the agents learn from
 
-Date: 2026-10-24, evening. Proposed by Cayden, agreed by the team.
+Date: 2026-10-24, evening.
+Proposed by Cayden, agreed by the team.
 
 Decision:
-1. Stochastic ships as a Mac desktop app only: the Next console inside an Electron window. There is no separate web product.
-2. After the agents finish, the combined table is editable in the app: a target line can be remapped, and a platform or target amount can be changed. Combined values and totals stay computed.
-3. Each edit asks "Why did you change this?" through a companion that follows the cursor in the app and moves to the edited cell. The reasons are chips plus optional text; the demo chips are hardcoded and the pitch says so.
-4. A remap with a reason becomes a mapping policy for every add-on on the same platform (the D12 path). An amount edit becomes a logged adjustment that the Preparer proposes on a later deal for approval. It is never applied silently.
-5. Edits are recorded on top of the agents' run, not over it. Code recomputes with new run ids, the Reviewer's checks re-run, and approval is refused while an edit has no reason.
+1. Stochastic ships as a Mac desktop app only: the Next console inside an Electron window.
+   There is no separate web product.
+2. After the agents finish, the combined table is editable in the app: a target line can be remapped, and a platform or target amount can be changed.
+   Combined values and totals stay computed.
+3. Each edit asks "Why did you change this?" through a companion that follows the cursor in the app and moves to the edited cell.
+   The reasons are chips plus optional text; the demo chips are hardcoded and the pitch says so.
+4. A remap with a reason becomes a mapping policy for every add-on on the same platform (the D12 path).
+   An amount edit becomes a logged adjustment that the Preparer proposes on a later deal for approval.
+   It is never applied silently.
+5. Edits are recorded on top of the agents' run, not over it.
+   Code recomputes with new run ids, the Reviewer's checks re-run, and approval is refused while an edit has no reason.
 6. After approval, "Download final files" saves the workbook (edited cells marked, with notes and an Edits sheet) and the draft certificate.
 
 Why:
-- Flags catch lines the Mapper knows it is unsure about. Review edits catch the lines it was sure about and got wrong, which a next deal would repeat silently. [inferred]
+- Flags catch lines the Mapper knows it is unsure about.
+  Review edits catch the lines it was sure about and got wrong, which a next deal would repeat silently. [inferred]
 - "Improves with every correction" is a strong signal in the Hyphenate workshop notes, and an edit is a correction. [verified: `hyphenate-workshop.md`]
 - Controllers finish in Excel, so the download keeps the edits and their reasons instead of losing them. [inferred]
 
 Rejected:
-- A guard that watches exported files or other apps for changed numbers. With editing in the app, it is a roadmap line.
-- A full spreadsheet in the app. It would always be a worse Excel, and formulas would break traceability.
+- A guard that watches exported files or other apps for changed numbers.
+  With editing in the app, it is a roadmap line.
+- A full spreadsheet in the app.
+  It would always be a worse Excel, and formulas would break traceability.
 - Tauri. The stack is Node, Squeek's companion is a working Electron reference, and Chromium renders the same as the browser the console was designed in.
 
 Design: `design/review-companion.md`.
 
 ## D20. A fourth agent, the Brief Reader, reads the credit agreement into the Brief
 
-Date: 2026-10-24, evening. Decided by Cayden after asking whether Stochastic works only for the one PNC agreement; the design comes from three research passes the same evening.
+Date: 2026-10-24, evening.
+Decided by Cayden after asking whether Stochastic works only for the one PNC agreement; the design comes from three research passes the same evening.
 
 Context: the code takes any Brief (`POST /deals` accepts one as JSON, and nothing in the math names PNC), but a person writes the Brief by hand, and only one exists. [verified: `backend/app/api/routes.py`, `backend/app/db/fixtures/kewaunee.py`]
 So Stochastic is tested on one agreement, and "what about a different lender?" has no good answer.
 This answers D5's "Revisit if" (a step needs a judgment the three agents cannot make) and replaces D7's "Rejected: reading the full credit agreement in the MVP".
 
 Decision:
-1. Add a fourth role, the Brief Reader (credit analyst). It reads the covenant section and the definitions it uses, and drafts the Brief with a verbatim quote and a section for every field.
-2. It is a separate role, not part of the Mapper. The agreement is read once per loan and the books on every deal; the agent that applies the definition of debt must not also write it; and the approved Brief is a gate before mapping starts.
-3. The model points and code decides. The gateway refuses a quote that is not an exact substring of the agreement after normalization, and a number that does not appear in its quote. The model never computes a number.
-4. The controller approves the Brief, and no agent can. Mapping and the covenant tools are refused until it is approved. The approved Brief is locked and keyed by the agreement's hash, so the next add-on under the same facility reuses it.
-5. Adjustment amounts come from the books, not the agreement. The reader gives each add-back's name and cap and flags its amount; the controller enters it with its source.
-6. Stage 1 keeps the current Brief schema. What the schema cannot express becomes a flag, not a guess. Stage 2 turns the covenant into data from a fixed menu (several covenants, step-downs, cash netting, percent caps, pro forma acquisitions, the EBITDA base as parts); the model never writes a free-form formula.
-7. A Brief JSON can still be sent instead of an agreement. The demo deal and the existing tests stay as they are.
+1. Add a fourth role, the Brief Reader (credit analyst).
+   It reads the covenant section and the definitions it uses, and drafts the Brief with a verbatim quote and a section for every field.
+2. It is a separate role, not part of the Mapper.
+   The agreement is read once per loan and the books on every deal; the agent that applies the definition of debt must not also write it; and the approved Brief is a gate before mapping starts.
+3. The model points and code decides.
+   The gateway refuses a quote that is not an exact substring of the agreement after normalization, and a number that does not appear in its quote.
+   The model never computes a number.
+4. The controller approves the Brief, and no agent can.
+   Mapping and the covenant tools are refused until it is approved.
+   The approved Brief is locked and keyed by the agreement's hash, so the next add-on under the same facility reuses it.
+5. Adjustment amounts come from the books, not the agreement.
+   The reader gives each add-back's name and cap and flags its amount; the controller enters it with its source.
+6. Stage 1 keeps the current Brief schema.
+   What the schema cannot express becomes a flag, not a guess.
+   Stage 2 turns the covenant into data from a fixed menu (several covenants, step-downs, cash netting, percent caps, pro forma acquisitions, the EBITDA base as parts); the model never writes a free-form formula.
+7. A Brief JSON can still be sent instead of an agreement.
+   The demo deal and the existing tests stay as they are.
 8. The answer key for the reader is a set of hand-written Briefs: PNC and Kewaunee, Noble Roman's, and Mayville Engineering, scored field by field.
 
 Why:
 - One approved Brief serves every add-on under the same facility, so the reader runs rarely and the Mapper runs every deal. [inferred]
 - Models find citations convincing on topic alone (37% to 61% of wrong pinpoints caught in one study), so code checks the quotes, not a model. [verified: `research/brief-reader.md` section 4.2]
 - The Citations API cannot be combined with structured output and is not on the Droid or scripted backends, so the quote check lives in the gateway, where it works on every backend. [verified: `research/brief-reader.md` section 4.4]
-- Products that read credit agreements extract terms and link to the source. Barring the model from numbers and checking every quote in code is the narrower, stricter claim we can defend. [inferred: `research/brief-reader.md` section 6]
+- Products that read credit agreements extract terms and link to the source.
+  Barring the model from numbers and checking every quote in code is the narrower, stricter claim we can defend. [inferred: `research/brief-reader.md` section 6]
 - Hyphenate asks "would you hire it?", and a tool that only works for one loan is a weak answer. [inferred]
 
 Rejected:
-- The Mapper reads the agreement too. It would write the rule it then applies, and it would re-read a 240K to 690K character agreement on every deal.
-- The whole agreement in one prompt. The relevant text is 8K to 30K characters, and accuracy drops mid-context. [verified: `research/brief-reader.md` sections 1 and 4.2]
-- Fuzzy quote matching. It can accept "4.50" for "4.25" or drop a "not".
+- The Mapper reads the agreement too.
+  It would write the rule it then applies, and it would re-read a 240K to 690K character agreement on every deal.
+- The whole agreement in one prompt.
+  The relevant text is 8K to 30K characters, and accuracy drops mid-context. [verified: `research/brief-reader.md` sections 1 and 4.2]
+- Fuzzy quote matching.
+  It can accept "4.50" for "4.25" or drop a "not".
 - A model-written formula that code runs.
 
 Not changed: the math in `backend/app/tools/finance.py`, and the three existing roles.
 
-Not decided: when to build stage 1. The order of work in `TASKS.md` has a feature freeze on Saturday at 8pm.
+Not decided: when to build stage 1.
+The order of work in `TASKS.md` has a feature freeze on Saturday at 8pm.
 
-Design: `architecture/brief-reader.md`. Research: `research/brief-reader.md`.
+Design: `architecture/brief-reader.md`.
+Research: `research/brief-reader.md`.
 
 ## D21. Logo and launch splash
 

@@ -1,6 +1,7 @@
 # Documentation index
 
-Start with `STOCHASTIC.md`. It is the product reference.
+Start with `STOCHASTIC.md`.
+It is the product reference.
 
 | Folder or file | What it holds |
 | --- | --- |
@@ -27,4 +28,5 @@ Start with `STOCHASTIC.md`. It is the product reference.
 Rules for all docs:
 - Mark every claim verified or inferred.
 - Put each sentence on its own line.
-- Use a plain hyphen. Never use the em dash.
+- Use a plain hyphen.
+  Never use the em dash.

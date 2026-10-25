@@ -1,14 +1,16 @@
 # Architecture
 
 Status: describes the code as of 2026-10-24.
-The product reference is `../STOCHASTIC.md`. If this folder and that file disagree, that file is correct.
+The product reference is `../STOCHASTIC.md`.
+If this folder and that file disagree, that file is correct.
 
 ## Goals
 
 - Keep the system small enough to build in one weekend.
 - Make the trust rules true in code: code does the math, only the gateway writes, unsure means ask.
 - Run one deal end to end (Kewaunee buys Nu Aire) before adding anything else.
-- Agents are stateful. What the controller teaches them is kept and applied next time.
+- Agents are stateful.
+  What the controller teaches them is kept and applied next time.
 
 ## Parts
 
@@ -47,13 +49,22 @@ flowchart LR
 
 ## Request flow
 
-1. The fixture loads the platform lines, the target lines, and the brief. The gateway creates the deal.
-2. `POST /deals/{id}/run`. The runner opens `map_lines`. The Mapper (with its policies) returns mappings, tags, and flag proposals.
-3. The gateway stores the mappings and tags, and opens a flag per proposal. For each option it runs the tools as a what-if and writes the effect on the option.
-4. The console shows the flag card. The controller answers. The gateway applies the tags or the mapping, writes a policy, and posts the flag. The run continues.
+1. The fixture loads the platform lines, the target lines, and the brief.
+   The gateway creates the deal.
+2. `POST /deals/{id}/run`.
+   The runner opens `map_lines`.
+   The Mapper (with its policies) returns mappings, tags, and flag proposals.
+3. The gateway stores the mappings and tags, and opens a flag per proposal.
+   For each option it runs the tools as a what-if and writes the effect on the option.
+4. The console shows the flag card.
+   The controller answers.
+   The gateway applies the tags or the mapping, writes a policy, and posts the flag.
+   The run continues.
 5. The Preparer calls `consolidate`, `ebitda`, `covenant_debt`, and `leverage` through the gateway and returns the draft with the run ids.
-6. The Reviewer calls `tie_out` and `limit_test` and returns pass or needs-attention. The gateway opens `approve_result`.
-7. The controller approves. The gateway posts and the deal stage is `posted`.
+6. The Reviewer calls `tie_out` and `limit_test` and returns pass or needs-attention.
+   The gateway opens `approve_result`.
+7. The controller approves.
+   The gateway posts and the deal stage is `posted`.
 8. Run again after a reset: the Mapper applies the policies and asks nothing.
 
 ## Documents in this folder

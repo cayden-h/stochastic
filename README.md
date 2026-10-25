@@ -38,9 +38,11 @@ Errors in the mapping flow silently into every later number. [inferred]
 2. **Flags** only the unclear lines for a human, with both options and the effect on the result.
 3. **Combines** the books in code: platform, target, and total, with EBITDA adjusted the way the agreement defines it. (Intercompany eliminations are cut for the weekend.)
 4. **Tests** combined leverage against the lender's limit, using the covenant's own definitions of debt and EBITDA.
-5. **Checks** the work with a reviewer agent, and a human controller approves. The agent that prepares a result cannot approve it, and the gateway refuses a number that no tool run produced.
+5. **Checks** the work with a reviewer agent, and a human controller approves.
+   The agent that prepares a result cannot approve it, and the gateway refuses a number that no tool run produced.
 6. **Logs** every action in an audit log, and each row is chained to the row before it.
-7. **Learns.** The controller's answer to a flag becomes a policy. The Mapper applies it on the next run instead of asking again, and the log shows it.
+7. **Learns.** The controller's answer to a flag becomes a policy.
+   The Mapper applies it on the next run instead of asking again, and the log shows it.
 
 ## How it works
 
@@ -95,7 +97,8 @@ The agent layer uses one function, `run_agent(role, item)`, with four backends: 
 
 Each agent is stateful.
 It receives one work item with all its inputs, plus its session and the policies it learned, and returns one typed result.
-The state lives in the store, written only by the gateway, so it survives a restart. Today only a re-run of the same deal shows the memory; a second deal is not built.
+The state lives in the store, written only by the gateway, so it survives a restart.
+Today only a re-run of the same deal shows the memory; a second deal is not built.
 
 | Agent | Real-team role | Gets | Returns | Never |
 | --- | --- | --- | --- | --- |
@@ -107,12 +110,14 @@ The human controller approves flagged lines and the final result.
 
 Planned, not built: a fourth agent, the Brief Reader (credit analyst), reads the credit agreement and drafts the brief with a verbatim quote for every field.
 The gateway refuses a quote that is not in the agreement and a number that is not in its quote, and the controller approves the brief before mapping starts.
-Today a person writes the brief. See `docs/architecture/brief-reader.md`.
+Today a person writes the brief.
+See `docs/architecture/brief-reader.md`.
 
 ## The demo
 
 The proof deal is Kewaunee Scientific buying Nu Aire, closed 2024-11-01, for $55M. [verified]
-Kewaunee is the platform. Nu Aire is the target.
+Kewaunee is the platform.
+Nu Aire is the target.
 The data comes from public filings: Nu Aire's audited statements, Kewaunee's pro forma statements with a note that maps Nu Aire's lines, and the PNC credit agreement.
 Public filings give statement lines, not trial balances, so the demo maps statement lines.
 
@@ -120,7 +125,8 @@ Public filings give statement lines, not trial balances, so the demo maps statem
 It holds the Statesville sale-leaseback ($27,782K), the new PNC term loan and revolver ($20,563K), and the 8% seller notes ($22,540K). [verified]
 The credit agreement's Senior Funded Bank Debt excludes the capital lease on that property and subordinated debt.
 So the agent asks the controller which parts count, and each option shows the leverage it gives, computed by the tools.
-Read as filed, counting the whole line over reported EBITDA gives 2.84x, over the 2.50x limit. The agreement's reading gives 0.76x. [verified: `backend/tests/test_demo_run.py`]
+Read as filed, counting the whole line over reported EBITDA gives 2.84x, over the 2.50x limit.
+The agreement's reading gives 0.76x. [verified: `backend/tests/test_demo_run.py`]
 
 **The one screen** has the flag card with its options and effects, a combined table (the combined balance sheet balances at $182,456K of total assets), and one verdict line that shows combined leverage against the 2.50x limit with the room left.
 The audit log is a small link.
@@ -148,7 +154,8 @@ We target four tracks. [set by Cayden, 2026-10-24]
 | Figma | The console is designed in Figma and built from the Figma frame. The Figma file and one agent-driven edit are on screen in the pitch. |
 | Tiger Data | The record, the hash-chained audit log, and the agents' memory live in Postgres on Tiger Cloud. The audit log is a TimescaleDB hypertable that refuses edits, and a restart loads everything back. Each covenant flag's what-ifs live in a zero-copy fork of the ledger until the answer deletes it. |
 
-Other tracks are not targeted. The details, the per-track checklist, and the open questions are in section 15 of `docs/STOCHASTIC.md`.
+Other tracks are not targeted.
+The details, the per-track checklist, and the open questions are in section 15 of `docs/STOCHASTIC.md`.
 
 ## Tech stack (proposed)
 
@@ -246,14 +253,22 @@ The Droid backend needs the `droid` CLI on PATH: `curl -fsSL https://app.factory
 
 Every figure is from the filings or computed by the tools. [verified: `backend/tests/test_trust_rules.py`]
 
-1. Kewaunee's balance sheet has one line, "Financing liability". At 2024-10-31 it was $750K current plus $27,032K long-term, a sale-leaseback of the Statesville property carried at $27,782K. [10-Q]
+1. Kewaunee's balance sheet has one line, "Financing liability".
+   At 2024-10-31 it was $750K current plus $27,032K long-term, a sale-leaseback of the Statesville property carried at $27,782K. [10-Q]
 2. At close the pro forma adds $43,103K to the same line: the $15,000K term loan, the $5,563K revolver draw, and the $22,540K seller notes. [Ex 99.2 Note 4(h)]
 3. The credit agreement's Senior Funded Bank Debt excludes the capital lease on that property and excludes subordinated debt. [Ex 10.1]
-4. The Mapper tags the line unclear and raises a flag with three options. The gateway runs the tools for each option and writes the effect on the card.
-5. Whole line, read as filed: debt $71,955K over reported EBITDA $25,312K, leverage 2.84x, over the limit. Agreement's reading: debt $21,633K, leverage 0.76x, OK. Bank debt plus seller notes: 1.56x.
+4. The Mapper tags the line unclear and raises a flag with three options.
+   The gateway runs the tools for each option and writes the effect on the card.
+5. Whole line, read as filed: debt $71,955K over reported EBITDA $25,312K, leverage 2.84x, over the limit.
+   Agreement's reading: debt $21,633K, leverage 0.76x, OK.
+   Bank debt plus seller notes: 1.56x.
 6. Covenant EBITDA is $28,379K: both companies' net income plus interest expense less interest income, plus taxes, depreciation, and amortization, plus the $4,019K noncash pension termination add-back and $1,018K of stock-based compensation, less $1,970K of Statesville cash rent (inferred from the 10-K obligations table).
-7. The controller picks b. The Preparer calls consolidate, ebitda, covenant_debt, and leverage. The Reviewer calls tie_out and limit_test. The controller approves and the gateway posts.
-8. Reset and run again with memory kept: the Mapper applies the policy and asks nothing. Between judges, reset with memory cleared so the flag comes back.
+7. The controller picks b.
+   The Preparer calls consolidate, ebitda, covenant_debt, and leverage.
+   The Reviewer calls tie_out and limit_test.
+   The controller approves and the gateway posts.
+8. Reset and run again with memory kept: the Mapper applies the policy and asks nothing.
+   Between judges, reset with memory cleared so the flag comes back.
 
 ## Team and branches
 
@@ -264,13 +279,16 @@ Every figure is from the filings or computed by the tools. [verified: `backend/t
 | Eric | Data, input files, answer key, Devpost draft | `eric/data` | [`docs/tasks/eric.md`](docs/tasks/eric.md) |
 | Tri | Math tools, tests, API | `tri/tools` | [`docs/tasks/tri.md`](docs/tasks/tri.md) |
 
-Each person edits only the folders they own. The rules for parallel work are in [`docs/tasks/README.md`](docs/tasks/README.md).
+Each person edits only the folders they own.
+The rules for parallel work are in [`docs/tasks/README.md`](docs/tasks/README.md).
 Cayden owns the shared data contract in `backend/app/core/models.py`.
 
 ## Open questions
 
-- Does PE add-on integration count as a corner of a finance team for Hyphenate? Ask a Hyphenate mentor on Saturday.
-- Which reading of Kewaunee's financing liability is right? All three are computed; a practitioner should confirm the default.
+- Does PE add-on integration count as a corner of a finance team for Hyphenate?
+  Ask a Hyphenate mentor on Saturday.
+- Which reading of Kewaunee's financing liability is right?
+  All three are computed; a practitioner should confirm the default.
 - Droid runs Claude Sonnet 5.5 and Haiku 5.5 on our key (answered 2026-10-24).
 - The Anthropic API backend ran on Eric's key; the demo laptop has none, so it is not in the stage fallback chain.
 
@@ -278,17 +296,23 @@ The full list is in section 18 of `docs/STOCHASTIC.md`.
 
 ## Honesty notes
 
-- Claims in the docs are tagged verified or inferred. No practitioner has checked the user assumptions.
-- The demo is a reconstruction from public filings. It does not show the internal views of the lender or the company.
-- The screen says which backend produced the agent output: anthropic, droid, scripted, or replay. The gateway, the math, and the audit log are real.
-- The rent deduction and zero transaction costs in covenant EBITDA are inferred, not filed figures. The combined table is historical plus target, without purchase accounting, and the two fiscal years differ.
-- The output is a mapped, combined set of books and a limit check that a human approves. It is not advice.
+- Claims in the docs are tagged verified or inferred.
+  No practitioner has checked the user assumptions.
+- The demo is a reconstruction from public filings.
+  It does not show the internal views of the lender or the company.
+- The screen says which backend produced the agent output: anthropic, droid, scripted, or replay.
+  The gateway, the math, and the audit log are real.
+- The rent deduction and zero transaction costs in covenant EBITDA are inferred, not filed figures.
+  The combined table is historical plus target, without purchase accounting, and the two fiscal years differ.
+- The output is a mapped, combined set of books and a limit check that a human approves.
+  It is not advice.
 - Other situations are roadmap, not built.
 - Sponsor and vendor numbers are self-reported.
 
 ## License
 
-None yet. This repository is private, and all rights are reserved until the team decides.
+None yet.
+This repository is private, and all rights are reserved until the team decides.
 
 ## Acknowledgments
 

@@ -42,12 +42,14 @@ Most of the FigBuild lessons carry over, but the "speculative, not judged on fea
    Why: HAX guideline 16 is "Convey the consequences of user actions". [verified: https://www.microsoft.com/en-us/haxtoolkit/library/]
    Why: Smashing says to show the plan in plain words and offer proceed, edit or take over. [verified: https://smashingmagazine.com/2026/02/designing-agentic-ai-practical-ux-patterns/]
 
-5. Mark one default answer and say why. Never pre-submit it.
+5. Mark one default answer and say why.
+   Never pre-submit it.
    Why: Hick's law says to highlight the recommended option. [verified: https://lawsofux.com/hicks-law/]
    Why: showing confidence only helps if it changes the decision, and a category needs a stated action. [verified: https://pair.withgoogle.com/chapter/explainability-trust/]
    [inferred] A pre-selected default that still needs one click keeps the human as the decider.
 
-6. Make every answer reversible by adding a new linked item. Never delete.
+6. Make every answer reversible by adding a new linked item.
+   Never delete.
    Why: Smashing lists "Action Audit and Undo" as a core pattern. [verified: https://smashingmagazine.com/2026/02/designing-agentic-ai-practical-ux-patterns/]
    Why: it matches gateway rule 5, where a reversal is a new item linked to the original. [local: docs/STOCHASTIC.md]
 
@@ -74,15 +76,20 @@ Most of the FigBuild lessons carry over, but the "speculative, not judged on fea
 - Can I state the one job of this screen in one sentence of 10 words or fewer?
 - Is there one primary button, and is it the only filled button?
 - Are there 7 or fewer interactive controls on first view? [inferred threshold, a budget and not a research result]
-- Does every element answer a question the reviewer asks at this moment? If not, move it behind one click or delete it.
-- Is there a second level of detail at most? Never a third. [verified: https://www.nngroup.com/articles/progressive-disclosure/]
+- Does every element answer a question the reviewer asks at this moment?
+  If not, move it behind one click or delete it.
+- Is there a second level of detail at most?
+  Never a third. [verified: https://www.nngroup.com/articles/progressive-disclosure/]
 - Does every number have a unit, and every claim a source link?
-- Is color the only carrier of meaning anywhere? If yes, add a word.
+- Is color the only carrier of meaning anywhere?
+  If yes, add a word.
 - Does the empty state say what the system is doing and what the human should do (often "nothing")?
 - Is the text readable at 3 meters on a projector (see Visual direction for sizes)?
-- Would a judge understand the screen in 5 seconds without hearing a word? If not, cut or rewrite.
+- Would a judge understand the screen in 5 seconds without hearing a word?
+  If not, cut or rewrite.
 - Does the copy pass a plain-writing check: short sentences, no hedges, no marketing words?
-- Is any control there only because "dashboards have it"? Delete it.
+- Is any control there only because "dashboards have it"?
+  Delete it.
 
 Evidence for the "fewer controls" stance: Hick's law key takeaways say to cut options when speed matters and to break complex tasks into smaller steps. [verified: https://lawsofux.com/hicks-law/]
 Counter-evidence to keep in mind: Hick's law also warns against oversimplifying to the point of vagueness. [verified: https://lawsofux.com/hicks-law/]
@@ -92,23 +99,34 @@ So "minimal" here means "hidden until asked", not "missing".
 ### NOT in the UI (explicit list)
 
 - No dashboard home with charts, KPI tiles or trend lines.
-- No chat box or free-text prompt to the agents. The agents ask, the human picks.
-- No agent-to-agent conversation view. Agents pass typed work items, so show the items, not a chat. [local: docs/STOCHASTIC.md]
+- No chat box or free-text prompt to the agents.
+  The agents ask, the human picks.
+- No agent-to-agent conversation view.
+  Agents pass typed work items, so show the items, not a chat. [local: docs/STOCHASTIC.md]
 - No autonomy dial, settings page, profile editor or theme switcher in the MVP. (Smashing recommends an autonomy dial, but the demo covers one deal and one profile, so it is not needed. [verified: https://smashingmagazine.com/2026/02/designing-agentic-ai-practical-ux-patterns/])
-- No confidence percentages on clause readings. Use one word (Sure, Unsure) and the action it triggers. [verified: https://pair.withgoogle.com/chapter/explainability-trust/]
-- No Monte Carlo fan charts, histograms or decorative charts. One number (chance of breach) plus a run id.
-- No donut, gauge or 3D chart. Covenant headroom gets one thin bar with a limit tick, or just text. [inferred; no source found for covenant visuals]
-- No more than 3 plans in the comparison table. Extra plans stay behind one link, "Show other plans".
+- No confidence percentages on clause readings.
+  Use one word (Sure, Unsure) and the action it triggers. [verified: https://pair.withgoogle.com/chapter/explainability-trust/]
+- No Monte Carlo fan charts, histograms or decorative charts.
+  One number (chance of breach) plus a run id.
+- No donut, gauge or 3D chart.
+  Covenant headroom gets one thin bar with a limit tick, or just text. [inferred; no source found for covenant visuals]
+- No more than 3 plans in the comparison table.
+  Extra plans stay behind one link, "Show other plans".
 - No login, accounts, mobile layout, many deals, search, saved views, export, date-range filters or pagination. (Matches the MVP cut list. [local: docs/diagrams/04-mvp-build-plan.html])
 - No notification center, badges with counts on everything, toasts for routine events, or sounds.
-- No modal confirmation on routine answers. Use undo instead. Confirmation is reserved for E6 approve.
-- No separate memo editor. The memo is a short block on the Plans screen with an "Open full memo" link.
+- No modal confirmation on routine answers.
+  Use undo instead.
+  Confirmation is reserved for E6 approve.
+- No separate memo editor.
+  The memo is a short block on the Plans screen with an "Open full memo" link.
 - No dark mode and no theme toggle (one theme to test and to film). [inferred]
-- No eight-situation picker. The demo has one situation, shown as a label.
+- No eight-situation picker.
+  The demo has one situation, shown as a label.
 
 ## Minimal screen set
 
-Four screens. The fifth slot is deliberately unused.
+Four screens.
+The fifth slot is deliberately unused.
 Evidence is a slide-over panel, so it is counted as the fourth screen but never a page change.
 
 ### 1. Desk
@@ -122,7 +140,9 @@ Evidence is a slide-over panel, so it is counted as the fourth screen but never 
 ### 2. Plans (hero screen)
 
 - One job: compare plans and decide.
-- Primary action: "Approve Plan B" (E6). Secondary: "Ask for changes". Tertiary text link: "Reject".
+- Primary action: "Approve Plan B" (E6).
+  Secondary: "Ask for changes".
+  Tertiary text link: "Reject".
 - Handles E4 (plan blocked) and E5 (plan flipped after an event) as a banner on top of the same table, not as new screens.
 - Shows: the verdict line, the plan table (see anatomy), and directly under the red plan the DENIED row with the quoted clause and page link.
 - Why this is the hero: it shows in one frame the three things the pitch claims, a limit enforced in code, a re-plan, and a human decision. [inferred]
@@ -131,14 +151,19 @@ Evidence is a slide-over panel, so it is counted as the fourth screen but never 
 ### 3. Log
 
 - One job: prove what happened.
-- Primary action: none. The page is read-only. One toggle: "Denied only". One button: "Verify chain".
+- Primary action: none.
+  The page is read-only.
+  One toggle: "Denied only".
+  One button: "Verify chain".
 - Shows: the audit log (see anatomy) and a chain status line.
 
 ### 4. Source (slide-over panel)
 
 - One job: show the page and the exact quote behind a fact or a denial.
-- Primary action: "Close". The quote is highlighted on the page image or text.
-- Opens from any quote chip on Desk, Plans or Log. It never changes the route.
+- Primary action: "Close".
+  The quote is highlighted on the page image or text.
+- Opens from any quote chip on Desk, Plans or Log.
+  It never changes the route.
 - Shows: document name, page number, the highlighted quote, and the validator result ("Quote found on page 41. Checked by code.").
 
 ### Demo flow across the screens (from the MVP script)
@@ -154,12 +179,19 @@ Evidence is a slide-over panel, so it is counted as the fourth screen but never 
 Order of fields, top to bottom.
 Everything fits in one card with no scroll at 1280 by 720.
 
-1. Header line: agent chip, point label, and age. Example: "Clause reader - E3 Unclear clause - just now".
+1. Header line: agent chip, point label, and age.
+   Example: "Clause reader - E3 Unclear clause - just now".
 2. The question: one sentence, under 20 words, ends with a question mark.
-3. The quote: serif text, the deciding phrase highlighted, then a source chip "Credit agreement, p. 41, 7.6(e)". Click opens Source.
-4. Answer buttons: two or three, equal width, each with a one-line effect under it. The agent's suggestion carries the tag "Agent suggests" and a short reason. Nothing is submitted until the click.
-5. Escape link: "Not sure. Hold this item." This pauses that branch and logs it.
-6. After the click: the card collapses to one line "Answered: Counts as debt. Logged 14:02:11. Undo" with a 30-second undo link. Undo adds a REVERSED item. It deletes nothing.
+3. The quote: serif text, the deciding phrase highlighted, then a source chip "Credit agreement, p. 41, 7.6(e)".
+   Click opens Source.
+4. Answer buttons: two or three, equal width, each with a one-line effect under it.
+   The agent's suggestion carries the tag "Agent suggests" and a short reason.
+   Nothing is submitted until the click.
+5. Escape link: "Not sure. Hold this item."
+   This pauses that branch and logs it.
+6. After the click: the card collapses to one line "Answered: Counts as debt. Logged 14:02:11. Undo" with a 30-second undo link.
+   Undo adds a REVERSED item.
+   It deletes nothing.
 
 Copy style rules:
 - Write the question so the answer is a choice, not an essay.
@@ -195,8 +227,10 @@ Not sure. Hold this item.
 ```
 
 The 4.1x and 3.00x figures come from the project notes and use an inferred adjusted EBITDA. [local: docs/STOCHASTIC.md]
-The "2.2x" and the run ids are placeholders for the layout only. Replace them with real engine output.
-The quote above is a paraphrase for layout. Use the exact clause text in the real card.
+The "2.2x" and the run ids are placeholders for the layout only.
+Replace them with real engine output.
+The quote above is a paraphrase for layout.
+Use the exact clause text in the real card.
 
 ### Example E4 (plan blocked)
 
@@ -224,14 +258,16 @@ The facts that a blocked cash dividend and a consent route exist come from the p
 
 ## Plan comparison table anatomy
 
-Layout: plans as columns, measures as rows. Maximum 3 plan columns.
+Layout: plans as columns, measures as rows.
+Maximum 3 plan columns.
 Reason: a person scans down a row to compare one measure across plans. [inferred]
 
 Column header for each plan: name, one verdict word, and one status icon.
 Verdict words, fixed set: Blocked (red), Needs consent (amber), Clear (green).
 The recommended plan has a thin ink outline and the tag "Agent suggests".
 
-Rows, in this order. Stop at 8 rows.
+Rows, in this order.
+Stop at 8 rows.
 1. Verdict (word plus icon).
 2. Raises ($M).
 3. All-in cost (% per year).
@@ -242,12 +278,17 @@ Rows, in this order. Stop at 8 rows.
 8. Blocked by (clause section, linked to Source).
 
 Number rules:
-- Right-align all numbers. Use tabular lining digits. Same decimals down a row. [verified: http://design.alberta.ca/examples/display-numbers-in-a-table-so-they-can-be-scanned-easily/]
-- Units sit in the row label, not in every cell. Show a delta against the recommended plan in a smaller muted line (for example "+0.4 pts"). [inferred]
+- Right-align all numbers.
+  Use tabular lining digits.
+  Same decimals down a row. [verified: http://design.alberta.ca/examples/display-numbers-in-a-table-so-they-can-be-scanned-easily/]
+- Units sit in the row label, not in every cell.
+  Show a delta against the recommended plan in a smaller muted line (for example "+0.4 pts"). [inferred]
 - Negative numbers use a real minus sign, never color alone. [search summary: https://www.quackit.com/html/templates/tables/financial_data_table.cfm]
-- Row height 44 px or more, header the same height as a row. Carbon uses a consistent row size with the header matching it. [verified: https://carbondesignsystem.com/components/data-table/usage/]
+- Row height 44 px or more, header the same height as a row.
+  Carbon uses a consistent row size with the header matching it. [verified: https://carbondesignsystem.com/components/data-table/usage/]
 - A blocked plan keeps its numbers but the column gets the red tint and a DENIED strip under the header that quotes the clause.
-- The headroom bar is optional. If the build is short on time, show the text "4.1x of 3.00x max. Over by 1.1x." and skip the bar. [inferred]
+- The headroom bar is optional.
+  If the build is short on time, show the text "4.1x of 3.00x max. Over by 1.1x." and skip the bar. [inferred]
 - One highlighted cell per column at most (the cell that decides).
 
 GitHub's review model is a useful comparison: three outcomes (comment, approve, request changes) and an option to require approvals before merge. [verified: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews]
@@ -258,28 +299,41 @@ Stochastic maps to it as: Ask for changes, Approve, and Reject, with the propose
 One row per event, newest at the bottom (a ledger reads downward). [inferred]
 Fixed columns:
 
-1. Time: 24-hour with seconds. The header says the time zone once.
+1. Time: 24-hour with seconds.
+   The header says the time zone once.
 2. Actor: chip with role color and a name (Intake, Clause reader, Structuring, Risk, Memo, Gateway, Reviewer).
-3. Verb: from a fixed list: PROPOSED, ASKED, ANSWERED, APPROVED, POSTED, DENIED, REVERSED. A controlled verb list keeps the log scannable. [search summary: https://gravitee.io/corpus/gen-1361/monochrome-racing/audit-log-presentation.html]
+3. Verb: from a fixed list: PROPOSED, ASKED, ANSWERED, APPROVED, POSTED, DENIED, REVERSED.
+   A controlled verb list keeps the log scannable. [search summary: https://gravitee.io/corpus/gen-1361/monochrome-racing/audit-log-presentation.html]
 4. Object: a link to the work item, plan or fact.
-5. Detail: one line. For DENIED, the rule plus the quoted clause and a Source chip. For a changed value, "from X to Y". [verified: https://www.saasui.design/blog/saas-activity-feed-audit-log-ux-patterns]
+5. Detail: one line.
+   For DENIED, the rule plus the quoted clause and a Source chip.
+   For a changed value, "from X to Y". [verified: https://www.saasui.design/blog/saas-activity-feed-audit-log-ux-patterns]
 6. Ids: run id and the first 6 characters of the row hash, in small mono, muted.
 
 Rules:
-- DENIED rows have a red tint and a left bar. Nothing else in the log has a fill. This makes them findable in one glance.
+- DENIED rows have a red tint and a left bar.
+  Nothing else in the log has a fill.
+  This makes them findable in one glance.
 - Human actions have a heavier chip than agent actions, so a reader can follow the human trail.
-- Above the table: one status line "Chain intact. 214 rows. Head a3f9c1." with a "Verify" button that recomputes the chain live and then shows "Verified 14:05:02". This is the whole tamper-evident UI.
-- Filters: one toggle "Denied only" and one agent dropdown. Nothing else.
-- Row click opens a slide-over with the full event JSON. This is the second and last level of depth.
-- Absolute timestamps only. Audit logs need precise, timezone-clear times. [verified: https://www.saasui.design/blog/saas-activity-feed-audit-log-ux-patterns]
+- Above the table: one status line "Chain intact. 214 rows. Head a3f9c1." with a "Verify" button that recomputes the chain live and then shows "Verified 14:05:02".
+  This is the whole tamper-evident UI.
+- Filters: one toggle "Denied only" and one agent dropdown.
+  Nothing else.
+- Row click opens a slide-over with the full event JSON.
+  This is the second and last level of depth.
+- Absolute timestamps only.
+  Audit logs need precise, timezone-clear times. [verified: https://www.saasui.design/blog/saas-activity-feed-audit-log-ux-patterns]
 
 Leave out: search, export, date range, grouping, relative times, avatars, pagination.
-I found no source on how to display hash-chain status. The "chain intact plus Verify" pattern is [inferred]. It turns a hidden property into a visible action, and that fits the "invisible made visible" FigBuild pattern. [local: showcase/patterns/design-winners.md]
+I found no source on how to display hash-chain status.
+The "chain intact plus Verify" pattern is [inferred].
+It turns a hidden property into a visible action, and that fits the "invisible made visible" FigBuild pattern. [local: showcase/patterns/design-winners.md]
 
 ## Visual direction
 
 Name: Paper and ink.
-Idea: a deal-room ledger. A calm paper background, black ink for people, blue for agents, mono for code, amber for "waiting on you", red for "denied".
+Idea: a deal-room ledger.
+A calm paper background, black ink for people, blue for agents, mono for code, amber for "waiting on you", red for "denied".
 [inferred] This reads as finance and as audit work, and it does not look like a default white SaaS dashboard or a neon "AI" look.
 It sits at the opposite end from NeuraLyfe's dark holographic look, which fits a clinical emergency but not a lender-facing review. [local: showcase/projects/hackathon/neuralyfe.md]
 One serif voice for documents echoes the FigBuild pattern of a serif plus a mono or clean sans. [local: showcase/patterns/design-winners.md]
@@ -305,18 +359,25 @@ WCAG minimums: 4.5:1 for normal text, 3:1 for large text and UI components. [ver
 | Clear | #1E6B52 on #E1F0EA | Clear verdict, verified chain | 5.82 on Paper, 5.44 on tint |
 
 Rules:
-- A state is always a color plus a word plus an icon shape (square for agent, circle for human, triangle for escalation, cross for denied, check for clear). Never color alone.
+- A state is always a color plus a word plus an icon shape (square for agent, circle for human, triangle for escalation, cross for denied, check for clear).
+  Never color alone.
 - White text on Agent (#274C77) is 8.8:1, on Denied (#B3261E) 6.54:1, on Clear (#1E6B52) 6.4:1.
 - Only one filled primary button per screen: Ink fill with Paper text.
-- Stripe built its color system in a perceptual color space and set contrast rules per pair of steps. We do not need that scale, but the idea of testing every pair is worth copying. [verified: https://stripe.com/blog/accessible-color-systems]
+- Stripe built its color system in a perceptual color space and set contrast rules per pair of steps.
+  We do not need that scale, but the idea of testing every pair is worth copying. [verified: https://stripe.com/blog/accessible-color-systems]
 
 ### Type
 
 All three are on Google Fonts and free.
-- Public Sans: all UI text and numbers. It has the tabular-figure feature. [inferred from a byte-level check of the Google Fonts file on 2026-10-23, not a visual test. Test `font-variant-numeric: tabular-nums` in a browser before relying on it.]
-- Newsreader: verdict headlines and every clause quote. Serif means "this is the document". It has the feature too by the same check.
-- IBM Plex Mono: run ids, hashes, clause numbers. Mono digits are fixed width by design.
-- I rejected Inter as the main face because it is the default SaaS look. [inferred] It does have tabular figures by the same check.
+- Public Sans: all UI text and numbers.
+  It has the tabular-figure feature. [inferred from a byte-level check of the Google Fonts file on 2026-10-23, not a visual test. Test `font-variant-numeric: tabular-nums` in a browser before relying on it.]
+- Newsreader: verdict headlines and every clause quote.
+  Serif means "this is the document".
+  It has the feature too by the same check.
+- IBM Plex Mono: run ids, hashes, clause numbers.
+  Mono digits are fixed width by design.
+- I rejected Inter as the main face because it is the default SaaS look. [inferred]
+  It does have tabular figures by the same check.
 - IBM Plex Sans looked like the obvious pairing, but the Google Fonts file did not show a tabular feature in my check, so I did not choose it. [inferred, unverified]
 
 Sizes (screen first, then the projector):
@@ -324,70 +385,123 @@ Sizes (screen first, then the projector):
 - Section label: 14 px Public Sans, weight 600, letter-spacing 0.04em, uppercase.
 - Body and table: 18 px Public Sans.
 - Quote: 20 px Newsreader.
-- Ids and hashes: 14 px IBM Plex Mono. Never below 14 px anywhere. [inferred rule for demo legibility]
+- Ids and hashes: 14 px IBM Plex Mono.
+  Never below 14 px anywhere. [inferred rule for demo legibility]
 
 ### Density, spacing, radius, motion
 
-- Density: medium. Row height 44 px, 18 px text. Dense on data, loose around it.
-- Spacing scale: 4, 8, 12, 16, 24, 32, 48 px. Nothing else.
-- Layout: one centered column at 960 px max on Desk and Log. Plans uses 1120 px.
-- Radius: 4 px for chips and inputs, 8 px for cards. No pill buttons.
-- Borders: 1 px Rule color for controls. No shadows. A card is a white rectangle on paper.
-- Motion: 150 ms ease-out for hover and expand. The key moment gets one 400 ms cross-fade of the plan column to the red tint, and the DENIED row slides in over 200 ms. Respect reduced-motion. No spinners; one slow pulsing dot for "agent working". [inferred]
+- Density: medium.
+  Row height 44 px, 18 px text.
+  Dense on data, loose around it.
+- Spacing scale: 4, 8, 12, 16, 24, 32, 48 px.
+  Nothing else.
+- Layout: one centered column at 960 px max on Desk and Log.
+  Plans uses 1120 px.
+- Radius: 4 px for chips and inputs, 8 px for cards.
+  No pill buttons.
+- Borders: 1 px Rule color for controls.
+  No shadows.
+  A card is a white rectangle on paper.
+- Motion: 150 ms ease-out for hover and expand.
+  The key moment gets one 400 ms cross-fade of the plan column to the red tint, and the DENIED row slides in over 200 ms.
+  Respect reduced-motion.
+  No spinners; one slow pulsing dot for "agent working". [inferred]
 
 ## Lessons carried over from FigBuild
 
 FigBuild was a speculative design contest judged on craft, story and fit, "not on feasibility". [local: showcase/sources/figbuild-2026-winners.md]
 Cal Hacks is a build event with a live demo, and Hyphenate asks "is it real enough". [local: docs/sponsors/hyphenate.md]
-The lessons below come from winners only. There are no losers in the library. [local: showcase/patterns/design-winners.md]
+The lessons below come from winners only.
+There are no losers in the library. [local: showcase/patterns/design-winners.md]
 
 Carry over:
-- A distinct identity, not a default UI. Applies. Paper and ink does this. [local: showcase/patterns/design-winners.md]
-- The invisible made visible in one hero screen. Applies. The Plans screen with the DENIED row is it. [local: showcase/patterns/design-winners.md]
-- Plain verdicts and a number plus a word. Applies directly. NeuraLyfe pairs "95" with "Mandatory removal". [local: showcase/projects/hackathon/neuralyfe.md]
-- Design for the user's real state. Somne designed for a half-asleep user. Our user is a busy senior reviewer, so the card answers in seconds. [local: showcase/projects/hackathon/somne.md]
-- Show the quiet or empty screen. Somne showed its idle screen. Our Desk empty state does the same. [local: showcase/projects/hackathon/somne.md]
-- Make the aha one comparison on one screen, and let the user commit before the reveal. Chrono does this with "guess first". The E3 card works the same way, because the reviewer answers before seeing the plan that depends on it. [inferred link] [local: showcase/projects/hackathon/chrono.md]
-- A clickable prototype on a public URL. Applies, and a working product on a public URL is stronger. Dandi shipped a coded app. [local: showcase/projects/hackathon/dandi.md]
-- Craft that survives close inspection. Applies. Judges visit tables and look closely. [inferred]
-- Designed safeguards. Applies in a stronger form: the safeguards are real code (gateway rules, DENIED rows), and the UI shows them. [local: docs/STOCHASTIC.md]
+- A distinct identity, not a default UI.
+  Applies.
+  Paper and ink does this. [local: showcase/patterns/design-winners.md]
+- The invisible made visible in one hero screen.
+  Applies.
+  The Plans screen with the DENIED row is it. [local: showcase/patterns/design-winners.md]
+- Plain verdicts and a number plus a word.
+  Applies directly.
+  NeuraLyfe pairs "95" with "Mandatory removal". [local: showcase/projects/hackathon/neuralyfe.md]
+- Design for the user's real state.
+  Somne designed for a half-asleep user.
+  Our user is a busy senior reviewer, so the card answers in seconds. [local: showcase/projects/hackathon/somne.md]
+- Show the quiet or empty screen.
+  Somne showed its idle screen.
+  Our Desk empty state does the same. [local: showcase/projects/hackathon/somne.md]
+- Make the aha one comparison on one screen, and let the user commit before the reveal.
+  Chrono does this with "guess first".
+  The E3 card works the same way, because the reviewer answers before seeing the plan that depends on it. [inferred link] [local: showcase/projects/hackathon/chrono.md]
+- A clickable prototype on a public URL.
+  Applies, and a working product on a public URL is stronger.
+  Dandi shipped a coded app. [local: showcase/projects/hackathon/dandi.md]
+- Craft that survives close inspection.
+  Applies.
+  Judges visit tables and look closely. [inferred]
+- Designed safeguards.
+  Applies in a stronger form: the safeguards are real code (gateway rules, DENIED rows), and the UI shows them. [local: docs/STOCHASTIC.md]
 
 Do not carry over:
-- One metaphor for the whole interface (root network, jar, compass). Our product is the metaphor: a ledger. Do not add a second one. [inferred]
-- Photoreal lifestyle mockups and AI-generated portraits. They prove a speculative product feels real. We have a real product, so show it running. [inferred]
-- A named person's story as the opening. The Hyphenate script opens with the moment, and the pitch rules say to lead with the problem. [local: docs/STOCHASTIC.md]
-- Warm, anti-clinical branding (Dandi). Our reviewer wants sober and exact. [inferred]
-- Mood over journey. Somne needed a clear before-and-after story too, and ours is the moment-first script. [local: showcase/projects/hackathon/somne.md]
-- Unsourced statistics. Dandi quoted numbers without sources. We mark every claim verified or inferred. [local: showcase/projects/hackathon/dandi.md]
-- Any claim that polish is the score. Cal Hacks judges say they care about the idea, effort and thought process more than a polished product. [local: CalHacks/logistics.md]
+- One metaphor for the whole interface (root network, jar, compass).
+  Our product is the metaphor: a ledger.
+  Do not add a second one. [inferred]
+- Photoreal lifestyle mockups and AI-generated portraits.
+  They prove a speculative product feels real.
+  We have a real product, so show it running. [inferred]
+- A named person's story as the opening.
+  The Hyphenate script opens with the moment, and the pitch rules say to lead with the problem. [local: docs/STOCHASTIC.md]
+- Warm, anti-clinical branding (Dandi).
+  Our reviewer wants sober and exact. [inferred]
+- Mood over journey.
+  Somne needed a clear before-and-after story too, and ours is the moment-first script. [local: showcase/projects/hackathon/somne.md]
+- Unsourced statistics.
+  Dandi quoted numbers without sources.
+  We mark every claim verified or inferred. [local: showcase/projects/hackathon/dandi.md]
+- Any claim that polish is the score.
+  Cal Hacks judges say they care about the idea, effort and thought process more than a polished product. [local: CalHacks/logistics.md]
 
 ## Hackathon demo UX (3-minute live demo and judged video)
 
-- Open on the hero screen already in the red state. The script says the moment comes first. [local: docs/diagrams/04-mvp-build-plan.html]
+- Open on the hero screen already in the red state.
+  The script says the moment comes first. [local: docs/diagrams/04-mvp-build-plan.html]
 - Keep the browser at 1920 by 1080 with 125 percent zoom for the video, so 18 px text reads as about 22 px. [inferred]
-- One thing moves at a time. Highlight with a thin outline, not an animated arrow. [inferred]
-- Prefill the data. No loading wait longer than 2 seconds on stage. Keep the recorded run ready, as the build plan says. [local: docs/diagrams/04-mvp-build-plan.html]
-- Never show a screen with more than one idea. If the judge cannot say what the screen is for in 5 seconds, cut.
+- One thing moves at a time.
+  Highlight with a thin outline, not an animated arrow. [inferred]
+- Prefill the data.
+  No loading wait longer than 2 seconds on stage.
+  Keep the recorded run ready, as the build plan says. [local: docs/diagrams/04-mvp-build-plan.html]
+- Never show a screen with more than one idea.
+  If the judge cannot say what the screen is for in 5 seconds, cut.
 - Keep a visible "reconstruction from public filings" label in the footer of Plans, because Hyphenate wants proof of what is real and what is simulated. [local: docs/sponsors/hyphenate.md]
 
 ## Judging fit
 
 Cal Hacks 13.0 factors: impact, quality, technical complexity, creativity. [local: CalHacks/logistics.md]
-That list comes from the organizers' Hacker Guide as noted in the local file. I did not find an official public rubric online. [search summary: web search found only older Cal Hacks rubrics, for example https://www.hackerearth.com/challenges/hackathon/cal-hacks-50/rules]
+That list comes from the organizers' Hacker Guide as noted in the local file.
+I did not find an official public rubric online. [search summary: web search found only older Cal Hacks rubrics, for example https://www.hackerearth.com/challenges/hackathon/cal-hacks-50/rules]
 Map to the UI:
 - Impact: the verdict-first Plans screen shows the cost of a wrong decision in one frame. [inferred]
-- Quality: the 4-screen set, the tokens and the contrast checks. Small and finished beats wide and rough.
+- Quality: the 4-screen set, the tokens and the contrast checks.
+  Small and finished beats wide and rough.
 - Technical complexity: the DENIED row, run ids, quote validator result and chain verify are all visible proof of real engineering. [local: docs/STOCHASTIC.md]
-- Creativity: the paper-and-ink identity and the "Verify chain" action. Not a chat box.
+- Creativity: the paper-and-ink identity and the "Verify chain" action.
+  Not a chat box.
 
 Figma track: the local notes say Figma posted a track "coming" with no details, and the current plan is to skip it. [local: CalHacks/ideation/tracks.md]
-Do not design for a Figma prize. If it is published and fits, a Figma file of the tokens above is cheap. [inferred]
+Do not design for a Figma prize.
+If it is published and fits, a Figma file of the tokens above is cheap. [inferred]
 
 Hyphenate's four questions and the UI answer to each: [local: docs/sponsors/hyphenate.md]
-- Real enough? A real clause quote with a page link, run ids on every number, and the real-versus-simulated label.
-- Would you hire it? The agent asks at the right time, shows its record, and cannot approve its own item. The Desk and Log show this.
-- Something new? The DENIED row and the priced consent route on one screen.
-- The moment? The plan turns red, the log shows DENIED with the clause, the agent re-plans, the human approves.
+- Real enough?
+  A real clause quote with a page link, run ids on every number, and the real-versus-simulated label.
+- Would you hire it?
+  The agent asks at the right time, shows its record, and cannot approve its own item.
+  The Desk and Log show this.
+- Something new?
+  The DENIED row and the priced consent route on one screen.
+- The moment?
+  The plan turns red, the log shows DENIED with the clause, the agent re-plans, the human approves.
 
 ## Sources
 
@@ -419,19 +533,30 @@ Search summaries only (not opened):
 
 Computed by me:
 - Contrast ratios (WCAG formula, Python, 2026-10-23).
-- Font feature check: I downloaded the Google Fonts TTF files and searched the bytes for the `tnum` tag. This is a crude check.
+- Font feature check: I downloaded the Google Fonts TTF files and searched the bytes for the `tnum` tag.
+  This is a crude check.
 
 ## Limits
 
-- I did not open Nielsen Norman Group pages on AI agents or alert fatigue. Search returned none, so the alert-fatigue and rubber-stamp points rest on secondary and healthcare sources.
-- The HAX page gave only the 18 guideline titles, not the full guideline text. I used titles 11 and 16 only.
-- I did not read Linear, Atlassian or Stripe Dashboard UI guidance. Stripe is cited only for its color-system post.
-- The Bloomberg page returned 403. Its claims come from a search summary and are company marketing, not an independent usability study.
-- I found no source on covenant headroom visuals, hash-chain display, or delta-column conventions. Those parts are [inferred].
+- I did not open Nielsen Norman Group pages on AI agents or alert fatigue.
+  Search returned none, so the alert-fatigue and rubber-stamp points rest on secondary and healthcare sources.
+- The HAX page gave only the 18 guideline titles, not the full guideline text.
+  I used titles 11 and 16 only.
+- I did not read Linear, Atlassian or Stripe Dashboard UI guidance.
+  Stripe is cited only for its color-system post.
+- The Bloomberg page returned 403.
+  Its claims come from a search summary and are company marketing, not an independent usability study.
+- I found no source on covenant headroom visuals, hash-chain display, or delta-column conventions.
+  Those parts are [inferred].
 - The Smashing numbers (for example reversion thresholds) came from a third-party summary, so I did not use them.
-- I found no official Cal Hacks 13.0 rubric. The four factors come from a local file that cites the Hacker Guide. Judges' weights are unknown.
+- I found no official Cal Hacks 13.0 rubric.
+  The four factors come from a local file that cites the Hacker Guide.
+  Judges' weights are unknown.
 - Figma track details are not published, so I made no plan for it.
-- No user test and no test with a real reviewer. The card and table layouts are untested design proposals.
-- The font tabular check is by bytes, not by rendering. Test in the browser. The contrast numbers cover the listed pairs only, not every combination in the build.
+- No user test and no test with a real reviewer.
+  The card and table layouts are untested design proposals.
+- The font tabular check is by bytes, not by rendering.
+  Test in the browser.
+  The contrast numbers cover the listed pairs only, not every combination in the build.
 - All example numbers (2.2x, 75 bp, +0.4 pts, run ids) are layout placeholders, not engine output.
 - Figma, FigBuild and Hyphenate lessons come from winners only, so they carry survivorship bias. [local: showcase/patterns/design-winners.md]

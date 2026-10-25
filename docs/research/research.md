@@ -12,11 +12,13 @@ The Morgan Stanley pages and the General Atlantic press release returned HTTP 40
 - Led by General Atlantic Credit's Atlantic Park fund, alongside Blackstone Tactical Opportunities and Morgan Stanley Tactical Value.
   So both versions in the pasted notes were partly right: Morgan Stanley and Blackstone were co-investors, not one working for the other, and General Atlantic led. [verified: same sources]
 - William Blair was the placement agent.
-  The note that JPM was agent for Buyers Edge was not supported by anything found. Treat it as wrong unless a source appears. [verified: William Blair page]
+  The note that JPM was agent for Buyers Edge was not supported by anything found.
+  Treat it as wrong unless a source appears. [verified: William Blair page]
 - Use of proceeds: platform innovation, strategic M&A, and European expansion.
   Bregal Sagemount, the first institutional investor, exited its minority stake, and founder John Davie increased his majority stake. [verified: pulse2.com summary and the sources above]
 - Why it matters for us: it is a real, public example of a company that needed capital outside a normal bank loan and got it from a consortium of special-situations funds, which is the exact story the pitch tells.
-  Terms such as the preferred dividend rate and covenants were not found. Do not invent them. [verified absence]
+  Terms such as the preferred dividend rate and covenants were not found.
+  Do not invent them. [verified absence]
 
 ## Morgan Stanley Tactical Value team
 
@@ -25,7 +27,8 @@ The Morgan Stanley pages and the General Atlantic press release returned HTTP 40
   Listed under both Private Credit and Private Equity. [verified: https://www.morganstanley.com/im/en-au/institutional-investor/about-us/people-and-teams/investment-teams/tactical-value-team.html (search summary)]
 - Not confirmed: the "10 to 20 percent of portfolios" figure in the pasted notes, and any named preferred-equity strategy.
   The page text does not say either. [verified absence]
-- Takeaway for the pitch: we are describing the kind of work these teams do. Do not claim Morgan Stanley uses AI for it or that they are a customer.
+- Takeaway for the pitch: we are describing the kind of work these teams do.
+  Do not claim Morgan Stanley uses AI for it or that they are a customer.
 
 ## Instruments and rough pricing (secondary sources, ballpark)
 
@@ -50,7 +53,8 @@ The Morgan Stanley pages and the General Atlantic press release returned HTTP 40
 - Ratio tests differ by debt type, for example first lien leverage for first lien debt and total net leverage or interest coverage for unsecured. [verified: same]
 - Maintenance versus incurrence covenants are different: maintenance is tested on a schedule, incurrence only when you take an action. [verified: https://www.creditgpt.com/content/maintenance-versus-incurrence-covenants (title and summary)]
 - Treat debt baskets as a capacity map: how much, by which entity, secured by what, with what priority. [verified: creditgpt]
-- Inferred design implication: the clause-reader agent should output a capacity map, and the hero trap can be a ratio test that passes for the $80M plan on EBITDA but fails once a definition (for example debt including leases) is applied. This needs a real credit agreement to copy language from, which is not yet found.
+- Inferred design implication: the clause-reader agent should output a capacity map, and the hero trap can be a ratio test that passes for the $80M plan on EBITDA but fails once a definition (for example debt including leases) is applied.
+  This needs a real credit agreement to copy language from, which is not yet found.
 
 ## 2026 update (added 2026-10-22)
 
@@ -88,18 +92,21 @@ Use this phrase in the pitch and in searches, because it is the industry's curre
 
 - AI financing is a live example of layered, hard-to-see structures: Goldman estimates nearly $500B of AI-related debt issuance so far in 2026 and about one-third of AI capex debt financed. [verified: https://www.goldmansachs.com/insights/goldman-sachs-exchanges/how-ai-debt-is-reshaping-the-credit-market (search summary)]
   A Columbia working paper notes growing complexity in the number and structure of claims on the same cash flows. [verified: search summary]
-  A possible fictional borrower: a mid-size company building data center capacity, with GPU collateral that depreciates fast (a real collateral risk per the Brookings draft). Inferred, not decided.
+  A possible fictional borrower: a mid-size company building data center capacity, with GPU collateral that depreciates fast (a real collateral risk per the Brookings draft).
+  Inferred, not decided.
 - Venture debt is growing, and Runway Growth notes Anthropic's roughly $2.5B revolving credit facility is the outer edge and not representative. [verified: https://runwaygrowth.com/venture-debt-review/ (search summary)]
 
 ### Prior art (searched 2026-10-22)
 
 - No startup, product launch, or Devpost project doing AI capital-structure advising with simulation and covenant checking turned up in standard searches.
   The finance hackathon found was AdvisoryAI Hackathon 2026 (January, consumer financial advice access), which is a different problem. [verified absence of results, not proof none exists]
-- Absence in search is weak evidence. Still to do: search EDGAR-adjacent vendors, Hypercore and Ellis (see `../private-credit-market.md`), and ask the Hyphenate booth.
+- Absence in search is weak evidence.
+  Still to do: search EDGAR-adjacent vendors, Hypercore and Ellis (see `../private-credit-market.md`), and ask the Hyphenate booth.
 
 ### Still open
 
-- The General Atlantic and Morgan Stanley pages for Buyers Edge returned 403 to direct fetch, so the dividend rate and terms are unread. The Business Wire copy (https://www.businesswire.com/news/home/20240408441127/en/) may be fetchable.
+- The General Atlantic and Morgan Stanley pages for Buyers Edge returned 403 to direct fetch, so the dividend rate and terms are unread.
+  The Business Wire copy (https://www.businesswire.com/news/home/20240408441127/en/) may be fetchable.
 - No 2026 preferred equity deals led by these three firms turned up, so Buyers Edge remains the best public anchor, though it is from April 2024.
 - Still no primary credit agreement text.
 

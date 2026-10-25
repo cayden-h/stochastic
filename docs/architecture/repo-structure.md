@@ -69,22 +69,31 @@ Other new code:
 
 ## Conventions
 
-- **Thin routes.** Routes validate input and call the gateway. They hold no business rules.
-- **One writer.** Only `backend/app/gateway/` writes to the store. Agents, the runner, and routes call it.
+- **Thin routes.** Routes validate input and call the gateway.
+  They hold no business rules.
+- **One writer.** Only `backend/app/gateway/` writes to the store.
+  Agents, the runner, and routes call it.
 - **Pure tools.** A tool is a function with typed inputs and outputs and no side effects.
-- **Stateless agents.** An agent gets one work item and returns one typed result. It keeps no memory.
-- **Typed contracts.** Pydantic models define source lines, mappings, results, work items, and audit rows. The frontend types follow the same shapes.
-- **Fixtures.** Fixture data lives in `backend/app/db/fixtures/`. The prototype runs on it.
-- **No secrets in git.** Keys live in `.env`. `.env.example` lists the names.
-- **Tests for the trust rules.** Tests in `backend/tests/test_trust_rules.py` stay green. Add tests for: the model never writes a number, an agent cannot approve its own item, a denied action is logged, and the tie-out check.
+- **Stateless agents.** An agent gets one work item and returns one typed result.
+  It keeps no memory.
+- **Typed contracts.** Pydantic models define source lines, mappings, results, work items, and audit rows.
+  The frontend types follow the same shapes.
+- **Fixtures.** Fixture data lives in `backend/app/db/fixtures/`.
+  The prototype runs on it.
+- **No secrets in git.** Keys live in `.env`.
+  `.env.example` lists the names.
+- **Tests for the trust rules.** Tests in `backend/tests/test_trust_rules.py` stay green.
+  Add tests for: the model never writes a number, an agent cannot approve its own item, a denied action is logged, and the tie-out check.
 
 ## Naming
 
 - Python: `snake_case` for files and functions, `PascalCase` for classes.
 - TypeScript: `PascalCase` for components, `camelCase` for functions, `kebab-case` for route folders.
-- Work-item types are `snake_case`. States are `UPPER_CASE`, as in `agents-and-work-items.md`.
+- Work-item types are `snake_case`.
+  States are `UPPER_CASE`, as in `agents-and-work-items.md`.
 
 ## Docs
 
-- Each code folder has a `README.md` that says what the folder holds. Several still describe the earlier framing and need an update.
+- Each code folder has a `README.md` that says what the folder holds.
+  Several still describe the earlier framing and need an update.
 - A decision that changes the design goes in `docs/STOCHASTIC.md` first, and then in the matching architecture file.

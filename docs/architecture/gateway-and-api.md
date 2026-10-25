@@ -191,10 +191,13 @@ They come from a separate `limit_test` run the gateway makes as `system:gateway`
 `naive_debt` and `naive_ebitda` are the whole-line reading as filed, read from the `covenant_debt` and as-filed `ebitda` runs behind the covenant flag option that counts every flagged line as debt (option a on the demo deal).
 When no covenant flag opened (for example the second demo run, where a policy settles the financing lines), there is no such run, so the keys are absent and no run is made.
 If the gateway refuses the sensitivity run, the keys are absent and `/case` still answers; the refusal is audited once and not retried.
-`naive_flip_addback` is the EBITDA increase at which that reading reaches the limit (debt / limit - reported EBITDA): positive means that much more EBITDA is needed, zero or negative means it already passes. On the demo deal it is $3,470K.
-`naive_flip_rent` is no longer returned on `/case`: the as-filed reading has no rent deduction. The `limit_test` tool still computes it when given `ebitda_run_id`.
+`naive_flip_addback` is the EBITDA increase at which that reading reaches the limit (debt / limit - reported EBITDA): positive means that much more EBITDA is needed, zero or negative means it already passes.
+On the demo deal it is $3,470K.
+`naive_flip_rent` is no longer returned on `/case`: the as-filed reading has no rent deduction.
+The `limit_test` tool still computes it when given `ebitda_run_id`.
 `result.run_ids_by_tool` maps `consolidate`, `ebitda`, `covenant_debt`, and `leverage` to their run ids, so the console can link each figure to `GET /runs/{run_id}`.
-`source_lines[].note` is what the filing says about a line (for example the 10-Q note that the financing liability is the Statesville sale-leaseback). Show it on the flag card's evidence.
+`source_lines[].note` is what the filing says about a line (for example the 10-Q note that the financing liability is the Statesville sale-leaseback).
+Show it on the flag card's evidence.
 A mapping flag may cover several target lines; its options then carry `mappings` (target line id to platform line) in `payload.option_actions`, and the option `effect` text lists each line.
 `GET /health` returns `backend.settings` with the configured backend, the fallback chain, and the model per role on each backend.
 On the Postgres store, `GET /health` `store` also has `writes` (batches written), `avg_write_ms`, and `last_write_ms`: the time from queueing a batch to its commit on Tiger Cloud, rounded to 0.1 ms.
@@ -671,13 +674,15 @@ After an edit, the stage is `awaiting_approval` or `needs_attention` again, from
 
 ## Errors
 
-- 403: the actor may not do this. The gateway also writes a DENIED row.
+- 403: the actor may not do this.
+  The gateway also writes a DENIED row.
 - 404: the deal, item, or run does not exist.
 - 409: the state change is not legal, or `POST /deals/{id}/run` while a run of that deal is in progress (answering the last flag starts one).
 
 Fields the gateway sets, never a model:
 - `Option.added_by` is `system:gateway` on the baseline reading the gateway adds to a covenant flag (every flagged line counted as debt) when the Mapper did not offer it; `null` on the Mapper's options.
-- `Mapping.policy_id` and `SourceLine.covenant_policy_id` name the learned policy that decided the line, and are set only when the cited policy exists and decided the same thing. The console's Learned chip reads them.
+- `Mapping.policy_id` and `SourceLine.covenant_policy_id` name the learned policy that decided the line, and are set only when the cited policy exists and decided the same thing.
+  The console's Learned chip reads them.
 - 422: the payload is not valid, such as a number with no run id, or a tool called while a flag is open.
 
 ## run_agent(role, item)

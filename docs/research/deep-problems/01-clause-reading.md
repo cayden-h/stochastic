@@ -189,10 +189,12 @@ It then re-plans, for example with PIK preferred, a longer maturity, and a recom
 ### Pipeline: LLM extraction plus deterministic checker
 
 1. Fetch and clean: pull the exhibit HTML, strip tags, keep page markers.
-2. Segment: split by article and section using the table of contents. Keep the definitions article separate.
+2. Segment: split by article and section using the table of contents.
+   Keep the definitions article separate.
 3. Extract (LLM, one call per covenant section, structured output).
    Fields: clause_type, section_id, basket_label, cap_amount_text, cap_formula (for example `max(25000000, 0.25*EBITDA)`), conditions, referenced_sections, referenced_defined_terms, exact_quote, confidence.
-   Rule: the quote must be a verbatim substring of the source, checked by code. If not, reject the extraction.
+   Rule: the quote must be a verbatim substring of the source, checked by code.
+   If not, reject the extraction.
 4. Resolve: a second pass pulls the definition text for every defined term used in a basket (Indebtedness, Disqualified Capital Stock, Consolidated EBITDA, Permitted Liens).
    Store these as a graph: term to definition to terms it uses.
 5. Check (plain code, no LLM): take the proposed instrument as structured data (amount, secured or not, cash-pay or PIK, redemption date, voting percent).
@@ -224,7 +226,8 @@ Build two kinds, because real documents have unlabeled truth.
 ### Scores
 
 - Catch rate (recall) = clauses found with correct section and correct value / clauses in key.
-- Precision = correct findings / all findings. Report both so that spamming findings does not win.
+- Precision = correct findings / all findings.
+  Report both so that spamming findings does not win.
 - Value accuracy: share of found clauses where the extracted number or formula equals the key (exact match).
 - Quote validity: share of quotes that are exact substrings of the source (should be 100 percent by construction).
 - Decision accuracy: for 5 to 10 test financing proposals per agreement, does the checker's verdict (allowed, blocked, needs consent) match a human verdict.

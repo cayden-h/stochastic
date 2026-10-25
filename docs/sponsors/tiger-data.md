@@ -4,7 +4,8 @@
 
 Stochastic is now a PE add-on integration tool.
 It merges the books of a newly acquired company into the platform company's books, flags the few lines a human must decide, and checks the combined result against the lender's limit.
-Three stateful agents do the work (Mapper, Preparer, Reviewer), code does all the math, and a controller approves. What the controller decides once, the agents keep.
+Three stateful agents do the work (Mapper, Preparer, Reviewer), code does all the math, and a controller approves.
+What the controller decides once, the agents keep.
 The demo uses a real public deal: Kewaunee Scientific buying Nu Aire. [verified: `../STOCHASTIC.md` section 12]
 
 ### How Tiger Data fits now
@@ -15,10 +16,20 @@ The store is built on Tiger Cloud: service `stochastic`, PostgreSQL 18.6 with Ti
 - The audit log is a TimescaleDB hypertable on `at`, and a trigger refuses UPDATE and DELETE on it.
 - A reset starts a new ledger instead of deleting, so every earlier run stays queryable.
 - The Tiger CLI (0.26.0) is installed and lists the service; the Tiger MCP is installed for Claude Code.
-- Built 2026-10-24 09:00: forks that hold a covenant flag's what-ifs (`../../backend/app/gateway/whatif.py`, `../../backend/app/db/forks.py`). The gateway forks the ledger when the flag opens, writes each option's tags and computed figures into a `what_if` table in the fork, and deletes the fork when the controller answers; the live ledger keeps only the chosen option. Live: fork ready in 33 s with 3 what-ifs, deleted 1 s after the answer, three FORK rows in the audit log. Settings: `FORKS=tiger`, `TIGER_SERVICE_ID`. [verified]
-- History of the spike, 2026-10-24 08:40: `tiger service fork p4a7k2ox3x --no-set-default` failed at once with "You have reached your free service limit. Delete a service or create a paid service instead." The free plan allows two services, and the account holds `stochastic` and `larp-city` (a paused HackRice database). So a fork needs either `larp-city` deleted (Cayden's call) or a paid plan, and then one fork per option would also hit the same two-service limit. Cayden chose to delete `larp-city` (backed up first to `HackRice/backups/larp-city-2026-10-24.dump`, 15 MB). A fork then took 33 to 35 s. With the main service running there is room for one fork at a time, so a second covenant flag while one fork is open gets no fork and says so. [verified]
-- Built 2026-10-24 afternoon (`ANALYTICS_SQL` in `../../backend/app/db/postgres.py`, run on every start, idempotent): continuous aggregate `audit_activity` (real time, refresh every 5 min), a columnstore policy on `audit_log` (after 1 day, segment by ledger), BM25 search on `record.search_text` with pg_textsearch 1.5.1, typed views `covenant_runs` and `ledger_runs`, and `run_stats` from timescaledb_toolkit 1.26 (`stats_agg`, `percentile_agg`). Live on 2026-10-24 over 23 ledgers: 12 posted runs, mean 98 s, p50 84 s, p95 465 s, deal created to posted, human answer time included. [verified]
-- Spike notes: all of these coexist with the append-only trigger; inserts into a columnar chunk work, and UPDATE and DELETE are still refused. `CREATE EXTENSION` must name `SCHEMA public`, or the extension lands in the store's schema and a test's `DROP SCHEMA ... CASCADE` takes it. [verified]
+- Built 2026-10-24 09:00: forks that hold a covenant flag's what-ifs (`../../backend/app/gateway/whatif.py`, `../../backend/app/db/forks.py`).
+  The gateway forks the ledger when the flag opens, writes each option's tags and computed figures into a `what_if` table in the fork, and deletes the fork when the controller answers; the live ledger keeps only the chosen option.
+  Live: fork ready in 33 s with 3 what-ifs, deleted 1 s after the answer, three FORK rows in the audit log.
+  Settings: `FORKS=tiger`, `TIGER_SERVICE_ID`. [verified]
+- History of the spike, 2026-10-24 08:40: `tiger service fork p4a7k2ox3x --no-set-default` failed at once with "You have reached your free service limit. Delete a service or create a paid service instead."
+  The free plan allows two services, and the account holds `stochastic` and `larp-city` (a paused HackRice database).
+  So a fork needs either `larp-city` deleted (Cayden's call) or a paid plan, and then one fork per option would also hit the same two-service limit.
+  Cayden chose to delete `larp-city` (backed up first to `HackRice/backups/larp-city-2026-10-24.dump`, 15 MB).
+  A fork then took 33 to 35 s.
+  With the main service running there is room for one fork at a time, so a second covenant flag while one fork is open gets no fork and says so. [verified]
+- Built 2026-10-24 afternoon (`ANALYTICS_SQL` in `../../backend/app/db/postgres.py`, run on every start, idempotent): continuous aggregate `audit_activity` (real time, refresh every 5 min), a columnstore policy on `audit_log` (after 1 day, segment by ledger), BM25 search on `record.search_text` with pg_textsearch 1.5.1, typed views `covenant_runs` and `ledger_runs`, and `run_stats` from timescaledb_toolkit 1.26 (`stats_agg`, `percentile_agg`).
+  Live on 2026-10-24 over 23 ledgers: 12 posted runs, mean 98 s, p50 84 s, p95 465 s, deal created to posted, human answer time included. [verified]
+- Spike notes: all of these coexist with the append-only trigger; inserts into a columnar chunk work, and UPDATE and DELETE are still refused.
+  `CREATE EXTENSION` must name `SCHEMA public`, or the extension lands in the store's schema and a test's `DROP SCHEMA ... CASCADE` takes it. [verified]
 - Not used: pgvector and pgvectorscale (available, but no embedding model without an Anthropic key), and the Tiger "Fluid Storage" features.
 - What the demo also shows: the restart moment (`../demo-script.md` section 5), the append-only hypertable, and the ledgers kept across resets.
 
@@ -42,13 +53,15 @@ The Tiger MCP ships inside the Tiger CLI and can create, fork, and resize servic
 Signup: create a Tiger Data account at tigerdata.com and start a service [verified: DEV challenge page].
 ## Track brief and judging analysis
 
-Official prize text: "The team that demonstrates the most innovative, impactful, and performance-driven use of Tiger Data." Reward: Stream Deck Mini [verified: https://www.mlh.com/events/cal-hacks-13-0/prizes].
+Official prize text: "The team that demonstrates the most innovative, impactful, and performance-driven use of Tiger Data."
+Reward: Stream Deck Mini [verified: https://www.mlh.com/events/cal-hacks-13-0/prizes].
 Requirement wording at other 2026 events: use Tiger Data (a PostgreSQL extension) for real-time data, time-series metrics, or analytics [verified: https://www.mlh.com/events/vthacks-14/prizes].
 Opt-in mechanics: the MLH export lists "Opt-In Prizes (any categories/tracks they submitted to)" as a required field, so you tick the category in the Devpost opt-in field [verified: https://guide.mlh.com/general-information/judging-and-submissions/hackathon-submission-portal].
 The guide does not say who judges MLH categories, and no Cal Hacks 13.0 judging rubric was published [verified: same guide, plus the https://www.mlh.com/events/cal-hacks-13-0/prizes page has no rubric].
 The Devpost page returned HTTP 403 to our fetcher, so Devpost-only wording was not read; the MLH event prize page was [verified: https://www.mlh.com/events/cal-hacks-13-0/prizes].
 The MLH Hack Days guide has no Tiger Data page; its partner list is Gemini, Gemma, Snowflake, Cloudflare, Solana [verified: https://hackdays-guide.mlh.com/partner-details/partner-details], so there is no published judge checklist [verified by absence].
-Our measured figures (2026-10-24, `scripts/tiger_bench.py`, server time, median of 25, read-only on the live schema of 3,892 records and 748 log rows): BM25 ranked top 10 in 0.09 ms against 3.9 ms for an ILIKE scan; the continuous aggregate in 0.14 ms against 0.38 ms from the raw hypertable; a fork in 33 to 35 s. The data is small, so say "the shape, not scale". [verified]
+Our measured figures (2026-10-24, `scripts/tiger_bench.py`, server time, median of 25, read-only on the live schema of 3,892 records and 748 log rows): BM25 ranked top 10 in 0.09 ms against 3.9 ms for an ILIKE scan; the continuous aggregate in 0.14 ms against 0.38 ms from the raw hypertable; a fork in 33 to 35 s.
+The data is small, so say "the shape, not scale". [verified]
 
 The three stated axes are innovative, impactful, performance-driven [verified: prize text], which suggests judges want measured speed or a clever use of forks or time-series, not just a Postgres connection [inferred].
 
@@ -61,7 +74,8 @@ No MLH Best Use of Tiger Data winner was found [verified: searches 2026-10-16].
 What a winning entry looks like: forks as a core primitive (one fork per agent or per proposed change), a visible benchmark or timing, and Tiger MCP or CLI in the workflow [inferred from winners].
 What loses: ordinary CRUD on a managed Postgres [inferred].
 
-Minimum honest integration and fit: use Tiger Cloud as our session and attribution store (hypertable of line events with actor, session id, timestamp), and run each agent's proposed edit set against a fork of the attribution DB that is merged or dropped on human approval. Effort 4 to 6 hours for the store, plus 2 hours for the fork demo [inferred].
+Minimum honest integration and fit: use Tiger Cloud as our session and attribution store (hypertable of line events with actor, session id, timestamp), and run each agent's proposed edit set against a fork of the attribution DB that is merged or dropped on human approval.
+Effort 4 to 6 hours for the store, plus 2 hours for the fork demo [inferred].
 Honesty check: forks are database forks, not code forks, so say that clearly; the fit is attribution history and what-if queries, not replacing Git [inferred].
 Worth doing only if Postgres is our real store; otherwise skip.
 

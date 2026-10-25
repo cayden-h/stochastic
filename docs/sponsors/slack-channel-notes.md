@@ -133,7 +133,8 @@ Not read: the YC afterparty thread (7 replies), the Jane Street card thread (5 r
 
 ## Empty (no sponsor post yet)
 
-a16z, Adobe, Annapurna Labs, Armadin, Canva, Citadel (only "interested in Citadel" replies), Context.dev, Convex, D.E. Shaw, Decagon, Elastic, Factory, Greptile, Illumio, Mana, MoonPay, Notability, Opal Electronics, Savvy, Scale AI, SpaceXAI, The House Fund.
+a16z, Adobe, Annapurna Labs, Armadin, Canva, Citadel (only "interested in Citadel" replies), Context.dev, Convex, D.E.
+Shaw, Decagon, Elastic, Factory, Greptile, Illumio, Mana, MoonPay, Notability, Opal Electronics, Savvy, Scale AI, SpaceXAI, The House Fund.
 
 ## General logistics found (`#0-general`, `#0-announcements`)
 

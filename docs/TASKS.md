@@ -1,15 +1,19 @@
 # Tasks: who builds what
 
 Last updated: 2026-10-24, night (build phase 2: D19 and D20).
-The product and scope are in `STOCHASTIC.md`. This file only splits the work.
-Josie owns UI and UX only. She gets no other task.
+The product and scope are in `STOCHASTIC.md`.
+This file only splits the work.
+Josie owns UI and UX only.
+She gets no other task.
 Swap tasks freely and tell the team when you do.
 
 ## Build phase 2: D19 and D20 (2026-10-24 night)
 
 Two features are designed and agreed, and now they get built:
-- **D19:** the Mac desktop app, edits in review that the agents learn from, the companion that asks why, and the final files. Spec: `design/review-companion.md`.
-- **D20:** Brief Reader stage 1, which reads the credit agreement, cites every field, and lets the controller approve the Brief. Spec: `architecture/brief-reader.md`.
+- **D19:** the Mac desktop app, edits in review that the agents learn from, the companion that asks why, and the final files.
+  Spec: `design/review-companion.md`.
+- **D20:** Brief Reader stage 1, which reads the credit agreement, cites every field, and lets the controller approve the Brief.
+  Spec: `architecture/brief-reader.md`.
 
 | Person | Phase 2 tasks | Branch | Folders |
 | --- | --- | --- | --- |
@@ -22,28 +26,38 @@ The details, with "done when" for each task, are in each person's file in `tasks
 
 ### Order and what blocks what
 
-1. **Cayden C1 (contract) first.** Tri's T1, T2, and T4 need the `Edit` and Brief types. Merge C1 alone and tell the team.
-2. **In parallel, with no wait:** Eric E1 (Electron) and E2 (demo figure). Josie continues on Figma.
+1. **Cayden C1 (contract) first.** Tri's T1, T2, and T4 need the `Edit` and Brief types.
+   Merge C1 alone and tell the team.
+2. **In parallel, with no wait:** Eric E1 (Electron) and E2 (demo figure).
+   Josie continues on Figma.
 3. **Tri T1, then Cayden C2 with Tri T2.** The edit loop works end to end through the API.
-4. **Tri T3** (final files) after T1. **Cayden C4** (screens) as Josie's frames land.
+4. **Tri T3** (final files) after T1.
+   **Cayden C4** (screens) as Josie's frames land.
 5. **Cayden C5** (companion) after C4.
-6. **Cayden C3 with Tri T4 and Eric E3** (Brief Reader), after the edit loop works. D19 is the demo beat, so it goes first.
+6. **Cayden C3 with Tri T4 and Eric E3** (Brief Reader), after the edit loop works.
+   D19 is the demo beat, so it goes first.
 
-If time runs short, cut from the bottom: the Brief Reader becomes a pitch line ("the next agent we are building"), then the companion falls back to a fixed panel. The editable table, the why bubble, and the final files are the minimum.
+If time runs short, cut from the bottom: the Brief Reader becomes a pitch line ("the next agent we are building"), then the companion falls back to a fixed panel.
+The editable table, the why bubble, and the final files are the minimum.
 
 ### The demo beat this phase must deliver
 
-Edit a number in the app, the verdict moves, the companion asks why, pick a chip, approve, and download. The workbook shows the edit and its reason. Then, on deal 2, the Mapper cites the policy (`design/review-companion.md` section 9).
+Edit a number in the app, the verdict moves, the companion asks why, pick a chip, approve, and download.
+The workbook shows the edit and its reason.
+Then, on deal 2, the Mapper cites the policy (`design/review-companion.md` section 9).
 
 ## State of the build
 
 The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.76x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run. 115 tests pass. [verified: `backend/tests/`]
-The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded. Not yet run live: the Anthropic backend (no key in `.env`).
+The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 and is recorded.
+Not yet run live: the Anthropic backend (no key in `.env`).
 Done 2026-10-24 and merged to `main`: the Note 2 answer key and Mapper score (Eric), the Devpost text (Eric), the recorded model runs (Sonnet 5.5 is the default replay), the tool guardrails, typed case, stage events, and CSV upload (Tri).
 Done 2026-10-24, evening: the console on `GET /deals/{id}/case` (flag card, verdict line, combined table, mapping, log, backend badge, second-run moment), and the EBITDA items (stock compensation and the $4,019K pension figure applied, transaction costs kept at zero).
-Done 2026-10-24, 08:00 (commit 08b2629): the Tiger Cloud store (`STORE=postgres`), with the audit log as an append-only TimescaleDB hypertable and a reload on start. Tiger Data is a target track (D15).
+Done 2026-10-24, 08:00 (commit 08b2629): the Tiger Cloud store (`STORE=postgres`), with the audit log as an append-only TimescaleDB hypertable and a reload on start.
+Tiger Data is a target track (D15).
 Not yet done: Tiger forks, the compliance certificate, the sensitivity figures, the timeline route, the Anthropic run or its removal, the rehearsals, the Devpost submission, the demo video.
-Each person's open list, in order, is in their task file in `tasks/`. The lists below are the summary.
+Each person's open list, in order, is in their task file in `tasks/`.
+The lists below are the summary.
 
 ## The four seats
 
@@ -54,7 +68,8 @@ Each person's open list, in order, is in their task file in `tasks/`. The lists 
 | Eric | Data, answer key, facts, Devpost | `eric/data` | `data/`, `scripts/`, `evals/` |
 | Tri | Math tools, tests, API | `tri/tools` | `backend/app/tools/`, `backend/app/api/`, `backend/app/db/`, `backend/tests/` |
 
-Cayden wrote first versions of `backend/app/tools/finance.py`, `backend/app/api/routes.py`, `backend/app/db/fixtures/kewaunee.py`, and `backend/tests/test_trust_rules.py` so the pipeline could run. Tri and Eric own them from here.
+Cayden wrote first versions of `backend/app/tools/finance.py`, `backend/app/api/routes.py`, `backend/app/db/fixtures/kewaunee.py`, and `backend/tests/test_trust_rules.py` so the pipeline could run.
+Tri and Eric own them from here.
 
 ## Shared contract (done)
 
@@ -68,11 +83,15 @@ Done on 2026-10-24: the contract, the gateway rewrite (per-role permissions, run
 
 Done at 03:30: the `droid` CLI, the probe (Claude models are on our key), and a full Droid run with Claude Sonnet 5.5, recorded.
 
-Done at 05:10: Haiku 5.5 as the default model with per-role overrides, the failure switch rehearsed, the pitch words written, the Haiku run recorded. See `tasks/cayden.md` and `agents.md`.
+Done at 05:10: Haiku 5.5 as the default model with per-role overrides, the failure switch rehearsed, the pitch words written, the Haiku run recorded.
+See `tasks/cayden.md` and `agents.md`.
 
 Done at 08:00: the Tiger Cloud store and Tiger Data as a target.
 
-Done at 08:50 (`tasks/cayden.md`): tasks 1 to 4 and 8, plus the machine half of 5 and 7. Done at 09:00: Tiger forks (task 3), after Cayden chose to delete `larp-city`. Still open, and each needs a person: the stopwatch rehearsal, the mentor questions, and the Devpost submission. The Sunday wake-up is scheduled in Cayden's Claude session for 07:52 (it runs only if that session is still open).
+Done at 08:50 (`tasks/cayden.md`): tasks 1 to 4 and 8, plus the machine half of 5 and 7.
+Done at 09:00: Tiger forks (task 3), after Cayden chose to delete `larp-city`.
+Still open, and each needs a person: the stopwatch rehearsal, the mentor questions, and the Devpost submission.
+The Sunday wake-up is scheduled in Cayden's Claude session for 07:52 (it runs only if that session is still open).
 
 Open (details in `tasks/cayden.md`):
 1. Run the demo on `STORE=postgres` and rehearse the restart moment (the case, the log, and the policy come back).
@@ -83,22 +102,30 @@ Open (details in `tasks/cayden.md`):
 6. Submit the Devpost first draft by Saturday night, with the four tracks opted in (from Eric).
 7. The honest-limits card and a printed one-page summary (from Eric).
 8. Sunday 8am: wake the Tiger service and check `GET /health`.
-9. Decide when to build the Brief Reader's stage 1 (D20), given the 8pm freeze. The build list is in `architecture/brief-reader.md` sections 7 and 8. Until it is built, the pitch says a person writes the brief.
+9. Decide when to build the Brief Reader's stage 1 (D20), given the 8pm freeze.
+   The build list is in `architecture/brief-reader.md` sections 7 and 8.
+   Until it is built, the pitch says a person writes the brief.
 
 ## Eric
 
-Tasks 1 to 6 done 2026-10-24, merged in PR #2. Figures were refreshed to the post-interest-income values the same day.
+Tasks 1 to 6 done 2026-10-24, merged in PR #2.
+Figures were refreshed to the post-interest-income values the same day.
 
-No open tasks. On 2026-10-24 at 08:20 his open work moved: the Devpost submission and the one-page summary to Cayden, the certificate wording and the input checks to Tri.
+No open tasks.
+On 2026-10-24 at 08:20 his open work moved: the Devpost submission and the one-page summary to Cayden, the certificate wording and the input checks to Tri.
 
 Done:
 
-1. Check every figure in `backend/app/db/fixtures/kewaunee.py` against the filings. The links are in the file header and in `research/real-deal-candidates.md`. Flag any difference to Cayden; the tools recompute from the fixture.
+1. Check every figure in `backend/app/db/fixtures/kewaunee.py` against the filings.
+   The links are in the file header and in `research/real-deal-candidates.md`.
+   Flag any difference to Cayden; the tools recompute from the fixture.
 2. Export the two input files as CSVs in `data/` (git-ignored) with the fixture's columns, and write the loader script in `scripts/` so the fixture can read CSVs later.
-3. Build the answer key from Note 2 of Ex 99.2 in `evals/`: each Nu Aire line and its Kewaunee line. Score the Mapper's output from `GET /deals/{id}/mappings` against it, and write the score down with the date and the backend.
+3. Build the answer key from Note 2 of Ex 99.2 in `evals/`: each Nu Aire line and its Kewaunee line.
+   Score the Mapper's output from `GET /deals/{id}/mappings` against it, and write the score down with the date and the backend.
 4. Write the facts behind the flag on one card: the "Financing liability" line, its three parts ($27,782K, $20,563K, $22,540K), and the agreement's exclusions, with quotes under 15 words and the exhibit and section.
 5. Write the brief as prose for the Devpost and the slide: the 2.50x limit, Section 4.8(a), the definitions of Senior Funded Bank Debt and EBITDA.
-6. Write the Devpost text and the real-versus-simulated list by Saturday night. Include: statement lines are real, account detail is not claimed, the rent and transaction-cost inputs are inferred, which backend produced the shown run, and that agent memory is policies written by the gateway.
+6. Write the Devpost text and the real-versus-simulated list by Saturday night.
+   Include: statement lines are real, account detail is not claimed, the rent and transaction-cost inputs are inferred, which backend produced the shown run, and that agent memory is policies written by the gateway.
 
 ## Tri
 
@@ -112,24 +139,41 @@ Open (details in `tasks/tri.md`):
 
 Done, plus the video:
 
-1. Review `backend/app/tools/finance.py` and own it. Check the EBITDA build (net income plus interest, taxes, D&A; add-backs; rent deduction) against Ex 10.1's definition. Add any add-back the agreement names that we left at zero, with its source. Done 2026-10-24. Reviewed against Ex 10.1; covenant EBITDA now subtracts interest income as Addendum I requires.
-2. Add tests: a test per tool with hand-computed expected values from the fixture, a test that `consolidate` refuses an unapproved flagged mapping, and a test for `limit_test` at exactly 2.50x. Done 2026-10-24. Per-tool tests with hand-computed values, the unapproved-flag refusal, and `limit_test` at exactly 2.50x.
-3. Add `debt_capacity` to the verdict in `GET /deals/{id}/case` (it is already in the `limit_test` output) so the console can show the covenant headroom. Done 2026-10-24. `debt_capacity` and `debt_capacity_run_id` are on the verdict.
-4. Make `POST /deals` accept two CSV uploads and a brief, using Eric's loader, so a judge can try an unseen input. Keep the route thin. Done 2026-10-24. `POST /deals` takes two CSVs and a brief; 422 names the file, row, and column.
-5. Make the SSE stream also emit stage changes, so the console can refresh the case without polling. Done 2026-10-24. `GET /deals/{id}/stream` sends `stage` events as well as audit rows.
-6. Cut the demo video if the team agrees on one. Hyphenate wants a video that opens with the moment. [verified: `hyphenate-workshop.md`]
+1. Review `backend/app/tools/finance.py` and own it.
+   Check the EBITDA build (net income plus interest, taxes, D&A; add-backs; rent deduction) against Ex 10.1's definition.
+   Add any add-back the agreement names that we left at zero, with its source.
+   Done 2026-10-24.
+   Reviewed against Ex 10.1; covenant EBITDA now subtracts interest income as Addendum I requires.
+2. Add tests: a test per tool with hand-computed expected values from the fixture, a test that `consolidate` refuses an unapproved flagged mapping, and a test for `limit_test` at exactly 2.50x.
+   Done 2026-10-24.
+   Per-tool tests with hand-computed values, the unapproved-flag refusal, and `limit_test` at exactly 2.50x.
+3. Add `debt_capacity` to the verdict in `GET /deals/{id}/case` (it is already in the `limit_test` output) so the console can show the covenant headroom.
+   Done 2026-10-24.
+   `debt_capacity` and `debt_capacity_run_id` are on the verdict.
+4. Make `POST /deals` accept two CSV uploads and a brief, using Eric's loader, so a judge can try an unseen input.
+   Keep the route thin.
+   Done 2026-10-24.
+   `POST /deals` takes two CSVs and a brief; 422 names the file, row, and column.
+5. Make the SSE stream also emit stage changes, so the console can refresh the case without polling.
+   Done 2026-10-24.
+   `GET /deals/{id}/stream` sends `stage` events as well as audit rows.
+6. Cut the demo video if the team agrees on one.
+   Hyphenate wants a video that opens with the moment. [verified: `hyphenate-workshop.md`]
 
 ## Josie (UI and UX only)
 
-Josie works on the design only. She has no other task.
-Done 2026-10-24: the console is on `GET /deals/{id}/case` and the three write routes (`frontend/README.md`). Josie owns its look from here.
+Josie works on the design only.
+She has no other task.
+Done 2026-10-24: the console is on `GET /deals/{id}/case` and the three write routes (`frontend/README.md`).
+Josie owns its look from here.
 Inputs for the design:
 - The case shape, the flag shape, and the verdict shape are in `architecture/gateway-and-api.md`.
 - The flag card shows the question, the evidence quotes, and the options with their computed effects; the default option is marked.
 - The verdict line shows leverage against the limit, OK or Over the limit, the room left, and the Reviewer badge; the Approve button is live only when `approval_state` is `PROPOSED`.
 - A small "learned" chip on a mapping or a tag whose reason starts with "Policy", and a second-run moment: after `POST /dev/reset`, Run again shows no flag.
 - The backend badge from `GET /health` ("scripted", "anthropic", "droid", "replay").
-- The design rules are in `design/README.md`, and the Figma file is linked there. The Figma track needs the frame on screen in the pitch.
+- The design rules are in `design/README.md`, and the Figma file is linked there.
+  The Figma track needs the frame on screen in the pitch.
 - Coming from the backend today (each owner tells Josie when it lands): a Download certificate button (Tri), a fork id and state on each flag option (Cayden), the store badge from `GET /health` (`memory` or `postgres`), and the sensitivity line on the verdict (Tri).
 
 ## Everyone
@@ -150,15 +194,32 @@ Inputs for the design:
 ## Order of work
 
 1. **Saturday morning (done).** Console on `/case`, figure check and CSVs, tool review and tests, Droid runs, the Tiger store.
-2. **Saturday until 6pm.** Josie: the UI. Cayden: `STORE=postgres`, the restart moment, the fork spike, then forks. Tri: Tiger tests, certificate with its wording, sensitivity with the input recheck, timeline. Cayden also: the one-page summary. Mentor questions asked.
-3. **Saturday night.** Feature freeze at 8pm. Devpost draft submitted (Cayden). Full rehearsals with the failure switch and the restart. Demo video.
-4. **Sunday morning.** Fix only blockers. Submit before 9am. Practice the 2 minutes once more before judging at 10:30am.
+2. **Saturday until 6pm.** Josie: the UI.
+   Cayden: `STORE=postgres`, the restart moment, the fork spike, then forks.
+   Tri: Tiger tests, certificate with its wording, sensitivity with the input recheck, timeline.
+   Cayden also: the one-page summary.
+   Mentor questions asked.
+3. **Saturday night.** Feature freeze at 8pm.
+   Devpost draft submitted (Cayden).
+   Full rehearsals with the failure switch and the restart.
+   Demo video.
+4. **Sunday morning.** Fix only blockers.
+   Submit before 9am.
+   Practice the 2 minutes once more before judging at 10:30am.
 
 ## Risks to watch
 
-- The naive-versus-covenant gap rests on the inferred rent deduction and zero transaction costs. If Tri or Eric change them, re-read the flag effects before the pitch. The code recomputes; the words must follow.
-- The EBITDA definition items moved EBITDA to 28,379 and leverage to 0.76x on 2026-10-24; the pitch words, the Devpost, and the tests use the new figures. Since 2026-10-24 evening the whole-line reading is computed as filed, 2.84x, with $3,470K of EBITDA to spare, so the inferred rent and the transaction costs no longer move it (D18).
-- The Droid subprocess can fail live. The switch, the fallback chain, and the recording are the answer. Rehearse it.
-- The console is on the new API as of 2026-10-24. Rehearse the 2:00 on it with the stopwatch.
-- The Tiger service is on the free shared tier and can pause when idle. If it cannot be reached, the API starts in memory and `/health` says why; wake it before judging.
-- A Droid run from the console overwrites `backend/recordings/*.json`. Check `git status` before committing, and move a new run into its own folder instead of replacing the default replay.
+- The naive-versus-covenant gap rests on the inferred rent deduction and zero transaction costs.
+  If Tri or Eric change them, re-read the flag effects before the pitch.
+  The code recomputes; the words must follow.
+- The EBITDA definition items moved EBITDA to 28,379 and leverage to 0.76x on 2026-10-24; the pitch words, the Devpost, and the tests use the new figures.
+  Since 2026-10-24 evening the whole-line reading is computed as filed, 2.84x, with $3,470K of EBITDA to spare, so the inferred rent and the transaction costs no longer move it (D18).
+- The Droid subprocess can fail live.
+  The switch, the fallback chain, and the recording are the answer.
+  Rehearse it.
+- The console is on the new API as of 2026-10-24.
+  Rehearse the 2:00 on it with the stopwatch.
+- The Tiger service is on the free shared tier and can pause when idle.
+  If it cannot be reached, the API starts in memory and `/health` says why; wake it before judging.
+- A Droid run from the console overwrites `backend/recordings/*.json`.
+  Check `git status` before committing, and move a new run into its own folder instead of replacing the default replay.

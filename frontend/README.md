@@ -1,6 +1,7 @@
 # frontend
 
-The console. Next.js, React, TypeScript, and Tailwind.
+The console.
+Next.js, React, TypeScript, and Tailwind.
 Six pages on `GET /deals/{id}/case`, built from the Figma Hi-fi v3 frames (V3-1 to V3-7).
 Every page sits in a 240 px sidebar shell: Dashboard, Case, Mapping, Agents, Log, and Review last.
 The design notes are in `docs/design/README.md`.
@@ -27,7 +28,8 @@ Review edits (D19, Tri's T2): `POST /deals/{id}/edits`, `POST /edits/{id}/reason
 The Brief Reader (D20, Tri's T4): `POST /deals` with `agreement_txt`, `POST /deals/{id}/brief/amounts` (`field`, `value`, `source_ref`), and `POST /deals/{id}/brief/approve`; `/case` carries `brief_draft`.
 After approval, Download final files reads `GET /deals/{id}/export.xlsx` (Tri's T3) and `GET /deals/{id}/certificate`.
 Every write carries `X-Actor: human:controller`.
-The console computes no number. Every figure comes from a tool run and shows its run id.
+The console computes no number.
+Every figure comes from a tool run and shows its run id.
 The one exception is the Change column on Case and Review, which shows an edit's own new value minus its old value.
 
 ## Run
@@ -51,24 +53,33 @@ In Electron a question also fires a native macOS notification through `window.st
 
 ## What the screen shows
 
-- The sidebar's model card names which backend produced the agent output (scripted, anthropic, droid, or replay) and where the record lives (Tiger Cloud or memory). If the runner fell back, the card says from what.
+- The sidebar's model card names which backend produced the agent output (scripted, anthropic, droid, or replay) and where the record lives (Tiger Cloud or memory).
+  If the runner fell back, the card says from what.
 - A run on the replay backend that plays a recorded Claude Haiku run (a `last_runs` entry, or the case's backend info, with `backend: "replay"`, `recorded: true`, and a Haiku `model` such as `claude-haiku-5-5`) shows "Claude Haiku 5.5", with "recorded run" and the store under it.
   A scripted run always shows "Scripted rules", and no other run shows a model name it did not use (`recordedModelName` in `src/lib/format.ts`, with its test).
 - The sidebar's "Always learning from" counts human answers, policies, and reasoned edits across every deal, from `GET /health` `memory_counts: {human_answers, policies, edits, by_deal}` (the same as `GET /memory/counts`).
   On a gateway without `memory_counts` it counts the selected deal (`case.flags`, `case.policies`, `case.edits`).
 - Every agent character (chips, the Agents rows and timeline, the Log, the pipeline, toasts, the asking banner, the page titles, and the Review companion) is drawn by `Avatar` from `ROLES` in `src/components/ui.tsx`, the one source: `public/v3/agent-mapper.png` (the teal star), `agent-preparer.png`, `agent-reviewer.png`, and `agent-brief-reader.png`.
   The files are served as they are (`unoptimized`), not through `/_next/image`, whose URLs the browser and the Mac app cache for hours: that cache kept the old green Mapper on the small avatars after the art changed.
-- The flag card shows the question, the flagged lines with the filing's note, the evidence quotes, and the options with their computed effects. The default option is marked "Agent suggests".
+- The flag card shows the question, the flagged lines with the filing's note, the evidence quotes, and the options with their computed effects.
+  The default option is marked "Agent suggests".
 - The Case shows, top to bottom: the flag card (or the Brief card), the pipeline, the limit check's four figure tiles (the covenant debt, Covenant EBITDA, Room in turns of EBITDA, and Covenant headroom in dollars of debt, each with its run id), and the combined books, hidden until Show combined books.
   The Case has no conversation (it is on the Agents and Log pages) and no verdict sentence: the leverage against the limit, the as-filed reading, approval, and Download final files are on the Review page.
-  Over the limit, or a Reviewer that needs attention, adds its reasons under the tiles. Approve is live only when `approval_state` is `PROPOSED` and the Reviewer passed.
-- While the result waits for approval, the platform and target amounts in Combined books are editable (click, type, Enter; Esc cancels; Tab moves on). A row that gathers several target lines opens to show them, because an edit names one source line. The Combined cell shows the change from the agents' value, taken from the edits' own old and new values.
+  Over the limit, or a Reviewer that needs attention, adds its reasons under the tiles.
+  Approve is live only when `approval_state` is `PROPOSED` and the Reviewer passed.
+- While the result waits for approval, the platform and target amounts in Combined books are editable (click, type, Enter; Esc cancels; Tab moves on).
+  A row that gathers several target lines opens to show them, because an edit names one source line.
+  The Combined cell shows the change from the agents' value, taken from the edits' own old and new values.
 - A change of more than half the agents' value asks for confirmation in the bubble before it is sent.
-- Your edits sits under the verdict: a click scrolls to the cell and flashes it, and Undo reverts the edit. Approve stays off while an edit has no reason.
+- Your edits sits under the verdict: a click scrolls to the cell and flashes it, and Undo reverts the edit.
+  Approve stays off while an edit has no reason.
 - After approval, Download final files calls `window.stochastic.saveFiles([{url, name}])` in the Electron window (Eric's preload), and downloads both files in a browser.
 - An adjustment flag (a learned adjustment the Preparer offers on a later deal) shows as "Learned adjustment" with apply and skip.
-- On a deal made from agreement text, the Case opens on the Brief card before mapping: every field with the quote it came from, the open questions on the Brief, the EBITDA adjustment amounts to enter from the books with their source, and "Approve the Brief and map". `deal.brief` is null until the reader has drafted it.
-- A "Learned" chip marks a mapping or a tag the gateway tied to a live policy (`policy_id`). After "Run it again with what was learned", Run again shows no flag. "Fresh deal (clear memory)" resets for the next judge.
+- On a deal made from agreement text, the Case opens on the Brief card before mapping: every field with the quote it came from, the open questions on the Brief, the EBITDA adjustment amounts to enter from the books with their source, and "Approve the Brief and map".
+  `deal.brief` is null until the reader has drafted it.
+- A "Learned" chip marks a mapping or a tag the gateway tied to a live policy (`policy_id`).
+  After "Run it again with what was learned", Run again shows no flag.
+  "Fresh deal (clear memory)" resets for the next judge.
 
 ## Cases and the 15-second demo
 
@@ -76,11 +87,14 @@ In Electron a question also fires a native macOS notification through `window.st
   A row opens its case: it becomes the current deal (kept for a reload of the window), and every page reads it.
   A case with `data_source: "sample"` shows a Sample data tag (a deal from the filings or an upload shows none), with the note as its tooltip; its Case and Source panel say the figures are not from a filing.
   The stat cards count across every case; Policies learned is the store's own count.
-- The demo deal starts from its agreement (D23): the Case shows the Brief card with the verification card ("22 of 22 checks passed", Show the checks lists each field with its quote, section, and pass mark), and Approve the Brief and map is one click; the approval continues the run. The pipeline shows Brief Reader, Verifier (a lock chip, no avatar), Mapper, Preparer, Reviewer, You. A `notify` of kind `brief_approval` shows "Needs your approval" off the Case.
+- The demo deal starts from its agreement (D23): the Case shows the Brief card with the verification card ("22 of 22 checks passed", Show the checks lists each field with its quote, section, and pass mark), and Approve the Brief and map is one click; the approval continues the run.
+  The pipeline shows Brief Reader, Verifier (a lock chip, no avatar), Mapper, Preparer, Reviewer, You.
+  A `notify` of kind `brief_approval` shows "Needs your approval" off the Case.
 - Run the demo resets with memory cleared (`POST /dev/reset?keep_memory=false`, which reseeds only the demo deal and returns `kept_deals`), makes the deal it reseeded current, runs it with `"pace": "demo"`, and opens the Case.
   This is the Hyphenate demo.
 - The Upload modal's Begin is the Factory demo: after the files are chosen it resets with memory cleared (`POST /dev/reset?keep_memory=false`, retried while a run finishes, so the uploaded deal's questions are asked), creates the deal (`POST /deals`), runs it with `{"sync": false, "pace": "factory"}` (about 30 s of agent time, twice the demo), and opens its Case.
-  With no files chosen it runs the current case at the same pace. The Dashboard has no Begin.
+  With no files chosen it runs the current case at the same pace.
+  The Dashboard has no Begin.
 - A `notify` event (`{id, deal_id, at, kind, item_id, from, title, body}`) shows a toast at the top right of every page: the agent's character, the title, the question, Decide, and Later.
   One question shows at a time, with how many more wait.
   Decide opens the Case on that flag card and moves the focus to it; the deal's later questions then get no toast on its Case, since the card shows them.
@@ -126,6 +140,8 @@ The edit state the table, Your edits, Mapping, and the companion share is in `sr
 
 ## Rules
 
-- Do not overbloat. Apply the checklist in `docs/design/README.md` before adding any screen or control.
+- Do not overbloat.
+  Apply the checklist in `docs/design/README.md` before adding any screen or control.
 - State is always color plus a word plus a shape.
-- Type sizes follow the v3 frames (11 px caps labels, 12 px mono, 13 to 14 px text). Numbers are right-aligned with tabular digits and carry their unit.
+- Type sizes follow the v3 frames (11 px caps labels, 12 px mono, 13 to 14 px text).
+  Numbers are right-aligned with tabular digits and carry their unit.

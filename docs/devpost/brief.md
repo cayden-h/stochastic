@@ -37,13 +37,20 @@ Title: The lender's own rules
 - EBITDA: net income, plus interest, taxes, depreciation, and amortization, less interest income and extraordinary gains.
 - Add back: pension termination, stock compensation, deal costs up to $4M, integration costs up to $1M.
 - Also: Nu Aire's four quarters to October 31, 2024, less Statesville cash rent.
-- Footer: Figures from public SEC filings. Covenant EBITDA is preliminary.
+- Footer: Figures from public SEC filings.
+  Covenant EBITDA is preliminary.
 
 Speaker line: "The tools use the agreement's definitions, not the balance sheet's labels. That is where the flag comes from."
 
 ## What the brief does not settle
 
-- Whether the failed sale-leaseback counts as a "capitalized lease obligation" under the exclusion. We read it as yes. [inferred]
-- The Statesville cash rent for the tested period. We use $1,970K, the 10-K's obligation due within one year. [inferred]
-- Transaction and integration costs. The demo applies $0. Ex 99.2 Note 5(b) estimates $698K of expected transaction expenses after 2024-10-31, which may or may not fall in the tested period. It moves only the agreement's reading, which stays far under the limit. [verified: Ex 99.2, Note 5(b); timing inferred]
-- Nu Aire's EBITDA for the exact four quarters the agreement names. We use its audited year to 2024-09-30, one month off. [inferred]
+- Whether the failed sale-leaseback counts as a "capitalized lease obligation" under the exclusion.
+  We read it as yes. [inferred]
+- The Statesville cash rent for the tested period.
+  We use $1,970K, the 10-K's obligation due within one year. [inferred]
+- Transaction and integration costs.
+  The demo applies $0.
+  Ex 99.2 Note 5(b) estimates $698K of expected transaction expenses after 2024-10-31, which may or may not fall in the tested period.
+  It moves only the agreement's reading, which stays far under the limit. [verified: Ex 99.2, Note 5(b); timing inferred]
+- Nu Aire's EBITDA for the exact four quarters the agreement names.
+  We use its audited year to 2024-09-30, one month off. [inferred]

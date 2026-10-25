@@ -33,7 +33,8 @@ The frame titles the page "Agent"; the console keeps "Agents", the name in the s
 
 Other pages in the same file:
 - `Components` (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=487-1681): the components behind v3.
-- `Technologies Used` (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2): material for the pitch deck and the pitches, not the UI. See "Team board" below.
+- `Technologies Used` (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2): material for the pitch deck and the pitches, not the UI.
+  See "Team board" below.
 - `Hi-fi - v1`, `Hi-fi - v2`, `Wireframes + Ideation`, `Ideation`, and `3D Mockup`: earlier work, kept as history.
 
 The D19 additions (editable cells, the reason bubble, the companion) are specified in `review-companion.md` and go on top of V3-3 and V3-4.
@@ -62,12 +63,15 @@ File: https://www.figma.com/design/KDbPUruO6f5oPLyzyLgUZh (Stochastic - Reviewer
 | Foundations | Components | https://www.figma.com/design/KDbPUruO6f5oPLyzyLgUZh?node-id=2-2 |
 
 The file holds one variable collection (`Tokens`), seven text styles, and five local components: Actor Chip, Button, Source Chip, Verdict, and Log Row.
-All numbers in the mockups are illustrative placeholders. They are not engine output and not from real filings.
+All numbers in the mockups are illustrative placeholders.
+They are not engine output and not from real filings.
 
 ## Team board (Schocastic)
 
-File: https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi (Schocastic). It holds the current UI (Hi-fi v3, above) and the pitch material.
-Its `Technologies Used` page is for the pitch deck and the pitches. It (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2) holds one area per track: Tiger Data, Factory, Workflow, Tech stack, Research, and How it works.
+File: https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi (Schocastic).
+It holds the current UI (Hi-fi v3, above) and the pitch material.
+Its `Technologies Used` page is for the pitch deck and the pitches.
+It (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2) holds one area per track: Tiger Data, Factory, Workflow, Tech stack, Research, and How it works.
 Each item there is a card: a real screenshot (12 px corners, light stroke, soft shadow, dark backing at FIT), a DM Sans SemiBold 20 title, and a DM Sans Regular 15 description.
 Add new evidence as cards in the same style, by cloning an existing card.
 
@@ -115,7 +119,8 @@ Type:
 - Newsreader for verdict headlines and clause quotes.
 - IBM Plex Mono for run ids, hashes, and clause numbers.
 
-Sizes: verdict 40, heading 26, body 18, quote 20, label 14, mono 14. Nothing is smaller than 14.
+Sizes: verdict 40, heading 26, body 18, quote 20, label 14, mono 14.
+Nothing is smaller than 14.
 Spacing scale: 4, 8, 12, 16, 24, 32, 48.
 Radius: 4 for chips and buttons, 8 for cards.
 State is always a color plus a word plus a shape: square (agent), circle (human), triangle (escalation), cross (denied), check (clear).
