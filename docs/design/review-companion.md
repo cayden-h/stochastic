@@ -10,7 +10,7 @@ The Review page (`/review`, Figma section "Review flow (D19)", frames V3-7.1 to 
 It is a full-window workbook with no sidebar: a title bar, a ribbon (Review, Combined, Mapping, Log), a formula bar, the sheet (A line, B platform, C target, D combined, E change), the verdict and Your edits strips, and the sheet tabs (Combined, Edits, Audit).
 The Case (V3-3) is read-only: flags, verdict, read-only combined books, conversation, and pipeline; after the Reviewer's hand-off, "Review the books" is its primary action, and the header's Approve is a link, "Review and approve".
 Mapping (V3-4) is read-only too; a remap is made from the line cell's menu on Review (V3-7.7a and 7.7b).
-The companion is the Reviewer (`frontend/public/agents/reviewer-avatar.png`, 26 px) and lives on the Review page only.
+The companion is the Reviewer (`frontend/public/v3/agent-reviewer.png`, drawn by `Avatar` in `frontend/src/components/ui.tsx`, 26 px) and lives on the Review page only.
 Where the sections below say V3-3, V3-4, or the agent-blue dot, the Review page and the Reviewer now stand in their place.
 
 Update, 2026-10-25: the Review page keeps the sidebar, like every other page, and Review is last in it.

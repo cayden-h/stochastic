@@ -27,7 +27,9 @@ export function Shape({ kind, size = 14 }: { kind: ShapeKind; size?: number }) {
 
 export type Role = "mapper" | "preparer" | "reviewer" | "brief_reader";
 
-/** Each agent's look in v3: its character, chip tint, chip text, and its name on the Agents timeline. */
+/** Each agent's look in v3: its character, chip tint, chip text, and its name on the Agents timeline.
+ * This is the one source of the agents' character art: every chip, tile, banner, toast, and page title draws it
+ * through Avatar below. */
 export const ROLES: Record<Role, { src: string | null; tint: string; ink: string; name: string; blend?: boolean }> = {
   mapper: { src: "/v3/agent-mapper.png", tint: "bg-mint", ink: "text-forest", name: "text-forest" },
   preparer: { src: "/v3/agent-preparer.png", tint: "bg-preparer-tint", ink: "text-preparer", name: "text-preparer" },
@@ -47,6 +49,9 @@ export function actorOf(actor: string): { kind: "Agent" | "Human" | "Gateway"; l
   return { kind: "Agent", label: titleCase(name ?? "agent"), role: isRole(name) ? name : undefined };
 }
 
+/** An agent's character at `size` px. The file is served as it is (`unoptimized`), not through /_next/image: the
+ * optimizer's URLs are cached for hours by the browser and the Mac app, so a small avatar kept showing the old green
+ * Mapper after the art changed, while a new size showed the new one. Every size now reads the same file. */
 export function Avatar({ role, size = 20, className = "" }: { role: Role; size?: number; className?: string }) {
   const r = ROLES[role];
   if (!r.src) {
@@ -60,7 +65,7 @@ export function Avatar({ role, size = 20, className = "" }: { role: Role; size?:
     );
   }
   return (
-    <Image src={r.src} alt="" width={size} height={size} className={`shrink-0 object-contain ${r.blend ? "mix-blend-multiply" : ""} ${className}`} />
+    <Image unoptimized src={r.src} alt="" width={size} height={size} data-agent={role} className={`shrink-0 object-contain ${r.blend ? "mix-blend-multiply" : ""} ${className}`} />
   );
 }
 
