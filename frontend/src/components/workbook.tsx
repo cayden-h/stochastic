@@ -8,29 +8,33 @@ import { type AmountCell, type CovenantRow, type LineRow, type SubRow, amountAnc
 import { Shape } from "./ui";
 
 /** The Review sheet (V3-7, Figma 670:44): A line, B platform, C target, D combined, E change, F room to breathe.
- * Rows are 32 px, the grid is hairline gray, and the figures are the case's. */
+ * Rows are 32 px, the grid is hairline gray, and the figures are the case's. The widths fit the page beside the
+ * 240 px sidebar at 1440 by 900. */
 
-export const COLS = [
-  { letter: "A", width: "w-[420px]" },
-  { letter: "B", width: "w-[180px]" },
-  { letter: "C", width: "w-[180px]" },
-  { letter: "D", width: "w-[180px]" },
-  { letter: "E", width: "w-[140px]" },
+export interface SheetCol { letter: string; width: string }
+
+export const COLS: readonly SheetCol[] = [
+  { letter: "A", width: "w-[380px]" },
+  { letter: "B", width: "w-[170px]" },
+  { letter: "C", width: "w-[170px]" },
+  { letter: "D", width: "w-[170px]" },
+  { letter: "E", width: "w-[130px]" },
 ] as const;
 
 const GUTTER = "w-[44px] shrink-0";
-const BOX = "relative flex h-full shrink-0 items-center border-r border-sheet-line";
-const CELL = `${BOX} px-[10px]`;
-const NUM = `${CELL} w-[180px] justify-end`;
+export const BOX = "relative flex h-full shrink-0 items-center border-r border-sheet-line";
+export const CELL = `${BOX} px-[10px]`;
+const NUM = `${CELL} w-[170px] justify-end`;
 
 /** The cell the controller is working in: typing, asking, or picking a line. Its row number and column letter light up. */
 export interface Active { key: string; row: number; col: string }
 
-export function ColumnLetters({ active }: { active: Active | null }) {
+/** The column letters over a sheet. `rest` names the last column, which takes the room that is left. */
+export function ColumnLetters({ active, cols = COLS, rest = "F" }: { active: Active | null; cols?: readonly SheetCol[]; rest?: string }) {
   return (
     <div className="flex h-[24px] w-full shrink-0 border-b border-sheet-line bg-sheet-head">
       <div className={`${GUTTER} border-r border-sheet-line`} />
-      {COLS.map((c) => {
+      {cols.map((c) => {
         const on = active?.col === c.letter;
         return (
           <div key={c.letter} className={`flex h-full shrink-0 items-center justify-center border-r border-sheet-line text-[11px] ${c.width} ${on ? "bg-mint font-semibold text-forest" : "font-medium text-sheet-muted"}`}>
@@ -38,12 +42,12 @@ export function ColumnLetters({ active }: { active: Active | null }) {
           </div>
         );
       })}
-      <div className="flex h-full min-w-0 flex-1 items-center justify-center text-[11px] font-medium text-sheet-muted">F</div>
+      <div className={`flex h-full min-w-0 flex-1 items-center justify-center text-[11px] ${active?.col === rest ? "bg-mint font-semibold text-forest" : "font-medium text-sheet-muted"}`}>{rest}</div>
     </div>
   );
 }
 
-function RowNumber({ n, on }: { n: number; on: boolean }) {
+export function RowNumber({ n, on }: { n: number; on: boolean }) {
   return (
     <div className={`${GUTTER} flex h-full items-center justify-center border-r border-sheet-line text-[11px] ${on ? "bg-mint font-semibold text-forest" : "bg-sheet-head text-sheet-muted"}`}>
       {n}
@@ -51,7 +55,7 @@ function RowNumber({ n, on }: { n: number; on: boolean }) {
   );
 }
 
-function Row({ n, on, band, children }: { n: number; on: boolean; band?: boolean; children: React.ReactNode }) {
+export function Row({ n, on, band, children }: { n: number; on: boolean; band?: boolean; children: React.ReactNode }) {
   return (
     <div className={`flex h-[32px] w-full shrink-0 border-b border-sheet-line ${band ? "bg-sheet-band" : ""}`} data-sheet-row={n}>
       <RowNumber n={n} on={on} />
@@ -65,11 +69,12 @@ export function HeaderRow({ n, platform, target }: { n: number; platform: string
   const h = "text-[12px] font-semibold whitespace-nowrap text-ink";
   return (
     <Row n={n} on={false}>
-      <div className={`${CELL} w-[420px] ${h}`}>Line</div>
-      <div className={`${NUM} ${h}`}>Platform &middot; {platform}</div>
-      <div className={`${NUM} ${h}`}>Target &middot; {target}</div>
+      <div className={`${CELL} w-[380px] ${h}`}>Line</div>
+      {/* A long company name truncates inside its column; the full name is in the tooltip. */}
+      <div className={`${NUM} ${h} overflow-hidden`} title={`Platform · ${platform}`}><span className="truncate">Platform &middot; {platform}</span></div>
+      <div className={`${NUM} ${h} overflow-hidden`} title={`Target · ${target}`}><span className="truncate">Target &middot; {target}</span></div>
       <div className={`${NUM} ${h}`}>Combined</div>
-      <div className={`${CELL} w-[140px] justify-end ${h}`}>Change</div>
+      <div className={`${CELL} w-[130px] justify-end ${h}`}>Change</div>
     </Row>
   );
 }
@@ -77,11 +82,11 @@ export function HeaderRow({ n, platform, target }: { n: number; platform: string
 export function SectionTitleRow({ n, title }: { n: number; title: string }) {
   return (
     <Row n={n} on={false} band>
-      <div className={`${CELL} w-[420px] text-[11px] font-semibold tracking-[0.88px] whitespace-nowrap text-sheet-muted uppercase`}>{title}</div>
-      <div className={`${CELL} w-[180px]`} />
-      <div className={`${CELL} w-[180px]`} />
-      <div className={`${CELL} w-[180px]`} />
-      <div className={`${CELL} w-[140px]`} />
+      <div className={`${CELL} w-[380px] text-[11px] font-semibold tracking-[0.88px] whitespace-nowrap text-sheet-muted uppercase`}>{title}</div>
+      <div className={`${CELL} w-[170px]`} />
+      <div className={`${CELL} w-[170px]`} />
+      <div className={`${CELL} w-[170px]`} />
+      <div className={`${CELL} w-[130px]`} />
     </Row>
   );
 }
@@ -90,7 +95,7 @@ export function SectionTitleRow({ n, title }: { n: number; title: string }) {
 function Change({ value, text }: { value?: number; text?: string | null }) {
   const moved = value !== undefined && Math.round(value) !== 0;
   return (
-    <div className={`${CELL} w-[140px] justify-end font-mono text-[12px] font-semibold whitespace-nowrap ${moved && value! < 0 ? "text-denied" : "text-forest"}`}>
+    <div className={`${CELL} w-[130px] justify-end font-mono text-[12px] font-semibold whitespace-nowrap ${moved && value! < 0 ? "text-denied" : "text-forest"}`}>
       {text ?? (moved ? signed(value!) : null)}
     </div>
   );
@@ -136,7 +141,7 @@ function Amount({ cell, editable, row, col, bold, active, onSelect, onTyped }: C
       await ctx.apply({ kind: "amount", company: src.company, line: src.line, section: src.section, value: v }, anchor, cell.value);
     };
     return (
-      <div className={`${BOX} z-20 w-[180px]`}>
+      <div className={`${BOX} z-20 w-[170px]`}>
         <input
           autoFocus
           defaultValue={num(cell.value)}
@@ -205,7 +210,7 @@ function Amount({ cell, editable, row, col, bold, active, onSelect, onTyped }: C
   );
 }
 
-function Chevron({ up }: { up?: boolean }) {
+export function Chevron({ up }: { up?: boolean }) {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" className={`shrink-0 text-sheet-muted ${up ? "rotate-180" : ""}`}>
       <path d="M3 4.5L6 7.5L9 4.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -214,7 +219,7 @@ function Chevron({ up }: { up?: boolean }) {
 }
 
 /** The menu of the platform's lines under a target line cell (V3-7.7a). The current line is first, with a check. */
-function LineMenu({
+export function LineMenu({
   platform, current, options, label, onPick, onClose,
 }: {
   platform: string; current: string | null; options: string[]; label?: string; onPick: (line: string) => void; onClose: () => void;
@@ -279,7 +284,7 @@ function LineCell({
   const text = `text-[14px] text-ink ${bold ? "font-semibold" : ""}`;
   if (!line) {
     return (
-      <div className={`${CELL} w-[420px] gap-[6px] ${pad} ${text}`}>
+      <div className={`${CELL} w-[380px] gap-[6px] ${pad} ${text}`}>
         <span className="truncate" title={name}>{name}</span>
         {collapse}
       </div>
@@ -292,7 +297,7 @@ function LineCell({
   const canOpen = editable && !remap;
   const select = () => onSelect({ key: anchor, row, col: "A" });
   return (
-    <div className={`${BOX} w-[420px] ${open ? "z-30" : ""}`}>
+    <div className={`${BOX} w-[380px] ${open ? "z-30" : ""}`}>
       <button
         type="button"
         data-edit-anchor={anchor}
@@ -383,10 +388,10 @@ export function SubSheetRow({ n, row, editable, platform, options, h }: { n: num
         name={row.line.line} line={row.line} current={row.parentLine} remap={row.remap} editable={editable} indent bold={false} row={n}
         options={options} platform={platform} active={h.active} menu={h.menu} setMenu={h.setMenu} onSelect={h.onSelect}
       />
-      <div className={`${CELL} w-[180px]`} />
+      <div className={`${CELL} w-[170px]`} />
       <Amount cell={row.target} editable={editable} row={n} col="C" active={h.active} onSelect={h.onSelect} onTyped={h.onTyped} />
-      <div className={`${CELL} w-[180px]`} />
-      <div className={`${CELL} w-[140px]`} />
+      <div className={`${CELL} w-[170px]`} />
+      <div className={`${CELL} w-[130px]`} />
     </Row>
   );
 }
@@ -394,9 +399,9 @@ export function SubSheetRow({ n, row, editable, platform, options, h }: { n: num
 export function CovenantSheetRow({ n, row }: { n: number; row: CovenantRow }) {
   return (
     <Row n={n} on={false}>
-      <div className={`${CELL} w-[420px] text-[14px] whitespace-nowrap text-ink ${row.bold ? "font-semibold" : ""}`}>{row.label}</div>
-      <div className={`${CELL} w-[180px]`} />
-      <div className={`${CELL} w-[180px]`} />
+      <div className={`${CELL} w-[380px] text-[14px] whitespace-nowrap text-ink ${row.bold ? "font-semibold" : ""}`}>{row.label}</div>
+      <div className={`${CELL} w-[170px]`} />
+      <div className={`${CELL} w-[170px]`} />
       <div className={`${NUM} text-[14px] font-semibold whitespace-nowrap text-forest`}>{row.value}</div>
       <Change text={row.was} />
     </Row>
