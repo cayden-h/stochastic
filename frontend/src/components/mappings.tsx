@@ -103,6 +103,7 @@ export function Mappings({
           const unsure = isUnsure(m, asking);
           const line = byId.get(m.target_line_id);
           const total = line?.is_total ?? false;
+          // A low confidence the Mapper did not ask about is shown plainly, not in the green of a sure line.
           const remap = editOf(line, edits, "remap");
           const amount = editOf(line, edits, "amount");
           const now = effectivePlatformLine(m, line, edits);
@@ -126,7 +127,7 @@ export function Mappings({
                 {m.approved_by && !remap ? <Mono>by you</Mono> : null}
                 {unsure && !remap ? <Tag tone="escalation">Needs you</Tag> : null}
               </span>
-              <span className={`w-[130px] shrink-0 font-ui font-semibold ${remap || total ? "text-slate" : unsure ? "text-escalation" : "text-clear"}`}>
+              <span className={`w-[130px] shrink-0 font-ui font-semibold ${remap || total ? "text-slate" : unsure ? "text-escalation" : m.confidence < 0.8 ? "text-slate" : "text-clear"}`}>
                 {remap ? "Your edit" : total ? "Total" : pct(m.confidence)}
               </span>
             </div>
