@@ -106,6 +106,18 @@ export function isLearnedTag(l: SourceLine): boolean {
   return Boolean(l.covenant_policy_id);
 }
 
+/** The confidence a mapping shows. A line the controller answered (`approved_by`, no open question) or a policy
+ * placed (`policy_id`) is settled, so it shows 100%; the Mapper's own figure stays in the tooltip. */
+export function shownConfidence(m: Pick<Mapping, "target_line_id" | "confidence" | "approved_by" | "policy_id">,
+  asking: Set<string>): { text: string; sure: boolean; by: "you" | "policy" | null; title: string | null } {
+  const model = pct(m.confidence);
+  if (!asking.has(m.target_line_id)) {
+    if (m.policy_id) return { text: "100%", sure: true, by: "policy", title: `Mapper's confidence before policy ${m.policy_id} placed it: ${model}` };
+    if (m.approved_by) return { text: "100%", sure: true, by: "you", title: `Mapper's confidence before your answer: ${model}` };
+  }
+  return { text: model, sure: m.confidence >= 0.8, by: null, title: null };
+}
+
 /** The lines an open question is about (an open flag item's `line_ids`). Answered flags are not open. */
 export function openQuestionLines(flags: Pick<WorkItem, "id" | "state" | "payload">[], openIds?: string[]): Set<string> {
   const open = flags.filter((f) => (openIds ? openIds.includes(f.id) : f.state === "NEEDS_INFO"));

@@ -66,3 +66,9 @@ Net income,income_statement,FY2025,900,USD thousands,10-K p5,false
 Depreciation,cash_flow,FY2025,300,USD thousands,10-K p6,false
 Short-term borrowings,balance_sheet,FY2025,"3,000",USD thousands,10-K p7,false
 ```
+
+## Simulated GL detail
+
+`scripts/write_gl_files.py` writes `data/kewaunee_gl.csv` and `data/nuaire_gl.csv` (company, line, section, account, name, amount, prior, entries, last_posted, unit).
+Every row is simulated: the filings stop at statement lines, so `backend/app/tools/gl_detail.py` generates the accounts, and they sum exactly to each filed line.
+They are not upload files and never replace `kewaunee_lines.csv` or `nuaire_lines.csv`.

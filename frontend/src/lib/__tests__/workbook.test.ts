@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Case, Edit, Mapping, SourceLine, ToolRun } from "../types";
-import { agentsLeverageRun, amountNote, lineNote, remapOptions, sectionRows, was } from "../workbook.ts";
+import { agentsLeverageRun, amountNote, detailRows, lineNote, remapOptions, sectionRows, was } from "../workbook.ts";
 
 const S = "income_statement" as const;
 function line(id: string, company: string, name: string, amount: number, is_total = false): SourceLine {
@@ -91,4 +91,24 @@ test("the formula bar says who changed a cell, what the agents read, and why", (
   assert.equal(lineNote(target[3], undefined, "Kewaunee"), "Nu Aire line. Pick the Kewaunee line it maps to.");
   const remap = edit({ kind: "remap", old_platform_line: "Operating expenses", new_platform_line: "Cost of products sold" });
   assert.equal(lineNote(target[3], remap, "Kewaunee"), "Remapped by controller. The agents mapped it to Operating expenses.");
+});
+
+test("an opened row's detail: each company's statement lines, its GL accounts, and the GL total that ties", () => {
+  const rows = sectionRows(kase.result!, kase, [], S);
+  const opex = rows.find((r) => r.line === "Operating expenses")!;
+  const acct = (account: string, amount: number) => ({ account, name: account, amount, prior: amount, entries: 1, last_posted: "2024-09-30" });
+  const gl = { simulated: true, note: "simulated", lines: { p2: [acct("6000", 30000), acct("6010", 3770)], t3: [acct("7000", 6000), acct("7010", 100)] } };
+  const d = detailRows(opex, kase, gl, []);
+  assert.deepEqual(d.filter((r) => r.kind === "dline").map((r) => r.kind === "dline" && r.line.id), ["p2", "t2", "t3", "t4"]);
+  const totals = d.filter((r) => r.kind === "dgltotal");
+  assert.deepEqual(totals.map((t) => t.kind === "dgltotal" && [t.line.id, t.ties]), [["p2", true], ["t3", false]], "t3's accounts add to 6,100, not 6,163");
+  assert.equal(d.filter((r) => r.kind === "dgl").length, 4);
+  // The target lines keep their editable sub row; with no GL route, no GL rows show.
+  const t3 = d.find((r) => r.kind === "dline" && r.line.id === "t3");
+  assert.ok(t3?.kind === "dline" && t3.sub, "t3 is edited in the block");
+  assert.equal(detailRows(opex, kase, null, []).some((r) => r.kind === "dgl" || r.kind === "dgltotal"), false);
+  // A subtotal has no GL and says so.
+  const gp = detailRows(rows.find((r) => r.line === "Gross profit")!, kase, gl, []);
+  assert.equal(gp.some((r) => r.kind === "dgl"), false);
+  assert.ok(gp.some((r) => r.kind === "dnote" && /subtotal/.test(r.text)));
 });

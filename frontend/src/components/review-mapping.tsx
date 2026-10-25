@@ -2,7 +2,7 @@
 
 import { useEdits } from "@/lib/edit-context";
 import { effectivePlatformLine } from "@/lib/edits";
-import { isLearned, isUnsure, pct } from "@/lib/format";
+import { isLearned, isUnsure, shownConfidence } from "@/lib/format";
 import type { Case, Edit, Mapping, Section, SourceLine } from "@/lib/types";
 import { SECTION_TITLES, cellRef, lineNote, remapAnchor, remapOptions } from "@/lib/workbook";
 import { Shape } from "./ui";
@@ -24,6 +24,8 @@ export interface MappingLine {
   /** The platform line the target line lands on now: the remap's new line, else the Mapper's. */
   now: string | null;
   remap?: Edit; unsure: boolean; learned: boolean;
+  /** The confidence to show: 100% once the controller answered the line or a policy placed it. */
+  shown: ReturnType<typeof shownConfidence>;
 }
 type MappingRow = { kind: "head" } | { kind: "section"; key: string; title: string } | MappingLine;
 export interface MappingCellMeta { ref: string; row: number; col: string; value: string; note: string }
@@ -40,7 +42,7 @@ export function mappingLayout(kase: Case, mappings: Mapping[], edits: Edit[], as
       const l = byId.get(m.target_line_id);
       if (!l || l.section !== section || l.is_total || l.company !== kase.deal.target) continue;
       const remap = edits.find((e) => e.kind === "remap" && e.company === l.company && e.line === l.line && e.section === l.section);
-      lines.push({ kind: "mapping", key: m.id, mapping: m, line: l, now: effectivePlatformLine(m, l, edits), remap, unsure: isUnsure(m, asking), learned: isLearned(m) });
+      lines.push({ kind: "mapping", key: m.id, mapping: m, line: l, now: effectivePlatformLine(m, l, edits), remap, unsure: isUnsure(m, asking), learned: isLearned(m), shown: shownConfidence(m, asking) });
     }
     if (!lines.length) continue;
     rows.push({ n: rows.length + 1, row: { kind: "section", key: section, title: SECTION_TITLES[section] } });
@@ -147,8 +149,9 @@ export function MappingSheet({
             </Row>
           );
         }
-        const conf = row.remap ? "Your edit" : row.unsure ? "Needs you" : pct(row.mapping.confidence);
-        const tone = row.remap ? "text-sheet-muted" : row.unsure ? "text-escalation" : row.mapping.confidence < 0.8 ? "text-sheet-muted" : "text-forest";
+        const conf = row.remap ? "Your edit" : row.unsure ? "Needs you" : row.shown.text;
+        const tone = row.remap ? "text-sheet-muted" : row.unsure ? "text-escalation" : row.shown.sure ? "text-forest" : "text-sheet-muted";
+        const byYou = !row.remap && !row.unsure && row.shown.by === "you";
         return (
           <Row key={row.key} n={n} on={active?.row === n}>
             <div className={`${CELL} ${MAPPING_COLS[0].width} gap-[8px] text-[14px] text-ink`}>
@@ -158,7 +161,13 @@ export function MappingSheet({
               r={row} n={n} editable={editable} options={remapOptions(kase, row.line.section)} platform={platform}
               active={active} menu={menu} setMenu={setMenu} onSelect={onSelect}
             />
-            <div className={`${CELL} ${MAPPING_COLS[2].width} justify-end text-[13px] font-semibold whitespace-nowrap ${tone}`}>{conf}</div>
+            <div
+              className={`${CELL} ${MAPPING_COLS[2].width} justify-end gap-[6px] text-[13px] font-semibold whitespace-nowrap ${tone}`}
+              title={!row.remap && !row.unsure ? row.shown.title ?? undefined : undefined}
+            >
+              {byYou ? <span className="font-mono text-[11px] font-normal text-sheet-muted">by you</span> : null}
+              {conf}
+            </div>
             <div className={`${CELL} ${MAPPING_COLS[3].width} gap-[8px] text-[13px] text-sheet-muted`}>
               {row.learned && !row.remap ? <span className="shrink-0 rounded-chip bg-mint px-[6px] py-[1px] text-[10px] font-semibold tracking-[0.6px] text-forest uppercase">Learned</span> : null}
               <span className="truncate" title={row.mapping.reason}>{row.mapping.reason}</span>

@@ -61,7 +61,7 @@ def test_a_demo_pace_run_never_calls_droid_and_reaches_the_questions(droid_confi
     r = c.post(f"/deals/{DEAL_ID}/run", json={"sync": False, "pace": "demo"})
     assert r.status_code == 200
     body = c.get(f"/deals/{DEAL_ID}/case").json()
-    assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 2
+    assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 3
     assert calls == []
     assert 3.0 <= clock.now <= 4.5  # paced like the demo's Mapper (a Brief sent as JSON), not a live model's own time
     answer_all(c, DEAL_ID)  # the last answer continues in the background, at the same pace and on the same backend

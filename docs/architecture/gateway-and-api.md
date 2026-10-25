@@ -144,7 +144,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
   "policies": [ "..." ],
   "sessions": [ "..." ],
   "audit": { "rows": 12, "chain_valid": true, "denied": 0 },
-  "backend": { "configured": "scripted", "fallback": "scripted", "anthropic_key": false, "factory_key": true, "last_runs": [ "..." ], "demo_recording": { "name": "haiku-5-5-run2", "model": "claude-haiku-5-5", "backend": "droid", "recorded_at": "2026-10-24T03:40:02-07:00", "model_confirmed": false, "...": "..." } },
+  "backend": { "configured": "scripted", "fallback": "scripted", "anthropic_key": false, "factory_key": true, "last_runs": [ "..." ], "demo_recording": { "name": "haiku-5-5-run3", "model": "claude-haiku-5-5", "backend": "droid", "recorded_at": "2026-10-24T03:40:02-07:00", "model_confirmed": false, "...": "..." } },
   "edits": [],
   "adjustments": [],
   "brief_draft": null,
@@ -605,7 +605,7 @@ Two switches:
 #### The backend of the two demo paces: the recorded Claude Haiku 5.5 run
 
 Since 2026-10-25 (D22), `demo` and `factory` with no `backend` replay a real recorded model run instead of the scripted rules (`backend/app/agents/demo_replay.py`).
-The recording is `backend/recordings/haiku-5-5-run2/`: the live Droid run of the demo deal with `DROID_MODEL=claude-haiku-5-5`, committed on 2026-10-24 at 03:40 PDT (commit 8b914db); its `recording.json` says so.
+The recording is `backend/recordings/haiku-5-5-run3/`: the live Droid run of the demo deal with `DROID_MODEL=claude-haiku-5-5`, committed on 2026-10-24 at 03:40 PDT (commit 8b914db); its `recording.json` says so.
 The model is the one requested; the served-model check from the droid session record was added later that day, so `model_confirmed` is false for this run.
 What is replayed and what is live:
 - The Mapper's typed output (53 mappings, 78 covenant tags, two flags with the model's own questions and options) is the one Haiku 5.5 returned.
@@ -624,7 +624,7 @@ A Brief Reader step (an upload with the agreement as text) always runs the scrip
 The input key stored with the recording does not match today's Mapper input (`input_matches` false): the input has gained fields since 03:40 (line notes and Brief fields).
 The output is still the one the model returned, and the gateway re-checks every mapping, tag, and flag against the current lines, so a mismatch that matters is refused.
 
-What the model card reads from: each `last_runs` entry has `backend` and `asked` (both `replay`), `model` (`claude-haiku-5-5`), `recorded` (true), `recording` (`haiku-5-5-run2`), `recorded_at`, and `recorded_backend` (`droid`).
+What the model card reads from: each `last_runs` entry has `backend` and `asked` (both `replay`), `model` (`claude-haiku-5-5`), `recorded` (true), `recording` (`haiku-5-5-run3`), `recorded_at`, and `recorded_backend` (`droid`).
 A scripted run has `model` null and `recorded` false; a live droid run has the served or requested model and `recorded` false.
 `backend.demo_recording` on `/health` and `/case` describes the recording itself.
 So the card can say "Claude Haiku 5.5 · recorded run", and that is true: the questions on screen are the ones the model wrote on that run.

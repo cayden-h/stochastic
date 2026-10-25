@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useEdits } from "@/lib/edit-context";
 import { num, parseAmount, signed } from "@/lib/edits";
-import type { Edit, Section, SourceLine } from "@/lib/types";
-import { type AmountCell, type CovenantRow, type LineRow, type SubRow, amountAnchor, remapAnchor } from "@/lib/workbook";
+import { shownConfidence } from "@/lib/format";
+import type { Edit, Mapping, Section, SourceLine } from "@/lib/types";
+import {
+  type AmountCell, type CovenantRow, type DetailRow, type LineRow, type SubRow, amountAnchor, remapAnchor,
+} from "@/lib/workbook";
 import { Shape } from "./ui";
 
 /** The Review sheet (V3-7, Figma 670:44): A line, B platform, C target, D combined, E change, F room to breathe.
@@ -271,22 +274,28 @@ export function LineMenu({
 /** The line cell of a target line: its name, and a menu of the platform's lines to remap it (V3-7.7a and 7.7b).
  * A remapped line keeps its place and says where it goes now, amber until it has a reason. */
 function LineCell({
-  name, line, current, remap, editable, indent, bold, row, options, platform, active, menu, setMenu, onSelect, menuLabel, collapse,
+  name, line, current, remap, editable, indent, bold, row, options, platform, active, menu, setMenu, onSelect, menuLabel, toggle, badge,
 }: {
   name: string; line: SourceLine | null;
   /** The platform line the Mapper put the target line on: the row it sits under. */
   current: string; remap?: Edit; editable: boolean; indent: boolean; bold: boolean; row: number;
   options: string[]; platform: string; active: Active | null; menu: string | null; setMenu: (k: string | null) => void;
-  onSelect: (a: Active) => void; menuLabel?: string; collapse?: React.ReactNode;
+  onSelect: (a: Active) => void; menuLabel?: string;
+  /** The detail toggle at the left of a combined row; it sits outside the line's menu button. */
+  toggle?: React.ReactNode;
+  /** A small mark after the name, such as the Mapper's confidence. */
+  badge?: React.ReactNode;
 }) {
   const ctx = useEdits();
-  const pad = indent ? "pl-[42px]" : "";
+  const pad = indent ? "pl-[58px]" : toggle ? "pl-[34px]" : "";
+  const toggleSlot = toggle ? <span className="absolute top-1/2 left-[10px] z-[1] flex -translate-y-1/2">{toggle}</span> : null;
   const text = `text-[14px] text-ink ${bold ? "font-semibold" : ""}`;
   if (!line) {
     return (
       <div className={`${CELL} w-[380px] gap-[6px] ${pad} ${text}`}>
+        {toggleSlot}
         <span className="truncate" title={name}>{name}</span>
-        {collapse}
+        {badge}
       </div>
     );
   }
@@ -298,6 +307,7 @@ function LineCell({
   const select = () => onSelect({ key: anchor, row, col: "A" });
   return (
     <div className={`${BOX} w-[380px] ${open ? "z-30" : ""}`}>
+      {toggleSlot}
       <button
         type="button"
         data-edit-anchor={anchor}
@@ -318,7 +328,7 @@ function LineCell({
               {needs ? null : <span className="text-forest"><Shape kind="check" size={10} /></span>}
             </span>
           ) : null}
-          {collapse}
+          {badge}
         </span>
         {canOpen || remap ? <span className={open || remap ? "" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"}><Chevron up={open} /></span> : null}
       </button>
@@ -348,30 +358,19 @@ export interface SheetHandlers {
 }
 
 export function LineSheetRow({
-  n, row, editable, platform, target, options, collapsed, onToggle, h,
+  n, row, editable, platform, target, options, open, onToggle, h,
 }: {
   n: number; row: LineRow; editable: boolean; platform: string; target: string; options: string[];
-  collapsed: boolean; onToggle: () => void; h: SheetHandlers;
+  open: boolean; onToggle: () => void; h: SheetHandlers;
 }) {
   const on = h.active?.row === n;
-  const collapse = row.subs.length ? (
-    <button
-      type="button"
-      onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      aria-expanded={!collapsed}
-      aria-label={`${collapsed ? "Show" : "Hide"} ${row.subs.length} ${target} lines`}
-      className={`flex size-[18px] shrink-0 items-center justify-center rounded-[3px] text-sheet-muted hover:bg-sheet-head ${collapsed ? "" : "opacity-0 hover:opacity-100 focus-visible:opacity-100"}`}
-    >
-      <span className={collapsed ? "-rotate-90" : ""}><Chevron /></span>
-    </button>
-  ) : null;
   return (
     <Row n={n} on={on}>
       <LineCell
         name={row.line} line={row.remapLine} current={row.line} remap={row.remap} editable={editable} indent={false} bold={row.bold} row={n}
         options={options} platform={platform} active={h.active} menu={h.menu} setMenu={h.setMenu} onSelect={h.onSelect}
         menuLabel={row.remapLine && row.remapLine.line !== row.line ? `${target}'s ${row.remapLine.line}` : undefined}
-        collapse={collapse}
+        toggle={<OutlineToggle open={open} onToggle={onToggle} line={row.line} />}
       />
       <Amount cell={row.platform} editable={editable} row={n} col="B" bold={row.bold} active={h.active} onSelect={h.onSelect} onTyped={h.onTyped} />
       <Amount cell={row.target} editable={editable} row={n} col="C" bold={row.bold} active={h.active} onSelect={h.onSelect} onTyped={h.onTyped} />
@@ -381,12 +380,14 @@ export function LineSheetRow({
   );
 }
 
-export function SubSheetRow({ n, row, editable, platform, options, h }: { n: number; row: SubRow; editable: boolean; platform: string; options: string[]; h: SheetHandlers }) {
+export function SubSheetRow({
+  n, row, editable, platform, options, h, badge,
+}: { n: number; row: SubRow; editable: boolean; platform: string; options: string[]; h: SheetHandlers; badge?: React.ReactNode }) {
   return (
     <Row n={n} on={h.active?.row === n}>
       <LineCell
         name={row.line.line} line={row.line} current={row.parentLine} remap={row.remap} editable={editable} indent bold={false} row={n}
-        options={options} platform={platform} active={h.active} menu={h.menu} setMenu={h.setMenu} onSelect={h.onSelect}
+        options={options} platform={platform} active={h.active} menu={h.menu} setMenu={h.setMenu} onSelect={h.onSelect} badge={badge}
       />
       <div className={`${CELL} w-[170px]`} />
       <Amount cell={row.target} editable={editable} row={n} col="C" active={h.active} onSelect={h.onSelect} onTyped={h.onTyped} />
@@ -409,3 +410,165 @@ export function CovenantSheetRow({ n, row }: { n: number; row: CovenantRow }) {
 }
 
 export type { Section };
+
+/** The outline box at the left of a combined row, as a spreadsheet's row group: + opens the detail block, - closes it. */
+export function OutlineToggle({ open, onToggle, line }: { open: boolean; onToggle: () => void; line: string }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      aria-expanded={open}
+      aria-label={`${open ? "Hide" : "Show"} detail for ${line}`}
+      title={open ? "Hide the source lines and GL accounts" : "Show the source lines and GL accounts"}
+      className={`flex size-[14px] shrink-0 items-center justify-center rounded-[2px] border bg-white text-sheet-muted outline-none hover:border-forest hover:text-forest focus-visible:border-forest ${open ? "border-forest text-forest" : "border-[#C9C9C5]"}`}
+    >
+      <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+        <path d={open ? "M1.5 4h5" : "M1.5 4h5M4 1.5v5"} stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
+/** The Mapper's confidence on a target line: 100% once you answered it or a policy placed it, the model's own % in the
+ * tooltip; else the model's %, teal when sure. */
+export function ConfidenceMark({ mapping, asking }: { mapping: Mapping; asking: Set<string> }) {
+  const c = shownConfidence(mapping, asking);
+  const open = asking.has(mapping.target_line_id);
+  return (
+    <span className="flex shrink-0 items-center gap-[5px]" title={c.title ?? `Mapper's confidence: ${c.text}`}>
+      <span className={`font-mono text-[11px] font-semibold ${open ? "text-escalation" : c.sure ? "text-forest" : "text-sheet-muted"}`}>{c.text}</span>
+      {c.by === "you" ? <span className="font-mono text-[11px] text-sheet-muted">by you</span> : null}
+      {c.by === "policy" ? <span className="rounded-chip bg-mint px-[5px] py-[1px] text-[9px] font-semibold tracking-[0.6px] text-forest uppercase">Learned</span> : null}
+    </span>
+  );
+}
+
+const DROW = "flex w-full shrink-0 border-b border-sheet-line";
+const DNUM = `${CELL} w-[170px] justify-end whitespace-nowrap`;
+
+/** One row of the detail block under an opened combined row (DetailRow in lib/workbook). Columns keep the sheet's
+ * meaning where they can: the platform's figures in B, the target's in C; then D prior period, E change, F entries and
+ * the last posting. GL rows are 26 px and 12 px type, denser than the statement rows. */
+export function DetailSheetRow({
+  n, row, platform, target, asking, note,
+}: { n: number; row: DetailRow; platform: string; target: string; asking: Set<string>; note: string }) {
+  const amountCells = (side: "platform" | "target", content: React.ReactNode, cls = "") => (
+    <>
+      <div className={`${DNUM} ${cls}`}>{side === "platform" ? content : null}</div>
+      <div className={`${DNUM} ${cls}`}>{side === "target" ? content : null}</div>
+    </>
+  );
+  const ties = (ok: boolean, label: string) => (
+    <span className={`flex items-center gap-[4px] text-[11px] font-medium whitespace-nowrap ${ok ? "text-forest" : "text-denied"}`} title={ok ? `${label}: the GL accounts add up to the filed line` : `${label}: the GL accounts do not add up to the filed line`}>
+      <Shape kind={ok ? "check" : "cross"} size={9} />{ok ? "Ties" : "Off"}
+    </span>
+  );
+  if (row.kind === "dhead") {
+    const h = "text-[11px] font-semibold whitespace-nowrap text-sheet-muted";
+    return (
+      <div className={`${DROW} h-[26px] bg-sheet-head/60`} data-sheet-row={n} data-detail={row.parent}>
+        <RowNumber n={n} on={false} />
+        <div className={`${CELL} w-[380px] pl-[34px] ${h}`}>Source line &middot; GL account</div>
+        <div className={`${DNUM} ${h} overflow-hidden`}><span className="truncate">{platform}</span></div>
+        <div className={`${DNUM} ${h} overflow-hidden`}><span className="truncate">{target}</span></div>
+        <div className={`${DNUM} ${h}`}>{row.gl ? "Prior period" : null}</div>
+        <div className={`${CELL} w-[130px] justify-end ${h}`}>{row.gl ? "Change" : null}</div>
+        <div className={`flex h-full min-w-0 flex-1 items-center justify-end px-[10px] ${h}`}>{row.gl ? "Entries · posted" : null}</div>
+      </div>
+    );
+  }
+  if (row.kind === "dcompany") {
+    return (
+      <div className={`${DROW} h-[26px] bg-sheet-band`} data-sheet-row={n} data-detail={row.parent}>
+        <RowNumber n={n} on={false} />
+        <div className={`${CELL} w-[380px] gap-[6px] pl-[34px] text-[11px] whitespace-nowrap`}>
+          <span className="font-semibold tracking-[0.88px] text-ink uppercase">{row.company}</span>
+          <span className="text-sheet-muted">&middot; {row.count === 1 ? "1 statement line" : `${row.count} statement lines`}</span>
+        </div>
+        {amountCells(row.side, num(row.value), "text-[13px] font-semibold text-ink")}
+        <div className={`${CELL} w-[170px]`} />
+        <div className={`${CELL} w-[130px]`} />
+        <div className="flex h-full min-w-0 flex-1 items-center justify-end px-[10px]">{row.ties === null || !row.count ? null : ties(row.ties, row.company)}</div>
+      </div>
+    );
+  }
+  if (row.kind === "dline") {
+    const e = row.edit;
+    return (
+      <div className={`${DROW} h-[32px]`} data-sheet-row={n} data-detail={row.parent}>
+        <RowNumber n={n} on={false} />
+        <div className={`${CELL} w-[380px] gap-[8px] pl-[58px] text-[14px] text-ink ${row.line.is_total ? "font-semibold" : ""}`}>
+          <span className="truncate" title={row.line.line}>{row.line.line}</span>
+          {row.mapping && !row.line.is_total ? <ConfidenceMark mapping={row.mapping} asking={asking} /> : null}
+        </div>
+        {amountCells(row.side, (
+          <span className="flex items-center gap-[6px]">
+            {e && e.old_value != null ? <span className="font-mono text-[11px] text-[#6b6b6b] line-through">{num(e.old_value)}</span> : null}
+            <span className={`text-[14px] text-ink ${e || row.line.is_total ? "font-semibold" : ""}`}>{num(row.value)}</span>
+          </span>
+        ))}
+        <div className={`${CELL} w-[170px]`} />
+        <div className={`${CELL} w-[130px]`} />
+        <div className="h-full min-w-0 flex-1" />
+      </div>
+    );
+  }
+  if (row.kind === "dfacts" || row.kind === "dnote") {
+    const text = row.kind === "dnote" ? row.text : facts(row.line, row.mapping, asking);
+    return (
+      <div className={`${DROW} h-[24px]`} data-sheet-row={n} data-detail={row.parent}>
+        <RowNumber n={n} on={false} />
+        <div className={`flex h-full min-w-0 flex-1 items-center pr-[16px] ${row.kind === "dnote" ? "pl-[58px] italic" : "pl-[58px]"} text-[12px] text-sheet-muted`}>
+          <span className="truncate" title={text}>{text}</span>
+        </div>
+      </div>
+    );
+  }
+  if (row.kind === "dgl") {
+    const change = row.value - row.prior;
+    return (
+      <div className={`${DROW} h-[26px] text-[12px]`} data-sheet-row={n} data-detail={row.parent} title={note}>
+        <RowNumber n={n} on={false} />
+        <div className={`${CELL} w-[380px] gap-[8px] pl-[74px] text-ink`}>
+          <span className="w-[34px] shrink-0 font-mono text-[11px] text-sheet-muted">{row.gl.account}</span>
+          <span className="min-w-0 truncate" title={row.gl.name}>{row.gl.name}</span>
+        </div>
+        {amountCells(row.side, num(row.value), "text-ink")}
+        <div className={`${DNUM} text-sheet-muted`}>{num(row.prior)}</div>
+        <div className={`${CELL} w-[130px] justify-end font-mono text-[11px] whitespace-nowrap ${Math.round(change) < 0 ? "text-denied" : "text-sheet-muted"}`}>{Math.round(change) ? signed(change) : "0"}</div>
+        <div className="flex h-full min-w-0 flex-1 items-center justify-end gap-[6px] overflow-hidden px-[10px] font-mono text-[11px] whitespace-nowrap text-sheet-muted">
+          <span>{row.gl.entries.toLocaleString("en-US")}</span><span aria-hidden="true">&middot;</span><span>{row.gl.last_posted}</span>
+        </div>
+      </div>
+    );
+  }
+  // dgltotal: the GL accounts' total, which must equal the filed statement line.
+  return (
+    <div className={`${DROW} h-[26px] text-[12px]`} data-sheet-row={n} data-detail={row.parent}>
+      <RowNumber n={n} on={false} />
+      <div className={`${CELL} w-[380px] gap-[6px] pl-[74px] font-semibold text-ink`}>
+        <span className="truncate" title={`GL total, ${row.line.line}`}>GL total &middot; {row.line.line}</span>
+      </div>
+      {amountCells(row.side, <span className="border-t border-ink pt-px">{num(row.value)}</span>, "font-semibold text-ink")}
+      <div className={`${CELL} w-[170px]`} />
+      <div className={`${CELL} w-[130px]`} />
+      <div className="flex h-full min-w-0 flex-1 items-center justify-end px-[10px]">{ties(row.ties, row.line.line)}</div>
+    </div>
+  );
+}
+
+/** The facts row under a statement line: for a target line the Mapper's confidence and reason and who settled it, then
+ * the filing it came from and the filing's note. */
+function facts(line: SourceLine, m: Mapping | null, asking: Set<string>): string {
+  const parts: string[] = [];
+  if (m && !line.is_total) {
+    const c = shownConfidence(m, asking);
+    const who = c.by === "you" ? `Answered by you (Mapper was ${Math.round(m.confidence * 100)}%)` : c.by === "policy" ? `Learned: placed by policy ${m.policy_id}` : `Mapper ${c.text}`;
+    parts.push(`${who}: ${m.reason.replace(/[.\s]+$/, "")}.`);
+  } else if (m) {
+    parts.push(`Mapper: ${m.reason.replace(/[.\s]+$/, "")}.`);
+  }
+  parts.push(`Filed in ${line.source_ref}.`);
+  if (line.note) parts.push(`Note: ${line.note.replace(/[.\s]+$/, "")}.`);
+  return parts.join("  ·  ");
+}

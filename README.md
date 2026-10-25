@@ -144,7 +144,7 @@ The Review page holds the editable books, Approve, and Download final files.
 Two demo beats run with no live model call.
 Run the demo on the Dashboard resets the demo deal with memory cleared and plays it in about 15 seconds of agent time (the Hyphenate beat, pace `demo`).
 Upload, then Begin in the Upload modal, runs an uploaded deal at twice those waits, about 30 seconds (the Factory beat, pace `factory`).
-Both replay the recorded Claude Haiku 5.5 run of the demo deal (`backend/recordings/haiku-5-5-run2/`) for the Mapper, the Preparer, and the Reviewer; the Brief Reader runs on the scripted rules. [verified: `backend/tests/test_demo_replay.py`]
+Both replay the recorded Claude Haiku 5.5 run of the demo deal (`backend/recordings/haiku-5-5-run3/`) for the Mapper, the Preparer, and the Reviewer; the Brief Reader runs on the scripted rules. [verified: `backend/tests/test_demo_replay.py`]
 The Dashboard also lists four seeded cases: three real deals from their filings (DLH and GRSi, Mama's Creations and Crown I, Shutterstock and Envato) and one QuickBooks sample (DLH and Craig's Design and Landscaping).
 
 Pitch time is 1:30, and the live demo is 0:30.

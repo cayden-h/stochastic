@@ -8,7 +8,8 @@ import { MathPanel } from "@/components/math-panel";
 import { MAPPING_COLS, MappingSheet, mappingLayout } from "@/components/review-mapping";
 import { Shape } from "@/components/ui";
 import {
-  type Active, type SheetHandlers, ColumnLetters, CovenantSheetRow, HeaderRow, LineSheetRow, SectionTitleRow, SubSheetRow,
+  type Active, type SheetHandlers, ColumnLetters, ConfidenceMark, CovenantSheetRow, DetailSheetRow, HeaderRow, LineSheetRow,
+  SectionTitleRow, SubSheetRow,
 } from "@/components/workbook";
 import { EditsStrip, change, useDownloadFinal } from "@/components/your-edits";
 import { api } from "@/lib/api";
@@ -16,10 +17,10 @@ import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
 import { canEdit, editAnchor, num } from "@/lib/edits";
 import { fmtX, mappingCounts, openQuestionLines, plural } from "@/lib/format";
-import type { Case, Edit, ToolRun } from "@/lib/types";
+import type { Case, Edit, GlResponse, ToolRun } from "@/lib/types";
 import {
   type AmountCell, type CovenantRow, type LineRow, type SheetRow, SECTION_TITLES, SHEET_ORDER, agentsLeverageRun,
-  amountAnchor, amountNote, cellRef, lineNote, rawAmount, remapAnchor, remapOptions, sectionRows, was,
+  amountAnchor, amountNote, cellRef, detailRows, lineNote, rawAmount, remapAnchor, remapOptions, sectionRows, was,
 } from "@/lib/workbook";
 
 /** What the formula bar shows for a cell, and where the cell is. */
@@ -27,8 +28,9 @@ interface CellMeta { ref: string; row: number; col: string; value: string; note:
 
 type Laid = { n: number; row: SheetRow | { kind: "head" } };
 
-/** The rows in sheet order with their row numbers, and each editable cell's reference and formula-bar text. */
-function layout(kase: Case, edits: Edit[], collapsed: Set<string>, covenant: CovenantRow[]) {
+/** The rows in sheet order with their row numbers, and each editable cell's reference and formula-bar text. An opened
+ * row shows its detail block (detailRows) in place of its target lines; the block's target lines stay editable there. */
+function layout(kase: Case, edits: Edit[], open: Set<string>, covenant: CovenantRow[], gl: GlResponse | null) {
   const rows: Laid[] = [{ n: 1, row: { kind: "head" } }];
   const meta = new Map<string, CellMeta>();
   const result = kase.result;
@@ -54,7 +56,17 @@ function layout(kase: Case, edits: Edit[], collapsed: Set<string>, covenant: Cov
       amount(r.platform, n, "B");
       amount(r.target, n, "C");
       if (r.remapLine) meta.set(remapAnchor(r.remapLine), { ref: cellRef("A", n), row: n, col: "A", value: r.remapLine.line, note: lineNote(r.remapLine, r.remap, platform) });
-      if (collapsed.has(r.key)) continue;
+      if (open.has(r.key)) {
+        for (const d of detailRows(r, kase, gl, edits)) {
+          const m = rows.length + 1;
+          rows.push({ n: m, row: d });
+          if (d.kind === "dline" && d.sub) {
+            amount(d.sub.target, m, "C");
+            meta.set(remapAnchor(d.sub.line), { ref: cellRef("A", m), row: m, col: "A", value: d.sub.line.line, note: lineNote(d.sub.line, d.sub.remap, platform) });
+          }
+        }
+        continue;
+      }
       for (const s of r.subs) {
         const m = rows.length + 1;
         rows.push({ n: m, row: s });
@@ -110,7 +122,10 @@ function ReviewScreen() {
   const [selected, setSelected] = useState<Active | null>(null);
   const [typed, setTyped] = useState("");
   const [menu, setMenu] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // The combined rows whose detail block is open. All start closed, so the covenant block stays pinned under the income
+  // statement; Expand all opens every row.
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [gl, setGl] = useState<GlResponse | null>(null);
   const [sheet, setSheet] = useState<"combined" | "edits">("combined");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -129,6 +144,14 @@ function ReviewScreen() {
     return () => { gone = true; };
   }, [dealId, editStamp]);
 
+  // The simulated GL accounts under each source line. Read once per deal; without the route the GL rows stay hidden.
+  useEffect(() => {
+    if (!dealId) return;
+    let gone = false;
+    void api.gl(dealId).then((g) => { if (!gone) setGl(g); });
+    return () => { gone = true; };
+  }, [dealId]);
+
   const verdict = kase?.verdict ?? null;
   const covenant = useMemo<CovenantRow[]>(() => {
     if (!verdict) return [];
@@ -140,7 +163,8 @@ function ReviewScreen() {
     ];
   }, [verdict, edits, runs]);
 
-  const laid = useMemo(() => (kase ? layout(kase, edits, collapsed, covenant) : { rows: [] as Laid[], meta: new Map<string, CellMeta>() }), [kase, edits, collapsed, covenant]);
+  const laid = useMemo(() => (kase ? layout(kase, edits, open, covenant, gl) : { rows: [] as Laid[], meta: new Map<string, CellMeta>() }), [kase, edits, open, covenant, gl]);
+  const lineKeys = useMemo(() => laid.rows.flatMap((r) => (r.row.kind === "line" ? [r.row.key] : [])), [laid]);
   const asking = useMemo(() => openQuestionLines(kase?.flags ?? [], kase?.open_flags ?? []), [kase]);
   const mapped = useMemo(() => (kase ? mappingLayout(kase, mappings, edits, asking) : null), [kase, mappings, edits, asking]);
 
@@ -171,6 +195,7 @@ function ReviewScreen() {
 
   const h: SheetHandlers = { active, menu, setMenu, onSelect: setSelected, onTyped: setTyped };
   const options = (s: LineRow["section"]) => remapOptions(kase, s);
+  const allOpen = lineKeys.length > 0 && lineKeys.every((k) => open.has(k));
 
   async function act(fn: () => Promise<unknown>) {
     setBusy(true); setNote(null);
@@ -231,6 +256,23 @@ function ReviewScreen() {
             );
           })}
         </div>
+        {tab === "review" && sheet === "combined" && result ? (
+          <>
+            <span className="mx-[10px] h-[18px] w-px shrink-0 bg-sheet-line" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={() => setOpen(allOpen ? new Set() : new Set(lineKeys))}
+              className="inline-flex shrink-0 items-center gap-[6px] rounded-chip px-[8px] py-[4px] text-[13px] font-medium text-sheet-muted hover:bg-sheet-band hover:text-forest"
+              title={allOpen ? "Close every row's detail" : "Open every row's source lines and GL accounts"}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                <rect x="0.5" y="0.5" width="11" height="11" rx="2" fill="none" stroke="currentColor" />
+                <path d={allOpen ? "M3.5 6h5" : "M3.5 6h5M6 3.5v5"} stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+              {allOpen ? "Collapse all" : "Expand all"}
+            </button>
+          </>
+        ) : null}
         <span className="flex-1" />
         <div className="flex items-center gap-[8px]">
           {note ? <span role="alert" className="max-w-[360px] truncate text-[12px] font-semibold text-denied" title={note}>{note}</span> : null}
@@ -339,11 +381,22 @@ function ReviewScreen() {
               if (row.kind === "section") return <SectionTitleRow key={row.key} n={n} title={row.title} />;
               if (row.kind === "covenant") return null; // drawn in the pinned block above
               if (row.kind === "sub") return <SubSheetRow key={row.key} n={n} row={row} editable={editable} platform={deal.platform} options={options(row.line.section)} h={h} />;
+              if (row.kind === "dline" && row.sub) {
+                return (
+                  <SubSheetRow
+                    key={row.key} n={n} row={row.sub} editable={editable} platform={deal.platform} options={options(row.line.section)} h={h}
+                    badge={row.mapping ? <ConfidenceMark mapping={row.mapping} asking={asking} /> : null}
+                  />
+                );
+              }
+              if (row.kind !== "line") {
+                return <DetailSheetRow key={row.key} n={n} row={row} platform={deal.platform} target={deal.target} asking={asking} note={gl?.note ?? ""} />;
+              }
               return (
                 <LineSheetRow
                   key={row.key} n={n} row={row} editable={editable} platform={deal.platform} target={deal.target} options={options(row.section)}
-                  collapsed={collapsed.has(row.key)}
-                  onToggle={() => setCollapsed((s) => { const x = new Set(s); if (x.has(row.key)) x.delete(row.key); else x.add(row.key); return x; })}
+                  open={open.has(row.key)}
+                  onToggle={() => setOpen((s) => { const x = new Set(s); if (x.has(row.key)) x.delete(row.key); else x.add(row.key); return x; })}
                   h={h}
                 />
               );

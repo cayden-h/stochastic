@@ -2,7 +2,7 @@
 
 Pace "demo" (Run the demo, about 15 s) and pace "factory" (Upload then Begin, about 30 s) run with no live model call.
 Before this, both ran the scripted rules. Now they replay the recorded Haiku 5.5 run of the demo deal
-(backend/recordings/haiku-5-5-run2/, Droid, 2026-10-24; see its recording.json): the Mapper's typed output is the one
+(backend/recordings/haiku-5-5-run3/, Droid, 2026-10-24; see its recording.json): the Mapper's typed output is the one
 the model returned, and the Preparer and the Reviewer re-run the recorded tool sequence through the gateway, so every
 figure is a fresh tool run. The gateway checks the replayed output like any other.
 
@@ -27,7 +27,7 @@ from app.agents import recording
 from app.core.models import MapperOutput, SourceLine
 from app.tools import finance
 
-DEMO_RECORDING = "haiku-5-5-run2"
+DEMO_RECORDING = "haiku-5-5-run3"
 DEMO_PACES = ("demo", "factory")
 
 

@@ -1,6 +1,6 @@
 import type { ConversationMessage } from "./conversation";
 import type {
-  AuditResponse, Brief, Case, Deal, DealCreated, DealSummary, Edit, EditBody, EditResponse, Health, Stage, ToolRun, WorkItem,
+  AuditResponse, Brief, Case, Deal, DealCreated, DealSummary, Edit, EditBody, EditResponse, GlResponse, Health, Stage, ToolRun, WorkItem,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -74,6 +74,9 @@ export const api = {
   run: (runId: string) => get<ToolRun>(`/runs/${runId}`),
   /** Every tool run of the deal, oldest first. The Review page reads the agents' own leverage run from it. */
   runs: (id: string) => get<ToolRun[]>(`/deals/${id}/runs`),
+  /** The GL accounts under each source line (simulated from the real statement lines). Null when the gateway has no
+   * GL route or the read fails: the Review sheet then shows the statement lines without GL rows. */
+  gl: (id: string) => get<GlResponse>(`/deals/${id}/gl`).then((g) => (g && typeof g.lines === "object" ? g : null)).catch(() => null),
   conversation: (id: string) => get<ConversationMessage[]>(`/deals/${id}/conversation`),
   // The run goes in the background ({"sync": false}): a paced run takes about 23 s, and the console follows it on the
   // stream instead of waiting on the request. `pace: "demo"` plays it in about 15 s of agent time, `pace: "factory"` in

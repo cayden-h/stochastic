@@ -1,4 +1,4 @@
-"""The demo replays a real recorded Claude Haiku 5.5 run (backend/recordings/haiku-5-5-run2/) through the gateway.
+"""The demo replays a real recorded Claude Haiku 5.5 run (backend/recordings/haiku-5-5-run3/) through the gateway.
 
 The recording is the Mapper's typed output from the Droid run of 2026-10-24 evening (docs/agents.md, section 9).
 The Preparer and the Reviewer re-run their tool sequence on replay, so every number is a fresh gateway run.
@@ -17,7 +17,7 @@ from app.db.fixtures.kewaunee import BRIEF, DEAL_ID, seed, seed_demo  # noqa: E4
 from app.db.memory import MemoryStore  # noqa: E402
 from app.gateway.gateway import Gateway  # noqa: E402
 
-RUN2 = Path(__file__).resolve().parents[1] / "recordings" / "haiku-5-5-run2"
+RUN2 = Path(__file__).resolve().parents[1] / "recordings" / "haiku-5-5-run2"  # the earlier run; its None options
 
 
 @pytest.fixture
@@ -118,35 +118,41 @@ def test_the_demo_pace_replays_the_recorded_haiku_run_and_keeps_its_timings(demo
     assert (runs[0]["backend"], runs[0]["model"], runs[0]["recorded"]) == ("scripted", None, False)  # no recording
     for r in runs[1:]:
         assert (r["backend"], r["asked"], r["model"], r["recorded"], r["recording"]) == (
-            "replay", "replay", "claude-haiku-5-5", True, "haiku-5-5-run2")
-        assert r["recorded_backend"] == "droid" and r["recorded_at"].startswith("2026-10-24")
+            "replay", "replay", "claude-haiku-5-5", True, "haiku-5-5-run3")
+        assert r["recorded_backend"] == "droid" and r["recorded_at"].startswith("2026-10-25")
         assert [a["backend"] for a in r["attempts"]] == ["replay"]  # no fallback chain, no live call
     result = store.latest_result(DEAL_ID)
     assert result.backend == "replay" and round(result.leverage, 2) == 0.76 and result.review.verdict == "pass"
     assert store.deals[DEAL_ID].stage == "awaiting_approval"
     notes = [m.text for m in gw.conversation(DEAL_ID) if m.sender == "agent:preparer"]
-    assert any(t.startswith("Replay of the recorded Claude Haiku 5.5 run on droid (haiku-5-5-run2)") for t in notes)
+    assert any(t.startswith("Replay of the recorded Claude Haiku 5.5 run on droid (haiku-5-5-run3)") for t in notes)
 
 
-def test_the_replayed_mapper_raises_the_covenant_and_the_certificates_of_deposit_questions(world, paced):
+def test_the_replayed_mapper_raises_the_covenant_question_and_two_mapping_questions(world, paced):
+    """The run3 Mapper keeps every line it does not flag at 0.90 or more, so the lines under the bar come to the
+    controller in two mapping questions by kind (no platform home, two honest homes), beside the covenant question."""
     store, gw = world
     advance(gw, DEAL_ID, pace_name="demo")
     flags = gw.open_flags(DEAL_ID)
-    assert [f.payload["kind"] for f in flags] == ["covenant_tag", "mapping"]
-    cov, cds = flags
+    assert sorted(f.payload["kind"] for f in flags) == ["covenant_tag", "mapping", "mapping"]
+    cov = next(f for f in flags if f.payload["kind"] == "covenant_tag")
+    homeless, two_homes = sorted((f for f in flags if f is not cov), key=lambda f: -len(f.payload["line_ids"]))
     lines = {l.id: l.line for l in store.lines(DEAL_ID)}
-    assert {lines[i] for i in cov.payload["line_ids"]} >= {"Financing liability: PNC Term Loan"}
-    assert "Certificates of Deposit" in {lines[i] for i in cds.payload["line_ids"]}
-    assert {o.id: round(o.leverage, 2) for o in cov.options} == {"agreement_reading": 0.76, "no_exclusions": 2.84,
-                                                                  "unsecured_short_term": 0.73}
+    assert {lines[i] for i in cov.payload["line_ids"]} >= {"Financing liability: 8% Seller Notes (subordinated)"}
+    assert "Certificates of Deposit" in {lines[i] for i in homeless.payload["line_ids"]}
+    assert {lines[i] for i in two_homes.payload["line_ids"]} == {"Software", "Accrued Commissions",
+                                                                  "Depreciation and Amortization"}
+    assert {o.id: round(o.leverage, 2) for o in cov.options} == {"agreement_reading": 0.76, "exclusions_do_not_apply": 2.84,
+                                                                  "statesville_only": 1.56}
+    flagged = {i for f in (homeless, two_homes) for i in f.payload["line_ids"]}
+    sure = [m for m in store.deal_mappings(DEAL_ID) if m.target_line_id not in flagged]
+    assert sure and min(m.confidence for m in sure) >= 0.9  # the 0.90 bar
     msgs = gw.conversation(DEAL_ID)
     assert "Scripted rules" not in " ".join(m.text for m in msgs)
-    q1 = next(m.text for m in msgs if m.kind == "question" and m.item_id == cov.id)
-    assert "count as debt: leverage 0.76x, under the 2.50x limit; no_exclusions)" in q1  # no "debt.:"
     for f in flags:
         gw.answer(CONTROLLER, f.id, f.default)
     taught = [p for p in store.policies.values() if p.deal_id == DEAL_ID]
-    assert taught and {p.learned_from for p in taught} == {cov.id, cds.id}  # the answers teach the policies
+    assert taught and {p.learned_from for p in taught} == {f.id for f in flags}  # the answers teach the policies
 
 
 def test_the_factory_pace_is_twice_the_demo(demo_world, paced):
@@ -172,8 +178,8 @@ def test_health_and_case_say_replay_with_the_recorded_model(paced):
         (run,) = [r for r in status["last_runs"] if r["role"] == "mapper"]
         assert (run["backend"], run["model"], run["recorded"]) == ("replay", "claude-haiku-5-5", True)
         rec = status["demo_recording"]
-        assert (rec["name"], rec["model"], rec["backend"]) == ("haiku-5-5-run2", "claude-haiku-5-5", "droid")
-        assert rec["recorded_at"] == "2026-10-24T03:40:02-07:00" and rec["model_confirmed"] is False
+        assert (rec["name"], rec["model"], rec["backend"]) == ("haiku-5-5-run3", "claude-haiku-5-5", "droid")
+        assert rec["recorded_at"] == "2026-10-25T08:56:51-07:00" and rec["model_confirmed"] is True
 
 
 def test_a_demo_run_after_a_fresh_reset_with_the_cases_seeded_still_escalates_and_learns(paced):
@@ -189,7 +195,7 @@ def test_a_demo_run_after_a_fresh_reset_with_the_cases_seeded_still_escalates_an
     runner.LAST_RUNS.clear()
     c.post(f"/deals/{DEAL_ID}/run", json={"sync": True, "pace": "demo"})
     body = c.get(f"/deals/{DEAL_ID}/case").json()
-    assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 2
+    assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 3
     assert runner.LAST_RUNS[-1]["backend"] == "replay" and runner.LAST_RUNS[-1]["meta"]["line_ids_translated"]
     answer_all(c, DEAL_ID)
     body = c.get(f"/deals/{DEAL_ID}/case").json()
@@ -230,7 +236,7 @@ def test_an_upload_of_the_demo_statements_replays_the_recording_at_the_factory_p
     r = c.post(f"/deals/{did}/run", json={"sync": False, "pace": "factory"})
     assert r.status_code == 200
     body = c.get(f"/deals/{did}/case").json()
-    assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 2
+    assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 3
     assert 6.0 <= paced.now <= 8.5, paced.now  # a Brief sent as JSON: no read; the Mapper 2.4 + 2.8 + 1.2, then 1.2
     asked = paced.now
     from tests.test_demo_fresh import answer_all
@@ -280,7 +286,7 @@ def test_an_agreement_upload_reads_the_brief_with_the_rules_then_replays_the_map
         assert c.post(f"/deals/{did}/brief/approve").status_code == 200, deal.brief_status
     c.post(f"/deals/{did}/run", json={"sync": True, "pace": "factory"})
     assert runner.LAST_RUNS[-1]["role"] == "mapper" and runner.LAST_RUNS[-1]["backend"] == "replay"
-    assert len(gw.open_flags(did)) == 2
+    assert len(gw.open_flags(did)) == 3
 
 
 def test_an_upload_of_the_demo_agreement_and_statements_reads_verifies_and_replays_in_about_30_s(paced):
@@ -299,7 +305,7 @@ def test_an_upload_of_the_demo_agreement_and_statements_reads_verifies_and_repla
     assert body["brief_verification"]["passed"] == 22 and len(body["brief_verification"]["filled"]) == 5
     assert c.post(f"/deals/{did}/brief/approve").status_code == 200  # one click; the run goes on at its pace
     body = c.get(f"/deals/{did}/case").json()
-    assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 2
+    assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 3
     asked = paced.now
     assert 14.0 <= asked <= 17.5, asked
     answer_all(c, did)

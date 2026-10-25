@@ -1,0 +1,10 @@
+{
+  "name": "haiku-5-5-run3",
+  "model": "claude-haiku-5-5",
+  "model_label": "Claude Haiku 5.5",
+  "backend": "droid",
+  "recorded_at": "2026-10-25T08:56:51-07:00",
+  "source": "scripts/record_run.py --backend droid with DROID_MODEL_MAPPER=claude-haiku-5-5, after the Mapper's calibrated-confidence rule (0.90 bar) and the whole-family covenant rule",
+  "model_confirmed": true,
+  "note": "The live Droid run on the Kewaunee and Nu Aire deal with every role on claude-haiku-5-5; the droid session records (~/.factory/sessions) name claude-haiku-5-5 as the served model for the Mapper, the Preparer, and the Reviewer. Every detail line it did not flag is at 0.93 or more; the 9 lines under 0.90 are in two mapping flags, beside the covenant flag over all six Kewaunee debt-family lines. The Mapper's typed output is replayed as recorded; the Preparer and the Reviewer re-run the recorded tool sequence through the gateway, so every figure is a fresh run."
+}

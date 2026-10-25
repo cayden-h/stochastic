@@ -29,6 +29,7 @@ from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, Edit, State
 from app.db.fixtures.kewaunee import DEAL_ID
 from app.db.loader import MAX_BYTES, LoaderError, parse_statement_csv
 from app.gateway.gateway import Denied, Gateway, GatewayError, Invalid
+from app.tools.gl_detail import gl_response
 
 BRIEF_TEXT_FIELDS = ("lender", "limit_section", "limit_wording", "debt_term", "debt_definition", "ebitda_definition",
                      "test_period_note")  # the text fields gateway.amend_brief sets
@@ -349,6 +350,12 @@ def build_router(gw: Gateway) -> APIRouter:
     def source_lines(deal_id: str, company: str | None = None):
         need_deal(deal_id)
         return [dump(l) for l in store.lines(deal_id, company)]
+
+    @r.get("/deals/{deal_id}/gl")
+    def gl(deal_id: str):
+        """Simulated account-level detail under every detail line, labeled simulated. It sums exactly to each line."""
+        need_deal(deal_id)
+        return gl_response(store.lines(deal_id))
 
     @r.get("/deals/{deal_id}/mappings")
     def mappings(deal_id: str):

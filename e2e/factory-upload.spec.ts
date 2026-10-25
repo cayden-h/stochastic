@@ -34,6 +34,7 @@ test("the Factory beat: Upload, Begin at pace factory, the recorded Haiku run as
   if (await later.count()) await later.click();
   await answerSuggested(page);
   await answerSuggested(page);
+  await answerSuggested(page);
   await expect(page.getByText("The Mapper is asking you")).toHaveCount(0);
   await expect(handoff(page)).toBeVisible({ timeout: 40_000 });
   await expectCleanCase(page);

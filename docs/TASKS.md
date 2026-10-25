@@ -51,7 +51,7 @@ Then, on deal 2, the Mapper cites the policy (`design/review-companion.md` secti
 
 On `main` on 2026-10-25, every item in the "Not yet done" line below is done except the rehearsals, the Devpost submission, and the demo video: Tiger forks, the certificate (`backend/app/api/certificate.py`), the sensitivity figures, the timeline route, and an Anthropic run (`backend/recordings/anthropic-haiku-5-5/`).
 The backend has 435 tests passing offline with 18 skipped (verified 2026-10-25), and 448 passing against Tiger Cloud (PR #35, 2026-10-25).
-The two demo paces replay the recorded Claude Haiku 5.5 run (`backend/recordings/haiku-5-5-run2/`, D22); the replay backend on its own still reads the pinned Sonnet 5.5 run.
+The two demo paces replay the recorded Claude Haiku 5.5 run (`backend/recordings/haiku-5-5-run3/`, D22); the replay backend on its own still reads the pinned Sonnet 5.5 run.
 The rest of this section is as of 2026-10-24 morning.
 
 The backend runs the whole deal end to end on the scripted backend: mapping, two flags with computed effects, consolidation with a tie-out, covenant EBITDA and debt, leverage 0.76x against 2.50x, Reviewer pass, controller approval, hash-chained log, and policies the Mapper applies on the second run.
