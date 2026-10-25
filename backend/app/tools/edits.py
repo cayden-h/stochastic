@@ -186,7 +186,8 @@ def remap_moves(target_lines: list[SourceLine], platform_lines: list[SourceLine]
         old = [(own[j], c) for j, c in statement_feeds(own, next(k for k, x in enumerate(own) if x.id == t.id))]
         p = next(p for p in platform_lines if _norm(p.line) == _norm(m.platform_line))
         theirs = [x for x in platform_lines if _norm(x.company) == _norm(p.company) and x.section == p.section]
-        new = [(theirs[j], c) for j, c in statement_feeds(theirs, next(k for k, x in enumerate(theirs) if x.id == p.id))]
+        at = next(k for k, x in enumerate(theirs) if x.id == p.id)
+        new = [(theirs[j], c) for j, c in statement_feeds(theirs, at)]
         eid = next((getattr(e, "id", "?") for e in remaps if _line_matches(t, e)), "?")
         out.append({"edit_id": eid, "line": t, "old": old, "new": new})
     order = {getattr(e, "id", "?"): n for n, e in enumerate(remaps)}

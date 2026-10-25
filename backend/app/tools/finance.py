@@ -379,10 +379,10 @@ EDIT_RULE = ("An amount edit on an income statement detail line carries into the
              "recomputed. An income statement detail edit with no later net income total line is refused. Every "
              "line the carry moved is listed in rollup. An edit on a total line replaces that line only. An amount "
              "edit on a balance sheet detail line is refused: its roll-up is not defined, so code cannot recompute "
-             "the totals. A remap moves the target subtotals the line fed in the target's statement to the ones its new "
-             "platform line feeds in the platform's statement (each move is listed in remap_rollup), so a remap "
-             "across the balance sheet's sides fails the tie-out. An edit that matches no line or several lines, or a remap onto a platform total or a line "
-             "the platform does not have, is refused.")
+             "the totals. A remap moves the target subtotals the line fed in the target's statement to the ones "
+             "its new platform line feeds in the platform's statement (each move is listed in remap_rollup), so a "
+             "remap across the balance sheet's sides fails the tie-out. An edit that matches no line or several "
+             "lines, or a remap onto a platform total or a line the platform does not have, is refused.")
 
 TOOL_DESCRIPTIONS = {
     "consolidate": "Add the target's statement lines onto the platform's lines using the approved mappings. "
