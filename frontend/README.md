@@ -9,9 +9,9 @@ The design notes are in `docs/design/README.md`.
 
 | Route | Screen | One job |
 | --- | --- | --- |
-| `/` | Dashboard (V3-1) | See every case with its stage, verdict, last update, and a Sample data tag; Run the demo plays the 15-second demo; Begin runs the current case |
-| (modal) | New deal (V3-2) | Load two statement CSVs and a Brief JSON or the credit agreement as text (`POST /deals`), then run |
-| `/case` | Case (V3-3) | Watch the run live, answer the flags, read the verdict and the read-only books; "Review the books" after the Reviewer's hand-off |
+| `/` | Dashboard (V3-1) | See every case with its stage, verdict, last update, and a Sample data tag; Run the demo plays the 15-second Hyphenate demo; Upload opens New deal |
+| (modal) | New deal (V3-2) | Load two statement CSVs and a Brief JSON or the credit agreement as text (`POST /deals`); Begin creates the deal and runs it as the Factory demo (`"pace": "factory"`, about 30 s) |
+| `/case` | Case (V3-3) | Answer the flags, watch the pipeline, read the limit check's four figure tiles; the combined books start hidden behind Show combined books; "Review the books" after the Reviewer's hand-off |
 | `/review` | Review (V3-7) | Two tabs: Review, the combined books as a workbook, and Mapping, the target lines with a menu to remap each one; give each edit a reason to the Reviewer companion, approve or reject, download the final files; Back to case |
 | `/mapping` | Mapping (V3-4) | Where each target line went and how sure the Mapper was, line by line as it happens: All, Unsure, By policy, Edited (read-only) |
 | `/agents` | Agents (V3-6) | The Agent House plays the conversation live, with the timeline beside it |
@@ -21,8 +21,8 @@ The design notes are in `docs/design/README.md`.
 
 ## Routes the console uses
 
-Reads: `GET /deals` (the Dashboard rows: `deal_id`, `platform`, `target`, `stage`, `verdict`, `updated_at`, `data_source`, `note`; the older Deal shape also reads), `GET /deals/{id}/case`, `GET /health` (the backend badge), `GET /deals/{id}/audit`, `GET /deals/{id}/conversation` (the history, on load), and `GET /deals/{id}/runs` (the Review page reads the agents' own leverage run for its "was" figures), and `GET /deals/{id}/stream` for `stage`, `audit`, `edit`, `conversation`, `mapping`, and `notify` events.
-Writes: `POST /deals` (the upload), `POST /deals/{id}/run` (always `{"sync": false}`: the console follows the run on the stream; Run the demo adds `"pace": "demo"`), `POST /work-items/{id}/answer`, `POST /work-items/{id}/hold`, `POST /work-items/{id}/approve`, `POST /work-items/{id}/reject`, and `POST /dev/reset` for the second-run moment and Run the demo (`keep_memory=false`).
+Reads: `GET /deals` (the Dashboard rows: `deal_id`, `platform`, `target`, `stage`, `verdict`, `updated_at`, `data_source`, `note`; the older Deal shape also reads), `GET /deals/{id}/case`, `GET /health` (the model card, and the cross-deal learning counters in `counts`), `GET /deals/{id}/audit`, `GET /deals/{id}/conversation` (the history, on load), and `GET /deals/{id}/runs` (the Review page reads the agents' own leverage run for its "was" figures), and `GET /deals/{id}/stream` for `stage`, `audit`, `edit`, `conversation`, `mapping`, and `notify` events.
+Writes: `POST /deals` (the upload), `POST /deals/{id}/run` (always `{"sync": false}`: the console follows the run on the stream; Run the demo adds `"pace": "demo"`, the Upload modal's Begin adds `"pace": "factory"`), `POST /work-items/{id}/answer`, `POST /work-items/{id}/hold`, `POST /work-items/{id}/approve`, `POST /work-items/{id}/reject`, and `POST /dev/reset` for the second-run moment and Run the demo (`keep_memory=false`).
 Review edits (D19, Tri's T2): `POST /deals/{id}/edits`, `POST /edits/{id}/reason`, and `DELETE /edits/{id}`; `/case` carries `edits` and `adjustments`.
 The Brief Reader (D20, Tri's T4): `POST /deals` with `agreement_txt`, `POST /deals/{id}/brief/amounts` (`field`, `value`, `source_ref`), and `POST /deals/{id}/brief/approve`; `/case` carries `brief_draft`.
 After approval, Download final files reads `GET /deals/{id}/export.xlsx` (Tri's T3) and `GET /deals/{id}/certificate`.
@@ -52,9 +52,16 @@ In Electron a question also fires a native macOS notification through `window.st
 ## What the screen shows
 
 - The sidebar's model card names which backend produced the agent output (scripted, anthropic, droid, or replay) and where the record lives (Tiger Cloud or memory). If the runner fell back, the card says from what.
-- The sidebar's "Always learning from" counts human answers, policies, and reasoned edits (`case.edits`).
+- A run on the replay backend that plays a recorded Claude Haiku run (a `last_runs` entry, or the case's backend info, with `backend: "replay"`, `recorded: true`, and a Haiku `model` such as `claude-haiku-5-5`) shows "Claude Haiku 5.5", with "recorded run" and the store under it.
+  A scripted run always shows "Scripted rules", and no other run shows a model name it did not use (`recordedModelName` in `src/lib/format.ts`, with its test).
+- The sidebar's "Always learning from" counts human answers, policies, and reasoned edits across every deal, from `GET /health` `counts: {human_answers, policies, edits}`.
+  On a gateway without `counts` it counts the selected deal (`case.flags`, `case.policies`, `case.edits`).
+- Every agent character (chips, the Agents rows and timeline, the Log, the pipeline, toasts, the asking banner, the page titles, and the Review companion) is drawn by `Avatar` from `ROLES` in `src/components/ui.tsx`, the one source: `public/v3/agent-mapper.png` (the teal star), `agent-preparer.png`, `agent-reviewer.png`, and `agent-brief-reader.png`.
+  The files are served as they are (`unoptimized`), not through `/_next/image`, whose URLs the browser and the Mac app cache for hours: that cache kept the old green Mapper on the small avatars after the art changed.
 - The flag card shows the question, the flagged lines with the filing's note, the evidence quotes, and the options with their computed effects. The default option is marked "Agent suggests".
-- The verdict line shows leverage against the limit, OK or Over the limit, the room left, the debt capacity, and the Reviewer badge. Approve is live only when `approval_state` is `PROPOSED` and the Reviewer passed.
+- The Case shows, top to bottom: the flag card (or the Brief card), the pipeline, the limit check's four figure tiles (the covenant debt, Covenant EBITDA, Room in turns of EBITDA, and Covenant headroom in dollars of debt, each with its run id), and the combined books, hidden until Show combined books.
+  The Case has no conversation (it is on the Agents and Log pages) and no verdict sentence: the leverage against the limit, the as-filed reading, approval, and Download final files are on the Review page.
+  Over the limit, or a Reviewer that needs attention, adds its reasons under the tiles. Approve is live only when `approval_state` is `PROPOSED` and the Reviewer passed.
 - While the result waits for approval, the platform and target amounts in Combined books are editable (click, type, Enter; Esc cancels; Tab moves on). A row that gathers several target lines opens to show them, because an edit names one source line. The Combined cell shows the change from the agents' value, taken from the edits' own old and new values.
 - A change of more than half the agents' value asks for confirmation in the bubble before it is sent.
 - Your edits sits under the verdict: a click scrolls to the cell and flashes it, and Undo reverts the edit. Approve stays off while an edit has no reason.
@@ -70,7 +77,9 @@ In Electron a question also fires a native macOS notification through `window.st
   A case with `data_source: "sample"` shows a Sample data tag (a deal from the filings or an upload shows none), with the note as its tooltip; its Case and Source panel say the figures are not from a filing.
   The stat cards count across every case; Policies learned is the store's own count.
 - Run the demo resets with memory cleared (`POST /dev/reset?keep_memory=false`, which reseeds only the demo deal and returns `kept_deals`), makes the deal it reseeded current, runs it with `"pace": "demo"`, and opens the Case.
-  Begin runs the current case at its normal pace.
+  This is the Hyphenate demo.
+- The Upload modal's Begin is the Factory demo: after the files are chosen it creates the deal (`POST /deals`), runs it with `{"sync": false, "pace": "factory"}` (about 30 s of agent time, twice the demo), and opens its Case.
+  With no files chosen it runs the current case at the same pace. The Dashboard has no Begin.
 - A `notify` event (`{id, deal_id, at, kind, item_id, from, title, body}`) shows a toast at the top right of every page: the agent's character, the title, the question, Decide, and Later.
   One question shows at a time, with how many more wait.
   Decide opens the Case on that flag card and moves the focus to it; the deal's later questions then get no toast on its Case, since the card shows them.
@@ -85,8 +94,9 @@ The reducers are pure and live in `src/lib/conversation.ts` with their tests (`n
 the message list (ordered by id, the stream's replay deduplicated, a reset detected when an id comes back with another time), each agent's state, the mappings (upserted by `mapping_id`), and the Agent House's reading (`settle`, `fromAudit` for a backend without conversation events, `verbOfEvent`).
 The agent state rules: a `handoff` to an agent sets it working and the sender done; a `question` to the controller sets the sender asking until the `answer` with the same `item_id`; a `message`, `check`, or `refusal` shows the speaker talking for 1.8 s, then working.
 
-- Begin and Run start the run with `{"sync": false}` and open the Case at once.
-- The Case shows the pipeline (Brief Reader, Mapper, Preparer, Reviewer, You) with each agent's state, and the conversation under it, newest at the bottom.
+- Run the demo, the Upload modal's Begin, and the Case's Run start the run with `{"sync": false}` and open the Case at once.
+- The Case shows the pipeline (Brief Reader, Mapper, Preparer, Reviewer, You) with each agent's state.
+  The conversation, newest at the bottom, is on the Log page's Conversation view and on the Agents page.
   A question opens its flag card with "The Mapper is asking you" and the pipeline shows the Mapper waiting on You.
   After the Reviewer's hand-off a card offers "Review the books" (`/review`) and "See the log".
 - The Mapping page adds each row as its `mapping` event arrives, highlights the newest for about a second, and keeps the counts and filters on screen.

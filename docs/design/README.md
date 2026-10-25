@@ -8,9 +8,9 @@ Every screen is 1440 by 900, with a 240 px sidebar (deal, Dashboard, Case, Revie
 
 | Frame | Shows | Link |
 | --- | --- | --- |
-| V3-1 Dashboard | The cases, with stage, verdict, and updated time | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-3 |
+| V3-1 Dashboard | The cases, with stage, verdict, and updated time; the header has Upload and Run the demo (the console has no Begin there) | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-3 |
 | V3-2 Dashboard, upload | The upload modal | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-119 |
-| V3-3 Case | The flag card with the three readings, the verdict, the combined books, and Mapping, Review, and Log tiles | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-35 |
+| V3-3 Case | The flag card with the three readings, the verdict, the combined books, and Mapping, Review, and Log tiles. The console (2026-10-25) shows the flag card, the pipeline, and the verdict's four figure tiles only, with no verdict sentence and no conversation, and the combined books start hidden behind Show combined books | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-35 |
 | V3-4 Mapping | Target line, platform line, and confidence, filtered by All, Unsure, or By policy | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-195 |
 | V3-5 Log | The audit log | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-379 |
 | V3-6 Agents | The four agents in the live 3D Agent House (code layer 736:1282), each actor's latest line, and the agent timeline | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=146-149 |
@@ -21,6 +21,7 @@ Josie's teal pass (2026-10-24 evening) changed the whole look, and the console f
   Surfaces and borders are pale teal, #DCEFF1.
   Empty values are #7A8A8C.
 - Each agent has its own character and tint: the Mapper a teal star (#DCEFF1, #0F6674), the Preparer a blue flower (#E2E9F7, #2E55A3), the Reviewer a violet character (#ECE5F6, #6A4C9C), and the Brief Reader a plum character.
+  The console has one source for the 2D characters: `ROLES` and `Avatar` in `frontend/src/components/ui.tsx`, from `frontend/public/v3/agent-*.png`, on every page (chips, the Agents rows and timeline, the Log, toasts, page titles, the Review companion).
 - The page wash is the page's agent tint: teal for Dashboard, Mapping, Agents, and Review, blue for the Case, violet for the Log.
 - The frames put the page's character in the brand row.
   The console keeps the Stochastic mark there (`brand.md`) and puts the page's character 24 px to the right of the page title instead.

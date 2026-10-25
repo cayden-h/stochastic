@@ -16,7 +16,7 @@ Order: the problem, then what Stochastic does, then the proof. Do not lead with 
 | 0:00 - 0:25 | Problem | The judge feels the gate: the next deal waits on the books. | Title slide or the empty console. No demo yet. |
 | 0:25 - 0:55 | What Stochastic does | Five steps in plain words: map, flag, combine, test, approve. | A simple flow slide, or the console at rest. |
 | 0:55 - 1:30 | Proof and honesty | A real public deal. Stateful agents that learn from the controller. Math is code. Say what is simulated. | The real-versus-simulated list. |
-| 1:30 - 2:00 | Live demo | One flag, one approval, one verdict line. | The console: Dashboard, then the Case page (`/case`). |
+| 1:30 - 2:00 | Live demo | One flag, one approval, the limit check's figures. | The console: Dashboard, then the Case page (`/case`). |
 
 Who speaks: one presenter talks. A second person drives the keyboard. The rest of the team stands back. [inferred]
 
@@ -61,9 +61,19 @@ If a judge gives a second minute, the memory moment: reset, run again, no flag, 
 
 ## 2. The 30-second live demo, beat by beat
 
+There are two demo beats, both one click on the Dashboard, both hard-coded paces:
+- The Hyphenate demo: "Run the demo" resets the demo deal with memory cleared and runs it with `"pace": "demo"`, about 15 s of agent time.
+- The Factory demo: Upload, choose the two statement CSVs and the Brief or the agreement, then Begin. Begin creates the deal and runs it with `{"sync": false, "pace": "factory"}`, about 30 s of agent time (twice the demo), and opens its Case.
+  The `"factory"` pace comes with the backend change on `cayden/demo2-backend`; a gateway without it refuses the run with a 422. [inferred until that branch merges]
+
+The click path: Dashboard, Run the demo, the Case (the notification, Decide, answer both flags, the pipeline moves on, the figure tiles appear), Review the books, the edit and its reason, Approve, Download final files on Review; then Agents and Log if a judge asks.
+The Dashboard has no Begin button any more.
+
 Rules:
-- The console opens on the Dashboard (`/`); the run plays on the Case page (`/case`): the flag card, the verdict line, and the read-only combined books, with Mapping, Review, and Log tiles on the right.
-  Editing, approval, and the final files are on the Review page (`/review`), opened by "Review the books" after the Reviewer's hand-off. [verified: `frontend/README.md`]
+- The console opens on the Dashboard (`/`); the run plays on the Case page (`/case`): the flag card, the pipeline, and the limit check's four figure tiles (Senior Funded Bank Debt, Covenant EBITDA, Room in turns of EBITDA, Covenant headroom), with Mapping, Review, and Log tiles on the right.
+  The Case has no conversation and no verdict sentence, and its combined books start hidden behind Show combined books.
+  The conversation is on the Agents page and the Log's Conversation view.
+  The leverage against the limit, editing, approval, and Download final files are on the Review page (`/review`), opened by "Review the books" after the Reviewer's hand-off. [verified: `frontend/README.md`]
 - The presenter does not read numbers aloud unless they are final. See section 4.
 - Do not stage a denied action. Show a DENIED row only if a judge asks to see the log. [verified: `STOCHASTIC.md`, section 9]
 
@@ -81,17 +91,19 @@ The reset with memory cleared also retires every policy that covers Kewaunee or 
 Uploads from an earlier session are hidden from the Dashboard, not deleted; a deal uploaded during the demo still shows.
 About 6 s after the click, the Mapper's question arrives as a notification at the top right (a native macOS one too, in the Mac app); Decide opens its flag card.
 After each answer the Mapper says what it learned ("The Mapper learned p_007: ..."), and about 7 s after the last answer the Reviewer hands off: "Ready for your approval".
-Begin still runs the current case at its normal pace, and the four sample cases on the Dashboard open on every page for a judge who wants to click around; each says Sample data.
+The four sample cases on the Dashboard open on every page for a judge who wants to click around; each says Sample data.
+The sidebar's "Always learning from" counters count across every deal (`GET /health` `counts`): the seeded cases hold 4 reasoned edits, so Edits reads 4 before the demo and 5 after its edit.
+On the replay backend with a recorded Claude Haiku run, the model card reads "Claude Haiku 5.5, recorded run"; a scripted run always reads "Scripted rules".
 
 The beats below are the original plan; Cayden times the real version with a stopwatch (`tasks/cayden.md` task 5).
 
 | Beat | Time | On-screen state | Presenter says | Hardcoded or real |
 | --- | --- | --- | --- | --- |
 | 1. Start | 1:30 - 1:35 | Console is open on the Dashboard. The Kewaunee Scientific case reads "Not started". Upload shows the two statement files and the brief already loaded. | "Two statement files and a short brief with the lender's limit." | The files and brief are real data from filings. The load is real. |
-| 2. Run | 1:35 - 1:42 | Press Begin. The Case page opens, and a progress row shows the Mapper working, with its seconds. | "The Mapper matches each Nu Aire line to a Kewaunee line." | The mapping call goes through `run_agent` on the backend the sidebar's model card names (live Droid on stage). The confidences come from the typed output. |
+| 2. Run | 1:35 - 1:42 | Press Run the demo (or open the case and press Run the deal). The Case page opens, and a progress row shows the Mapper working, with its seconds. | "The Mapper matches each Nu Aire line to a Kewaunee line." | The mapping call goes through `run_agent` on the backend the sidebar's model card names (live Droid on stage). The confidences come from the typed output. |
 | 3. Flag | 1:42 - 1:50 | The "Lender definition question" card appears for "Financing liability". Each option shows its ratio in large type with Over the limit or OK; the filing evidence is folded under the options. | "It stopped on the line it must not decide alone. Financing liability holds a sale-leaseback, the new bank debt, and seller notes. Which parts are covenant debt?" | The question and options are the Mapper's. Each ratio and effect comes from a gateway tool run. The flag work item and its state NEEDS_INFO are real gateway state. |
 | 4. Answer | 1:50 - 1:55 | The controller clicks Approve on one option, or Change. | "The controller decides. Not the model." | The answer call is real. The gateway logs it. |
-| 5. Combine and test | 1:55 - 2:00 | The verdict line shows 0.76x against 2.50x with OK and Reviewer pass, and under it "read as filed, counting the whole financing line: 2.84x, over the limit". | "Code adds the books and tests the lender's limit. That is the verdict." | The Preparer's tool calls, the math, the tie-out, and the limit test run for real. The gateway checks that every figure is the Preparer's own run and reads the Reviewer's pass from its checks. |
+| 5. Combine and test | 1:55 - 2:00 | The Case shows the four figure tiles: Senior Funded Bank Debt 21,633K, Covenant EBITDA, Room 1.74x, and Covenant headroom of about $49M of debt, each with its run id. The combined books stay hidden until Show combined books; Review shows 0.76x of 2.50x. | "Code adds the books and tests the lender's limit. That is the verdict." | The Preparer's tool calls, the math, the tie-out, and the limit test run for real. The gateway checks that every figure is the Preparer's own run and reads the Reviewer's pass from its checks. |
 | 6. Review | after the hand-off | The Reviewer hands off. On the Case, "Review the books" opens the Review page: the combined books as a workbook, the Reviewer avatar trailing the cursor. Click Nu Aire's General and Administrative (6,163), type 5663, Enter. The verdict reads 0.75x, the Reviewer glides to the cell and asks why. Press 1, then Enter: "Learned: allowed add-back, for the next add-on." Approve, then Download final files. | "The controller can change the books. Code recomputes every total, and the Reviewer asks why once. The reason becomes a policy for the next add-on." | Real. The edit, the recompute, the reason, the approval, and the workbook (amber cell with its note) all go through the gateway. The reason chips are hardcoded for the demo deal. |
 | 7. Close | after 2:00 if asked | The presenter clicks Log in the sidebar (or the Log tile on the Case). | "Every step is here, and each row is chained to the one before." | Real. The chain check is real. |
 
@@ -237,7 +249,7 @@ A second, smaller flag asks where Nu Aire's Certificates of Deposit ($991K) belo
 
 ### Two outcomes
 
-| Answer | Verdict line | Presenter says | Reviewer badge |
+| Answer | Verdict (Review page; the Case shows the figure tiles) | Presenter says | Reviewer badge |
 | --- | --- | --- | --- |
 | b (the agreement's reading) | OK. 0.76x against 2.50x. Room 1.74x. | "Under the limit, with the covenant's own definition of debt. About forty-nine million of covenant headroom; the next add-on still needs the basket and the revolver." | pass |
 | a (whole line) | Over the limit. 2.84x against 2.50x, as filed. | "Over the limit. The item comes back as needs-attention and cannot be approved." | needs_attention |
