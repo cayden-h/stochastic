@@ -8,14 +8,16 @@ With DEMO_PACE set, or a run's own pace ("demo", "human", "off"), it waits a lit
 replay backends (app/agents/pace.py), so a demo run plays at a speed people can follow. The gateway's checks never
 wait, and no wait holds the gateway's lock.
 
-Pace "demo" (the 15-second "Run the demo") always runs the scripted backend for every role, with no fallback chain
-and no live call, whatever AGENT_BACKEND says, unless the run names its own backend.
+Pace "demo" (the 15-second "Run the demo") and pace "factory" (the 30-second Factory demo) never make a live call,
+whatever AGENT_BACKEND says, unless the run names its own backend: they replay the recorded Claude Haiku 5.5 run when
+it fits the deal (app/agents/demo_replay.py), and run the scripted rules otherwise, with no fallback chain either way.
 """
 from __future__ import annotations
 
+import contextlib
 import os
 
-from app.agents import pace
+from app.agents import demo_replay, pace, recording
 from app.agents.roles import BRIEF_READER_ROLE, MAPPER_ROLE, PREPARER_ROLE, REVIEWER_ROLE, Role
 from app.agents import runner
 from app.agents.runner import run_agent
@@ -115,14 +117,22 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
             pace_name: str | None = None) -> list[str]:
     """Do every step that needs no human until the deal waits on a human or is posted. Returns what happened.
 
-    `pace_name` ("demo", "human", "off") paces this run whatever DEMO_PACE says; None follows DEMO_PACE.
-    Pace "demo" with no `backend` runs every role on the scripted backend alone, so the 15-second demo never makes a
-    live model call (a .env with AGENT_BACKEND=droid would otherwise take about 45 s and Factory credits).
+    `pace_name` ("demo", "factory", "human", "off") paces this run whatever DEMO_PACE says; None follows DEMO_PACE.
+    Pace "demo" or "factory" with no `backend` pins every role to one backend with no fallback chain, so the demo never
+    makes a live model call (a .env with AGENT_BACKEND=droid would otherwise take about 45 s and Factory credits): the
+    replay of the recorded Claude Haiku 5.5 run when it fits the deal, else the scripted rules, with a note that says
+    why. The Brief Reader has no Haiku recording, so a Brief step in a replayed run runs the scripted rules.
     A run that stops on an error marks the deal `run_failed` with a `run:failed` row before the error goes up, so
     the console offers Run again on the sync route too, not only after a background run."""
     try:
-        pin = "scripted" if pace_name == "demo" and backend is None else None
-        with pace.using(pace_name), runner.only(pin):
+        pin, folder, ids = None, None, None
+        if pace_name in demo_replay.DEMO_PACES and backend is None:
+            plan = demo_replay.plan(gw, deal_id)
+            pin, folder, ids = plan.backend, plan.folder, plan.ids
+            if plan.reason and not gw.store.deal_items(deal_id, "map_lines"):
+                gw.note(deal_id, MAPPER_ROLE.actor, f"Scripted rules for this run, not the recorded Claude Haiku 5.5 "
+                                                    f"run: {plan.reason}")
+        with pace.using(pace_name), runner.only(pin), recording.using(folder, ids):
             return _advance(gw, deal_id, pin or backend, max_steps)
     except Exception as error:
         if deal_id in gw.store.deals:  # the deal may have been reset meanwhile
@@ -150,9 +160,13 @@ def _advance(gw: Gateway, deal_id: str, backend: str | None, max_steps: int) -> 
                 item = live or gw.create_item(deal_id, "draft_brief")
                 inp = gw.brief_reader_input(deal_id, item.id).model_copy(
                     update={"session": store.sessions.get(BRIEF_READER_ROLE.name)})
-                run, _ = _store_or_fall_back(gw, BRIEF_READER_ROLE, inp, deal_id, item.id, backend,
-                                             lambda r: gw.store_brief(BRIEF_READER_ROLE.actor, item.id, r.output),
-                                             log, retry_with_reason=True)
+                # No Haiku recording exists for the Brief Reader: a replayed demo run reads the Brief with the rules.
+                replayed = runner.pinned() == "replay"
+                reader = "scripted" if replayed else backend
+                with runner.only("scripted") if replayed else contextlib.nullcontext():
+                    run, _ = _store_or_fall_back(gw, BRIEF_READER_ROLE, inp, deal_id, item.id, reader,
+                                                 lambda r: gw.store_brief(BRIEF_READER_ROLE.actor, item.id, r.output),
+                                                 log, retry_with_reason=True)
                 _remember(gw, BRIEF_READER_ROLE, run, item.id,
                           f"drafted the Brief: {len(run.output.citations)} citations, {len(run.output.flags)} flags")
                 log.append(f"brief reader ran on {run.backend}")

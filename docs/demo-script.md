@@ -1,6 +1,7 @@
 # Demo script: the 2:00 pitch
 
-Last updated: 2026-10-24, evening. The figures below are computed by the tools on the fixture and tested. The failure switch was rehearsed (section 5).
+Last updated: 2026-10-25: the two demo beats replay the recorded Claude Haiku 5.5 run (D22), and the seeded cases hold four reasoned edits.
+Before that: 2026-10-24, evening. The figures below are computed by the tools on the fixture and tested. The failure switch was rehearsed (section 5).
 Changed on 2026-10-24 evening: the whole-line reading is computed as filed (2.84x), the gateway guards are in, and the stage backend is live Droid with a scripted fallback.
 The product and scope are in `STOCHASTIC.md`. This file only says what we show and say.
 Claims are tagged [verified] when a source file shows them and [inferred] when they are our judgment.
@@ -63,8 +64,8 @@ If a judge gives a second minute, the memory moment: reset, run again, no flag, 
 
 There are two demo beats, both one click on the Dashboard, both hard-coded paces:
 - The Hyphenate demo: "Run the demo" resets the demo deal with memory cleared and runs it with `"pace": "demo"`, about 15 s of agent time.
-- The Factory demo: Upload, choose the two statement CSVs and the Brief or the agreement, then Begin. Begin creates the deal and runs it with `{"sync": false, "pace": "factory"}`, about 30 s of agent time (twice the demo), and opens its Case.
-  The `"factory"` pace comes with the backend change on `cayden/demo2-backend`; a gateway without it refuses the run with a 422. [inferred until that branch merges]
+- The Factory demo: Upload, choose the two statement CSVs and the Brief or the agreement, then Begin. Begin resets with memory cleared, creates the deal and runs it with `{"sync": false, "pace": "factory"}`, about 30 s of agent time (twice the demo), and opens its Case.
+  Begin first resets with memory cleared, so the uploaded deal's questions are asked. [verified: `e2e/agreement.spec.ts`]
 
 The click path: Dashboard, Run the demo, the Case (the notification, Decide, answer both flags, the pipeline moves on, the figure tiles appear), Review the books, the edit and its reason, Approve, Download final files on Review; then Agents and Log if a judge asks.
 The Dashboard has no Begin button any more.
@@ -85,15 +86,23 @@ Measured on live Droid on 2026-10-24 08:30 (Mapper Sonnet 5.5, Preparer and Revi
 - Between judges, reset with memory cleared: the console's "Fresh deal (clear memory)" on the Case page, or `curl -X POST 'localhost:8000/dev/reset?keep_memory=false'`. It also retires the policies earlier uploads of the same companies learned. The plain reset keeps memory, and the next judge would see no flag. The reset is refused while a run is going (409) and frees the fork slot.
 - The console shows a progress row while the agents work: which agent, and for how many seconds.
 
-The 15-second demo (2026-10-25): on the Dashboard, "Run the demo" resets the demo deal with memory cleared and runs it with `"pace": "demo"`.
-That run is always scripted, whatever `.env` says: with `AGENT_BACKEND=droid` it does not call Droid (about 45 s to the questions, on Factory credits), and the model card says "Scripted rules, no model". [verified: `test_demo_fresh.py`]
+The two demo beats (2026-10-25, D22), both on the recorded Claude Haiku 5.5 run, replayed:
+- The Hyphenate beat, about 15 s: on the Dashboard, "Run the demo" resets the demo deal with memory cleared and runs it with `"pace": "demo"`.
+- The Factory beat, about 30 s: Upload the Kewaunee and Nu Aire statement CSVs and the Brief (JSON), then Begin, which runs the new deal with `"pace": "factory"`.
+Both replay `backend/recordings/haiku-5-5-run2/`, whatever `.env` says: with `AGENT_BACKEND=droid` they do not call Droid (about 45 s to the questions, on Factory credits). [verified: `test_demo_fresh.py`, `test_demo_replay.py`]
+What the model card says and why it is true: "Claude Haiku 5.5 · recorded run".
+The Mapper's mappings, tags, questions, and options are the typed output Claude Haiku 5.5 returned on the live Droid run committed on 2026-10-24 at 03:40 PDT; the gateway checks them again now, and every figure on screen is a fresh tool run.
+The Preparer and the Reviewer re-run the recorded tool sequence, so their figures are live too.
+It is not a live model call, and the card does not say it is; the gateway, the math, and the log are live. [verified: `backend/recordings/haiku-5-5-run2/recording.json`, `agents.md` section 7a]
+When the recording does not fit (other statements, or memory kept from an earlier run), the same pace runs the scripted rules and the card says "Scripted rules"; the Mapper's first message says why.
+For the Factory beat to ask its questions, the upload must come after a fresh reset (Run the demo does one), or the policies learned on the demo deal cover the uploaded Kewaunee and Nu Aire lines, and the run asks nothing.
 The reset with memory cleared also retires every policy that covers Kewaunee or Nu Aire, even one learned on an earlier upload of the same companies, so the run always asks both questions. [verified: `test_demo_fresh.py`]
 Uploads from an earlier session are hidden from the Dashboard, not deleted; a deal uploaded during the demo still shows.
-About 6 s after the click, the Mapper's question arrives as a notification at the top right (a native macOS one too, in the Mac app); Decide opens its flag card.
-After each answer the Mapper says what it learned ("The Mapper learned p_007: ..."), and about 7 s after the last answer the Reviewer hands off: "Ready for your approval".
+About 6 s after the click (14 s on the Factory beat), the Mapper's questions arrive as a notification at the top right (a native macOS one too, in the Mac app); Decide opens its flag card.
+After each answer the Mapper says what it learned ("Learned p_007 to p_012: ..."), and about 7 s after the last answer (14 s on the Factory beat) the Reviewer hands off: "Ready for your approval".
 The four sample cases on the Dashboard open on every page for a judge who wants to click around; each says Sample data.
-The sidebar's "Always learning from" counters count across every deal (`GET /health` `counts`): the seeded cases hold 4 reasoned edits, so Edits reads 4 before the demo and 5 after its edit.
-On the replay backend with a recorded Claude Haiku run, the model card reads "Claude Haiku 5.5, recorded run"; a scripted run always reads "Scripted rules".
+The Upload modal's Begin resets with memory cleared (`POST /dev/reset?keep_memory=false`) before it creates the deal, so the Factory beat always asks its questions.
+The sidebar's "Always learning from" counters count across every deal (`GET /health` `memory_counts`, also `GET /memory/counts`): the seeded cases hold 4 reasoned edits, so Edits reads 4 before the demo and 5 after its edit.
 
 The beats below are the original plan; Cayden times the real version with a stopwatch (`tasks/cayden.md` task 5).
 
@@ -143,33 +152,45 @@ The console sends `POST /deals/d_kequ_nuaire/run` with `{"sync": false, "pace": 
 No `DEMO_PACE` is needed, and a live model backend gets no added wait.
 
 ```text
-curl -X POST localhost:8000/dev/reset?keep_memory=false
+curl -X POST 'localhost:8000/dev/reset?keep_memory=false'
 curl -X POST localhost:8000/deals/d_kequ_nuaire/run -H 'content-type: application/json' -d '{"sync": false, "pace": "demo"}'
 ```
 
-Measured on uvicorn on 2026-10-24 evening (scripted, memory store), agent time only; the controller's thinking time is not counted:
+Measured on uvicorn on 2026-10-25 at 00:05 (replay of the recorded Haiku 5.5 run, memory store, the four cases seeded), agent time only; the controller's thinking time is not counted:
 - 0 s, Run: the Gateway hands the Mapper its work item.
 - 0 to 1.2 s: the Mapper works.
 - 1.2 to 5.2 s: the 53 mappings stream into the mapping view.
-- 6.25 s: the Mapper asks both questions, and the stream sends a `notify` event for each ("The Mapper needs your decision"), which the console shows as a notification.
+- 6.2 s: the Mapper asks both questions, and the stream sends a `notify` event for each ("The Mapper needs your decision"), which the console shows as a notification.
 - The controller answers. At once, the Mapper tells the controller what it learned, with the policy id, and the Mapper hands the books to the Preparer.
-- 6.64 s after the last answer: the Preparer's four tool runs (about 4.2 s), the Reviewer's two checks (about 2.4 s), and "Ready for your approval: result r_001, leverage 0.76x against 2.50x".
-- 12.9 s in all.
+- 7.2 s after the last answer: the Preparer's four tool runs, the Reviewer's two checks, and "Ready for your approval: result r_001, leverage 0.76x against 2.50x".
+- 13.5 s in all.
 
-The exact texts the room reads, from the run (every figure is from its tool run, or a filed line amount, or the Brief's limit):
+The exact texts the room reads, from the replayed run (the questions and options are the model's words; every figure is from its tool run, or a filed line amount, or the Brief's limit; the conversation shortens a long question, and the flag card shows it whole):
 
 ```text
-Decision 1 of 2: Kewaunee's 'Financing liability' (70,885K across 5 lines) holds the Statesville sale-leaseback (27,782K), the new PNC term loan and revolver (20,563K), and the 8% seller notes (22,540K). Which parts count as Senior Funded Bank Debt under Section 4.8(a)? a) The whole line counts: leverage 2.84x as filed, over the 2.50x limit; b) Only the PNC term loan and revolver count: 0.76x, under; c) PNC debt and the seller notes count: 1.56x, under. Default b, the agreement's reading. The Preparer waits for both answers.
+Decision 1 of 2: Six platform lines are either in the 'Financing liability:' family or in a family of lines that hold more than one instrument, or fall under a Senior Funded Bank Debt exclusion. Which covenant reading should apply to each? agreement_reading) Agreement's own reading: the 8% seller notes and the Statesville sale-leaseback are excluded; the PNC revolver draw, the PNC term loan, and the short-term arrangements count as debt: leverage 0.76x, under the 2.50x limit; no_exclusions) No exclusions applied: every one of the six lines counts as debt: 2.84x as filed, over; unsecured_short_term) ...
 
-Decision 2 of 2: Where does Nu Aire's 'Certificates of Deposit' (991K) go on Kewaunee's chart of accounts? The Mapper's best match is Cash and cash equivalents at confidence 0.50: Kewaunee has no investments line; could be cash equivalents or other current assets. a) Cash and cash equivalents; b) Other assets; c) Leave unmapped and list it. Debt, EBITDA, and leverage do not change with this answer. The Preparer waits for both answers.
+Decision 2 of 2: Six Nu Aire lines have no clear Kewaunee home. Where should each sit in the combined books? default_homes) Other accrued expenses, Other assets, Other income, net, Other non-current liabilities, Prepaid expenses and other current assets; 1 line left unmapped; cds_as_cash_equivalents) Cash and cash equivalents, Other accrued expenses, Other assets, Other income, net, Other non-current liabilities, Prepaid expenses and other current assets; all_unmapped) Leave all six unmapped until the controller decides where each belongs. Debt, EBITDA, and leverage do not change with this answer. The Preparer waits for both answers.
 
-Learned p_001 to p_005 (Kewaunee, Senior Funded Bank Debt): 'Financing liability: PNC Revolving Credit Facility' and 'Financing liability: PNC Term Loan' count; 'Current portion of financing liability', 'Long-term portion of financing liability', and 'Financing liability: 8% Seller Notes (subordinated)' do not count. Applying it now; 1 question still open (wi_003), and the Preparer starts once it is answered.
+Learned p_001 to p_006 (Kewaunee, Senior Funded Bank Debt): 'Short-term borrowings', 'Financing liability: PNC Revolving Credit Facility', and 'Financing liability: PNC Term Loan' count; 'Current portion of financing liability', 'Long-term portion of financing liability', and 'Financing liability: 8% Seller Notes (subordinated)' do not count. Applying it now; 1 question still open (wi_003), and the Preparer starts once it is answered.
 
-Learned p_006: Nu Aire's 'Certificates of Deposit' goes to 'Cash and cash equivalents'. Applying it now, and to this line on later deals without asking. The Preparer is next.
+Learned p_007 to p_012: Nu Aire's 'Certificates of Deposit' stays unmapped and listed. Applying it now, and to this line on later deals without asking. The Preparer is next.
 ```
 
-The policy ids are those of a fresh process; after resets they keep counting.
-Say: "It asked, it waited, it learned your answer, and it finished: the waits are shortened for the demo; every check and every figure is the real run."
+The second question is about six lines; its options turn on the certificates of deposit (991K): the default leaves them unmapped and listed until their maturities are known, and `cds_as_cash_equivalents` puts them in cash.
+The third covenant reading (the short-term arrangements treated as unsecured) is 0.73x, under.
+The policy and item ids are those of a fresh process; after resets they keep counting.
+Say: "It asked, it waited, it learned your answer, and it finished, and this is a recorded Claude Haiku 5.5 run, replayed at demo speed; every check and every figure is live."
+
+### The 30-second Factory demo: upload, Begin, the same agents
+
+The Factory beat shows the same agents on an uploaded deal.
+Upload the two statement CSVs (Kewaunee as the platform, Nu Aire as the target) and the Brief as JSON, then press Begin; the console sends `POST /deals/{new id}/run` with `{"sync": false, "pace": "factory"}`.
+The gateway compares the uploaded lines with the recorded ones by a content hash (role, section, line name, amount, total flag); they match, so the run replays the same recorded Haiku 5.5 run, with the recorded line ids translated to the upload's own.
+Any other upload runs the scripted rules at the same pace, and the card says "Scripted rules".
+Measured on uvicorn on 2026-10-25: 14.29 s to the two questions, 14.48 s from the last answer to "Ready for your approval", 28.8 s in all (on the demo deal itself: 14.23 s and 14.46 s). [verified: `test_demo_replay.py` gives 14.0 s and 13.3 s on a fake clock]
+The same texts as above, at twice the waits.
+Run it after a fresh reset; with the demo deal's answers kept, the learned policies cover the same lines, and the run would apply them and ask nothing (scripted, and it says so).
 
 ### The other four cases on the Dashboard
 
@@ -179,11 +200,12 @@ Each can be opened: Case, Mapping, Agents conversation, Log, and Review.
 
 | Case | Source | Stage | Verdict |
 | --- | --- | --- | --- |
-| DLH Holdings acquires GRSi (2022-12-08, $185M) | Filings (10-K FY2022, 8-K, credit agreement, 8-K/A Ex 99.1 to 99.4) | Posted: one covenant answer (the prior loans were repaid at close), one reasoned remap (GRSi's Indirect costs to Contract costs, Ex 99.3 note 3b), approved | 3.74x against 4.50x Total Leverage, OK |
+| DLH Holdings acquires GRSi (2022-12-08, $185M) | Filings (10-K FY2022, 8-K, credit agreement, 8-K/A Ex 99.1 to 99.4) | Posted: one covenant answer (the prior loans were repaid at close), two reasoned remaps (GRSi's Indirect costs to Contract costs, Ex 99.3 note 3b; its Other current liabilities to Deferred revenue, Ex 99.2 Note 1: they are contract liabilities), approved | 3.74x against 4.50x Total Leverage, OK |
 | Mama's Creations acquires Crown I (2025-09-02, $17.5M) | Filings (10-Q, 10-K, 8-K, M&T loan agreement, 8-K/A Ex 99.2 and 99.3) | Awaiting approval: three questions answered (finance leases count; Due from parent; Parent's net investment) | 1.90x against 3.75x Total Funded Debt, OK |
 | Shutterstock acquires Envato (2024-07-22, about $250M) | Filings (10-Q, 10-K, 8-K, credit agreement, 8-K/A Ex 99.1 to 99.3) | Waiting on the controller: do Envato's IFRS 16 lease liabilities count? (1.18x as filed if counted, 0.99x if not) | None yet; 0.99x on the agreement's reading |
-| DLH acquires Craig's Design and Landscaping | Sample, not a real deal: the QuickBooks Online sample company as DLH's next add-on, on the posted DLH and GRSi books | Posted: the Mapper reused the controller's answer on DLH's prior loan, asked only about the Mastercard balance | 3.74x against 4.50x, OK |
+| DLH acquires Craig's Design and Landscaping | Sample, not a real deal: the QuickBooks Online sample company as DLH's next add-on, on the posted DLH and GRSi books | Posted: the Mapper reused the controller's answer on DLH's prior loan, asked only about the Mastercard balance; two reasoned remaps from the QuickBooks account list (Equipment Rental to G&A, Undeposited Funds to Other current assets) | 3.74x against 4.50x, OK |
 
+The sidebar's counters are totals across all five deals, from `GET /memory/counts`: after seeding, Edits reads 4 (the four reasoned edits above), and the live demo deal adds its answers, policies, and edits as it runs (Edits 5 after the demo edit). A fresh reset takes the demo deal's share back out.
 Say for the sample: "This one is a sample company, not a real deal; it shows the answer from the GRSi deal applied to the next add-on."
 Say for Shutterstock: "The schema cannot net cash yet, so this is gross debt over EBITDA, which is at least the net figure."
 
