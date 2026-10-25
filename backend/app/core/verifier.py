@@ -3,7 +3,7 @@
 Pure functions, no store and no model. The gateway runs them after the Brief Reader's draft passed the nine draft
 checks (brief-reader.md section 6), and turns each result into a conversation message and an audit row
 (`Gateway.verify_brief`). The draft checks refuse a draft that breaks a rule; the verifier reports field by field what
-it confirmed, so the controller (or, on the demo deal, the auto-approval) sees every quote, its section, and the result.
+it confirmed, so the controller sees every quote, its section, and the result.
 
 Per field, with the reader's best citation:
 - verbatim: the quote is in the agreement, normalized as the draft checks normalize, and at least four words.

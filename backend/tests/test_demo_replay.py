@@ -87,6 +87,10 @@ def run_beat(gw, clock, pace_name, deal_id=DEAL_ID):
     """Run to the questions, answer each with its default, run to the approval. Returns (to the questions, after)."""
     said = timed(gw, clock)
     advance(gw, deal_id, pace_name=pace_name)
+    if gw.store.deals[deal_id].brief_status == "draft":  # the demo deal from its agreement: one click (D23)
+        assert gw.store.deals[deal_id].stage == "brief_ready" and not gw.open_flags(deal_id)
+        gw.approve_brief(CONTROLLER, deal_id)
+        advance(gw, deal_id, pace_name=pace_name)
     t_q, _ = first(said, lambda m: m.kind == "question")
     t_answer = clock.now
     for f in gw.open_flags(deal_id):
@@ -108,7 +112,7 @@ def demo_world():
 def test_the_demo_pace_replays_the_recorded_haiku_run_and_keeps_its_timings(demo_world, paced):
     store, gw = demo_world
     to_q, after = run_beat(gw, paced, "demo")
-    assert 7.7 <= to_q <= 8.7 and 6.0 <= after <= 7.2, (to_q, after)  # read 2.8, verify 1.6, Mapper 3.8; then 6.6
+    assert 7.0 <= to_q <= 8.3 and 6.0 <= after <= 7.2, (to_q, after)  # read 2.4, verify 1.6+0.6, Mapper 3.2; then 6.6
     runs = [r for r in runner.LAST_RUNS if r["role"] != "runner"]
     assert [r["role"] for r in runs] == ["brief_reader", "mapper", "preparer", "reviewer"]
     assert (runs[0]["backend"], runs[0]["model"], runs[0]["recorded"]) == ("scripted", None, False)  # no recording
@@ -148,7 +152,7 @@ def test_the_replayed_mapper_raises_the_covenant_and_the_certificates_of_deposit
 def test_the_factory_pace_is_twice_the_demo(demo_world, paced):
     store, gw = demo_world
     to_q, after = run_beat(gw, paced, "factory")
-    assert 15.5 <= to_q <= 17.5, to_q  # twice the demo's 8.2 s
+    assert 14.0 <= to_q <= 16.6, to_q  # twice the demo's
     demo_store = MemoryStore()
     demo_gw = Gateway(demo_store)
     seed_demo(demo_store, demo_gw)
@@ -157,7 +161,7 @@ def test_the_factory_pace_is_twice_the_demo(demo_world, paced):
     d_q, d_after = run_beat(demo_gw, demo_clock, "demo")
     assert to_q == pytest.approx(2 * d_q, abs=0.01) and after == pytest.approx(2 * d_after, abs=0.01)
     assert 12.5 <= after <= 14.0, (after, d_after)
-    assert 28.5 <= to_q + after <= 31.5  # the 30-second Factory beat, agent time only
+    assert 27.0 <= to_q + after <= 30.5  # the 30-second Factory beat, agent time only
     assert all(r["backend"] == "replay" for r in runner.LAST_RUNS if r["role"] != "brief_reader")
 
 
@@ -281,7 +285,7 @@ def test_an_agreement_upload_reads_the_brief_with_the_rules_then_replays_the_map
 
 def test_an_upload_of_the_demo_agreement_and_statements_reads_verifies_and_replays_in_about_30_s(paced):
     """The Factory beat from the agreement (D23): the demo deal's extract and statements uploaded. The verifier fills
-    the book amounts and approves the Brief, so the first thing the controller sees is the Mapper's one escalation."""
+    the book amounts, so the controller only clicks Approve Brief, then answers the Mapper's one escalation."""
     from tests.test_api_brief import fixture_csv, post_deal
     from app.db.fixtures.kewaunee import agreement_text
     from tests.test_demo_fresh import answer_all
@@ -291,21 +295,24 @@ def test_an_upload_of_the_demo_agreement_and_statements_reads_verifies_and_repla
     did = r.json()["deal_id"]
     c.post(f"/deals/{did}/run", json={"sync": True, "pace": "factory"})
     body = c.get(f"/deals/{did}/case").json()
-    assert body["deal"]["brief_status"] == "approved" and body["brief_verification"]["auto_approved"]
+    assert body["stage"] == "brief_ready" and body["open_flags"] == []  # nothing to type: the amounts are filled
+    assert body["brief_verification"]["passed"] == 22 and len(body["brief_verification"]["filled"]) == 5
+    assert c.post(f"/deals/{did}/brief/approve").status_code == 200  # one click; the run goes on at its pace
+    body = c.get(f"/deals/{did}/case").json()
     assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 2
     asked = paced.now
-    assert 15.5 <= asked <= 18.5, asked
+    assert 14.0 <= asked <= 17.5, asked
     answer_all(c, did)
     assert c.get(f"/deals/{did}/case").json()["stage"] == "awaiting_approval"
-    assert 28.5 <= paced.now <= 32.5, paced.now
+    assert 27.5 <= paced.now <= 31.5, paced.now
     assert [(r["role"], r["backend"]) for r in runner.LAST_RUNS] == [
         ("brief_reader", "scripted"), ("mapper", "replay"), ("preparer", "replay"), ("reviewer", "replay")]
 
 
-def test_another_agreement_upload_is_not_auto_approved(paced):
+def test_another_agreement_upload_gets_no_book_amounts(paced):
     from tests.test_api_brief import EXCERPT, fixture_csv, post_deal
     c = TestClient(create_app())
     r = post_deal(c, agreement=EXCERPT, agreement_name="excerpt.txt", plat=fixture_csv(PLATFORM),
                   targ=fixture_csv(TARGET), platform=PLATFORM, target=TARGET)
     deal = c.app.state.gateway.store.deals[r.json()["deal_id"]]
-    assert not deal.brief_auto_approve and deal.book_amounts == []
+    assert deal.book_amounts == []

@@ -63,14 +63,12 @@ def test_a_demo_pace_run_never_calls_droid_and_reaches_the_questions(droid_confi
     body = c.get(f"/deals/{DEAL_ID}/case").json()
     assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 2
     assert calls == []
-    assert 7.7 <= clock.now <= 9.2  # paced like the demo (read and verification included), not a live model's own time
+    assert 3.0 <= clock.now <= 4.5  # paced like the demo's Mapper (a Brief sent as JSON), not a live model's own time
     answer_all(c, DEAL_ID)  # the last answer continues in the background, at the same pace and on the same backend
     assert c.get(f"/deals/{DEAL_ID}/case").json()["stage"] == "awaiting_approval"
     assert calls == []
     status = c.get("/health").json()["backend"]
     runs = [r for r in status["last_runs"] if r["role"] != "runner"]
-    reader, runs = runs[0], runs[1:]  # the Brief Reader has no recording, so it reads with the rules (D23)
-    assert (reader["role"], reader["backend"], reader["asked"]) == ("brief_reader", "scripted", "scripted")
     assert [r["role"] for r in runs] == ["mapper", "preparer", "reviewer"]
     assert all(r["backend"] == "replay" and r["asked"] == "replay" for r in runs)
     assert all([a["backend"] for a in r["attempts"]] == ["replay"] for r in runs)  # no fallback chain

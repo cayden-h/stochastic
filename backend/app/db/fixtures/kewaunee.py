@@ -202,21 +202,21 @@ def agreement_text() -> str:
 def seed(store: MemoryStore, gw: Gateway, from_agreement: bool = False) -> Deal:
     """The demo deal. With `from_agreement` (the app's live demo deal, D23) it starts from the agreement text: the
     Brief Reader drafts the Brief, the verifier checks it, fills the amounts from the books, and approves it when every
-    check passes. Without it (most tests) the deal carries the hand-written Brief, approved."""
+    check passes, for the controller to approve. Without it (most tests) the deal carries the hand-written Brief, approved."""
     deal = Deal(id=DEAL_ID, name="Kewaunee Scientific acquires Nu Aire", platform=PLATFORM, target=TARGET,
                 stage="new", brief=BRIEF, data_source="filings", note=NOTE)
     if not from_agreement:
         gw.create_deal(CONTROLLER, deal, build_lines(store))
         return deal
-    deal = deal.model_copy(update={"brief": None, "brief_status": "none", "brief_auto_approve": True,
+    deal = deal.model_copy(update={"brief": None, "brief_status": "none",
                                    "book_amounts": [a.model_copy(deep=True) for a in BOOK_AMOUNTS]})
     return gw.create_deal_from_agreement(CONTROLLER, deal, build_lines(store), agreement_text(), AGREEMENT_SOURCE)
 
 
 def is_demo_twin(lines: list[SourceLine], platform: str, text: str) -> bool:
     """An upload of the demo deal itself: the committed agreement extract and the same statements (by the replay's
-    content hash). Its adjustments then have the same sourced book amounts, so the upload gets them, and the
-    verifier's auto-approval, like the demo deal (D23). Any other upload is asked and approved by the controller."""
+    content hash). Its adjustments then have the same sourced book amounts, so the upload gets them, like the demo
+    deal (D23). Any other upload is asked and approved by the controller."""
     from app.agents import demo_replay
     from app.core.agreement import agreement_sha256
     if agreement_sha256(text) != agreement_sha256(agreement_text()):

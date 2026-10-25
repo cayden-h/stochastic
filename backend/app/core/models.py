@@ -44,8 +44,8 @@ REVIEWER = "agent:reviewer"
 BRIEF_READER = "agent:brief_reader"
 SYSTEM = "system:gateway"
 # The Brief verifier (D23): code, not a model. It checks every Brief field against the agreement after the reader's
-# draft is stored, fills the amounts the deal's books give with their sources, and on a deal that allows it approves a
-# Brief whose every check passed. It speaks in the conversation as itself, so its checks read apart from the gateway's.
+# draft is stored and fills the amounts the deal's books give with their sources; the controller then approves the
+# Brief. It speaks in the conversation as itself, so its checks read apart from the gateway's.
 VERIFIER = "system:verifier"
 
 
@@ -149,10 +149,6 @@ class Deal(BaseModel):
     # drafts the Brief, the verifier fills an adjustment of the same name from here, with this source, so the
     # controller is not asked for a figure the deal already holds. Empty for an upload unless the controller sends it.
     book_amounts: list[Adjustment] = Field(default_factory=list)
-    # True on the demo deal only (D23): a Brief whose every verification check passed, with no question left open, is
-    # approved by the verifier, and the audit row says "auto-approved: all N checks passed". False everywhere else,
-    # where the controller approves the Brief.
-    brief_auto_approve: bool = False
 
 
 class SourceLine(BaseModel):
@@ -442,7 +438,6 @@ class BriefVerification(BaseModel):
     filled: list[str] = Field(default_factory=list)  # the amount fields filled from the deal's books
     scope_notes: list[str] = Field(default_factory=list)  # what the Brief cannot hold, said, not tested
     escalated: list[str] = Field(default_factory=list)  # the flag ids the controller must answer
-    auto_approved: bool = False
     at: datetime = Field(default_factory=now)
 
 

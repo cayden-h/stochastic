@@ -87,8 +87,8 @@ PERMISSIONS: dict[str, set[str]] = {
     "human": {"answer", "approve", "reject", "hold", "reverse", "create_deal", "run", "amend_brief", "approve_brief"},
     "system": {"post", "log", "create_item", "tool:*"},
     # The Brief verifier (D23) is code with its own name, so its rows read apart from the gateway's. It checks the
-    # draft, fills amounts the deal's books give, and approves a Brief only on a deal that allows it (brief_auto_approve).
-    VERIFIER: {"verify_brief", "amend_brief_from_books", "auto_approve_brief"},
+    # draft and fills the amounts the deal's books give; it never approves: the controller does.
+    VERIFIER: {"verify_brief", "amend_brief_from_books"},
 }
 
 
@@ -2230,8 +2230,7 @@ class Gateway:
             self._deny(Invalid(bad or f"{', '.join(empty)} still empty"), deal_id, actor, action, item.id)
         return self._lock_brief(actor, deal, item, brief, action)
 
-    def _lock_brief(self, actor: str, deal: Deal, item: WorkItem, brief: Brief, action: str,
-                    why: str = "") -> Deal:
+    def _lock_brief(self, actor: str, deal: Deal, item: WorkItem, brief: Brief, action: str) -> Deal:
         """Approve and lock the Brief on the deal, keep it by the agreement's hash, and log who approved it."""
         deal.brief, deal.brief_status = brief, "approved"
         ag = self.agreement(deal.id)
@@ -2241,11 +2240,10 @@ class Gateway:
         self._sync_draft(deal)
         item.state = State.APPROVED
         self._log(deal.id, actor, action, "ALLOWED", item.id,
-                  reason=(f"{why}; " if why else "") + f"Brief locked: limit {brief.limit:.2f}x, {brief.debt_term}; "
+                  reason=f"Brief locked: limit {brief.limit:.2f}x, {brief.debt_term}; "
                          f"agreement sha256 {ag.sha256[:12] if ag else 'none'}; base agreement only")
         self._say(deal.id, actor, item.proposed_by, "message",
-                  f"Brief {'auto-approved' if why else 'approved'}: limit {brief.limit:.2f}x, {brief.debt_term}"
-                  + (f" ({why})" if why else ""), item_id=item.id)
+                  f"Brief approved: limit {brief.limit:.2f}x, {brief.debt_term}", item_id=item.id)
         self._post(item)
         deal.stage = "new"
         return deal
@@ -2285,8 +2283,8 @@ class Gateway:
         """Check the reader's draft field by field against the agreement (app/core/verifier.py), after filling the
         adjustment amounts the deal's books give, each with its source. Each check is one conversation message and
         one audit row. A failed check, an amount the books do not give, or a question the reader asked opens a
-        brief_field flag for the controller. On a deal with `brief_auto_approve` (the demo deal) a Brief whose every
-        check passed is approved by the verifier, and the audit row says so; elsewhere the controller approves it.
+        brief_field flag for the controller. A Brief whose every
+        check passed waits for the controller's approval, one click with nothing to type.
 
         Written in steps like `store_mapping`: `progress("verify")` is called after each check, outside the gateway
         lock, so a paced demo shows the checks one by one and never holds the lock while it waits."""
@@ -2330,8 +2328,9 @@ class Gateway:
             # What the Brief cannot hold (a second covenant, stage 2), as distinct from a question about a field.
             gaps = [f for f in pending if f["field"] not in known and not f["field"].startswith(ver._GROUPS)]
             notes: list[str] = []
-            if deal.brief_auto_approve and not failed:
-                for f in gaps:  # said on the report and in the log, not tested, and not asked (D23)
+            if not failed:
+                # What the Brief cannot hold is said on the report the controller approves, not asked one by one.
+                for f in gaps:
                     notes.append(f["question"])
                     self._log(deal_id, actor, "verify:scope_note", "ALLOWED", f["field"],
                               reason=f"noted on the verification report, not tested: {f['question'][:240]}")
@@ -2348,19 +2347,15 @@ class Gateway:
             opened = [self._open_brief_flag(deal, item, f) for f in pending]
             self._sync_draft(deal, flags=[i.id for i in opened])
             waiting = self._brief_flags(deal_id)
-            auto = deal.brief_auto_approve and not failed and not waiting
             report = BriefVerification(item_id=item.id, sha256=ag.sha256, checks=checks, passed=passed,
                                        failed=len(failed), filled=filled, scope_notes=notes,
-                                       escalated=[f.id for f in waiting], auto_approved=auto)
+                                       escalated=[f.id for f in waiting])
             item.payload = {**{k: v for k, v in item.payload.items() if k != "pending_flags"},
                             "verification": report.model_dump(mode="json")}
-            if auto:
-                self._auto_approve_brief(actor, deal, item, report)
-            else:
-                deal.stage = "awaiting_brief" if waiting else "brief_ready"
-                self._say(deal_id, actor, CONTROLLER, "handoff",
-                          "Brief checked; " + (f"{_count(len(waiting), 'question')} for you, then approve it"
-                                               if waiting else "ready for your approval"), item_id=item.id)
+            deal.stage = "awaiting_brief" if waiting else "brief_ready"
+            self._say(deal_id, actor, CONTROLLER, "handoff",
+                      "Brief checked; " + (f"{_count(len(waiting), 'question')} for you, then approve it"
+                                           if waiting else "ready for your approval"), item_id=item.id)
             return report
 
     def _fill_amounts_from_books(self, actor: str, deal: Deal, item: WorkItem) -> list[str]:
@@ -2393,23 +2388,3 @@ class Gateway:
                       f"Filled {_count(len(filled), 'adjustment amount')} from the deal's books, each with its source",
                       item_id=item.id)
         return filled
-
-    def _auto_approve_brief(self, actor: str, deal: Deal, item: WorkItem, report: BriefVerification) -> Deal:
-        """The demo deal's Brief approval (D23): only with `brief_auto_approve`, every check passed, and no question
-        open. The verifier is not the reader, so maker-checker holds; the audit row names the verifier and why."""
-        action = "auto_approve_brief"
-        self._require(actor, action, deal.id, item.id)
-        if not deal.brief_auto_approve:
-            self._deny(Denied("this deal's Brief is approved by the controller"), deal.id, actor, action, item.id)
-        if actor == item.proposed_by:
-            self._deny(Denied("the proposer cannot approve its own draft"), deal.id, actor, action, item.id)
-        if report.failed or self._brief_flags(deal.id):
-            self._deny(Denied("a check failed or a question is open; the controller approves this Brief"),
-                       deal.id, actor, action, item.id)
-        brief = Brief.model_validate(deal.brief.model_dump())
-        bad = _brief_number_problem(brief)
-        empty = [k for k, v in self._brief_paths(brief).items() if v in ("", None)]
-        if bad or empty:
-            self._deny(Invalid(bad or f"{', '.join(empty)} still empty"), deal.id, actor, action, item.id)
-        return self._lock_brief(actor, deal, item, brief, "approve_brief",
-                                why=f"auto-approved: all {report.passed} checks passed")

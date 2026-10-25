@@ -1,5 +1,5 @@
-"""The Brief verifier (D23): code checks every Brief field against the agreement, fills the amounts the books give,
-and on the demo deal approves a Brief whose every check passed. docs/architecture/brief-reader.md section 6a.
+"""The Brief verifier (D23): code checks every Brief field against the agreement and fills the amounts the books give,
+so the controller approves the demo deal's Brief in one click. docs/architecture/brief-reader.md section 6a.
 
 The agreement is the committed verbatim extract of Ex 10.1 (data/brief/kewaunee_ex101_extract.txt), the text the live
 demo deal starts from.
@@ -132,27 +132,32 @@ def test_book_amounts_match_by_name_only():
 
 # ---- the demo deal: read, verify, auto-approve -----------------------------------------------------------------
 
-def test_the_demo_deal_starts_from_the_agreement_and_the_verifier_approves_its_brief(world):
+def test_the_demo_deal_starts_from_the_agreement_and_waits_for_one_click(world):
     store, gw = world
     deal = store.deals[DEAL_ID]
-    assert deal.brief is None and deal.brief_status == "none" and deal.brief_auto_approve
-    assert gw.agreement(DEAL_ID).source == AGREEMENT_SOURCE
+    assert deal.brief is None and deal.brief_status == "none" and gw.agreement(DEAL_ID).source == AGREEMENT_SOURCE
     log = jobs.advance(gw, DEAL_ID, backend="scripted")
-    assert log[:3] == ["brief reader ran on scripted", "verifier: 22 of 22 checks passed, Brief auto-approved",
-                       "mapper ran on scripted"]
+    assert log == ["brief reader ran on scripted", "verifier: 22 of 22 checks passed",
+                   "waiting on the controller to approve the Brief"]
     deal = store.deals[DEAL_ID]
-    assert deal.brief_status == "approved" and not gw._brief_flags(DEAL_ID, open_only=False)  # no Brief question
+    assert deal.stage == "brief_ready" and deal.brief_status == "draft"
+    assert not gw._brief_flags(DEAL_ID, open_only=False)  # no Brief question at all
     report = gw.brief_verification(DEAL_ID)
-    assert (report.passed, report.failed, report.auto_approved, report.escalated) == (22, 0, True, [])
+    assert (report.passed, report.failed, report.escalated) == (22, 0, [])
     assert report.filled == [f"ebitda_addbacks[{i}].amount" for i in range(4)] + ["ebitda_deductions[0].amount"]
     assert len(report.scope_notes) == 1 and "Fixed Charge Coverage Ratio" in report.scope_notes[0]
-    # The amounts are the books' amounts, each with its source; the math gets the same Brief as the fixture.
     for got, want in zip(deal.brief.ebitda_addbacks + deal.brief.ebitda_deductions, BOOK_AMOUNTS):
         assert (got.amount, got.source_ref, got.inferred) == (want.amount, want.source_ref, want.inferred)
+    with pytest.raises(Denied):
+        gw.approve_brief(VERIFIER, DEAL_ID)  # the verifier never approves
+    gw.approve_brief(CONTROLLER, DEAL_ID)
+    assert [(r.actor, r.result) for r in store.audit if r.action == "approve_brief"] == [
+        (VERIFIER, "DENIED"), (CONTROLLER, "ALLOWED")]
+    assert jobs.advance(gw, DEAL_ID, backend="scripted")[:1] == ["mapper ran on scripted"]
     assert deal.brief.limit == BRIEF.limit and deal.brief.debt_excludes == BRIEF.debt_excludes
 
 
-def test_every_check_is_a_message_and_an_audit_row_and_the_approval_says_why(world):
+def test_every_check_is_a_message_and_an_audit_row(world):
     store, gw = world
     jobs.advance(gw, DEAL_ID, backend="scripted")
     report = gw.brief_verification(DEAL_ID)
@@ -161,33 +166,29 @@ def test_every_check_is_a_message_and_an_audit_row_and_the_approval_says_why(wor
     assert [r.target for r in checks] == [c.field for c in report.checks] and all(r.result == "ALLOWED" for r in checks)
     amends = [r for r in rows if r.action == "brief:amend"]
     assert len(amends) == 5 and "4,019.000 from the books; source: 10-K FY2024" in amends[0].reason
-    approve = next(r for r in store.audit if r.action == "approve_brief")
-    assert approve.actor == VERIFIER and approve.result == "ALLOWED"
-    assert approve.reason.startswith("auto-approved: all 22 checks passed; Brief locked: limit 2.50x")
     assert any(r.action == "verify:scope_note" for r in rows)
     msgs = gw.conversation(DEAL_ID)
     said = [m for m in msgs if m.sender == VERIFIER and m.kind == "check"]
     assert len(said) == 23 and said[-1].text == ("Brief verified: 22 of 22 checks passed; noted, not tested: 1 item "
                                                   "the Brief cannot hold")
     assert said[1].text.startswith("Verified limit = 2.50 in section 4.8(a)")
-    # Nobody is asked anything before the Mapper: the first question is the Mapper's.
-    first_q = next(m for m in msgs if m.kind == "question")
-    assert first_q.sender == MAPPER
+    assert msgs[-1].kind == "handoff" and msgs[-1].text == "Brief checked; ready for your approval"
+    assert not [m for m in msgs if m.kind == "question"]
     assert gw.verify_chain()
 
 
-def test_a_failed_check_escalates_and_blocks_the_auto_approval(world):
+def test_a_failed_check_escalates(world):
     store, gw = world
 
     def bad(out):  # a verbatim quote from the agreement, so the draft checks pass, but from the wrong definition
         return out.model_copy(update={"citations": cite(
             out, "debt_excludes[0]", "noncash pension termination expense completed during the fiscal year")})
-    item = draft(gw, bad)
+    draft(gw, bad)
     assert store.deals[DEAL_ID].stage == "verifying_brief" and not gw._brief_flags(DEAL_ID)
     report = gw.verify_brief(VERIFIER, DEAL_ID)
-    assert report.failed == 1 and not report.auto_approved and store.deals[DEAL_ID].brief_status == "draft"
+    assert report.failed == 1 and store.deals[DEAL_ID].brief_status == "draft"
     flags = gw._brief_flags(DEAL_ID)
-    # The scope note stays a question too, since the Brief is not auto-approved: the controller sees every point.
+    # With a failed check, the scope note is asked too: the controller sees every point.
     assert [f.payload["field"] for f in flags] == ["covenants", "debt_excludes[0]"]
     assert report.escalated == [f.id for f in flags] and report.scope_notes == []
     assert flags[1].proposed_by == VERIFIER and "The verifier could not confirm debt_excludes[0]" in flags[1].question
@@ -195,8 +196,8 @@ def test_a_failed_check_escalates_and_blocks_the_auto_approval(world):
         == "DENIED"
     assert store.deals[DEAL_ID].stage == "awaiting_brief"
     with pytest.raises(Denied):
-        gw._auto_approve_brief(VERIFIER, store.deals[DEAL_ID], item, report)
-    for f in gw._brief_flags(DEAL_ID):  # the controller settles it and approves
+        gw.approve_brief(CONTROLLER, DEAL_ID)  # the questions first
+    for f in gw._brief_flags(DEAL_ID):
         gw.answer(CONTROLLER, f.id, "confirm")
     gw.approve_brief(CONTROLLER, DEAL_ID)
     assert store.deals[DEAL_ID].brief_status == "approved"
@@ -207,23 +208,8 @@ def test_an_amount_the_books_do_not_give_is_asked(world):
     store.deals[DEAL_ID].book_amounts = [a for a in BOOK_AMOUNTS if a.name != "Stock-based compensation"]
     draft(gw)
     report = gw.verify_brief(VERIFIER, DEAL_ID)
-    assert report.failed == 0 and not report.auto_approved
+    assert report.failed == 0
     assert [f.payload["field"] for f in gw._brief_flags(DEAL_ID)] == ["ebitda_addbacks[1].amount"]
-
-
-def test_a_deal_without_auto_approval_waits_for_the_controller(world):
-    store, gw = world
-    store.deals[DEAL_ID].brief_auto_approve = False
-    draft(gw)
-    report = gw.verify_brief(VERIFIER, DEAL_ID)
-    assert report.failed == 0 and not report.auto_approved and report.scope_notes == []
-    flags = gw._brief_flags(DEAL_ID)
-    assert [f.payload["field"] for f in flags] == ["covenants"]  # the second covenant is asked, not noted
-    gw.answer(CONTROLLER, flags[0].id, "confirm")
-    with pytest.raises(Denied):
-        gw.approve_brief(VERIFIER, DEAL_ID)  # only the controller approves here
-    gw.approve_brief(CONTROLLER, DEAL_ID)
-    assert store.deals[DEAL_ID].brief_status == "approved"
 
 
 def test_only_the_verifier_verifies_and_only_once(world):
@@ -242,7 +228,7 @@ def test_a_draft_left_unverified_by_a_restart_is_verified_on_the_next_run(world)
     draft(gw)
     assert gw.needs_verification(DEAL_ID)
     log = jobs.advance(gw, DEAL_ID, backend="scripted")
-    assert log[0] == "verifier: 22 of 22 checks passed, Brief auto-approved"
+    assert log[0] == "verifier: 22 of 22 checks passed"
 
 
 def test_the_fixture_seed_still_carries_the_approved_brief():
@@ -250,7 +236,7 @@ def test_the_fixture_seed_still_carries_the_approved_brief():
     gw = Gateway(store)
     seed(store, gw)
     deal = store.deals[DEAL_ID]
-    assert deal.brief_status == "approved" and not deal.brief_auto_approve and gw.agreement(DEAL_ID) is None
+    assert deal.brief_status == "approved" and not deal.book_amounts and gw.agreement(DEAL_ID) is None
 
 
 def test_a_reader_flag_on_a_field_still_reaches_the_controller(world):
@@ -260,5 +246,5 @@ def test_a_reader_flag_on_a_field_still_reaches_the_controller(world):
         return out.model_copy(update={"flags": [*out.flags, BriefFieldFlag(field="lender", question="Is it PNC?")]})
     draft(gw, unsure)
     report = gw.verify_brief(VERIFIER, DEAL_ID)
-    assert not report.auto_approved and [f.payload["field"] for f in gw._brief_flags(DEAL_ID)] == ["lender"]
+    assert [f.payload["field"] for f in gw._brief_flags(DEAL_ID)] == ["lender"]
     assert store.items[report.escalated[0]].state == State.NEEDS_INFO

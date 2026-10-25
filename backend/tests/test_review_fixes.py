@@ -183,10 +183,10 @@ def test_reader_flag_evidence_not_in_the_agreement_is_kept_apart(world):
     item, out = reader_output(gw)
     real = Evidence(quote="a Fixed Charge Coverage Ratio of at least 1.20 to 1", document_id="4.8(b)")
     made_up = Evidence(quote="the lender waived every covenant last year", document_id="4.8(b)")
-    flag = BriefFieldFlag(field="covenants", question="Second covenant?", evidence=[real, made_up])
+    flag = BriefFieldFlag(field="lender", question="Is the lender PNC?", evidence=[real, made_up])
     gw.store_brief(BRIEF_READER, item.id, out.model_copy(update={"flags": [flag]}))
     gw.verify_brief(VERIFIER, DEAL_ID)  # the questions open once the verifier has checked the draft (D23)
-    opened = next(f for f in gw._brief_flags(DEAL_ID) if f.payload["field"] == "covenants")
+    opened = next(f for f in gw._brief_flags(DEAL_ID) if f.payload["field"] == "lender")
     assert [e.quote for e in opened.evidence] == [real.quote]
     assert [e["quote"] for e in opened.payload["unverified_evidence"]] == [made_up.quote]
 

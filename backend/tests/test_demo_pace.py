@@ -54,7 +54,7 @@ class FakeClock:
 def world(monkeypatch):
     store = MemoryStore()
     gw = Gateway(store)
-    seed_demo(store, gw)  # the live demo deal: it starts from the agreement (D23)
+    seed(store, gw)
     clock = FakeClock(gw)
     monkeypatch.setattr(pace, "ALLOW_IN_TESTS", True)
     monkeypatch.setattr(pace, "_sleep", clock.sleep)
@@ -75,39 +75,56 @@ def first(said, pred):
     return next((t, m) for t, m in said if pred(m))
 
 
-def test_the_demo_pace_reads_verifies_asks_once_and_finishes_in_about_15_s(world):
-    store, gw, clock, said = world
-    advance(gw, DEAL_ID, backend="scripted", pace_name="demo")
-    t_verified, _ = first(said, lambda m: m.kind == "check" and m.text.startswith("Brief verified"))
+def test_the_demo_pace_reads_verifies_asks_once_and_finishes_in_about_15_s(world, monkeypatch):
+    """The demo deal from its agreement (D23): two human touchpoints, the one-click Brief approval after the verifier,
+    and the Mapper's one escalation (two questions, answered together). The rest runs by itself."""
+    _, _, clock, _ = world
+    store = MemoryStore()
+    gw = Gateway(store)
+    seed_demo(store, gw)
+    clock.gw = gw
+    said: list = []
+    real_say = gw._say
+
+    def say(*args, **kwargs):
+        msg = real_say(*args, **kwargs)
+        if msg is not None:
+            said.append((clock.now, msg))
+        return msg
+    monkeypatch.setattr(gw, "_say", say)
+    log = advance(gw, DEAL_ID, backend="scripted", pace_name="demo")
+    assert log[-1] == "waiting on the controller to approve the Brief"
     t_read, _ = first(said, lambda m: m.kind == "handoff" and m.text.startswith("Draft Brief ready to verify"))
-    assert 2.4 <= t_read <= 3.2 and 1.0 <= t_verified - t_read <= 2.0, (t_read, t_verified)  # read 2.8, verify 1.6
-    t_question, q = first(said, lambda m: m.kind == "question")
-    assert 7.7 <= t_question <= 8.7, t_question  # the read, the checks, then the Mapper 1.2 + 1.4 + 0.6
-    assert q.sender == MAPPER and q.to == CONTROLLER  # the first question anyone is asked is the Mapper's
+    t_verified, _ = first(said, lambda m: m.kind == "check" and m.text.startswith("Brief verified: 22 of 22"))
+    assert 2.0 <= t_read <= 3.0 and 1.0 <= t_verified - t_read <= 2.0, (t_read, t_verified)  # read 2.4, verify 1.6
+    assert store.deals[DEAL_ID].stage == "brief_ready" and not gw.open_flags(DEAL_ID)  # nothing to answer or type
+    brief_time = clock.now
+    gw.approve_brief(CONTROLLER, DEAL_ID)  # touchpoint 1: one click
+    advance(gw, DEAL_ID, backend="scripted", pace_name="demo")
     flags = gw.open_flags(DEAL_ID)
-    assert len(flags) == 2 and all(t == t_question for t, m in said if m.kind == "question")  # one moment
-    t_answer = clock.now  # the human's thinking time is not counted: the clock only moves on agent waits
+    questions = [(t, m) for t, m in said if m.kind == "question"]
+    assert len(flags) == 2 and {m.sender for _, m in questions} == {MAPPER}  # touchpoint 2: asked together
+    assert len({t for t, _ in questions}) == 1
+    to_q = questions[0][0] - brief_time
+    assert 3.0 <= to_q <= 4.5, to_q  # the Mapper 1.2 + its mappings over 1.4 + 0.6
+    t_answer = clock.now
     for f in flags:
         gw.answer(CONTROLLER, f.id, f.default)
-    learned = [(t, m) for t, m in said if m.text.startswith("Learned")]
-    assert len(learned) == 2 and all(t == t_answer for t, _ in learned)  # the learn message comes at once
+    assert len([m for _, m in said if m.text.startswith("Learned")]) == 2
     advance(gw, DEAL_ID, backend="scripted", pace_name="demo")
-    t_ready, ready = first(said, lambda m: m.kind == "handoff" and m.text.startswith("Ready for your approval"))
-    assert 6.0 <= t_ready - t_answer <= 7.2, t_ready - t_answer
-    assert 14.0 <= t_question + (t_ready - t_answer) <= 15.5  # the whole demo, agent time only
-    # The Mapper visibly hands off right after the last answer, before the Preparer's turn.
-    t_handoff, _ = first(said, lambda m: m.kind == "handoff" and m.text.startswith("Mappings posted"))
-    assert t_handoff == t_answer
+    t_ready, _ = first(said, lambda m: m.kind == "handoff" and m.text.startswith("Ready for your approval"))
+    after = t_ready - t_answer
+    assert 6.0 <= after <= 7.2, after
+    assert 13.0 <= brief_time + to_q + after <= 15.5  # the whole demo, agent time only
     assert store.deals[DEAL_ID].stage == "awaiting_approval"
-    assert clock.lock_free and all(clock.lock_free)  # no wait ever held the gateway lock
+    assert all(clock.lock_free)
 
 
 def test_the_human_pace_keeps_the_documented_timings(world):
     store, gw, clock, said = world
     advance(gw, DEAL_ID, backend="scripted", pace_name="human")
     t_question, _ = first(said, lambda m: m.kind == "question")
-    # The read (2 + 2.5 + 1), the 22 checks (22 x 0.3 + 1), then the Mapper (2.5 + 53 x 0.3 + 1.5)
-    assert 31.0 <= t_question <= 35.0, t_question
+    assert 19.0 <= t_question <= 22.0, t_question  # 2.5 + 53 x 0.3 + 1.5
     start = clock.now
     for f in gw.open_flags(DEAL_ID):
         gw.answer(CONTROLLER, f.id, f.default)
@@ -219,7 +236,7 @@ def test_the_api_run_takes_pace_and_the_answer_continues_at_that_pace(monkeypatc
     r = c.post(f"/deals/{DEAL_ID}/run", json={"sync": True, "pace": "demo"})
     assert r.status_code == 200 and r.json()["stage"] == "awaiting_flag"
     asked = clock.now
-    assert 7.7 <= asked <= 9.2  # the read and the verification included (D23)
+    assert 3.0 <= asked <= 4.5  # the Mapper only: this deal's Brief came as JSON
     body = c.get(f"/deals/{DEAL_ID}/case").json()
     for fid in body["open_flags"]:  # the last answer continues in the background, at the run's pace
         f = next(x for x in body["flags"] if x["id"] == fid)

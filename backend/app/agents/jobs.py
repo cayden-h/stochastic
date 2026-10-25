@@ -152,8 +152,7 @@ def _advance(gw: Gateway, deal_id: str, backend: str | None, max_steps: int) -> 
             n = gw.verification_size(deal_id)
             report = gw.verify_brief(VERIFIER, deal_id, progress=lambda step: pace.pause(step, asked, count=n))
             pace.pause("after", asked)
-            log.append(f"verifier: {report.passed} of {len(report.checks)} checks passed"
-                       + (", Brief auto-approved" if report.auto_approved else ""))
+            log.append(f"verifier: {report.passed} of {len(report.checks)} checks passed")
             continue
         if gw.open_flags(deal_id):
             log.append("waiting on a flag")

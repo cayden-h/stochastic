@@ -41,12 +41,12 @@ PROFILES: dict[str, dict[str, float]] = {
         "question": 1.5,  # before the questions to the controller open
         "after": 1.0,  # after an agent's result is stored, before the next hand-off
     },
-    # The 15-second demo (D23), read and verification included: the Brief Reader 2.8 s to its draft (read 1.6 +
+    # The 15-second demo (D23), read and verification included: the Brief Reader 2.4 s to its draft (read 1.2 +
     # turn 1.2), the verifier 1.6 s (0.6 hand-off + its 22 checks over 1 s), then 0.6 s and the Mapper 3.2 s to the
-    # questions (1.2 + its mappings over 1.4 s + 0.6), so the questions open at about 8.2 s; then about 6.6 s from the
+    # questions (1.2 + its mappings over 1.4 s + 0.6), so the questions open at about 7.8 s; then about 6.6 s from the
     # last answer to "Ready for your approval" (the Preparer 1.2 + 4 tools x 0.6 + 0.6, the Reviewer 1.2 + 2 x 0.6).
     "demo": {
-        "read": 1.6,
+        "read": 1.2,
         "turn": 1.2,
         "tool": 0.6,
         "mapping_total": 1.4,  # the whole list of mappings, spread evenly over the lines
@@ -55,7 +55,7 @@ PROFILES: dict[str, dict[str, float]] = {
         "after": 0.6,
     },
 }
-# The 30-second Factory demo: every demo wait doubled, so about 16.4 s to the questions and 13.2 s after the last answer.
+# The 30-second Factory demo: every demo wait doubled, so about 15.6 s to the questions and 13.2 s after the last answer.
 PROFILES["factory"] = {k: 2 * v for k, v in PROFILES["demo"].items()}
 STEPS = PROFILES["human"]  # kept for the callers and tests that read the human timings
 MAX_FACTOR = 5.0

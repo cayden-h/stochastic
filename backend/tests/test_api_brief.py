@@ -474,7 +474,7 @@ def test_the_stage_event_carries_brief_status(world):
     assert [(s["stage"], s["brief_status"]) for s in stages] == [("awaiting_brief", "draft")]
     assert stages[0]["open_flags"] == [f.id for f in store.deal_items(did, "flag") if f.state == State.NEEDS_INFO]
     answer_open_brief_flags(c, did)
-    c.post(f"/deals/{did}/brief/approve")
+    c.post(f"/deals/{did}/brief/approve?auto_advance=false")  # the approval alone, without the run it continues
     events, seen, last = next_events(store, did, seen, last)
     stages = [d for k, d in _parse(events) if k == "stage"]
     assert [(s["stage"], s["brief_status"]) for s in stages] == [("new", "approved")]
