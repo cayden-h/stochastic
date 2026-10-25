@@ -1,4 +1,4 @@
-import { toK } from "./format";
+import { toK } from "./format.ts";
 import type { Case, Edit, Mapping, ReasonChip, Result, ResultRow, Section, SourceLine, WorkItem } from "./types";
 
 /** The DOM key of an editable cell, so the companion, Your edits, and the flash can find it.

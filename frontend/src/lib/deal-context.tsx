@@ -122,9 +122,10 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [refresh]);
 
-  // Live updates: a `stage` event on every stage change, an `audit` event on every new log row, a `conversation`
-  // event per message, and a `mapping` event per stored or changed mapping. Stage and audit events are coalesced
-  // so a burst of rows reads the case once; conversation and mapping events go straight into their reducers.
+  // Live updates: a `stage` event on every stage change, an `audit` event on every new log row, an `edit` event when the
+  // controller's edits change, a `conversation` event per message, and a `mapping` event per stored or changed mapping.
+  // Stage, audit, and edit events are coalesced so a burst reads the case once; conversation and mapping events go
+  // straight into their reducers.
   // The stream replays the whole history on connect, and the reducers drop what they already hold.
   const id = kase?.deal.id;
   useEffect(() => {
@@ -156,6 +157,8 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
       bump();
     });
     es.addEventListener("audit", bump);
+    // An edit, a reason, or an undo made elsewhere (another window, the API): read the case again.
+    es.addEventListener("edit", bump);
     es.addEventListener("conversation", (e) => {
       const message = parse<ConversationMessage>(e);
       if (message) dispatchConversation({ type: "message", message, receivedAt: Date.now() });
