@@ -496,3 +496,29 @@ Not changed: the math in `backend/app/tools/finance.py`, and the three existing 
 Not decided: when to build stage 1. The order of work in `TASKS.md` has a feature freeze on Saturday at 8pm.
 
 Design: `architecture/brief-reader.md`. Research: `research/brief-reader.md`.
+
+## D21. Logo and launch splash
+
+Date: 2026-10-24, evening. Decided by Cayden, from an approved prototype of the launch animation.
+
+Decision:
+1. The logo is a circle with a random walk inside it: a filled start dot and barbed arrowheads along the walk, in one ink that follows the theme. The name under it is "stochastic", lowercase, in the console's display serif (Instrument Serif).
+2. On launch, the desktop app shows a splash before the main window: a frameless, transparent window centered on the screen with only the circle and the name. No card, no panel, no progress bar.
+3. The splash plays the approved draw once (circle, start dot, walk with arrowheads, then the name), with the prototype's exact timings, and holds the finished mark until the whole app has loaded: the backend answers, the console has loaded in the hidden main window, and it has read the deal. It never closes before 2.1 seconds, so it never cuts mid-draw. Then the main window shows and the splash fades out.
+4. With reduced motion, the finished mark and the name show at once.
+5. In a browser, the console shows the same lockup centered over the page until its first read of the deal, and skips it inside the desktop app.
+6. The mark replaces the brand icon in the sidebar, and it is the favicon and the macOS app icon.
+
+Why:
+- Brownian motion is what "stochastic" means, and the circle around it is the deterministic system (the gateway, the code math, the log) that the agents move inside. The walk ends at a checked point. [inferred: Cayden's framing]
+- A splash that holds until the app is ready replaces a blank or half-loaded window during the backend start, and it looks like an app, not a web page. [inferred]
+- Ink from the macOS appearance keeps the transparent splash readable over most desktops without a halo that would smudge the thin lines. [inferred]
+
+Rejected:
+- A splash with a card or a panel behind the mark. Cayden asked for only the circle and the name, on a transparent background.
+- A progress bar or status text on the splash.
+- A soft halo behind the strokes, as the way to stay readable on any wallpaper.
+
+Open: the walk was traced from a stock reference image (Alamy) that Cayden supplied. License it, or replace it with our own seeded walk, before any public brand use.
+
+Design: `design/brand.md`.

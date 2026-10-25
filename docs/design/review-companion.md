@@ -205,6 +205,7 @@ The gateway rules carry over: edits are recorded in the audit log as `human:cont
 
 ## 11. Desktop shell
 
+- On launch, before the main window, a splash window shows only the circle mark and the name "stochastic", centered on the screen, on a transparent background (`desktop/splash.html`, specified in `brand.md` section 4). It plays the draw once and stays until `GET /health` answers and the console has loaded and read the deal in the hidden main window, at least 2.1 seconds. Then the main window shows and the splash fades out over 200 ms. If startup fails, the error window opens and the splash closes.
 - Electron loads the Next app built with `next build`, served locally, in one window. The minimum size is 1280 by 800.
 - The title bar is hidden (`titleBarStyle: "hiddenInset"`), so the traffic lights (x 20, y 20) sit over the sidebar.
 - In Electron, detected from the user agent, the sidebar's brand row moves down to a 52 px top offset so it clears the traffic lights.

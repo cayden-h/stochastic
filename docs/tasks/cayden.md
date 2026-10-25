@@ -238,3 +238,8 @@ Built 2026-10-24 night in `cayden/phase2-console`: `frontend/src/components/comp
 The bubble follows Josie's Reason popover (Figma 545:408) for looks and section 5 for behavior.
 The demo beat runs headless through the shim in about 3 seconds, from opening the income statement to approved, with Download in the browser.
 Waiting on: the run on the demo laptop, and T1 and T2 for the real routes.
+
+## Logo and launch splash (D21, 2026-10-24 evening)
+
+Built in `cayden/launch-mark`: the mark in the sidebar, the favicon, the app icon, the browser splash, and the desktop splash in `desktop/splash.html` (Eric's folder; he has a note in `eric.md`). Spec: `design/brand.md`.
+Open: license the Alamy reference image the walk was traced from, or replace the walk with our own seeded walk, before any public brand use.
