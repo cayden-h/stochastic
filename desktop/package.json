@@ -10,7 +10,8 @@
     "desktop:dev": "STOCHASTIC_DEV=1 electron .",
     "build:console": "npm --prefix ../frontend run build",
     "package": "electron-builder --mac --dir -c.extraMetadata.stochasticRoot=\"$(cd .. && pwd)\"",
-    "open": "open dist/mac-$(uname -m)/Stochastic.app"
+    "open": "open dist/mac-$(uname -m)/Stochastic.app",
+    "icon": "electron scripts/make-icon.js"
   },
   "devDependencies": {
     "electron": "45.0.0",
@@ -22,6 +23,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "splash.html",
       "package.json",
       "assets/**/*"
     ],
@@ -33,7 +35,8 @@
         "dir"
       ],
       "category": "public.app-category.finance",
-      "identity": null
+      "identity": null,
+      "icon": "assets/icon.icns"
     }
   }
 }
