@@ -37,13 +37,15 @@ function splitQuestion(q: string): [string, string] {
  * The ratio, verdict, effect text and run id come from the gateway's tool runs. Nothing here is computed.
  */
 export function FlagCard({
-  item, lines, busy, onAnswer, onHold, position, approvalReady = true,
+  item, lines, busy, onAnswer, onHold, position, approvalReady = true, banner,
 }: {
   item: WorkItem; lines: SourceLine[]; busy: boolean; onAnswer: (optionId: string) => void; onHold: () => void;
   /** An adjustment's Apply edits the books, which needs the result's approval item to be PROPOSED. */
   approvalReady?: boolean;
   /** "1 of 2" when several flags are open. */
   position: string;
+  /** A line over the card, such as who is asking while the question holds the agents. */
+  banner?: React.ReactNode;
 }) {
   const covenant = item.payload.kind === "covenant_tag";
   // A learned adjustment the Preparer offers on a later deal (D19): apply or skip, never applied silently.
@@ -55,6 +57,7 @@ export function FlagCard({
   const letter = (i: number) => String.fromCharCode(97 + i);
   return (
     <section className="flex w-full flex-col gap-[14px] rounded-card border border-amber-line bg-white p-[20px]">
+      {banner}
       <div className="flex w-full items-center gap-[10px] whitespace-nowrap">
         <ActorChip actor={item.proposed_by} />
         <span className="inline-flex items-center gap-[6px] text-[11px] font-semibold uppercase tracking-[0.88px] text-escalation">
