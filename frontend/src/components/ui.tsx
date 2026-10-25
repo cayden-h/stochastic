@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { titleCase } from "@/lib/format";
 import { LockIcon, SilhouetteIcon } from "./icons";
@@ -26,14 +27,13 @@ export function Shape({ kind, size = 14 }: { kind: ShapeKind; size?: number }) {
 
 export type Role = "mapper" | "preparer" | "reviewer" | "brief_reader";
 
-/** Each agent's look in v3: its avatar, chip tint, chip text, and its name on the Agents timeline.
- * The frames write the Mapper's chip in clear green and its timeline name in forest. */
+/** Each agent's look in v3: its character, chip tint, chip text, and its name on the Agents timeline. */
 export const ROLES: Record<Role, { src: string | null; tint: string; ink: string; name: string; blend?: boolean }> = {
-  mapper: { src: "/v3/agent-mapper.png", tint: "bg-mint", ink: "text-clear", name: "text-forest", blend: true },
+  mapper: { src: "/v3/agent-mapper.png", tint: "bg-mint", ink: "text-forest", name: "text-forest" },
   preparer: { src: "/v3/agent-preparer.png", tint: "bg-preparer-tint", ink: "text-preparer", name: "text-preparer" },
   reviewer: { src: "/v3/agent-reviewer.png", tint: "bg-reviewer-tint", ink: "text-reviewer", name: "text-reviewer" },
-  // The fourth agent (D20) has no character art in v3 yet, so it wears the page mark in agent blue.
-  brief_reader: { src: null, tint: "bg-agent-tint", ink: "text-agent", name: "text-agent" },
+  // The fourth agent (D20) wears Josie's plum character from the Review screens.
+  brief_reader: { src: "/v3/agent-brief-reader.png", tint: "bg-brief-tint", ink: "text-brief", name: "text-brief" },
 };
 
 function isRole(name: string | undefined): name is Role {
@@ -126,11 +126,25 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   return <div className={`overflow-hidden rounded-card border border-line bg-white ${className}`}>{children}</div>;
 }
 
-/** The page title row: the serif title on the left, the page's actions on the right. The row drags the window. */
+/** Each page's character beside its title, as Josie's frames pair them: the Mapper's teal star on the Mapper's pages,
+ * the Preparer's blue flower on the Case, the Brief Reader's plum character on Review, the Reviewer's violet on the Log. */
+function pageRole(path: string): Role {
+  if (path.startsWith("/case")) return "preparer";
+  if (path.startsWith("/review")) return "brief_reader";
+  if (path.startsWith("/log")) return "reviewer";
+  return "mapper";
+}
+
+/** The page title row: the page's character and the serif title on the left, the page's actions on the right.
+ * The row drags the window. */
 export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
+  const role = pageRole(usePathname());
   return (
     <header className="drag flex w-full shrink-0 items-center gap-[12px]">
-      <h1 className="font-serif text-[32px] whitespace-nowrap text-forest">{title}</h1>
+      <span className="flex items-center gap-[10px]">
+        <Avatar role={role} size={30} />
+        <h1 className="font-serif text-[32px] whitespace-nowrap text-forest">{title}</h1>
+      </span>
       <span className="flex-1" />
       {children}
     </header>
@@ -142,7 +156,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { kind?: "primary" 
 export function Button({ kind = "secondary", className = "", ...props }: ButtonProps) {
   const base = "transition-colors duration-150 disabled:cursor-not-allowed";
   const tone =
-    kind === "primary" ? "inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-chip bg-forest px-[18px] py-[10px] font-ui text-[14px] leading-[28px] font-semibold text-paper hover:bg-clear disabled:opacity-40 disabled:hover:bg-forest"
+    kind === "primary" ? "inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-chip bg-forest px-[18px] py-[10px] font-ui text-[14px] leading-[28px] font-semibold text-paper hover:bg-forest-deep disabled:opacity-40 disabled:hover:bg-forest"
     : kind === "secondary" ? "inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-chip border border-rule bg-white px-[18px] py-[10px] font-ui text-[14px] leading-[28px] font-semibold text-ink hover:bg-fog disabled:opacity-40"
     : "text-[14px] font-semibold text-slate underline-offset-4 hover:text-forest hover:underline disabled:opacity-40";
   return <button className={`${base} ${tone} ${className}`} {...props} />;
