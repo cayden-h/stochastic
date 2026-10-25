@@ -225,6 +225,13 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
   expect(text).toContain("General and Administrative");
   expect(text).toContain("One-time acquisition cost, an allowed add-back");
 
+  // Agents after the finished run: the record is shown at once (the rows under the house and the timeline), with the
+  // same characters.
+  await nav(page, "Agents").click();
+  await expect(page.getByText("The agents have not started. Run the deal from the Case.")).toHaveCount(0);
+  await expect.poll(() => expectOneIconSource(page), { timeout: 15_000 }).toBeGreaterThan(1);
+  await shot("agents-after-run");
+
   // The record agrees: posted, one reasoned edit, chain intact.
   const kase = await readCase(backend);
   expect(kase.verdict.posted).toBeTruthy();
