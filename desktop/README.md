@@ -36,6 +36,11 @@ cd desktop && npm run desktop
 If `frontend/.next` has no build, the app runs `next build` first, which takes about a minute.
 After you change the console, rebuild it with `npm run build:console`, or the app keeps serving the old build.
 The backend reads the repo-root `.env` as usual, so `AGENT_BACKEND` and `STORE` work the same as in a terminal.
+`DEMO_PACE` comes from the same `.env` (verified 2026-10-24: the app's backend reads `DEMO_PACE=1` from it with nothing set in the app's own environment).
+`DEMO_PACE=1` paces scripted and replay runs at reading speed for the stage.
+It has no effect on a live Droid or Anthropic run, whose own model time is the pace.
+A variable already set in the environment that starts the app wins over `.env`.
+The backend runs with `--no-access-log`, so the terminal shows the app's own lines and not one line per request.
 The backend's and the console's output is printed in the terminal that ran `npm run desktop`, as `[backend]` and `[console]` lines.
 
 If the backend or the console does not answer within 30 seconds, or exits, or its port is already in use, the app shows an error window that names which one failed, with its last output.

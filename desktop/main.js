@@ -181,7 +181,7 @@ async function startEverything() {
     await runToEnd("console build", next, ["build"], FRONTEND_DIR);
   }
 
-  const backend = startService("backend", uvicorn, ["app.main:app", "--port", String(BACKEND_PORT), "--timeout-graceful-shutdown", "2"], BACKEND_DIR,
+  const backend = startService("backend", uvicorn, ["app.main:app", "--port", String(BACKEND_PORT), "--timeout-graceful-shutdown", "2", "--no-access-log"], BACKEND_DIR,
     process.env.CORS_ORIGINS ? {} : { CORS_ORIGINS: `http://localhost:${CONSOLE_PORT},http://127.0.0.1:${CONSOLE_PORT}` });
   const consoleApp = startService("console", next, ["start", "-p", String(CONSOLE_PORT)], FRONTEND_DIR, { NODE_ENV: "production" });
   await Promise.all([

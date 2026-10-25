@@ -131,13 +131,23 @@ test("the Mac app: splash, then the console, the demo path with saveFiles, and a
 
     // Download final files goes through window.stochastic.saveFiles: the folder dialog (answered here with a test
     // folder) and Finder (not opened) are stubbed in the main process; the download and the write are the app's own.
-    await app.evaluate(({ dialog, shell }, folder) => {
-      const g = globalThis as unknown as { shown: string[] };
-      g.shown = [];
-      dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [folder] })) as typeof dialog.showOpenDialog;
+    // First the controller closes the folder dialog: nothing is written and nothing says "Saved.".
+    await app.evaluate(({ dialog, shell }) => {
+      const g = globalThis as unknown as { shown: string[]; asked: number };
+      g.shown = []; g.asked = 0;
+      dialog.showOpenDialog = (async () => { g.asked += 1; return { canceled: true, filePaths: [] }; }) as typeof dialog.showOpenDialog;
       shell.showItemInFolder = (p: string) => { g.shown.push(p); };
+    });
+    const download = page.getByRole("button", { name: "Download final files" });
+    await download.click();
+    await expect.poll(() => app.evaluate(() => (globalThis as unknown as { asked: number }).asked)).toBe(1);
+    await expect(download).toBeEnabled();
+    await expect(page.getByText("Saved.")).toHaveCount(0);
+    expect(fs.readdirSync(saveDir)).toEqual([]);
+    await app.evaluate(({ dialog }, folder) => {
+      dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [folder] })) as typeof dialog.showOpenDialog;
     }, saveDir);
-    await page.getByRole("button", { name: "Download final files" }).click();
+    await download.click();
     await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
     await shot(page, "saved");
     const xlsx = path.join(saveDir, "Kewaunee + Nu Aire combined books.xlsx");

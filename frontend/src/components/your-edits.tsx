@@ -123,8 +123,9 @@ export function useDownloadFinal(deal: Deal | null) {
     setState({ busy: true, text: null, bad: false });
     try {
       if (window.stochastic?.saveFiles) {
-        await window.stochastic.saveFiles(files);
-        setState({ busy: false, text: "Saved.", bad: false });
+        const saved = await window.stochastic.saveFiles(files);
+        // Closing the folder dialog saves nothing, so nothing is said.
+        setState({ busy: false, text: saved?.canceled ? null : "Saved.", bad: false });
         return;
       }
       const missing = await browserDownload(files);
