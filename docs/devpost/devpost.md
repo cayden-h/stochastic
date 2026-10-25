@@ -209,6 +209,20 @@ Not real, or not claimed:
 - The output is a combined set of books and a limit check that a human approves.
   It is not advice.
 
+## The demo video
+
+The product demo in our video (50.8 s, built 2026-10-25) shows the real Mac app.
+Every screen is a capture or a screen recording of the console running the demo deal, rebuilt around a camera on the music's beats. [verified: `~/Documents/GitHub/videos/projects/2026-10-25-stochastic-demo/captures/README.md`]
+- Most screens come from Run the demo, the replay of the recorded Claude Haiku 5.5 run, and the model card says "Claude Haiku 5.5, recorded run".
+  A few earlier captures (the Mapper at 18 placed) were taken on the scripted rules, and the card in them says "Scripted rules".
+  The second-run screen ("Next run: no questions", 12 lines learned) was a live Droid run.
+- The Agents scene is a screen recording of the Agent House during a run, sped up 2x and 2.4x.
+- The four clay agents in the 3D scene are the app's own Blender models (`art/blender/`, `frontend/public/agents/*.glb`), rendered with three.js and their own animation clips.
+- The two downloaded files are real: Download final files saved the workbook and the draft certificate, and the certificate lines on screen are copied from that file.
+- Not real: the "Automation done" macOS notification after approval.
+  The Mac app sends a notification only when a question opens (`desktop/main.js`, `stochastic:notify`), not when the gateway posts.
+  Either add one `notify` call when the run posts, or say on stage that this banner is a mock-up.
+
 ## Tracks
 
 Claim nothing unconfirmed.

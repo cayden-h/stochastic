@@ -128,7 +128,7 @@ Pattern D: A Mana agent as an extra reader of the demo output (for example, summ
 - Privacy: the terms grant Mana a license to host and use Your Content "to operate, provide, secure, maintain, and improve the Services".
   The privacy text says providers do not train on data and that Google user data is not used for model training. [verified: bundle, self-reported]
   Public SEC filings are fine.
-  Put no credentials, private emails, or `funding/` material into Mana.
+  Put no credentials or private emails into Mana.
 - Lock-in: no documented export of apps or code.
   Mana apps seem to run on Mana's runtime (Firebase, Pyodide, in-browser JavaScript).
   Mana-generated code may not run on our stack without rework. [inferred]

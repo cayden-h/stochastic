@@ -29,6 +29,9 @@ Current status on 2026-10-25, from the code on `main`:
 - Five cases: the live demo deal and four seeded cases built through the real pipeline (three real deals from their filings and one QuickBooks sample); they rebuild when their fixtures change (`seed_version`). [verified: `backend/tests/test_demo_cases.py`]
 - The console runs in the browser and as a Mac app with a launch splash (D19, D21): Dashboard, Case, Mapping, Agents (the 3D Agent House), Log, and Review, live on the gateway's event stream.
 - Backend tests: 435 pass offline with 18 skipped, verified 2026-10-25; 448 pass against Tiger Cloud (PR #35, schema `stochastic_cayden_verify`, 2026-10-25).
+- The demo video is done (50.8 s, Cayden's own track) and is in the team video.
+  It opens on the mark, not on the flag; the flag lands at 30 s.
+  What it shows, and its one mock-up (the "Automation done" notification), are in `devpost/devpost.md`, "The demo video".
 
 The dated notes below record how the build got here.
 
