@@ -198,8 +198,12 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
             if second:
                 options.append(FlagOption(id="b", label=f"Map to {second[0]}", platform_line=second[0]))
             options.append(FlagOption(id="c", label="Leave unmapped and list it", platform_line=None))
+            amount = f"{to_thousands(t.amount, t.unit):,.0f}K"
+            why = f" The Mapper's best match is {platform_line} at confidence {conf:.2f}: {reason}." if platform_line \
+                else " The Mapper found no platform line for it."
             flags.append(FlagProposal(kind="mapping", line_ids=[t.id],
-                                      question=f"Where does the target's '{t.line}' belong on the platform's chart?",
+                                      question=f"Where does {inp.target}'s '{t.line}' ({amount}) go on {inp.platform}'s "
+                                               f"chart of accounts?{why}",
                                       evidence=[Evidence(quote=t.line, document_id=t.source_ref)],
                                       options=options, default="a"))
 
@@ -236,10 +240,19 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
         def option(oid: str, label: str, rule: str) -> FlagOption:
             return FlagOption(id=oid, label=label, tags={l.id: tag_for(l.line, rule) for l in unclear_lines})
 
+        def bucket(rule_line: str) -> str:
+            n = rule_line.lower()
+            return "sellers" if "seller" in n else "bank" if ("term loan" in n or "revolving" in n) else "lease"
+
+        parts = {k: sum(to_thousands(l.amount, l.unit) for l in unclear_lines if bucket(l.line) == k)
+                 for k in ("lease", "bank", "sellers")}
+        whole = sum(parts.values())
         flags.insert(0, FlagProposal(
             kind="covenant_tag", line_ids=unclear_ids,
-            question=f"'Financing liability' holds the Statesville sale-leaseback, the new PNC term loan and revolver, "
-                     f"and the 8% seller notes. Which parts count as {inp.brief.debt_term}?",
+            question=f"{inp.platform}'s 'Financing liability' ({whole:,.0f}K across {len(unclear_lines)} lines) holds "
+                     f"the Statesville sale-leaseback ({parts['lease']:,.0f}K), the new PNC term loan and revolver "
+                     f"({parts['bank']:,.0f}K), and the 8% seller notes ({parts['sellers']:,.0f}K). Which parts count "
+                     f"as {inp.brief.debt_term} under {inp.brief.limit_section}?",
             evidence=[Evidence(quote=inp.brief.limit_wording, document_id=f"{inp.brief.agreement_ref}, {inp.brief.limit_section}")]
                      + [Evidence(quote=x, document_id=inp.brief.agreement_ref) for x in inp.brief.debt_excludes],
             options=[

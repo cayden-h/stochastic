@@ -16,6 +16,8 @@ from app.db.memory import MemoryStore
 from app.gateway.gateway import Gateway
 
 DEAL_ID = "d_kequ_nuaire"
+NOTE = ("The live demo deal: closed 2024-11-01 for $55M, funded by a PNC term loan and revolver and 8% seller notes; "
+        "PNC's Senior Funded Bank Debt to EBITDA must stay below 2.50x.")
 PLATFORM = "Kewaunee"
 TARGET = "Nu Aire"
 
@@ -183,6 +185,6 @@ def build_lines(store: MemoryStore) -> list[SourceLine]:
 
 def seed(store: MemoryStore, gw: Gateway) -> Deal:
     deal = Deal(id=DEAL_ID, name="Kewaunee Scientific acquires Nu Aire", platform=PLATFORM, target=TARGET,
-                stage="new", brief=BRIEF)
+                stage="new", brief=BRIEF, data_source="filings", note=NOTE)
     gw.create_deal(CONTROLLER, deal, build_lines(store))
     return deal

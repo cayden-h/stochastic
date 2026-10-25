@@ -422,7 +422,7 @@ def test_second_run_while_one_is_in_progress_is_refused(monkeypatch):
 
     started, finish = threading.Event(), threading.Event()
 
-    def slow_advance(gw, deal_id, backend=None):
+    def slow_advance(gw, deal_id, backend=None, **kw):
         started.set()
         finish.wait(5)
         return ["slow"]

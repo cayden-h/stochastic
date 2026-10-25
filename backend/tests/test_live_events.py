@@ -88,13 +88,17 @@ def test_the_demo_conversation_in_order_through_the_api():
     asked = []
     for f in flags:  # each escalation: the Mapper asks the controller, with the flag's own question and item id
         j = find(msgs, i, **{"from": MAPPER, "to": CONTROLLER, "kind": "question", "item_id": f["id"]})
-        assert msgs[j]["text"] == f["question"]
+        assert f["question"] in msgs[j]["text"] and msgs[j]["text"].startswith("Decision")
+        assert msgs[j]["text"].endswith("The Preparer waits for both answers.")
         asked.append(j)
     i = max(asked)
     for f in flags:  # and the controller answers the agent that asked, with the option chosen
         label = next(o["label"] for o in f["options"] if o["id"] == f["default"])
         i = find(msgs, i, **{"from": CONTROLLER, "to": MAPPER, "kind": "answer", "item_id": f["id"]})
         assert msgs[i]["text"] == f"Option {f['default']}: {label}"
+        # right after it, the Mapper tells the controller what it learned, with the policy id
+        assert msgs[i + 1]["from"] == MAPPER and msgs[i + 1]["to"] == CONTROLLER and msgs[i + 1]["kind"] == "message"
+        assert msgs[i + 1]["text"].startswith(f"Learned {msgs[i + 1]['policy_id']}")
     i = find(msgs, i, **{"from": MAPPER, "to": PREPARER, "kind": "handoff", "text": "Mappings posted"})
     assert "the controller answered 2 questions" in msgs[i]["text"]
     lev_run = result["run_ids_by_tool"]["leverage"]
@@ -121,11 +125,14 @@ def test_every_message_has_the_contract_shape_and_plain_text():
     msgs = [m.model_dump(mode="json") for m in gw.conversation(DEAL_ID)]
     assert msgs
     for m in msgs:
-        assert set(m) == {"id", "deal_id", "at", "from", "to", "kind", "text", "item_id", "run_id", "line_id"}
+        assert set(m) == {"id", "deal_id", "at", "from", "to", "kind", "text", "item_id", "run_id", "line_id",
+                          "policy_id"}
+        assert m["policy_id"] is None or m["policy_id"] in store.policies
         assert m["from"] in ROLES and m["to"] in ROLES and m["from"] != m["to"]
         assert m["kind"] in KINDS
         assert m["text"] and "—" not in m["text"] and "–" not in m["text"] and "\n" not in m["text"]
-        assert len(m["text"]) <= 300
+        # a question lists every option with its effect, and a learn message every line it taught: 700 at most
+        assert len(m["text"]) <= (700 if m["kind"] == "question" or m["policy_id"] else 300)
         assert m["run_id"] is None or m["run_id"] in store.tool_runs
         assert m["item_id"] is None or m["item_id"] in store.items
     ats = [m["at"] for m in msgs]
@@ -155,6 +162,15 @@ def _allowed_figures(store, run_id: str) -> set[str]:
     return out
 
 
+def _line_amounts(store, line_ids: list[str]) -> set[str]:
+    """The filed amounts of these lines in USD thousands, and the sum of every group of them, as a message writes them."""
+    from itertools import combinations
+
+    from app.tools.finance import to_thousands
+    amounts = [to_thousands(store.source_lines[i].amount, store.source_lines[i].unit) for i in line_ids]
+    return {f"{sum(c):,.0f}K" for n in range(1, len(amounts) + 1) for c in combinations(amounts, n)}
+
+
 def test_every_figure_in_a_message_equals_the_run_it_cites():
     store, gw = fresh()
     run_to_approval(gw)
@@ -164,6 +180,18 @@ def test_every_figure_in_a_message_equals_the_run_it_cites():
     for m in gw.conversation(DEAL_ID):
         figures = {"".join(f) for f in FIGURE.findall(m.text)}
         if not figures:
+            continue
+        if m.kind == "question" and m.item_id in store.items:
+            # A question's figures: each option's leverage from its own run chain, the flagged lines' filed amounts
+            # (and their sums, by component), and the limit.
+            flag = store.items[m.item_id]
+            allowed = {limit}
+            for o in flag.options:
+                if o.run_id:
+                    allowed |= _allowed_figures(store, o.run_id)
+            allowed |= _line_amounts(store, flag.payload.get("line_ids", []))
+            assert figures <= allowed, (m.text, figures - allowed)
+            checked += 1
             continue
         if m.run_id is None:  # only the Brief's limit may appear without a run behind it
             assert figures == {limit}, (m.text, figures)
@@ -204,7 +232,8 @@ def test_the_second_run_asks_nothing_and_says_the_policies_decided():
     for f in c.get(f"/deals/{DEAL_ID}/case").json()["flags"]:
         c.post(f"/work-items/{f['id']}/answer", json={"option_id": f["default"]})
     learned = [m for m in c.get(f"/deals/{DEAL_ID}/conversation").json() if m["text"].startswith("Learned")]
-    assert len(learned) == 2 and all(m["to"] == MAPPER for m in learned)  # one per answered flag
+    assert len(learned) == 2  # one per answered flag, from the Mapper to the controller, naming the policy
+    assert all(m["from"] == MAPPER and m["to"] == CONTROLLER and m["policy_id"] for m in learned)
     assert c.post("/dev/reset").json()["ok"]
     assert c.get(f"/deals/{DEAL_ID}/conversation").json() == []  # the conversation is the deal's record
     c.post(f"/deals/{DEAL_ID}/run")
