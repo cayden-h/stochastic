@@ -148,6 +148,35 @@ def test_seeding_is_idempotent_and_never_touches_existing_records(seeded):
     assert (len(gw.store.audit), len(gw.store.tool_runs), len(gw.store.messages)) == snapshot
 
 
+def test_cases_seeded_from_other_fixtures_are_rebuilt_on_restart_and_the_demo_deal_is_kept():
+    """A store seeded by older fixtures (version A, missing two of today's edits) is rebuilt by a new Gateway on the
+    same store at version B: the cases are seeded again, the counts read 4 edits, the demo deal and its record are
+    untouched, and the audit chain is valid. Seeding again at B rebuilds nothing."""
+    from app.gateway.gateway import Gateway
+
+    app = create_app(demo_cases=False)
+    c = TestClient(app)
+    store = app.state.gateway.store
+    assert cases.seed_cases(Gateway(store), version="A") == list(cases.CASE_IDS)
+    for e in [e for e in store.edits.values() if e.deal_id == cases.SAMPLE_ID]:
+        del store.edits[e.id]  # what an older version seeded
+    assert c.get("/memory/counts").json()["edits"] == 2
+    demo = (store.deals[DEAL_ID].model_dump(), [sl.id for sl in store.lines(DEAL_ID)])
+    policies = len(store.policies)
+
+    gw = Gateway(store)  # a restart on the same store, with new fixtures
+    assert cases.seed_cases(gw, version="B") == list(cases.CASE_IDS)
+    assert c.get("/memory/counts").json()["edits"] == 4
+    assert {d: store.deals[d].seed_version for d in cases.CASE_IDS} == dict.fromkeys(cases.CASE_IDS, "B")
+    assert {d: store.deals[d].stage for d in store.deals} == STAGES
+    assert (store.deals[DEAL_ID].model_dump(), [sl.id for sl in store.lines(DEAL_ID)]) == demo
+    assert len(store.policies) == policies and gw.verify_chain()  # the old cases' memory went with them
+
+    snapshot = (len(store.audit), len(store.tool_runs), len(store.messages))
+    assert cases.seed_cases(Gateway(store), version="B") == []
+    assert (len(store.audit), len(store.tool_runs), len(store.messages)) == snapshot
+
+
 def test_seeding_runs_in_the_background_so_health_answers_at_once():
     app = create_app(demo_cases=True)
     c = TestClient(app)
