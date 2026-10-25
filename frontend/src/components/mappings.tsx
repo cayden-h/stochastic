@@ -22,44 +22,6 @@ export function editOf(line: SourceLine | undefined, edits: Edit[], kind?: Edit[
   return edits.find((e) => (!kind || e.kind === kind) && e.company === line.company && e.line === line.line && e.section === line.section);
 }
 
-function Chevron() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className="pointer-events-none absolute top-1/2 right-[8px] -translate-y-1/2 text-slate">
-      <path d="M2 3.5L5 6.5L8 3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** The Platform line as a dropdown of the platform's lines in the same section. Picking one remaps the target line. */
-function PlatformSelect({ line, value, options, unsure }: { line: SourceLine; value: string | null; options: string[]; unsure: boolean }) {
-  const ctx = useEdits();
-  const [busy, setBusy] = useState(false);
-  const anchor = anchorKey("remap", line.company, line.section, line.line);
-  const list = value && !options.includes(value) ? [value, ...options] : options;
-  return (
-    <span className="relative flex min-w-0 flex-1">
-      <select
-        data-edit-anchor={anchor}
-        aria-label={`Platform line for ${line.line}`}
-        value={value ?? ""}
-        disabled={busy}
-        onChange={async (e) => {
-          setBusy(true);
-          await ctx.apply({ kind: "remap", company: line.company, line: line.line, section: line.section, platform_line: e.target.value }, anchor);
-          setBusy(false);
-        }}
-        className={`-ml-[8px] w-full min-w-0 cursor-pointer appearance-none truncate rounded-chip bg-transparent py-[4px] pr-[24px] pl-[8px] text-[14px] transition-colors duration-150 hover:bg-paper hover:shadow-[inset_0_0_0_1px_var(--color-hairline)] focus-visible:outline-2 focus-visible:outline-agent disabled:opacity-50 ${
-          unsure ? "font-semibold text-escalation" : "text-forest"
-        } ${ctx.flash?.key === anchor ? "cell-flash" : ""}`}
-      >
-        {value ? null : <option value="" disabled>Not mapped</option>}
-        {list.map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
-      <Chevron />
-    </span>
-  );
-}
-
 /** A remapped line: the agents' platform line struck through above the new one, amber until it has a reason. */
 function Remapped({ edit }: { edit: Edit }) {
   const ctx = useEdits();
@@ -86,13 +48,13 @@ function Remapped({ edit }: { edit: Edit }) {
 /**
  * The Mapper's line-by-line answer: each target line, the platform line it goes to, and how sure it was.
  * A "Learned" chip marks a mapping or a tag the gateway tied to a learned policy: the controller decided it once.
- * While the result waits for approval, the Platform line is a dropdown. A remap is an edit (D19) and does not change
- * the Mapper's record, so the edit's new line is shown over it.
+ * Read-only: a remap is made on the Review page (D19, V3-7.7). It is an edit and does not change the Mapper's record,
+ * so the edit's new line is shown over it.
  */
 export function Mappings({
-  mappings, lines, filter, platform, editable, received = {}, live = false,
+  mappings, lines, filter, received = {}, live = false,
 }: {
-  mappings: Mapping[]; lines: SourceLine[]; filter: MappingFilter; platform: string; editable: boolean;
+  mappings: Mapping[]; lines: SourceLine[]; filter: MappingFilter;
   /** When each mapping arrived on the stream, in ms: rows that arrive while the page is open fade in. */
   received?: Record<string, number>;
   /** The Mapper is storing mappings now: every row shows, and the page follows the newest one. */
@@ -126,7 +88,6 @@ export function Mappings({
     if (live && newest && following.current) newestRef.current?.scrollIntoView({ block: "nearest" });
   }, [live, newest]);
   const byId = new Map(lines.map((l) => [l.id, l]));
-  const options = (section: string) => [...new Set(lines.filter((l) => l.company === platform && l.section === section && !l.is_total).map((l) => l.line))];
   const rows = filter === "unsure" ? mappings.filter(isUnsure)
     : filter === "policy" ? mappings.filter(isLearned)
     : filter === "edited" ? mappings.filter((m) => editOf(byId.get(m.target_line_id), edits))
@@ -147,7 +108,6 @@ export function Mappings({
           const remap = editOf(line, edits, "remap");
           const amount = editOf(line, edits, "amount");
           const now = effectivePlatformLine(m, line, edits);
-          const selectable = editable && line && !line.is_total && !remap;
           return (
             <div
               key={m.id}
@@ -163,7 +123,6 @@ export function Mappings({
               </span>
               <span className={`flex min-w-0 flex-1 items-center gap-[8px] ${unsure ? "font-semibold text-escalation" : now ? "text-forest" : "text-faint"}`} title={m.reason}>
                 {remap ? <Remapped edit={remap} />
-                  : selectable ? <PlatformSelect line={line} value={now} options={options(line.section)} unsure={unsure} />
                   : <span className="truncate">{now ?? (unsure ? "?" : "Total, not mapped")}</span>}
                 {isLearned(m) && !remap ? <Tag tone="agent">Learned</Tag> : null}
                 {m.approved_by && !remap ? <Mono>by you</Mono> : null}
@@ -188,7 +147,7 @@ export function Mappings({
           <p className="px-[20px] py-[14px] text-[14px] text-slate">
             {filter === "policy" ? "No line was settled by an earlier answer yet."
               : filter === "unsure" ? "The Mapper was sure of every line."
-              : filter === "edited" ? "No line was edited. Pick a platform line to remap one."
+              : filter === "edited" ? "No line was edited. Remap a line or change an amount on the Review page."
               : live ? "The Mapper is reading the lines. They appear here as the gateway stores them." : "The Mapper has not run."}
           </p>
         ) : null}
