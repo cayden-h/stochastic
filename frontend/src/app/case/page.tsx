@@ -1,63 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CombinedPending, CombinedTable } from "@/components/combined-table";
 import { FlagCard, MoreFlags, WaitingVerdict } from "@/components/flag-card";
 import { Page } from "@/components/shell";
-import { Button, Card, Label, Mono, PageHeader, Shape, Tag } from "@/components/ui";
+import { Avatar, Button, Card, Label, Mono, PageHeader, Shape, Tag } from "@/components/ui";
 import { VerdictLine } from "@/components/verdict-line";
 import { BriefCard } from "@/components/brief-card";
 import { DownloadFinal, YourEdits } from "@/components/your-edits";
+import { AskingBanner, Conversation, Pipeline } from "@/components/process-flow";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
 import { canEdit, isAdjustmentFlag } from "@/lib/edits";
 import { canStart, fmtX, isBriefStage, learnedPolicies, plural } from "@/lib/format";
-import type { AuditRow, Stage } from "@/lib/types";
-
-/** The agents in order, which stage means each one is working, and the work item the gateway opens for it.
- * The Brief Reader runs first, and only on a deal made from agreement text (D20). */
-const READER = { role: "Brief Reader", item: "draft_brief", working: ["reading_brief"] as Stage[], doing: "reading the agreement", done: ["awaiting_brief", "brief_ready", "new", "mapping", "awaiting_flag", "mapped", "flags_answered", "preparing", "awaiting_review", "awaiting_approval", "needs_attention", "posted"] as Stage[] };
-const STEPS: { role: string; item: string; working: Stage[]; done: Stage[]; doing?: string }[] = [
-  { role: "Mapper", item: "map_lines", working: ["mapping"], done: ["awaiting_flag", "mapped", "flags_answered", "preparing", "awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
-  { role: "Preparer", item: "prepare_result", working: ["mapped", "flags_answered", "preparing"], done: ["awaiting_review", "awaiting_approval", "needs_attention", "posted"] },
-  { role: "Reviewer", item: "review_result", working: ["awaiting_review"], done: ["awaiting_approval", "needs_attention", "posted"] },
-];
-
-/** While the agents run (30 to 60 s on a live model), show who is working and for how long.
- * The clock starts when this session saw the stage begin. On a fresh load it starts at the audit row where the
- * gateway opened the working agent's item, unless a failed run came after that row: a rerun reuses the item and
- * logs no new row (backend/app/agents/jobs.py), so then it counts from when the row appeared. */
-function Progress({ stage, rows, stageSince, reader }: { stage: Stage; rows: AuditRow[]; stageSince: number; reader: boolean }) {
-  const steps = reader ? [READER, ...STEPS] : STEPS;
-  const step = steps.find((s) => s.working.includes(stage));
-  const opened = step ? rows.findLast((r) => r.action === `create:${step.item}`)?.at : undefined;
-  const failed = rows.findLast((r) => r.action === "run:failed")?.at;
-  const [shown] = useState(() => Date.now());
-  const since = stageSince || (opened && (!failed || opened > failed) ? new Date(opened).getTime() : shown);
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const seconds = Math.max(0, Math.round((now - since) / 1000));
-  return (
-    <ol className="flex w-full flex-wrap items-center gap-x-[24px] gap-y-[8px] rounded-card border border-line bg-fog p-[14px] text-[16px]" aria-live="polite">
-      {steps.map((s) => {
-        const done = s.done.includes(stage);
-        const working = !done && s.working.includes(stage);
-        return (
-          <li key={s.role} className={`flex items-center gap-[8px] font-semibold ${done ? "text-clear" : working ? "text-forest" : "text-slate"}`}>
-            <Shape kind={done ? "check" : "circle"} size={12} />
-            {s.role}
-            {working ? <span className="font-medium text-slate">{s.doing ?? "working"}, {seconds} s</span> : null}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
+import { isReadyForApproval } from "@/lib/conversation";
 
 /** A tile in the right column: a label, one figure, one line under it. Each opens its page. */
 function CaseTile({ href, label, value, sub, children }: { href: string; label: string; value: string; sub: string; children?: React.ReactNode }) {
@@ -75,11 +33,26 @@ function CaseTile({ href, label, value, sub, children }: { href: string; label: 
  * Run, answer the flags, read the verdict, approve. Mapping, Review and Log are tiles on the right.
  */
 export default function CaseScreen() {
-  const { kase, refresh, stageSince, audit: { rows: auditRows } } = useDeal();
+  const { kase, refresh, messages, received, agentStates, startRun, starting, reset, running, mappings: liveRows } = useDeal();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const editsCtx = useEdits();
+  const flagRef = useRef<HTMLDivElement>(null);
+
+  // A new question from an agent brings its flag card into view, even if the controller scrolled down to read.
+  const asked = messages.filter((m) => m.kind === "question" && m.to === "human:controller").length;
+  const askedSeen = useRef(asked);
+  useEffect(() => {
+    if (asked > askedSeen.current) {
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      // The card is drawn from the next /case read, a moment after the message.
+      const t = setTimeout(() => flagRef.current?.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" }), 400);
+      askedSeen.current = asked;
+      return () => clearTimeout(t);
+    }
+    askedSeen.current = asked;
+  }, [asked]);
 
   if (!kase) return null;
   const { deal, stage, flags, open_flags, verdict, result, mappings, source_lines, policies, audit } = kase;
@@ -107,9 +80,10 @@ export default function CaseScreen() {
   const asFiled = asFiledOpt && deal.ebitda_basis !== "as_filed"
     ? { leverage: asFiledOpt.leverage!, ok: Boolean(asFiledOpt.ok), run_id: asFiledOpt.run_id } : null;
   const failed = stage === "run_failed";
-  const idle = canStart(stage);
-  // The Reviewer keeps working while an adjustment flag is open, so the progress row stays.
-  const working = !idle && !blocking.length && (!verdict || !verdict.review) && (!briefing || stage === "reading_brief");
+  const idle = canStart(stage) && !starting;
+  // The question the open flag came with, so its card can say who is asking (the gateway asks for some covenant flags).
+  const askedBy = current ? messages.findLast((m) => m.kind === "question" && m.item_id === current.id)?.from ?? current.proposed_by : null;
+  const handoff = messages.findLast(isReadyForApproval) ?? null;
   const review = verdict?.review?.verdict ?? null;
   const over = verdict?.verdict === "over_limit";
   // The controller's edits (D19). Approval is refused while one has no reason (check 5e).
@@ -121,7 +95,9 @@ export default function CaseScreen() {
   const flaggedIds = new Set(open.flatMap((f) => (Array.isArray(f.payload.line_ids) ? (f.payload.line_ids as string[]) : [])));
   const flaggedNames = new Set(source_lines.filter((l) => flaggedIds.has(l.id)).map((l) => l.line));
 
-  const unsure = mappings.filter((m) => m.flagged || m.confidence < 0.8).length;
+  const unsure = liveRows.filter((m) => m.flagged || m.confidence < 0.8).length;
+  const approvalWaiting = verdict?.approval_state === "PROPOSED" && !verdict.posted;
+  const showProcess = messages.length > 0 || running;
 
   async function act(fn: () => Promise<unknown>): Promise<boolean> {
     setBusy(true); setNote(null);
@@ -147,7 +123,7 @@ export default function CaseScreen() {
     <Page>
       <PageHeader title="Case">
         {idle ? (
-          <Button kind="primary" disabled={busy} onClick={() => act(() => api.start(deal.id))}>
+          <Button kind="primary" disabled={busy || running} onClick={() => act(() => startRun(deal.id))}>
             {!deal.brief ? "Read the agreement" : policies.length || failed ? "Run again" : "Run the deal"}
           </Button>
         ) : briefing ? null : verdict?.posted ? (
@@ -200,7 +176,9 @@ export default function CaseScreen() {
           {draft ? <BriefCard deal={deal} draft={draft} flags={flags} busy={busy} onAct={act} /> : null}
 
           {current ? (
+            <div ref={flagRef} className="scroll-mt-[20px]">
             <FlagCard
+              banner={askedBy && !isAdjustmentFlag(current) ? <AskingBanner party={askedBy} count={blocking.length} /> : null}
               approvalReady={verdict?.approval_state === "PROPOSED"}
               key={current.id}
               item={current}
@@ -210,11 +188,33 @@ export default function CaseScreen() {
               onAnswer={(id) => act(() => api.answer(current.id, id))}
               onHold={() => act(() => api.hold(current.id))}
             />
+            </div>
           ) : null}
           <MoreFlags items={open.filter((f) => f !== current)} onOpen={setCurrentId} />
 
-          {/* While an agent works the row shows who and for how long, also beside a verdict the Reviewer is checking. */}
-          {working ? <Progress stage={stage} rows={auditRows} stageSince={stageSince} reader={fromAgreement} /> : null}
+          {approvalWaiting && review === "pass" ? (
+            <Card className="flex w-full items-center gap-[14px] border-mint-edge p-[16px]">
+              <Avatar role="reviewer" size={34} />
+              <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
+                <strong className="text-[16px] font-semibold text-forest">The Reviewer passed the books. Ready for your approval.</strong>
+                <span className="truncate text-[13px] text-slate" title={handoff?.text}>{handoff?.text ?? "Tie-out and the limit test pass."}</span>
+              </span>
+              <Link href="/log" className="text-[14px] font-semibold text-slate underline-offset-4 hover:text-forest hover:underline">See the log</Link>
+              <Link href="/review" className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-chip bg-forest px-[18px] py-[10px] font-ui text-[14px] leading-[28px] font-semibold text-paper transition-colors duration-150 hover:bg-forest-deep">
+                Review the books
+              </Link>
+            </Card>
+          ) : null}
+
+          {/* The process as it happens: who is working, who waits on whom, and what they told each other. */}
+          {showProcess ? (
+            <section className="flex w-full flex-col gap-[12px]" aria-label="The process">
+              <Card className="p-[8px]">
+                <Pipeline agents={agentStates} readerUsed={fromAgreement} posted={Boolean(verdict?.posted)} approvalWaiting={approvalWaiting} />
+              </Card>
+              <Conversation messages={messages} received={received} live={running} />
+            </section>
+          ) : null}
 
           {verdict ? (
             <VerdictLine
@@ -238,7 +238,7 @@ export default function CaseScreen() {
           {result ? (
             <CombinedTable result={result} flagged={flaggedNames} kase={kase} />
           ) : !idle && !briefing ? (
-            <CombinedPending text={open.length ? "Code combines the books after you answer." : "Code is combining the books."} />
+            <CombinedPending text={open.length ? "Code combines the books after you answer." : stage === "mapping" || starting ? "Code combines the books after the Mapper." : "Code is combining the books."} />
           ) : null}
 
           {answered.length ? (
@@ -260,10 +260,10 @@ export default function CaseScreen() {
 
           <footer className="flex flex-wrap items-center gap-x-[16px] gap-y-[8px] border-t border-line pt-[14px]">
             {verdict?.posted ? (
-              <Button kind="link" disabled={busy} onClick={() => act(() => api.reset(true))}>Run it again with what was learned</Button>
+              <Button kind="link" disabled={busy || running} onClick={() => act(() => reset(true))}>Run it again with what was learned</Button>
             ) : null}
             {stage !== "new" || policies.length ? (
-              <Button kind="link" disabled={busy} onClick={() => act(() => api.reset(false))}>Fresh deal (clear memory)</Button>
+              <Button kind="link" disabled={busy || running} title={running ? "Wait for the agents to finish this step" : undefined} onClick={() => act(() => reset(false))}>Fresh deal (clear memory)</Button>
             ) : null}
             <span className="flex-1" />
             <Mono>Figures from public SEC filings. Code does the math; a human approves. Not advice.</Mono>
@@ -274,8 +274,8 @@ export default function CaseScreen() {
           <CaseTile
             href="/mapping"
             label="Mapping"
-            value={mappings.length ? `${mappings.length} placed` : "Not run"}
-            sub={mappings.length ? `${mappings.length - unsure} sure · ${unsure} unsure${learnedLines ? ` · ${plural(learnedLines, "line")} learned` : ""}` : briefing ? "Starts after you approve the Brief" : "The Mapper runs first"}
+            value={liveRows.length ? `${liveRows.length} placed` : stage === "mapping" ? "Mapping" : "Not run"}
+            sub={liveRows.length ? `${liveRows.length - unsure} sure · ${unsure} unsure${learnedLines ? ` · ${plural(learnedLines, "line")} learned` : ""}` : briefing ? "Starts after you approve the Brief" : "The Mapper runs first"}
           >
             {learned > 0 ? <Tag tone="agent">Learned</Tag> : null}
           </CaseTile>

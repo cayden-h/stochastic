@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentHouse, usePrefersReducedMotion, type AgentHouseHandle } from "@/components/agent-house/agent-house";
-import { CONTROLLER, fromAudit, mergeConversation, verbOfEvent, type ConversationEvent } from "@/components/agent-house/conversation";
-import { useConversationPlayer, useLiveConversation } from "@/components/agent-house/use-conversation";
+import { useConversationPlayer } from "@/components/agent-house/use-conversation";
+import { CONTROLLER, fromAudit, mergeConversation, verbOfEvent, type ConversationEvent } from "@/lib/conversation";
 import { LockIcon, SilhouetteIcon } from "@/components/icons";
 import { ActorChip, Avatar, Label, Mono, PageHeader, ROLES, actorOf } from "@/components/ui";
 import { useDeal } from "@/lib/deal-context";
@@ -47,7 +47,7 @@ function toWords(e: ConversationEvent): string | null {
  * canned loop instead, for the pitch preview.
  */
 export default function Agents() {
-  const { audit, kase } = useDeal();
+  const { audit, kase, messages, conversationLoaded, conversationSupported } = useDeal();
   const house = useRef<AgentHouseHandle>(null);
   const reduced = usePrefersReducedMotion();
   const [demo, setDemo] = useState(false);
@@ -59,9 +59,12 @@ export default function Agents() {
   const dealId = kase?.deal.id;
   const items = useMemo(() => kase?.work_items ?? [], [kase]);
   const derived = useMemo(() => fromAudit(audit.rows, items), [audit.rows, items]);
-  const live = useLiveConversation(dealId);
-  const events = useMemo(() => mergeConversation(derived, live.events, live.supported), [derived, live.events, live.supported]);
-  const player = useConversationPlayer({ events, stage: kase?.stage, loaded: Boolean(kase) && live.ready, dealId, house, reducedMotion: reduced || demo, drive: !demo });
+  // The gateway's conversation from deal-context (the one stream), else lines derived from the audit log.
+  const live = useMemo(() => messages.map((m): ConversationEvent => ({
+    id: m.id, at: m.at, from: m.from, to: m.to, kind: m.kind as ConversationEvent["kind"], text: m.text, item_id: m.item_id, run_id: m.run_id,
+  })), [messages]);
+  const events = useMemo(() => mergeConversation(derived, live, conversationSupported), [derived, live, conversationSupported]);
+  const player = useConversationPlayer({ events, stage: kase?.stage, loaded: Boolean(kase) && conversationLoaded, dealId, house, reducedMotion: reduced || demo, drive: !demo });
   const shown = player.shown;
 
   // The room: each actor's latest line, in time order, as in the frame.

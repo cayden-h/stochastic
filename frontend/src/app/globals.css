@@ -107,6 +107,18 @@ html[data-electron] .launch-splash { display: none; }
 }
 .cell-flash { animation: cell-flash 1.2s ease-out 1; }
 
+/* A conversation message or a mapping row that arrived while the page was open: a short fade and rise.
+   The newest mapping row also holds a teal wash for about a second. */
+@keyframes live-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.convo-in, .row-in { animation: live-in 260ms ease-out both; }
+@keyframes row-new {
+  0%, 60% { background-color: var(--color-mint); }
+}
+.row-new { animation: live-in 260ms ease-out both, row-new 1.1s ease-out; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
   .cell-flash { box-shadow: inset 0 0 0 2px var(--color-agent); }

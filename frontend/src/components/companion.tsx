@@ -384,6 +384,9 @@ export function Companion() {
   }, [ctx, reduced]);
 
   if (!kase) return null;
+  // The companion stays where editing happens: on the Case, and on the Mapping page only while a remap asks for its
+  // reason. It no longer trails the cursor on the other pages.
+  const here = path.startsWith("/case") || (path.startsWith("/mapping") && (Boolean(anchor) || waiting));
   const origin = side.side === "right" ? `0 ${side.tail}px` : side.side === "below" ? `${side.tail}px 0` : `${side.tail}px 100%`;
 
   return (
@@ -418,7 +421,7 @@ export function Companion() {
         </div>
       ) : null}
 
-      <div ref={markRef} className="absolute top-0 left-0 size-[18px] opacity-70 will-change-transform" aria-hidden={!waiting}>
+      <div ref={markRef} className={`absolute top-0 left-0 size-[18px] opacity-70 will-change-transform ${here ? "" : "hidden"}`} aria-hidden={!waiting || !here}>
         {anchor ? <span className="companion-pulse absolute inset-0 rounded-full bg-agent-tint" aria-hidden="true" /> : null}
         <span className="absolute inset-0 rounded-full border-2 border-white bg-agent shadow-[0_1px_4px_rgba(27,31,36,0.28)]" aria-hidden="true" />
         {waiting && waitingEdit ? (
@@ -434,7 +437,7 @@ export function Companion() {
         ) : null}
       </div>
 
-      {ctx.note && !anchor ? (
+      {ctx.note && !anchor && here ? (
         <div ref={noteRef} key={ctx.note.at} role="status" className="glass absolute top-0 left-0 rounded-[12px] px-[12px] py-[7px] text-[13px] leading-[18px] whitespace-nowrap text-forest">
           {ctx.note.text}
         </div>

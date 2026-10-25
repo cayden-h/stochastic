@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useDeal } from "@/lib/deal-context";
 import { parseAmount } from "@/lib/edits";
 import { fmtK, fmtX, plural } from "@/lib/format";
 import type { Brief, BriefAdjustment, Evidence, BriefCitation, BriefDraft, Deal, WorkItem } from "@/lib/types";
@@ -211,6 +212,7 @@ export function BriefCard({
   /** Runs one write and reads the case again; returns false on failure (the page shows the error). */
   onAct: (fn: () => Promise<unknown>) => Promise<boolean>;
 }) {
+  const { startRun } = useDeal();
   const b = draft.brief;
   const cite = (field: string) => draft.citations.find((c) => c.field === field);
   const mine = flags.filter((f) => draft.flags.includes(f.id));
@@ -338,7 +340,7 @@ export function BriefCard({
         <Button
           kind="primary"
           disabled={busy || left > 0}
-          onClick={() => void onAct(async () => { await api.approveBrief(deal.id); await api.start(deal.id); })}
+          onClick={() => void onAct(async () => { await api.approveBrief(deal.id); await startRun(deal.id); })}
         >
           Approve the Brief and map
         </Button>

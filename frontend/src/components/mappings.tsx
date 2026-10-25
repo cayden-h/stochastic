@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEdits } from "@/lib/edit-context";
 import { anchorKey, effectivePlatformLine } from "@/lib/edits";
 import { isLearned, isLearnedTag, pct } from "@/lib/format";
@@ -90,12 +90,41 @@ function Remapped({ edit }: { edit: Edit }) {
  * the Mapper's record, so the edit's new line is shown over it.
  */
 export function Mappings({
-  mappings, lines, filter, platform, editable,
+  mappings, lines, filter, platform, editable, received = {}, live = false,
 }: {
   mappings: Mapping[]; lines: SourceLine[]; filter: MappingFilter; platform: string; editable: boolean;
+  /** When each mapping arrived on the stream, in ms: rows that arrive while the page is open fade in. */
+  received?: Record<string, number>;
+  /** The Mapper is storing mappings now: every row shows, and the page follows the newest one. */
+  live?: boolean;
 }) {
   const { edits } = useEdits();
-  const [all, setAll] = useState(false);
+  const [expanded, setAll] = useState(false);
+  const all = expanded || live;
+  const [mounted] = useState(() => Date.now());
+  // The newest row that arrived while the page was open holds a teal wash for about a second.
+  let newest: string | null = null;
+  for (const m of mappings) {
+    const r = received[m.id] ?? 0;
+    if (r > mounted && (newest === null || r > (received[newest] ?? 0))) newest = m.id;
+  }
+  // Follow the newest row while the Mapper works, until the reader scrolls on their own.
+  const newestRef = useRef<HTMLDivElement>(null);
+  const following = useRef(true);
+  useEffect(() => {
+    const stop = () => { following.current = false; };
+    window.addEventListener("wheel", stop, { passive: true });
+    window.addEventListener("touchmove", stop, { passive: true });
+    window.addEventListener("keydown", stop);
+    return () => {
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchmove", stop);
+      window.removeEventListener("keydown", stop);
+    };
+  }, []);
+  useEffect(() => {
+    if (live && newest && following.current) newestRef.current?.scrollIntoView({ block: "nearest" });
+  }, [live, newest]);
   const byId = new Map(lines.map((l) => [l.id, l]));
   const options = (section: string) => [...new Set(lines.filter((l) => l.company === platform && l.section === section && !l.is_total).map((l) => l.line))];
   const rows = filter === "unsure" ? mappings.filter(isUnsure)
@@ -122,7 +151,11 @@ export function Mappings({
           return (
             <div
               key={m.id}
-              className={`flex w-full items-center gap-[12px] border-b border-line px-[20px] py-[12px] text-[14px] last:border-b-0 ${unsure && !remap ? "bg-amber-tint" : ""}`}
+              ref={m.id === newest ? newestRef : undefined}
+              data-mapping-id={m.id}
+              className={`flex w-full items-center gap-[12px] border-b border-line px-[20px] py-[12px] text-[14px] last:border-b-0 ${unsure && !remap ? "bg-amber-tint" : ""} ${
+                m.id === newest ? "row-new" : (received[m.id] ?? 0) > mounted ? "row-in" : ""
+              }`}
             >
               <span className="flex min-w-0 flex-1 items-center gap-[8px] font-medium text-body" title={m.target_line}>
                 <span className="truncate">{m.target_line}</span>
@@ -156,11 +189,11 @@ export function Mappings({
             {filter === "policy" ? "No line was settled by an earlier answer yet."
               : filter === "unsure" ? "The Mapper was sure of every line."
               : filter === "edited" ? "No line was edited. Pick a platform line to remap one."
-              : "The Mapper has not run."}
+              : live ? "The Mapper is reading the lines. They appear here as the gateway stores them." : "The Mapper has not run."}
           </p>
         ) : null}
       </Card>
-      {rows.length > FIRST ? (
+      {rows.length > FIRST && !live ? (
         <p className="font-mono text-[12px] text-slate">
           {all ? rows.length : FIRST} of {rows.length} &middot;{" "}
           <button className="hover:text-forest hover:underline" onClick={() => setAll((v) => !v)}>{all ? "Show fewer" : "Show all"}</button>
