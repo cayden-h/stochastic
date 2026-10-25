@@ -13,7 +13,7 @@ Claims are tagged [verified] when a test or a run shows them, and [inferred] whe
 | Preparer | `agent:preparer` | Builds the draft combined books and the leverage figure by calling tools in order | `consolidate`, `ebitda`, `covenant_debt`, `leverage` | Little. It follows the tool sequence and copies the figures. | `PreparerOutput` |
 | Reviewer | `agent:reviewer` | Checks the draft: tie-out and limit test | `tie_out`, `limit_test`, `leverage` | Little. Pass when both checks pass, needs-attention when one fails. | `ReviewerOutput` |
 
-A fourth role, the Brief Reader (`agent:brief_reader`), is decided and not built (D20). It reads the credit agreement and drafts the brief with a quote for every field; the gateway checks the quotes and the controller approves the brief before the Mapper runs. Design: `architecture/brief-reader.md`.
+A fourth role, the Brief Reader (`agent:brief_reader`), is built (D20), and a code verifier (`system:verifier`, not a model) checks its draft field by field before the controller approves it in one click (D23, `architecture/brief-reader.md` section 6a). It reads the credit agreement and drafts the brief with a quote for every field; the gateway checks the quotes and the controller approves the brief before the Mapper runs. Design: `architecture/brief-reader.md`.
 The roles are defined in `backend/app/agents/roles.py`: a system prompt, a tool list, an input type, and an output type.
 The same role runs on any backend.
 
@@ -86,8 +86,8 @@ Before, pace `demo` forced the scripted backend, and the model card said "Script
 
 | Pace | Where | Backend | To the questions | Last answer to approval |
 | --- | --- | --- | --- | --- |
-| `demo` | Run the demo (the Hyphenate beat, about 15 s) | replay of `haiku-5-5-run2`, forced | 6.2 s measured (6.0 s fake clock) | 7.2 s measured (6.6 s) |
-| `factory` | Upload then Begin (the Factory beat, about 30 s) | the same replay, forced | 14.2 s measured (14.0 s) | 14.5 s measured (13.3 s) |
+| `demo` | Run the demo (the Hyphenate beat, about 15 s) | the Brief Reader on the rules, then the replay of `haiku-5-5-run2`, forced | read and verify 4.2 s measured to the Brief approval, then 4.0 s to the questions (D23) | 7.3 s measured (6.6 s fake clock) |
+| `factory` | Upload then Begin (the Factory beat, about 30 s) | the same, forced | twice the demo's waits | 14.4 s measured (13.2 s) |
 | `human` | `DEMO_PACE=1` timings | `AGENT_BACKEND` and its fallback chain | 20.1 s (scripted) | 12.1 s (scripted) |
 | `off` | no waits | `AGENT_BACKEND` and its fallback chain | the backend's own time | the backend's own time |
 

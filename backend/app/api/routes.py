@@ -309,6 +309,7 @@ def build_router(gw: Gateway) -> APIRouter:
             "edits": [dump(e) for e in store.deal_edits(deal_id)],
             "adjustments": [dump(a) for a in store.adjustments.values()],
             "brief_draft": dump(draft) if (draft := gw.brief_draft(deal_id)) else None,
+            "brief_verification": dump(report) if (report := gw.brief_verification(deal_id)) else None,
             "reason_chips": {kind: [dump(c) for c in gw.reason_chips(deal_id, kind)] for kind in ("amount", "remap")},
         }
 
@@ -483,6 +484,10 @@ def build_router(gw: Gateway) -> APIRouter:
             lines = loaded["platform_csv"] + loaded["target_csv"]
             if agreement_text is not None:
                 deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=None, brief_status="none")
+                from app.db.fixtures import kewaunee
+                if kewaunee.is_demo_twin(lines, platform, agreement_text):  # the demo deal uploaded (D23)
+                    deal = deal.model_copy(update={"book_amounts": [
+                        a.model_copy(deep=True) for a in kewaunee.BOOK_AMOUNTS]})
                 source = (agreement_name or "agreement.txt").strip()[:200]
                 created = guard(lambda: gw.create_deal_from_agreement(x_actor, deal, lines, agreement_text,
                                                                       source=source))
@@ -588,12 +593,17 @@ def build_router(gw: Gateway) -> APIRouter:
                     "brief_status": d.brief_status, "stage": d.stage}
 
     @r.post("/deals/{deal_id}/brief/approve", response_model=Deal)
-    def brief_approve(deal_id: str, x_actor: str = Header(default=CONTROLLER)):
-        """The controller approves the draft Brief; it is then locked and the deal is back at stage new. The run does
-        not continue by itself: the console calls POST /deals/{id}/run next. No agent and no other human can."""
+    def brief_approve(deal_id: str, tasks: BackgroundTasks, x_actor: str = Header(default=CONTROLLER),
+                      auto_advance: bool = True):
+        """The controller approves the draft Brief; it is then locked and the deal is back at stage new. No agent and
+        no other human can. Like an answer, the approval continues the run in the background at the run's pace (D23),
+        so the controller's one click is all the Brief stage asks; `auto_advance=false` leaves it stopped."""
         need_deal(deal_id)
         controller_only(x_actor, "approve_brief", deal_id)
-        return dump(guard(lambda: gw.approve_brief(x_actor, deal_id)))
+        deal = guard(lambda: gw.approve_brief(x_actor, deal_id))
+        if auto_advance and deal_id in gw.run_pace:  # the deal was run, so its run goes on
+            run_in_background(deal_id, None, tasks)
+        return dump(deal)
 
     @r.post("/deals/{deal_id}/run")
     def run_deal(deal_id: str, body: RunBody | None = None, tasks: BackgroundTasks = None,

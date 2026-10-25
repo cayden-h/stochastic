@@ -19,7 +19,7 @@ from app.agents import pace  # noqa: E402
 from app.agents.backends.scripted import scripted_mapper  # noqa: E402
 from app.agents.jobs import advance  # noqa: E402
 from app.api.events import next_events  # noqa: E402
-from app.core.models import (BRIEF_READER, CONTROLLER, MAPPER, PREPARER, REVIEWER, ROLES, SYSTEM,  # noqa: E402
+from app.core.models import (VERIFIER, BRIEF_READER, CONTROLLER, MAPPER, PREPARER, REVIEWER, ROLES, SYSTEM,  # noqa: E402
                              MapperInput, State)
 from app.db.fixtures.kewaunee import DEAL_ID, TARGET, seed  # noqa: E402
 from app.db.memory import MemoryStore  # noqa: E402
@@ -260,9 +260,13 @@ def test_the_brief_reader_speaks_first_on_a_deal_read_from_its_agreement():
     i = find(msgs, 0, **{"from": SYSTEM, "to": BRIEF_READER, "kind": "handoff"})
     i = find(msgs, i, **{"from": BRIEF_READER, "to": SYSTEM, "kind": "message", "text": "Draft Brief: limit 2.50x"})
     i = find(msgs, i, **{"from": SYSTEM, "to": BRIEF_READER, "kind": "check", "text": "against the agreement"})
+    # The reader hands its draft to the verifier (D23), which checks each field before anyone is asked anything.
+    i = find(msgs, i, **{"from": BRIEF_READER, "to": VERIFIER, "kind": "handoff", "text": "ready to verify"})
+    i = find(msgs, i, **{"from": VERIFIER, "to": CONTROLLER, "kind": "check", "text": "Verified limit = 2.50"})
+    i = find(msgs, i, **{"from": VERIFIER, "to": CONTROLLER, "kind": "check", "text": "Brief verified:"})
     questions = [m for m in msgs[i:] if m["kind"] == "question"]
     assert questions and all(m["to"] == CONTROLLER and m["item_id"] for m in questions)
-    find(msgs, i, **{"from": BRIEF_READER, "to": CONTROLLER, "kind": "handoff"})
+    find(msgs, i, **{"from": VERIFIER, "to": CONTROLLER, "kind": "handoff", "text": "questions for you"})
     amounts = [{"field": f"{g}[{k}].amount", "value": a.amount, "source_ref": a.source_ref, "inferred": a.inferred,
                 "note": a.note} for g in ("ebitda_addbacks", "ebitda_deductions")
                for k, a in enumerate(getattr(FIXTURE_BRIEF, g)) if a.amount]

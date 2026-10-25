@@ -64,9 +64,11 @@ def put_edit_and_adjustment(store):
 def test_case_has_empty_phase2_fields_before_and_after_a_run(client):
     c = case(client)
     assert c["edits"] == [] and c["adjustments"] == [] and c["brief_draft"] is None
+    assert c["brief_verification"] is None
     run_to_posted(client)
     c = case(client)
     assert c["edits"] == [] and c["adjustments"] == [] and c["brief_draft"] is None
+    assert c["brief_verification"] is None  # a Brief sent as JSON is not read, so nothing is verified
 
 
 def test_case_export_and_certificate_show_a_stored_edit(app, client):

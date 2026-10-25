@@ -23,18 +23,18 @@ test("a deal from the agreement text: Brief card, answer and correct, approve th
   await expect(page).toHaveURL(/\/case$/);
   expect(run.body()).toEqual({ sync: false, pace: "factory" });
 
-  // The Brief card: every field quoted, six questions before approval.
+  // The Brief card: every field quoted and verified, five amounts before approval. The second covenant (4.8(b)) is
+  // noted on the verification report, not asked (D23).
   const brief = page.getByRole("region", { name: "Brief" });
   await expect(brief.getByRole("heading", { name: "Check the Brief before the agents map." })).toBeVisible();
-  await expect(brief.getByText("6 questions left before you can approve")).toBeVisible();
+  await expect(brief.getByText("5 questions left before you can approve")).toBeVisible();
+  await expect(brief.getByTestId("verification-summary")).toHaveText("22 of 22 checks passed");
   const approveBrief = brief.getByRole("button", { name: "Approve the Brief and map" });
   await expect(approveBrief).toBeDisabled();
   await expect(page.getByRole("list", { name: "The agents' progress" }).getByRole("listitem").filter({ hasText: "Brief Reader" })).toContainText("Done");
   await shot("brief-card");
 
-  // Answer the reader's question, enter three amounts from the books with their source, keep 0 on the other two.
-  await brief.getByRole("button", { name: "Keep the reader's value" }).click();
-  await expect(brief.getByText("5 questions left before you can approve")).toBeVisible();
+  // Enter three amounts from the books with their source, keep 0 on the other two.
   const amounts: [string, string, string][] = [
     ["Noncash pension termination expense", "4019", "10-K FY2025, pension termination"],
     ["Stock-based compensation", "1018", "10-K FY2025, cash flow statement"],

@@ -45,7 +45,7 @@ function isRole(name: string | undefined): name is Role {
 export function actorOf(actor: string): { kind: "Agent" | "Human" | "Gateway"; label: string; role?: Role } {
   const [kind, name] = actor.split(":");
   if (kind === "human") return { kind: "Human", label: titleCase(name ?? "controller") };
-  if (kind === "system") return { kind: "Gateway", label: "Gateway" };
+  if (kind === "system") return { kind: "Gateway", label: name === "verifier" ? "Verifier" : "Gateway" };
   return { kind: "Agent", label: titleCase(name ?? "agent"), role: isRole(name) ? name : undefined };
 }
 

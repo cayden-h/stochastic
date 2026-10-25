@@ -33,32 +33,30 @@ PaceName = Literal["demo", "factory", "human", "off"]
 # Seconds per step, per profile. `human` is the DEMO_PACE=1 timing and is scaled by DEMO_PACE.
 PROFILES: dict[str, dict[str, float]] = {
     "human": {
+        "read": 2.0,  # the Brief Reader reads the agreement, before its turn (D23)
         "turn": 2.5,  # an agent picks up its work item
         "tool": 1.0,  # before each tool call an agent makes
         "mapping": 0.3,  # after each mapping the gateway accepts
+        "verify": 0.3,  # after each Brief field the verifier checks (D23)
         "question": 1.5,  # before the questions to the controller open
         "after": 1.0,  # after an agent's result is stored, before the next hand-off
     },
-    # The 15-second demo: about 6 s from Run to the question (the Mapper works 1.2 s, its mappings stream over 4 s,
-    # the question opens 0.8 s later) and about 7 s from the answer to "Ready for your approval" (the Preparer
-    # 1.2 + 4 tools x 0.6 + 0.6 = 4.2 s, the Reviewer 1.2 + 2 tools x 0.6 = 2.4 s, then the hand-off).
+    # The 15-second demo (D23), read and verification included: the Brief Reader 2.4 s to its draft (read 1.2 +
+    # turn 1.2), the verifier 1.6 s (0.6 hand-off + its 22 checks over 1 s), then 0.6 s and the Mapper 3.2 s to the
+    # questions (1.2 + its mappings over 1.4 s + 0.6), so the questions open at about 7.8 s; then about 6.6 s from the
+    # last answer to "Ready for your approval" (the Preparer 1.2 + 4 tools x 0.6 + 0.6, the Reviewer 1.2 + 2 x 0.6).
     "demo": {
+        "read": 1.2,
         "turn": 1.2,
         "tool": 0.6,
-        "mapping_total": 4.0,  # the whole list of mappings, spread evenly over the lines
-        "question": 0.8,
+        "mapping_total": 1.4,  # the whole list of mappings, spread evenly over the lines
+        "verify_total": 1.0,  # the verifier's whole list of Brief checks, spread evenly over the checks
+        "question": 0.6,
         "after": 0.6,
     },
-    # The 30-second Factory demo: every demo wait doubled, and the mapping stream 10 s instead of 8, so the questions
-    # open at 14 s (2.4 + 10 + 1.6) and the approval is ready about 13 s after the last answer (twice the demo's).
-    "factory": {
-        "turn": 2.4,
-        "tool": 1.2,
-        "mapping_total": 10.0,
-        "question": 1.6,
-        "after": 1.2,
-    },
 }
+# The 30-second Factory demo: every demo wait doubled, so about 15.6 s to the questions and 13.2 s after the last answer.
+PROFILES["factory"] = {k: 2 * v for k, v in PROFILES["demo"].items()}
 STEPS = PROFILES["human"]  # kept for the callers and tests that read the human timings
 MAX_FACTOR = 5.0
 
@@ -129,8 +127,8 @@ def seconds(step: str, count: int = 1) -> float:
     list being stored, for the `demo` profile's fixed total."""
     name, f = _profile()
     steps = PROFILES[name]
-    if step == "mapping" and "mapping_total" in steps:
-        return f * steps["mapping_total"] / max(count, 1)
+    if f"{step}_total" in steps:  # a list streamed in a fixed total time: the mappings, the Brief checks
+        return f * steps[f"{step}_total"] / max(count, 1)
     return f * steps[step]
 
 

@@ -7,7 +7,7 @@ import math
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
 
-from app.core.models import (AgentSession, Brief, BriefDraft, Deal, Edit, EditKind, LearnedAdjustment, Mapping, Policy,
+from app.core.models import (AgentSession, Brief, BriefDraft, BriefVerification, Deal, Edit, EditKind, LearnedAdjustment, Mapping, Policy,
                              ReasonChip, Result, Review, Section, SourceLine, WorkItem)
 
 
@@ -96,6 +96,8 @@ class CaseResponse(BaseModel):
     edits: list[Edit] = Field(default_factory=list)  # the deal's edits in order, reverted ones included
     adjustments: list[LearnedAdjustment] = Field(default_factory=list)  # learned memory, all deals, like policies
     brief_draft: BriefDraft | None = None  # filled by the Brief Reader routes when they land
+    # The verifier's report on the draft (D23): every field with its quote, section, and pass or fail, once it ran.
+    brief_verification: BriefVerification | None = None
     # The reasons the edit bubble offers, per edit kind ("amount", "remap"). Hardcoded per deal for the demo.
     reason_chips: dict[str, list[ReasonChip]] | None = None
 

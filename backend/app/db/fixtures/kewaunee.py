@@ -11,6 +11,8 @@ Figures marked inferred=True are our estimates and must be said out loud.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from app.core.models import CONTROLLER, Adjustment, Brief, Deal, Financing, SourceLine
 from app.db.memory import MemoryStore
 from app.gateway.gateway import Gateway
@@ -183,8 +185,46 @@ def build_lines(store: MemoryStore) -> list[SourceLine]:
     return lines
 
 
-def seed(store: MemoryStore, gw: Gateway) -> Deal:
+# The agreement text the live demo deal starts from (D23): verbatim extracts of Ex 10.1 (the opening, Section 4.8, and
+# the EBITDA, Senior Funded Bank Debt, and Subordinated Debt definitions), committed so the demo runs on any machine
+# with the repo. The full 115K-character exhibit stays out of git (data/raw/, scripts/fetch_filings.py).
+AGREEMENT_PATH = Path(__file__).resolve().parents[4] / "data" / "brief" / "kewaunee_ex101_extract.txt"
+AGREEMENT_SOURCE = f"{EX101} (verbatim extracts)"
+# The amounts the books give for the agreement's adjustments, each with its source outside the agreement. The verifier
+# fills the reader's draft from them, so the controller is asked for none of them (D23).
+BOOK_AMOUNTS = [*BRIEF.ebitda_addbacks, *BRIEF.ebitda_deductions]
+
+
+def agreement_text() -> str:
+    return AGREEMENT_PATH.read_text()
+
+
+def seed(store: MemoryStore, gw: Gateway, from_agreement: bool = False) -> Deal:
+    """The demo deal. With `from_agreement` (the app's live demo deal, D23) it starts from the agreement text: the
+    Brief Reader drafts the Brief, the verifier checks it, fills the amounts from the books, and approves it when every
+    check passes, for the controller to approve. Without it (most tests) the deal carries the hand-written Brief, approved."""
     deal = Deal(id=DEAL_ID, name="Kewaunee Scientific acquires Nu Aire", platform=PLATFORM, target=TARGET,
                 stage="new", brief=BRIEF, data_source="filings", note=NOTE)
-    gw.create_deal(CONTROLLER, deal, build_lines(store))
-    return deal
+    if not from_agreement:
+        gw.create_deal(CONTROLLER, deal, build_lines(store))
+        return deal
+    deal = deal.model_copy(update={"brief": None, "brief_status": "none",
+                                   "book_amounts": [a.model_copy(deep=True) for a in BOOK_AMOUNTS]})
+    return gw.create_deal_from_agreement(CONTROLLER, deal, build_lines(store), agreement_text(), AGREEMENT_SOURCE)
+
+
+def is_demo_twin(lines: list[SourceLine], platform: str, text: str) -> bool:
+    """An upload of the demo deal itself: the committed agreement extract and the same statements (by the replay's
+    content hash). Its adjustments then have the same sourced book amounts, so the upload gets them, like the demo
+    deal (D23). Any other upload is asked and approved by the controller."""
+    from app.agents import demo_replay
+    from app.core.agreement import agreement_sha256
+    if agreement_sha256(text) != agreement_sha256(agreement_text()):
+        return False
+    return demo_replay.content_digest(lines, platform) == demo_replay.content_digest(build_lines(MemoryStore()),
+                                                                                    PLATFORM)
+
+
+def seed_demo(store: MemoryStore, gw: Gateway) -> Deal:
+    """The live demo deal as the app seeds it: from the agreement (D23)."""
+    return seed(store, gw, from_agreement=True)

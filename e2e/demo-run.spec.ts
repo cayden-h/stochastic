@@ -43,7 +43,7 @@ async function answerAll(page: Page): Promise<number> {
   }
 }
 
-test.use({ cases: true });
+test.use({ cases: true, fromAgreement: true });
 
 test.beforeEach(async ({ backend }) => {
   const missing = await missingContract(backend);
@@ -119,11 +119,26 @@ test("run the demo: the notification, Decide, Learned, Ready, then Review and Ma
   const demo = (await deals(backend)).find((d) => d.deal_id === "d_kequ_nuaire")!;
   await expect(page.getByRole("complementary").getByText(`${demo.platform} · ${demo.target}`, { exact: true })).toBeVisible();
 
-  // The question arrives as a toast with the agent, the question, and Decide, and the Case item gets a badge.
+  // Touchpoint 1 (D23): the Brief Reader reads the agreement, the Verifier checks every field, and the controller
+  // approves the Brief in one click, with nothing to type.
+  // On the Case the Brief card itself is the prompt, so its notification is not shown over it.
+  await expect(page.getByTestId("verification-summary")).toBeVisible({ timeout: 20_000 });
+  expect((Date.now() - started) / 1000).toBeLessThan(10);
+  await expect(page.locator('[data-step="verifier"][data-state="done"]')).toBeVisible();
+  await expect(page.getByTestId("verification-summary")).toHaveText("22 of 22 checks passed");
+  await shot("brief-verified");
+  await page.getByTestId("verification-card").click();
+  await expect(page.locator("[data-check]")).toHaveCount(22);
+  await expect(page.locator('[data-check][data-ok="false"]')).toHaveCount(0);
+  await shot("verification-checks");
+  await page.getByRole("button", { name: "Approve the Brief and map" }).click();
+  const approvedBrief = Date.now();
+
+  // Touchpoint 2: the Mapper's one escalation, its questions together, as one toast; the Case item gets a badge.
   const toast = page.getByRole("alert").filter({ hasText: "Needs your decision" });
   await expect(toast).toBeVisible({ timeout: 20_000 });
-  const toQuestion = (Date.now() - started) / 1000;
-  expect(toQuestion).toBeLessThan(12);
+  expect((Date.now() - approvedBrief) / 1000).toBeLessThan(8);
+  await expect(toast).toContainText("The Mapper needs 2 decisions");
   await expect(toast.getByRole("button", { name: "Decide" })).toBeVisible();
   await expect(page.locator("[data-badge]")).toBeVisible();
   // The demo replays the recorded Claude Haiku 5.5 run, and the model card says so.

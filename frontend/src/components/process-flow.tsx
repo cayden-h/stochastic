@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/api";
 import { type AgentInfo, type AgentKey, type ConversationMessage, CONTROLLER, agentKey } from "@/lib/conversation";
 import { clock } from "@/lib/format";
-import { SilhouetteIcon } from "./icons";
+import { LockIcon, SilhouetteIcon } from "./icons";
 import { ActorChip, Avatar, Label, Mono, type Role, ROLES, Shape } from "./ui";
 
 /** The agents in pipeline order, with the role key the v3 art uses. */
@@ -60,8 +60,34 @@ function StateWord({ info, elapsed, unused }: { info: AgentInfo; elapsed: number
  * The process at a glance: Brief Reader, Mapper, Preparer, Reviewer, You. Each agent shows its live state from the
  * conversation; an agent that asked shows the questions it waits on, and You shows whose turn it is.
  */
-export function Pipeline({ agents, readerUsed, posted, approvalWaiting }: {
+/** The Brief verifier (D23) between the Brief Reader and the Mapper: code, not a model, so a lock chip, no avatar. */
+function VerifierStep({ state, passed, total }: { state: "idle" | "working" | "done" | "failed"; passed: number; total: number }) {
+  return (
+    <li className="flex min-w-0 flex-1 items-center" data-step="verifier" data-state={state}>
+      <div className={`flex min-w-0 flex-1 items-center gap-[8px] rounded-[12px] border px-[8px] py-[8px] transition-colors duration-300 ${state === "working" ? "border-mint-edge bg-fog" : state === "failed" ? "border-amber-line bg-amber-tint" : "border-transparent"}`}>
+        <span className={`flex size-[26px] shrink-0 items-center justify-center rounded-[7px] border border-line bg-white ${state === "idle" ? "opacity-60" : ""}`} aria-hidden="true"><LockIcon size={16} /></span>
+        <span className="flex min-w-0 flex-col gap-[2px]">
+          <span className="truncate text-[14px] font-semibold text-code">Verifier</span>
+          {state === "working" ? (
+            <span className="flex items-center gap-[6px] text-[12px] font-semibold text-forest"><LiveDot tone="bg-forest" />Checking</span>
+          ) : state === "done" ? (
+            <span className="flex items-center gap-[6px] text-[12px] font-semibold text-clear"><Shape kind="check" size={10} />{passed} of {total}</span>
+          ) : state === "failed" ? (
+            <span className="flex items-center gap-[6px] text-[12px] font-semibold text-escalation"><Shape kind="triangle" size={10} />{total - passed} failed</span>
+          ) : (
+            <span className="flex items-center gap-[6px] text-[12px] text-faint"><Shape kind="circle" size={10} />Waiting</span>
+          )}
+        </span>
+      </div>
+      <span aria-hidden="true" className={`mx-[2px] h-[2px] w-[10px] shrink-0 rounded-full ${state === "done" ? "bg-forest" : "bg-line"}`} />
+    </li>
+  );
+}
+
+export function Pipeline({ agents, readerUsed, posted, approvalWaiting, verifier = null }: {
   agents: Record<AgentKey, AgentInfo>; readerUsed: boolean; posted: boolean; approvalWaiting: boolean;
+  /** The verifier's step, on a deal read from its agreement (D23). */
+  verifier?: { state: "idle" | "working" | "done" | "failed"; passed: number; total: number } | null;
 }) {
   const anyWorking = PIPELINE.some((p) => agents[p.key].state === "working");
   const now = useSeconds(anyWorking);
@@ -98,7 +124,7 @@ export function Pipeline({ agents, readerUsed, posted, approvalWaiting }: {
             <span aria-hidden="true" className={`mx-[2px] h-[2px] w-[10px] shrink-0 rounded-full ${flowed ? "bg-forest" : "bg-line"}`} />
           </li>
         );
-      })}
+      }).flatMap((node, n) => (n === 0 && readerUsed && verifier ? [node, <VerifierStep key="verifier" {...verifier} />] : [node]))}
       <li className="flex min-w-0 flex-1 items-center">
         <div className={`flex min-w-0 flex-1 items-center gap-[8px] rounded-[12px] border px-[8px] py-[8px] transition-colors duration-300 ${yourTurn ? "border-amber-line bg-amber-tint" : "border-transparent"}`}>
           <span className="flex size-[26px] shrink-0 items-center justify-center rounded-[7px] bg-ink text-paper" aria-hidden="true"><SilhouetteIcon /></span>

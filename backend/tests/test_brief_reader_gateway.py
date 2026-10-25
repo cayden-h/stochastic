@@ -345,7 +345,9 @@ def test_the_scripted_reader_on_the_kewaunee_excerpt_returns_the_fixture_brief(w
     new_deal(store, gw)
     jobs.advance(gw, DEAL_ID)
     flags = {f.payload["field"] for f in gw._brief_flags(DEAL_ID)}
-    assert "covenants" in flags  # the fixed charge coverage covenant in 4.8(b) is said, not dropped
+    # The fixed charge coverage covenant in 4.8(b) is said on the verification report, not dropped (D23).
+    assert "covenants" not in flags
+    assert any("Fixed Charge Coverage Ratio" in n for n in gw.brief_verification(DEAL_ID).scope_notes)
     assert {f"ebitda_addbacks[{i}].amount" for i in range(4)} | {"ebitda_deductions[0].amount"} <= flags
     answer_kewaunee(gw)
     gw.approve_brief(CONTROLLER, DEAL_ID)

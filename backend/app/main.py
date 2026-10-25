@@ -51,6 +51,15 @@ def demo_cases_wanted() -> bool:
     return (os.getenv("DEMO_CASES") or "1").strip().lower() not in ("0", "off", "false", "no")
 
 
+def demo_from_agreement_wanted() -> bool:
+    """DEMO_FROM_AGREEMENT (default on) starts the live demo deal from the agreement text (D23): the Brief Reader, the
+    verifier, then the controller's one-click Brief approval. Under pytest it is off unless a test asks
+    (create_app(demo_from_agreement=True)), so the suite's flows that start at the Mapper stay as they were."""
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
+    return (os.getenv("DEMO_FROM_AGREEMENT") or "1").strip().lower() not in ("0", "off", "false", "no")
+
+
 def start_demo_cases(gateway: Gateway, background: bool = True) -> threading.Thread | None:
     """Seed the cases through the real pipeline (scripted backend, no pace). In a background thread, so /health
     answers at once; a case already in the store (a Postgres ledger that loaded it) is kept while its seed version
@@ -73,9 +82,14 @@ def start_demo_cases(gateway: Gateway, background: bool = True) -> threading.Thr
     return t
 
 
-def create_app(demo_cases: bool | None = None, demo_cases_background: bool = True) -> FastAPI:
+def create_app(demo_cases: bool | None = None, demo_cases_background: bool = True,
+               demo_from_agreement: bool | None = None) -> FastAPI:
     store = open_store()
     gateway = Gateway(store)
+    from_agreement = demo_from_agreement if demo_from_agreement is not None else demo_from_agreement_wanted()
+
+    def seed_demo_deal() -> None:
+        seed(store, gateway, from_agreement=from_agreement)
     if settings.forks == "tiger" and store.kind == "postgres" and settings.tiger_service_id:
         from app.db.forks import TigerCliForks
         from app.gateway.whatif import WhatIfForks
@@ -84,7 +98,7 @@ def create_app(demo_cases: bool | None = None, demo_cases_background: bool = Tru
                                     schema=settings.db_schema)
         gateway.forks.clean_leftovers()
     if not store.deals:  # a Postgres store that loaded a ledger keeps it
-        seed(store, gateway)
+        seed_demo_deal()
     stuck = gateway.recover_interrupted_runs()  # no job survives a restart; a deal left mid-run gets Run again
     if stuck:
         log.warning("deals left mid-run by the last process, now run_failed: %s", ", ".join(stuck))
@@ -121,7 +135,7 @@ def create_app(demo_cases: bool | None = None, demo_cases_background: bool = Tru
                 keep = {d for d in store.deals if d != DEAL_ID}
                 store.reset_deals(keep_memory=keep_memory, keep_deals=keep, rechain=gateway.rechain)
                 gateway.run_pace.pop(DEAL_ID, None)
-                seed(store, gateway)
+                seed_demo_deal()
                 if not keep_memory:  # memory learned on other deals that covers the demo deal's companies, too
                     gateway.retire_policies_covering(DEAL_ID, FRESH_DEMO_REASON)
                 if gateway.forks:

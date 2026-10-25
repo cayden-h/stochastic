@@ -1,0 +1,37 @@
+Loan Agreement, Kewaunee Scientific Corporation and PNC Bank, dated November 1, 2024 (8-K Ex 10.1).
+Verbatim extracts: the opening, Section 4.8, and three definitions from Addendum I. The rest of the agreement is left out.
+Source: https://www.sec.gov/Archives/edgar/data/55529/000119312524249232/d886750dex101.htm
+Exhibit 10.1
+Execution Version
+Loan Agreement
+THIS LOAN AGREEMENT (the “ Agreement ”) is entered into as of November 1, 2024 (the
+“ Effective Date ”), between KEWAUNEE SCIENTIFIC CORPORATION , a Delaware corporation (the “ Borrower ”), with an address at 2700 West Front Street, P.O. Box 1842, Statesville, North Carolina 28677, and
+PNC BANK, NATIONAL ASSOCIATION (the “ Bank ”), with an address at 4720 Piedmont Row, Suite 200, Charlotte, North Carolina 28210.
+[...]
+4.8. Financial Covenants . Comply with all of the financial covenants, set forth
+below:
+(a) Senior Funded Bank Debt to EBITDA . The Borrower will maintain on a consolidated basis at all times a
+ratio of Senior Funded Bank Debt to EBITDA of less than 2.50 to 1.00, measured as of the end of each fiscal quarter of the Borrower.
+(b)
+Fixed Charge Coverage Ratio . The Borrower will maintain on a consolidated basis as of the end of each fiscal quarter, on a rolling four quarter basis, a Fixed Charge Coverage Ratio of at least 1.20 to 1, measured as of the end
+of each fiscal quarter of the Borrower.
+All of the above financial covenants shall be computed and determined in accordance with the
+Applicable Accounting Standards applied on a consistent basis (subject to normal year-end adjustments).
+[...]
+ADDENDUM I
+DEFINITIONS :
+As used in this Agreement, the
+following terms have the meanings specified below:
+[...]
+“ EBITDA ” means net income plus interest expense less interest income plus
+income tax expense plus depreciation plus amortization plus (without duplication) noncash pension termination expense completed during the fiscal year of the Borrower ending April 30, 2024 plus (without duplication)
+transaction costs related to the Closing Date Acquisition, but not exceeding $4,000,000 in the aggregate plus (without duplication) integration costs relating to the Closing Date Acquisition incurred by the Borrower within 18 months of the
+Closing Date Acquisition, but not exceeding $1,000,000 in the aggregate plus (without duplication) any stock-based compensation plus (without duplication), solely to the extent included in the tested period, the EBITDA of Nu Aire
+calculated on a pro forma basis for the four quarter period commencing on November 1, 2023 and concluding on October 31, 2024 less extraordinary gains less cash rental expense relating to the real property located at 2700
+West Front Street, Statesville, North Carolina 28677.
+[...]
+“ Senior Funded Bank Debt ” means all secured indebtedness for borrowed money, including but not
+limited to capital or finance lease obligations, reimbursement obligations in respect of letters of credit, and guarantees of any such indebtedness, but excluding (i) Subordinated Debt and (ii) any capitalized lease obligations relating to
+the real property located at 2700 West Front Street, Statesville, North Carolina 28677.
+“ Subordinated Debt ” means indebtedness that has
+been subordinated to the Borrower’s indebtedness to the Bank pursuant to a subordination agreement in form and content reasonably satisfactory to the Bank, including, without limitation, the Subordinated Seller Notes.

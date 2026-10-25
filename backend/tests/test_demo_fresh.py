@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import app.main as app_main  # noqa: E402
 from app.agents import pace, runner  # noqa: E402
 from app.agents.backends import droid_backend  # noqa: E402
-from app.db.fixtures.kewaunee import DEAL_ID, PLATFORM, TARGET  # noqa: E402
+from app.db.fixtures.kewaunee import BRIEF, DEAL_ID, PLATFORM, TARGET  # noqa: E402
 from app.main import create_app  # noqa: E402
 from tests.test_demo_pace import FakeClock  # noqa: E402
 
@@ -63,7 +63,7 @@ def test_a_demo_pace_run_never_calls_droid_and_reaches_the_questions(droid_confi
     body = c.get(f"/deals/{DEAL_ID}/case").json()
     assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 2
     assert calls == []
-    assert 5.5 <= clock.now <= 7.0  # paced like the scripted demo, not a live model's own time
+    assert 3.0 <= clock.now <= 4.5  # paced like the demo's Mapper (a Brief sent as JSON), not a live model's own time
     answer_all(c, DEAL_ID)  # the last answer continues in the background, at the same pace and on the same backend
     assert c.get(f"/deals/{DEAL_ID}/case").json()["stage"] == "awaiting_approval"
     assert calls == []
@@ -106,7 +106,7 @@ def upload_demo_companies(c) -> str:
     files = {"platform_csv": ("platform.csv", _csv(store, PLATFORM), "text/csv"),
              "target_csv": ("target.csv", _csv(store, TARGET), "text/csv")}
     data = {"name": "Kewaunee again", "platform": PLATFORM.lower(), "target": TARGET.lower(),
-            "brief": demo.brief.model_dump_json()}
+            "brief": (demo.brief or BRIEF).model_dump_json()}  # the demo deal reads its Brief on its first run (D23)
     r = c.post("/deals", files=files, data=data)
     assert r.status_code == 201, r.text
     return r.json()["deal_id"]

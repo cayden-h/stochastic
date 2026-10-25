@@ -22,23 +22,42 @@ def mapping_event(store, m) -> dict:
 
 
 ROLE_NAMES = {"agent:mapper": "Mapper", "agent:preparer": "Preparer", "agent:reviewer": "Reviewer",
-              "agent:brief_reader": "Brief Reader", "system:gateway": "Gateway"}
+              "agent:brief_reader": "Brief Reader", "system:gateway": "Gateway", "system:verifier": "Verifier"}
 
 
 def notify_event(store, msg) -> dict | None:
     """The `notify` event's body for a question to the controller, or None when the message is not one or its item
     is no longer waiting (answered while the page was away), so a reconnecting page never re-notifies an old
     question. `body` is the one-line question of the work item; the conversation message has the options."""
+    item = store.items.get(msg.item_id) if msg.item_id else None
+    if (msg.kind == "handoff" and msg.sender == "system:verifier" and msg.to == "human:controller" and item is not None
+            and item.type == "draft_brief" and item.state == State.PROPOSED and item.payload.get("verification")):
+        # The Brief approval (D23): the verifier checked every field; the controller approves in one click.
+        report = item.payload["verification"]
+        return {"id": msg.id, "deal_id": msg.deal_id, "at": msg.model_dump(mode="json", include={"at"})["at"],
+                "kind": "brief_approval", "item_id": item.id, "item_ids": [item.id], "from": msg.sender,
+                "title": "The Verifier checked the Brief",
+                "body": f"{report['passed']} of {len(report['checks'])} checks passed. " + msg.text}
     if msg.kind != "question" or msg.to != "human:controller":
         return None
-    item = store.items.get(msg.item_id) if msg.item_id else None
     if item is None or item.state != State.NEEDS_INFO:
+        return None
+    # One escalation, however many decisions (D23): the questions an agent opens together (one parent work item)
+    # come as one notification, on the first of them that is still open; the Case shows them all at once.
+    parent = item.payload.get("parent")
+    together = [i for i in store.deal_items(item.deal_id, "flag")
+                if parent and i.payload.get("parent") == parent and i.state == State.NEEDS_INFO] or [item]
+    if together[0].id != item.id:
         return None
     who = ROLE_NAMES.get(msg.sender, msg.sender)
     body = " ".join((item.question or msg.text).split())
+    n = len(together)
+    title = f"The {who} needs your decision" if n == 1 else f"The {who} needs {n} decisions"
+    if n > 1:
+        body = f"{body} (and {n - 1} more question{'s' if n > 2 else ''}, answered together)"
     return {"id": msg.id, "deal_id": msg.deal_id, "at": msg.model_dump(mode="json", include={"at"})["at"],
-            "kind": "decision", "item_id": item.id, "from": msg.sender, "title": f"The {who} needs your decision",
-            "body": body}
+            "kind": "decision", "item_id": item.id, "item_ids": [i.id for i in together], "from": msg.sender,
+            "title": title, "body": body}
 
 
 def _key(msg) -> tuple[str, str]:

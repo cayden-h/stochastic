@@ -3,7 +3,7 @@
 export type State = "NEW" | "PROPOSED" | "NEEDS_INFO" | "APPROVED" | "REJECTED" | "POSTED" | "REVERSED" | "SUPERSEDED";
 /** The deal stages the gateway and the job runner set (backend/app/gateway, backend/app/agents/jobs.py). */
 export type Stage =
-  | "new" | "reading_brief" | "awaiting_brief" | "brief_ready"
+  | "new" | "reading_brief" | "verifying_brief" | "awaiting_brief" | "brief_ready"
   | "mapping" | "awaiting_flag" | "mapped" | "flags_answered" | "preparing"
   | "awaiting_review" | "awaiting_approval" | "needs_attention" | "posted" | "run_failed";
 export type Backend = "scripted" | "anthropic" | "droid" | "replay" | string;
@@ -61,6 +61,25 @@ export interface BriefDraft {
   amendments_supplied: boolean;
   /** List fields the controller removed, applied at approval. */
   removed: string[];
+}
+
+/** One Brief field the verifier checked against the agreement, or one amount against its source (D23). */
+export interface BriefCheck {
+  field: string; value: string; section: string; quote: string; ok: boolean; reason: string;
+  /** The checks run: verbatim, in_section, number, defined, source. */
+  checks: string[];
+}
+
+/** The verifier's report on the draft Brief (D23). */
+export interface BriefVerification {
+  item_id: string; sha256: string; checks: BriefCheck[]; passed: number; failed: number;
+  /** The amount fields the verifier filled from the deal's books. */
+  filled: string[];
+  /** What the Brief cannot hold, noted on the report and not tested. */
+  scope_notes: string[];
+  /** The flag ids left for the controller. */
+  escalated: string[];
+  at: string;
 }
 
 export interface SourceLine {
@@ -139,6 +158,8 @@ export interface Case {
   reason_chips?: Partial<Record<Edit["kind"], ReasonChip[]>>;
   /** The Brief Reader's draft while the controller reviews it (D20, Tri's T4). */
   brief_draft?: BriefDraft | null;
+  /** The verifier's report on the draft, once it ran (D23). */
+  brief_verification?: BriefVerification | null;
 }
 
 export type Section = SourceLine["section"];
