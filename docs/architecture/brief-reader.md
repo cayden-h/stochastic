@@ -72,6 +72,49 @@ An amendment is a new text, so it is read again.
 8. **Missing is said, not blank.** A field not found is reported as "not found in sections X to Y", not left empty. This answers the "no related clause" failure that benchmarks report. [verified: ContractEval]
 9. **Amendments.** If no amendment was supplied, the draft says "base agreement only" and the approval card shows it.
 
+## 6a. The verifier: code checks every field after the read (D23)
+
+Built 2026-10-25.
+The draft checks above refuse a draft that breaks a rule.
+The verifier runs right after a draft is accepted and reports field by field what it confirmed, so the check is visible, not only enforced. [verified: `backend/app/core/verifier.py`, `Gateway.verify_brief`]
+It is code, not a model, and it speaks in the conversation as `system:verifier`.
+
+For each required field, with the reader's best quote:
+- **verbatim**: the quote is in the agreement word for word after the section 6 normalization, and at least four words long.
+- **in_section**: the section the citation names exists, and its text contains the quote.
+- **number**: the limit (2.50) is in its quote and in `limit_wording`, and the limit is quoted from `limit_section`; each cap in USD thousands is in its quote as written (4000 is "$4,000,000").
+- **defined**: `debt_term` and EBITDA are defined terms of the agreement; `debt_definition` and each `debt_excludes` item are quoted from the debt term's own definition; each add-back and deduction is quoted from the EBITDA definition.
+- `test_period_note` is checked when the reader quoted it.
+
+For each adjustment amount:
+1. If the deal carries `book_amounts` (adjustments with a source outside the agreement), the verifier fills each amount the reader left at 0 from the book amount of the same name, with its source, as a `brief:amend` row by `system:verifier`.
+   Names match after case, a trailing "(capped)", and a leading "any" are ignored; nothing fuzzier.
+2. An amount other than 0 passes only with a source outside the agreement; 0 passes as "not applied".
+
+Each check is one `check` message and one `verify:brief_field` audit row (ALLOWED when it passed, DENIED when it failed).
+The report, `BriefVerification`, is stored on the draft item and returned on `/case` as `brief_verification`: `checks` (field, value, section, quote, ok, reason, checks), `passed`, `failed`, `filled`, `scope_notes`, `escalated`, and `auto_approved`.
+
+What happens next:
+- The draft's questions open only after the verifier ran, so the controller is asked only what is left: amounts the books do not give, low-confidence fields, the reader's own questions, and every failed check.
+- What the Brief cannot hold (the second covenant in Section 4.8(b), stage 2) is asked on an ordinary deal.
+  On a deal with `brief_auto_approve` and no failed check, it is noted on the report and in a `verify:scope_note` row instead, and not tested.
+- On a deal with `brief_auto_approve` (the demo deal only), a Brief with every check passed and no question open is approved by the verifier.
+  The `approve_brief` row names `system:verifier` and starts "auto-approved: all N checks passed".
+  The verifier is not the reader, so maker-checker holds.
+  On every other deal the controller approves the Brief, as in section 5.
+
+On the demo deal the verifier writes 22 checks: 17 quoted fields and 5 amounts.
+It fills pension 4,019, stock compensation 1,018, and rent 1,970 (inferred) from the books with their 10-K sources, and keeps transaction and integration costs at 0 (not applied).
+The amounts are the ones in the hand-written fixture Brief, so the books' figures do not change: 0.76x on the agreement's reading.
+
+### The demo deal's agreement text
+
+The demo deal starts from `data/brief/kewaunee_ex101_extract.txt`, committed so the demo runs on any machine with the repo.
+It holds verbatim extracts of Ex 10.1: the opening (the PNC line), Section 4.8 in full, and the EBITDA, Senior Funded Bank Debt, and Subordinated Debt definitions from Addendum I, 3,434 characters in all.
+The rest of the 115K-character exhibit stays out of git (`data/raw/`, `scripts/fetch_filings.py`).
+Its normalized SHA-256 is listed in `data/brief/kewaunee_quotes.json` as `demo_extract`, so the scripted reader returns the verbatim quotes on it, and every quote is in its section of the extract.
+The pinned Sonnet 5.5 read of the full exhibit (`backend/recordings/brief_reader.json`) also passes all 25 of its verifier checks on the extract, but it asks five questions of its own (two of them substantive: the 2.00x prepayment test in Section 5.10(a) and the pro forma Nu Aire add-back), so the demo's read runs on the scripted reader. [verified: run on 2026-10-25]
+
 ## 7. Types and files
 
 Proposed, following the patterns already in the code. [inferred]

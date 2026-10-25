@@ -17,6 +17,7 @@ A real deployment would use signed tokens.
 | `agent:brief_reader` (D20) | The Brief Reader. It may store a draft brief (`propose:draft_brief`) and call the read-only tools `get_section` and `get_definition`, nothing else. See `brief-reader.md`. |
 | `human:controller` | The portfolio controller. |
 | `system:gateway` | The gateway itself. It posts, opens work items, and runs what-if tool calls for flag effects. |
+| `system:verifier` (D23) | The Brief verifier: code, not a model. It checks the reader's draft field by field (`verify_brief`), fills adjustment amounts from the deal's `book_amounts` (`amend_brief_from_books`), and approves the Brief only on a deal with `brief_auto_approve` (`auto_approve_brief`). See `brief-reader.md` section 6a. |
 
 ## Permission matrix
 
@@ -33,6 +34,7 @@ A real deployment would use signed tokens.
 | Approve | no | no | no | yes, not an item they prepared | no |
 | Create a deal, run the job runner | no | no | no | yes | no |
 | Amend and approve the Brief (`amend_brief`, `approve_brief`) | no | no | no | yes | no |
+| Verify the Brief, fill amounts from the books, auto-approve on the demo deal (D23) | no | no | no | no | `system:verifier` only |
 | Post to the record, open work items, write the log, write policies | no | no | no | no | yes |
 
 A forbidden action returns 403 and writes a DENIED row.
@@ -145,6 +147,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
   "edits": [],
   "adjustments": [],
   "brief_draft": null,
+  "brief_verification": null,
   "reason_chips": { "amount": [ { "id": 0, "label": "..." } ], "remap": [ "..." ] }
 }
 ```
@@ -152,6 +155,8 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 `edits`, `adjustments`, and `brief_draft` are the phase 2 additions (shapes in the next section).
 They are on `/case` and `CaseResponse` now (verified by `backend/tests/test_case_phase2.py`).
 The edit routes (`POST /deals/{id}/edits`, `POST /edits/{id}/reason`, `DELETE /edits/{id}`) fill `edits` and `adjustments` (verified by `backend/tests/test_api_edits.py`); `brief_draft` is the live draft from `gateway.brief_draft` (the Brief, its citations, its flag ids, `removed`), null for a deal whose Brief came as JSON or before the reader ran (verified by `backend/tests/test_api_brief.py`).
+`brief_verification` (D23) is the verifier's report on that draft, `BriefVerification`: `item_id`, `sha256`, `checks` (each `{field, value, section, quote, ok, reason, checks}`), `passed`, `failed`, `filled`, `scope_notes`, `escalated`, `auto_approved`, and `at`; null before the verifier ran (verified by `backend/tests/test_case_phase2.py` and `backend/tests/test_brief_verifier.py`).
+`deal.book_amounts` and `deal.brief_auto_approve` are on the deal itself.
 `deal.brief` is null while a deal from agreement text has no draft yet.
 `reason_chips` holds the chips the edit bubble offers, per kind (`amount`, `remap`), from the gateway's `reason_chips`; they are hardcoded per deal for the demo.
 `edits` lists the deal's edits in order, reverted ones included; `adjustments` lists every learned adjustment, as `policies` does.
@@ -413,10 +418,12 @@ The amounts route should accept any field path, not only amounts: `amend_brief` 
 | `create_deal_from_agreement(actor, deal, lines, text, source)` | Creates the deal with `brief_status` `none` and stores the `AgreementText` (kind `agreement`). If an earlier deal's approved Brief has the same agreement hash, it is reused (`brief:reuse`) and the reader is skipped. |
 | `brief_reader_input(deal_id, item_id)` | The section index, the definition index, and the sections that mention a leverage ratio; never the whole agreement. |
 | `read_agreement(actor, deal_id, name, args)` | `get_section(id)` and `get_definition(term)`, for the reader (and the system) only. Logged as `tool:get_section` and `tool:get_definition`; no `ToolRun` is stored, since they produce no figures. |
-| `store_brief(actor, item_id, out)` | The reader's draft. Refused (DENIED) unless it passes the nine checks below; then the deal's Brief is `draft`, its `brief_field` flags open, and the stage is `awaiting_brief`. |
+| `store_brief(actor, item_id, out)` | The reader's draft. Refused (DENIED) unless it passes the nine checks below; then the deal's Brief is `draft`, the stage is `verifying_brief`, and the reader hands the draft to the verifier. Its `brief_field` flags open after `verify_brief` (D23), so the controller is asked only what is left. |
 | `amend_brief(actor, deal_id, field, value, source_ref=None, inferred=False, note="")` (`human:controller` only) | The controller sets one field by path, for example `ebitda_addbacks[0].amount` with its `source_ref` (required for an amount). A new adjustment is added by its `.name` at the next index. The open flags on that field close with answer `amended`. |
 | `approve_brief(actor, deal_id)` | `human:controller` only, and only with no open `brief_field` flag. Applies the removals, checks the figures again, sets `brief_status` `approved`, and logs the agreement hash. The Brief is then locked: `amend_brief` and `store_brief` answer 409. |
 | `brief_draft(deal_id)` | The `BriefDraft` for `/case`: the Brief, its citations, its flag ids, `amendments_supplied` (false: base agreement only), and `removed`. |
+| `verify_brief(actor, deal_id, progress=None)` (`system:verifier` only, D23) | Runs once per draft, right after `store_brief`. Fills the amounts the deal's `book_amounts` give (`brief:amend` rows), checks every field (`app/core/verifier.py`; one `check` message and one `verify:brief_field` row each), opens the questions that are left, and stores the `BriefVerification` on the draft item. On a deal with `brief_auto_approve`, every check passed, and no question open, it approves the Brief (`approve_brief` row by `system:verifier`, reason "auto-approved: all N checks passed"). `progress("verify")` runs between checks outside the lock, for the pace. |
+| `brief_verification(deal_id)` | The report for `/case` as `brief_verification`, or null before the verifier ran. |
 
 The checks on a draft (`brief-reader.md` section 6):
 1. Only `agent:brief_reader` stores a draft, on a `draft_brief` item in state NEW.
@@ -618,11 +625,12 @@ The sources of each real case are in its fixture's header; the sample's platform
 
 ## Stages
 
-`new` (loaded), `reading_brief`, `awaiting_brief`, `brief_ready`, `awaiting_flag`, `flags_answered`, `mapped`, `awaiting_review`, `needs_attention`, `awaiting_approval`, `posted`, and `run_failed`.
-A deal from agreement text goes `reading_brief`, `awaiting_brief` (open Brief flags), `brief_ready` (all answered), then back to `new` on approval, and maps from there.
+`new` (loaded), `reading_brief`, `verifying_brief`, `awaiting_brief`, `brief_ready`, `awaiting_flag`, `flags_answered`, `mapped`, `awaiting_review`, `needs_attention`, `awaiting_approval`, `posted`, and `run_failed`.
+A deal from agreement text goes `reading_brief`, `verifying_brief`, `awaiting_brief` (open Brief flags), `brief_ready` (all answered), then back to `new` on approval, and maps from there.
+The demo deal goes `reading_brief`, `verifying_brief`, then straight to `new` when the verifier approves its Brief (D23).
 A run that stops on an error is `run_failed`, on the sync route as well as in the background, with one `run:failed` row.
 Jobs live in the API process, so none survives a restart.
-On start, a deal the store loaded at a working stage (`reading_brief`, `mapping`, `mapped`, `flags_answered`, `preparing`, or `awaiting_review`) is moved to `run_failed`, with a `run:failed` row whose reason is "the app restarted mid-run" and a message to the controller, so Run again picks up where it stopped (`Gateway.recover_interrupted_runs`).
+On start, a deal the store loaded at a working stage (`reading_brief`, `verifying_brief`, `mapping`, `mapped`, `flags_answered`, `preparing`, or `awaiting_review`) is moved to `run_failed`, with a `run:failed` row whose reason is "the app restarted mid-run" and a message to the controller, so Run again picks up where it stopped (`Gateway.recover_interrupted_runs`).
 `/dev/reset` checks for a running job and resets under the lock a run's claim takes, so a Run and a reset never interleave.
 After an edit, the stage is `awaiting_approval` or `needs_attention` again, from the recompute's checks.
 
