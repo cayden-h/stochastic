@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="frontend/public/v3/agent-house.png" alt="The Stochastic Agent House: four agents at their desks" width="760">
+  <img src="docs/images/banner.jpg" alt="Stochastic">
 </p>
-
-<h1 align="center">Stochastic</h1>
 
 <p align="center">
   <b>Four AI agents that merge an acquired company's books, ask a human only about the lines that matter, and never do the math themselves.</b> · Built at Cal Hacks 13.0, San Francisco, October 23-25 2026.
@@ -36,6 +34,10 @@ One line mapped the wrong way flows into every number after it, and nobody notic
 
 You drop in two sets of financial statements and the credit agreement.
 Four agents split up the work a real finance team would:
+
+<p align="center">
+  <img src="frontend/public/v3/agent-house.png" alt="The Stochastic Agent House: four agents at their desks" width="760">
+</p>
 
 1. **Read** the credit agreement and pull out the limit, what counts as debt, and how EBITDA is adjusted, with a verbatim quote for every field.
 2. **Map** every line of the target onto the platform's chart, with a confidence and a reason.
