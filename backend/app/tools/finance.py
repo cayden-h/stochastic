@@ -202,7 +202,7 @@ NET_INCOME = ("net earnings", "net income", "net income (loss)", "net earnings (
 INTEREST = ("interest expense", "interest expense, net")
 INTEREST_INCOME = ("interest income", "interest income - net", "interest income, net")
 TAXES = ("income tax (benefit) expense", "income tax expense", "provision for income taxes",
-         "income tax expense (benefit)", "income taxes")
+         "income tax expense (benefit)", "income taxes", "income tax provision")
 DA = ("depreciation and amortization", "depreciation", "amortization")
 
 
@@ -315,6 +315,17 @@ def leverage(debt: float, ebitda_value: float) -> dict:
     if ebitda_value <= 0:
         raise ValueError("ebitda must be positive")
     return {"leverage": round(debt / ebitda_value, 3), "debt": round(debt, 3), "ebitda": round(ebitda_value, 3)}
+
+
+def wording_of(limit_wording: str | None) -> str:
+    """How the covenant compares, from its own words: "less than" (strictly below the limit passes, the PNC
+    agreement) or "not more than" (at the limit passes: "not to exceed", "not ... greater than")."""
+    w = " ".join((limit_wording or "").lower().split())
+    if "less than" in w:
+        return "less than"
+    if any(k in w for k in ("exceed", "greater than", "more than")):
+        return "not more than"
+    return "less than"
 
 
 def limit_test(leverage_value: float, limit: float, wording: str = "less than", ebitda_value: float | None = None,
