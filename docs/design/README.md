@@ -21,6 +21,8 @@ Other pages in the same file:
 - `Hi-fi - v1`, `Hi-fi - v2`, `Wireframes + Ideation`, `Ideation`, and `3D Mockup`: earlier work, kept as history.
 
 The D19 additions (editable cells, the reason bubble, the companion) are specified in `review-companion.md` and go on top of V3-3 and V3-4.
+The logo, the name, and the launch splash are specified in `brand.md` (D21).
+The splash shows only the circle and the name, centered, on a transparent background, until the whole app has loaded.
 The tokens and rules below still apply.
 
 ## Earlier four-screen design (history)

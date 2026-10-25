@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- The Stochastic app icon (docs/design/brand.md): the mark at icon weight on a paper squircle.
+       Render with `npm run icon` in desktop/, which writes icon.png and icon.icns next to it. -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#F7F4EC"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" fill="none" stroke="#16191D" stroke-opacity="0.08"/>
+  <svg x="182" y="182" width="660" height="660" viewBox="240 240 820 820">
+  <g fill="none" stroke="#16191D" stroke-width="22" stroke-linejoin="miter">
+    <circle cx="650" cy="650" r="392"/>
+    <polyline points="437,397 550,588 752,385 345,637 812,925 812,628 402,763 515,898 958,793 622,632 782,498 896,566"/>
+  </g>
+  <g fill="#16191D">
+    <circle cx="437" cy="397" r="48"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(499.15 502.05) rotate(59.39) scale(2.6)"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(675.24 462.14) rotate(-45.14) scale(2.6)"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(499.66 541.24) rotate(148.24) scale(2.6)"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(601.85 795.4) rotate(31.66) scale(2.6)"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(812 821.05) rotate(-90) scale(2.6)"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(619.3 691.45) rotate(161.77) scale(2.6)"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(441.55 810.25) rotate(50.07) scale(2.6)"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(758.65 840.25) rotate(-13.33) scale(2.6)"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(773.2 704.45) rotate(-154.4) scale(2.6)"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(710 558.3) rotate(-39.95) scale(2.6)"/>
+    <path d="M12 0 L-12 -11 L-5 0 L-12 11 Z" transform="translate(833.3 528.6) rotate(30.82) scale(2.6)"/>
+  </g>
+  </svg>
+</svg>

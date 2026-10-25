@@ -1,0 +1,129 @@
+<!doctype html>
+<!--
+  The launch splash (docs/design/brand.md). main.js shows it in a frameless, transparent window
+  centered on the screen until the backend answers and the console has loaded in the hidden main window.
+  It shows only the circle mark and the name, on a transparent background. No network: the font is local.
+  The geometry and timings must match frontend/src/components/stochastic-mark.tsx.
+  Loaded as splash.html?wait=1 by main.js, which calls window.splashPlay() once the window is visible.
+  Opened any other way (a browser, a headless check), it plays on load.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src 'self' file:">
+<title>Stochastic</title>
+<style>
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("assets/fonts/InstrumentSerif-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: block;
+}
+/* Ink follows the macOS appearance: Electron maps nativeTheme to prefers-color-scheme. */
+:root { --ink: #16191D; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) { :root { --ink: #ECE9E2; } }
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+body {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  color: var(--ink); cursor: default; user-select: none; -webkit-user-select: none;
+  transition: opacity 200ms ease;
+}
+body.out { opacity: 0; }
+.mark { width: 232px; height: 232px; overflow: visible; }
+.ring, .walk { fill: none; stroke: var(--ink); stroke-width: 7; stroke-linejoin: miter; stroke-linecap: butt; }
+.dot, .head { fill: var(--ink); }
+.word {
+  font-family: "Instrument Serif", "Iowan Old Style", "New York", Georgia, serif;
+  font-size: 48px; line-height: 1; letter-spacing: 0.01em;
+  opacity: 0; transform: translateY(6px); transition: opacity 320ms ease, transform 320ms ease;
+}
+.word.on { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+<svg class="mark" viewBox="240 240 820 820" role="img" aria-label="Stochastic">
+  <circle class="ring" id="ring" cx="650" cy="650" r="392" transform="rotate(-90 650 650)"></circle>
+  <path class="walk" id="walk" d=""></path>
+  <g id="heads"></g>
+  <circle class="dot" id="dot" cx="437" cy="397" r="0"></circle>
+</svg>
+<div class="word" id="word">stochastic</div>
+<script>
+(() => {
+  const P = [[437,397],[550,588],[752,385],[345,637],[812,925],[812,628],[402,763],[515,898],[958,793],[622,632],[782,498],[896,566]];
+  const AT = [0.55, 0.62, 0.62, 0.55, 0.35, 0.47, 0.35, 0.55, 0.55, 0.55, 0.45];
+  const T = { ring: [0, 380], dot: [300, 460], walk: [420, 1500], word: 1450 };
+  const DOT_R = 27, RING_LEN = 2 * Math.PI * 392;
+  const NS = "http://www.w3.org/2000/svg";
+  const $ = (id) => document.getElementById(id);
+  const ring = $("ring"), walk = $("walk"), dot = $("dot"), heads = $("heads"), word = $("word");
+
+  walk.setAttribute("d", "M" + P.map((p) => p.join(" ")).join(" L"));
+  const segs = [];
+  let total = 0;
+  for (let i = 0; i < P.length - 1; i++) {
+    const [x1, y1] = P[i], [x2, y2] = P[i + 1];
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    const h = document.createElementNS(NS, "path");
+    h.setAttribute("class", "head");
+    h.setAttribute("d", "M12 0 L-12 -11 L-5 0 L-12 11 Z");
+    h.setAttribute("transform", `translate(${x1 + (x2 - x1) * AT[i]} ${y1 + (y2 - y1) * AT[i]}) rotate(${Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI})`);
+    heads.appendChild(h);
+    segs.push({ at: total + len * AT[i], h });
+    total += len;
+  }
+  ring.style.strokeDasharray = RING_LEN;
+  walk.style.strokeDasharray = total;
+
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const clamp = (t) => Math.max(0, Math.min(1, t));
+  const span = (ms, [a, b]) => clamp((ms - a) / (b - a));
+
+  function paint(ringT, dotScale, walkT) {
+    ring.style.strokeDashoffset = RING_LEN * (1 - ringT);
+    dot.setAttribute("r", String(DOT_R * dotScale));
+    const drawn = total * walkT;
+    walk.style.strokeDashoffset = total - drawn;
+    for (const s of segs) s.h.style.opacity = drawn >= s.at ? "1" : "0";
+  }
+  paint(0, 0, 0);
+
+  // After the draw, while the app is still loading: the start dot breathes, slowly. Nothing else moves.
+  function idle(t0) {
+    const frame = (now) => {
+      const s = Math.max(0, now - t0) / 2400;
+      dot.setAttribute("r", String(DOT_R * (1 + 0.12 * (0.5 - 0.5 * Math.cos(s * 2 * Math.PI)))));
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+
+  let played = false;
+  window.splashPlay = () => {
+    if (played) return;
+    played = true;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      paint(1, 1, 1);
+      word.style.transition = "none";
+      word.classList.add("on");
+      return;
+    }
+    const t0 = performance.now();
+    const frame = (now) => {
+      const ms = now - t0;
+      const d = span(ms, T.dot);
+      paint(ease(span(ms, T.ring)), d < 1 ? 1.25 * Math.sin(d * Math.PI / 2) - 0.25 * d : 1, ease(span(ms, T.walk)));
+      if (ms < T.walk[1]) requestAnimationFrame(frame);
+      else idle(now + 900);
+    };
+    requestAnimationFrame(frame);
+    setTimeout(() => word.classList.add("on"), T.word);
+  };
+  window.splashOut = () => document.body.classList.add("out");
+
+  if (!new URLSearchParams(location.search).has("wait")) window.splashPlay();
+})();
+</script>
+</body>
+</html>

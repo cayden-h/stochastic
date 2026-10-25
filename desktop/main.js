@@ -1,6 +1,7 @@
 // Electron main process for the Stochastic desktop app (design/review-companion.md section 11).
-// It starts the backend and the built console as child processes, waits for both to answer,
-// opens one window on the console, and stops both on quit.
+// It shows the launch splash (splash.html, design/brand.md), starts the backend and the built console as child
+// processes, waits for both to answer and for the console to load in a hidden window, then shows that window,
+// fades the splash out, and stops both children on quit.
 // STOCHASTIC_DEV=1 loads an already running `next dev` on port 3000 and starts nothing.
 // Packaged as Stochastic.app (`npm run package`), it still runs the backend and console from this repo,
 // whose path is written into the app's package.json at package time.
@@ -16,14 +17,22 @@ const ROOT = process.env.STOCHASTIC_ROOT
   || path.resolve(__dirname, "..");
 const BACKEND_DIR = path.join(ROOT, "backend");
 const FRONTEND_DIR = path.join(ROOT, "frontend");
-const BACKEND_PORT = 8000;
-const CONSOLE_PORT = 3000;
+// The ports can be moved (for a second copy next to a running one); the console must then be built with the
+// matching NEXT_PUBLIC_API_URL.
+const BACKEND_PORT = Number(process.env.STOCHASTIC_BACKEND_PORT) || 8000;
+const CONSOLE_PORT = Number(process.env.STOCHASTIC_CONSOLE_PORT) || 3000;
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || `http://localhost:${BACKEND_PORT}`;
 const CONSOLE_URL = `http://localhost:${CONSOLE_PORT}`;
 const READY_TIMEOUT_MS = 30_000;
 const STOP_TIMEOUT_MS = 5_000;
 const DEV = process.env.STOCHASTIC_DEV === "1";
 const BACKGROUND = "#F7F4EC";
+// The splash plays its whole draw (1.77 s) and holds the finished lockup until 2.1 s, the approved prototype's
+// handover, before it may close, so it never cuts mid-draw (design/brand.md).
+const SPLASH_MIN_MS = 2100;
+const SPLASH_FADE_MS = 200;
+// After the console page loads, wait for its first deal read (window.stochastic.appReady) up to this long.
+const APP_READY_CAP_MS = 8_000;
 
 app.setName("Stochastic");
 
@@ -59,6 +68,7 @@ function log(line) {
 
 const services = []; // { name, child, tail, exited }
 let mainWindow = null;
+let splashWindow = null;
 let quitting = false;
 
 // ---- child processes ----
@@ -167,7 +177,8 @@ async function startEverything() {
     await runToEnd("console build", next, ["build"], FRONTEND_DIR);
   }
 
-  const backend = startService("backend", uvicorn, ["app.main:app", "--port", String(BACKEND_PORT), "--timeout-graceful-shutdown", "2"], BACKEND_DIR);
+  const backend = startService("backend", uvicorn, ["app.main:app", "--port", String(BACKEND_PORT), "--timeout-graceful-shutdown", "2"], BACKEND_DIR,
+    process.env.CORS_ORIGINS ? {} : { CORS_ORIGINS: `http://localhost:${CONSOLE_PORT},http://127.0.0.1:${CONSOLE_PORT}` });
   const consoleApp = startService("console", next, ["start", "-p", String(CONSOLE_PORT)], FRONTEND_DIR, { NODE_ENV: "production" });
   await Promise.all([
     waitFor("backend", `http://127.0.0.1:${BACKEND_PORT}/health`, (r) => r.ok, backend),
@@ -177,6 +188,62 @@ async function startEverything() {
 
 // ---- windows ----
 
+// The launch splash: only the circle mark and the name, centered on the screen, on a transparent background.
+// Its ink follows the macOS appearance, because Electron maps nativeTheme to the page's prefers-color-scheme.
+// Resolves with the time the splash became visible, when its animation starts.
+function createSplash() {
+  splashWindow = new BrowserWindow({
+    title: "Stochastic",
+    width: 360,
+    height: 420,
+    center: true,
+    frame: false,
+    transparent: true,
+    backgroundColor: "#00000000",
+    hasShadow: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  const win = splashWindow;
+  win.on("closed", () => { if (splashWindow === win) splashWindow = null; });
+  const shown = new Promise((resolve) => {
+    win.once("ready-to-show", () => {
+      if (win.isDestroyed()) return resolve(Date.now());
+      win.show();
+      win.webContents.executeJavaScript("window.splashPlay()").catch(() => {});
+      resolve(Date.now());
+    });
+  });
+  win.loadFile(path.join(__dirname, "splash.html"), { query: { wait: "1" } });
+  // If the splash never paints, do not hold the app for it.
+  return Promise.race([shown, sleep(3000).then(() => Date.now() - SPLASH_MIN_MS)]);
+}
+
+async function closeSplash({ fade }) {
+  const win = splashWindow;
+  splashWindow = null;
+  if (!win || win.isDestroyed()) return;
+  if (fade) {
+    await win.webContents.executeJavaScript("window.splashOut()").catch(() => {});
+    await sleep(SPLASH_FADE_MS + 20);
+  }
+  if (!win.isDestroyed()) win.destroy();
+}
+
+let appReady = null; // resolves when the console reports its first deal read
+ipcMain.on("stochastic:app-ready", (event) => {
+  if (mainWindow && event.sender === mainWindow.webContents && appReady) appReady();
+});
+
+// Opens the console in a hidden window. Resolves once the page has loaded and painted and the console has
+// finished its first read of the deal (or APP_READY_CAP_MS after the load, for a console that does not report it).
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     title: "Stochastic",
@@ -195,8 +262,18 @@ function createMainWindow() {
       sandbox: true,
     },
   });
-  mainWindow.once("ready-to-show", () => mainWindow.show());
-  mainWindow.on("closed", () => { mainWindow = null; });
+  const win = mainWindow;
+  const reported = new Promise((resolve) => { appReady = resolve; });
+  const loaded = Promise.all([
+    new Promise((resolve) => win.once("ready-to-show", resolve)),
+    new Promise((resolve, reject) => {
+      win.webContents.once("did-finish-load", resolve);
+      win.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
+        if (isMainFrame && code !== -3) reject(new ServiceError("console", `the console page did not load (${description}, ${url})`));
+      });
+    }),
+  ]).then(() => Promise.race([reported, sleep(APP_READY_CAP_MS)]));
+  mainWindow.on("closed", () => { if (mainWindow === win) mainWindow = null; });
 
   // Links to other sites open in the browser; the window itself stays on the console.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -209,7 +286,8 @@ function createMainWindow() {
       if (/^https?:/.test(url)) shell.openExternal(url);
     }
   });
-  mainWindow.loadURL(CONSOLE_URL);
+  mainWindow.loadURL(CONSOLE_URL).catch(() => { /* did-fail-load reports it */ });
+  return loaded;
 }
 
 function escapeHtml(text) {
@@ -304,14 +382,24 @@ if (!app.requestSingleInstanceLock()) {
     const icon = path.join(__dirname, "assets", "icon.png");
     if (process.platform === "darwin" && fs.existsSync(icon)) app.dock.setIcon(icon);
     buildMenu();
+    const splashShown = createSplash();
     try {
       if (DEV) await waitFor("console", `http://127.0.0.1:${CONSOLE_PORT}/`, (r) => r.status < 500);
       else await startEverything();
-      if (!quitting) createMainWindow();
+      if (quitting) return;
+      await createMainWindow();
+      await sleep(Math.max(0, (await splashShown) + SPLASH_MIN_MS - Date.now()));
+      if (quitting || !mainWindow) return;
+      mainWindow.show();
+      await closeSplash({ fade: true });
     } catch (error) {
       log(error.message);
       await stopAll();
-      if (!quitting) showErrorWindow(error);
+      if (quitting) return;
+      // Open the error window before closing the others, so the app never has zero windows and quits.
+      showErrorWindow(error);
+      await closeSplash({ fade: false });
+      if (mainWindow) mainWindow.destroy();
     }
   });
 
