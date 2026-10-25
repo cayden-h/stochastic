@@ -63,6 +63,25 @@ export interface BriefDraft {
   removed: string[];
 }
 
+/** One Brief field the verifier checked against the agreement, or one amount against its source (D23). */
+export interface BriefCheck {
+  field: string; value: string; section: string; quote: string; ok: boolean; reason: string;
+  /** The checks run: verbatim, in_section, number, defined, source. */
+  checks: string[];
+}
+
+/** The verifier's report on the draft Brief (D23). */
+export interface BriefVerification {
+  item_id: string; sha256: string; checks: BriefCheck[]; passed: number; failed: number;
+  /** The amount fields the verifier filled from the deal's books. */
+  filled: string[];
+  /** What the Brief cannot hold, noted on the report and not tested. */
+  scope_notes: string[];
+  /** The flag ids left for the controller. */
+  escalated: string[];
+  auto_approved: boolean; at: string;
+}
+
 export interface SourceLine {
   id: string; company: string; line: string; section: "balance_sheet" | "income_statement" | "cash_flow";
   period: string; amount: number; unit: string; source_ref: string; is_total: boolean; note: string | null;
@@ -125,6 +144,8 @@ export interface Case {
   reason_chips?: Partial<Record<Edit["kind"], ReasonChip[]>>;
   /** The Brief Reader's draft while the controller reviews it (D20, Tri's T4). */
   brief_draft?: BriefDraft | null;
+  /** The verifier's report on the draft, once it ran (D23). */
+  brief_verification?: BriefVerification | null;
 }
 
 export type Section = SourceLine["section"];
