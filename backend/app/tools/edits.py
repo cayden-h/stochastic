@@ -24,6 +24,25 @@ The sign of a line is inferred from its name, not read from the filing; the fixt
 - An amount edit on an is_total line replaces that line only.
 A rolls_into field on the fixture lines would replace this rule later.
 
+The remap roll-up rule (a remap moves the subtotals the moved line feeds, so no total is left stale).
+A remap moves one target detail line out of the target's own statement and onto a platform line. Its amount v (USD
+thousands, after the amount edits) leaves every target subtotal it fed in the target's statement, and joins every
+platform subtotal the new platform line feeds in the platform's statement (statement_feeds, below). consolidate
+applies the difference to the target column of each platform subtotal row that a target subtotal landed on; a
+platform subtotal no target subtotal landed on has no target figure and does not move. For R&D moved from Operating
+expenses onto Cost of products sold: Gross profit -v, Operating profit -v + v = 0, and every later total 0.
+Which subtotals a line feeds (statement_feeds), in the order of that company's lines of that section:
+- Income statement: the carry rule above, with the line's own sign (a platform line's sign for the new place, the
+  target line's sign for the old one).
+- Balance sheet (and any other section): every amount counts +1 (the sign is in the amount). The "Total Assets" row
+  splits the section into two sides; a line feeds the top total of its side ("Total Assets", or the total
+  liabilities and equity line that tie_out reads). Under it, a line feeds the first total after it, and every later
+  total of its side that nests a total it feeds. A total S nests an earlier total U when U's name holds S's core
+  (S's name without "total", "net", a parenthesis, or ", at cost"): "Total Liabilities" nests "Total Current
+  Liabilities", "Total Property and Equipment (at Depreciated Cost)" nests "Total Property and Equipment, at Cost".
+  The nesting is inferred from the names, as line_sign is; the fixture figures are verified by the tests.
+So a remap across sides of the balance sheet moves both side totals, and the tie-out fails, as it should.
+
 Refusals (ValueError), so a total is never left stale and a figure is never guessed:
 - An amount edit that matches no line, or more than one line (give the section, or the line is ambiguous).
 - An amount edit on an income statement detail line when no later is_total line of that company is a net income
@@ -40,6 +59,7 @@ Owner: Tri (backend/app/tools/).
 """
 from __future__ import annotations
 
+import re
 from typing import Iterable
 
 from app.core.models import Edit, Mapping, SourceLine
@@ -101,6 +121,78 @@ def _thousands(line: SourceLine) -> float:
     return to_thousands(line.amount, line.unit)
 
 
+ASSETS_TOTALS = ("total assets",)
+LIABILITIES_AND_EQUITY_TOTALS = ("total liabilities and stockholders' equity",
+                                 "total liabilities and stockholders’ equity",
+                                 "total liabilities and shareholders' equity",
+                                 "total liabilities and shareholders’ equity",
+                                 "total liabilities and equity")
+
+
+def _is_side_total(line: SourceLine) -> bool:
+    return line.is_total and _norm(line.line) in ASSETS_TOTALS + LIABILITIES_AND_EQUITY_TOTALS
+
+
+def _core(name: str) -> str:
+    """A total's name without "total", "net", a parenthesis, or ", at cost": what the totals it nests are named for."""
+    n = re.sub(r"\([^)]*\)", "", _norm(name))
+    n = re.sub(r",\s*at cost$|,\s*net$", "", n.strip())
+    n = re.sub(r"^(total|net)\s+", "", n.strip())
+    return n.strip(" ,")
+
+
+def _nests(total: SourceLine, earlier: SourceLine) -> bool:
+    core = _core(total.line)
+    return bool(core) and core in _norm(earlier.line)
+
+
+def statement_feeds(lines: list[SourceLine], i: int) -> list[tuple[int, int]]:
+    """The subtotals that detail line i feeds, as (index, coefficient) in statement order.
+
+    `lines` are one company's lines of one section, in statement order. The coefficient is the line's sign in that
+    subtotal (+1 or -1). See the module docstring for the income statement and balance sheet rules."""
+    line = lines[i]
+    later = [j for j in range(i + 1, len(lines)) if lines[j].is_total]
+    if line.section == INCOME_STATEMENT:
+        out: list[tuple[int, int]] = []
+        if later and _norm(lines[later[0]].line).startswith("total"):
+            out.append((later[0], 1))
+        sign = line_sign(line.line)
+        return out + [(j, sign) for j in later if not _norm(lines[j].line).startswith("total")]
+    top = next((j for j in later if _is_side_total(lines[j])), None)
+    side = [j for j in later if top is None or j <= top]
+    fed: list[int] = []
+    for j in side:
+        if j == top or not fed or any(_nests(lines[j], lines[u]) for u in fed):
+            fed.append(j)
+    return [(j, 1) for j in fed]
+
+
+def remap_moves(target_lines: list[SourceLine], platform_lines: list[SourceLine], remapped: list[Mapping],
+                edits: Iterable[Edit] | None) -> list[dict]:
+    """For each remapped target detail line, the subtotals it leaves and the ones it joins (the remap roll-up rule).
+
+    `remapped` are the mappings apply_remap_edits changed. Returns, in edit order, one dict per moved line:
+    {edit_id, line (the target SourceLine), old: [(target total SourceLine, coefficient)],
+    new: [(platform total SourceLine, coefficient)]}. A remapped target total moves nothing else and is left out."""
+    by_id = {t.id: t for t in target_lines}
+    remaps = _of_kind(edits, "remap")
+    out = []
+    for m in remapped:
+        t = by_id.get(m.target_line_id)
+        if t is None or t.is_total or not m.platform_line:
+            continue
+        own = [x for x in target_lines if _norm(x.company) == _norm(t.company) and x.section == t.section]
+        old = [(own[j], c) for j, c in statement_feeds(own, next(k for k, x in enumerate(own) if x.id == t.id))]
+        p = next(p for p in platform_lines if _norm(p.line) == _norm(m.platform_line))
+        theirs = [x for x in platform_lines if _norm(x.company) == _norm(p.company) and x.section == p.section]
+        new = [(theirs[j], c) for j, c in statement_feeds(theirs, next(k for k, x in enumerate(theirs) if x.id == p.id))]
+        eid = next((getattr(e, "id", "?") for e in remaps if _line_matches(t, e)), "?")
+        out.append({"edit_id": eid, "line": t, "old": old, "new": new})
+    order = {getattr(e, "id", "?"): n for n, e in enumerate(remaps)}
+    return sorted(out, key=lambda x: order.get(x["edit_id"], len(order)))
+
+
 def carry_amount_edits(lines: list[SourceLine], edits: Iterable[Edit] | None
                        ) -> tuple[list[SourceLine], list[str], list[dict], list[str]]:
     """Copies of the lines with each active amount edit applied and carried by the income statement roll-up rule.
@@ -142,13 +234,10 @@ def carry_amount_edits(lines: list[SourceLine], edits: Iterable[Edit] | None
                                  f"no later total line of {line.company} is a net income line, so the edit could "
                                  f"not reach net income or EBITDA")
             delta = round(float(new_value) - _thousands(line), 6)
-            sign = line_sign(line.line)
             if not _has_sign_word(line.line):
                 notes.append(f"{line.line} ({line.company}) has no revenue or cost word in its name; "
                              f"the roll-up treated it as a cost")
-            if later and _norm(out[later[0]].line).startswith("total"):
-                carry.append((later[0], delta))
-            carry += [(j, sign * delta) for j in later if not _norm(out[j].line).startswith("total")]
+            carry = [(same[k], c * delta) for k, c in statement_feeds([out[j] for j in same], same.index(i))]
         out[i] = line.model_copy(update={"amount": float(new_value), "unit": THOUSANDS})
         for j, d in carry:
             out[j] = out[j].model_copy(update={"amount": round(_thousands(out[j]) + d, 6), "unit": THOUSANDS})
