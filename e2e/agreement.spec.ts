@@ -7,6 +7,7 @@ import { AGREEMENT } from "./support/env";
 import { expectCleanCase, handoff, reviewVerdict, runToHandoff, watchRunBody } from "./support/flows";
 
 test("a deal from the agreement text: Brief card, answer and correct, approve the Brief, map, review", async ({ page, backend, shot }, testInfo) => {
+  test.setTimeout(180_000);  // Begin runs at pace "factory", about 30 s of agent time
   const csv = writeDemoCsvs(testInfo.outputDir);
   await open(page, "/");
   await page.getByRole("button", { name: "Upload", exact: true }).click();
@@ -17,7 +18,7 @@ test("a deal from the agreement text: Brief card, answer and correct, approve th
   await expect(dialog.getByRole("button", { name: /kewaunee_ex101_excerpt\.txt Agreement text/ })).toBeVisible();
   await shot("upload");
   // Begin is the Factory demo: it creates the deal and runs it at pace "factory".
-  const run = await watchRunBody(page, backend.url);
+  const run = await watchRunBody(page);
   await dialog.getByRole("button", { name: "Begin", exact: true }).click();
   await expect(page).toHaveURL(/\/case$/);
   expect(run.body()).toEqual({ sync: false, pace: "factory" });

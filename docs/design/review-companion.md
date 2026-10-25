@@ -52,7 +52,7 @@ Changes per frame:
 - **V3-3 Case:** the Combined books table becomes editable for amounts (section 4). The **Your edits** section sits directly under the verdict, shown once there is at least one edit. After approval, the verdict shows **Download final files**. The table opens on the section with a change, so the edit stays in view.
 - **V3-4 Mapping:** the Platform line column becomes a dropdown, and that is where remaps happen. Add an **Edited** filter next to All, Unsure, and By policy.
 - **Sidebar:** "Always learning from" gains a third counter, **Edits**, next to Human answers and Policies. It goes up when an edit is saved with a reason.
-  The three counters count across every deal (`GET /health` `counts`), so the seeded cases' 4 reasoned edits show as Edits 4 before the demo and 5 after its edit.
+  The three counters count across every deal (`GET /health` `memory_counts`, the same as `GET /memory/counts`), so the seeded cases' 4 reasoned edits show as Edits 4 before the demo and 5 after its edit.
 - **V3-3 tiles:** the Review tile says "Re-checking your edit" for the second it takes after each edit.
 
 ### Header copy while editing

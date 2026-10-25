@@ -21,7 +21,7 @@ The design notes are in `docs/design/README.md`.
 
 ## Routes the console uses
 
-Reads: `GET /deals` (the Dashboard rows: `deal_id`, `platform`, `target`, `stage`, `verdict`, `updated_at`, `data_source`, `note`; the older Deal shape also reads), `GET /deals/{id}/case`, `GET /health` (the model card, and the cross-deal learning counters in `counts`), `GET /deals/{id}/audit`, `GET /deals/{id}/conversation` (the history, on load), and `GET /deals/{id}/runs` (the Review page reads the agents' own leverage run for its "was" figures), and `GET /deals/{id}/stream` for `stage`, `audit`, `edit`, `conversation`, `mapping`, and `notify` events.
+Reads: `GET /deals` (the Dashboard rows: `deal_id`, `platform`, `target`, `stage`, `verdict`, `updated_at`, `data_source`, `note`; the older Deal shape also reads), `GET /deals/{id}/case`, `GET /health` (the model card, and the cross-deal learning counters in `memory_counts`), `GET /deals/{id}/audit`, `GET /deals/{id}/conversation` (the history, on load), and `GET /deals/{id}/runs` (the Review page reads the agents' own leverage run for its "was" figures), and `GET /deals/{id}/stream` for `stage`, `audit`, `edit`, `conversation`, `mapping`, and `notify` events.
 Writes: `POST /deals` (the upload), `POST /deals/{id}/run` (always `{"sync": false}`: the console follows the run on the stream; Run the demo adds `"pace": "demo"`, the Upload modal's Begin adds `"pace": "factory"`), `POST /work-items/{id}/answer`, `POST /work-items/{id}/hold`, `POST /work-items/{id}/approve`, `POST /work-items/{id}/reject`, and `POST /dev/reset` for the second-run moment and Run the demo (`keep_memory=false`).
 Review edits (D19, Tri's T2): `POST /deals/{id}/edits`, `POST /edits/{id}/reason`, and `DELETE /edits/{id}`; `/case` carries `edits` and `adjustments`.
 The Brief Reader (D20, Tri's T4): `POST /deals` with `agreement_txt`, `POST /deals/{id}/brief/amounts` (`field`, `value`, `source_ref`), and `POST /deals/{id}/brief/approve`; `/case` carries `brief_draft`.
@@ -54,8 +54,8 @@ In Electron a question also fires a native macOS notification through `window.st
 - The sidebar's model card names which backend produced the agent output (scripted, anthropic, droid, or replay) and where the record lives (Tiger Cloud or memory). If the runner fell back, the card says from what.
 - A run on the replay backend that plays a recorded Claude Haiku run (a `last_runs` entry, or the case's backend info, with `backend: "replay"`, `recorded: true`, and a Haiku `model` such as `claude-haiku-5-5`) shows "Claude Haiku 5.5", with "recorded run" and the store under it.
   A scripted run always shows "Scripted rules", and no other run shows a model name it did not use (`recordedModelName` in `src/lib/format.ts`, with its test).
-- The sidebar's "Always learning from" counts human answers, policies, and reasoned edits across every deal, from `GET /health` `counts: {human_answers, policies, edits}`.
-  On a gateway without `counts` it counts the selected deal (`case.flags`, `case.policies`, `case.edits`).
+- The sidebar's "Always learning from" counts human answers, policies, and reasoned edits across every deal, from `GET /health` `memory_counts: {human_answers, policies, edits, by_deal}` (the same as `GET /memory/counts`).
+  On a gateway without `memory_counts` it counts the selected deal (`case.flags`, `case.policies`, `case.edits`).
 - Every agent character (chips, the Agents rows and timeline, the Log, the pipeline, toasts, the asking banner, the page titles, and the Review companion) is drawn by `Avatar` from `ROLES` in `src/components/ui.tsx`, the one source: `public/v3/agent-mapper.png` (the teal star), `agent-preparer.png`, `agent-reviewer.png`, and `agent-brief-reader.png`.
   The files are served as they are (`unoptimized`), not through `/_next/image`, whose URLs the browser and the Mac app cache for hours: that cache kept the old green Mapper on the small avatars after the art changed.
 - The flag card shows the question, the flagged lines with the filing's note, the evidence quotes, and the options with their computed effects. The default option is marked "Agent suggests".
@@ -78,7 +78,7 @@ In Electron a question also fires a native macOS notification through `window.st
   The stat cards count across every case; Policies learned is the store's own count.
 - Run the demo resets with memory cleared (`POST /dev/reset?keep_memory=false`, which reseeds only the demo deal and returns `kept_deals`), makes the deal it reseeded current, runs it with `"pace": "demo"`, and opens the Case.
   This is the Hyphenate demo.
-- The Upload modal's Begin is the Factory demo: after the files are chosen it creates the deal (`POST /deals`), runs it with `{"sync": false, "pace": "factory"}` (about 30 s of agent time, twice the demo), and opens its Case.
+- The Upload modal's Begin is the Factory demo: after the files are chosen it resets with memory cleared (`POST /dev/reset?keep_memory=false`, retried while a run finishes, so the uploaded deal's questions are asked), creates the deal (`POST /deals`), runs it with `{"sync": false, "pace": "factory"}` (about 30 s of agent time, twice the demo), and opens its Case.
   With no files chosen it runs the current case at the same pace. The Dashboard has no Begin.
 - A `notify` event (`{id, deal_id, at, kind, item_id, from, title, body}`) shows a toast at the top right of every page: the agent's character, the title, the question, Decide, and Later.
   One question shows at a time, with how many more wait.

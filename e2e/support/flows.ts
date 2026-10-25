@@ -74,26 +74,15 @@ export function booksToggle(page: Page, shown = false): Locator {
   return page.getByRole("button", { name: shown ? "Hide combined books" : "Show combined books" });
 }
 
-/**
- * Watches the Upload modal's run request and returns the body it sent, so a test can check Begin asks for pace
- * "factory". A gateway from before the Factory pace (its /openapi.json does not list "factory") would refuse it with a
- * 422, so on such a gateway the request goes on without the pace and runs at DEMO_PACE: the console's request is still
- * the one checked. The newer gateway gets the request unchanged.
- */
-export async function watchRunBody(page: Page, backendUrl: string): Promise<{ body: () => Record<string, unknown> | null; factoryKnown: boolean }> {
-  const spec = await (await fetch(`${backendUrl}/openapi.json`)).text();
-  const factoryKnown = spec.includes('"factory"');
+/** Watches the Upload modal's run request and returns the body it sent, so a test can check Begin asks for pace
+ * "factory". */
+export async function watchRunBody(page: Page): Promise<{ body: () => Record<string, unknown> | null }> {
   let sent: Record<string, unknown> | null = null;
   await page.route(/\/deals\/[^/]+\/run$/, async (route) => {
-    if (route.request().method() !== "POST") return route.fallback();
-    const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
-    sent ??= body;
-    if (factoryKnown || body.pace !== "factory") return route.fallback();
-    const { pace: _pace, ...rest } = body;
-    void _pace;
-    return route.fallback({ postData: JSON.stringify(rest) });
+    if (route.request().method() === "POST") sent ??= (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+    return route.fallback();
   });
-  return { body: () => sent, factoryKnown };
+  return { body: () => sent };
 }
 
 /** Answers the open flag with its Suggested option and waits until that flag has left the card. */
