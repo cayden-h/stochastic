@@ -22,12 +22,12 @@ function runOf(row: AuditRow, verb: string): string {
 
 export const LOG_COLS = { time: "w-[80px]", actor: "w-[130px]", verb: "w-[100px]", run: "w-[150px]" };
 
-export function AuditRowView({ row, items }: { row: AuditRow; items: WorkItem[] }) {
+export function AuditRowView({ row, items, fresh = false }: { row: AuditRow; items: WorkItem[]; fresh?: boolean }) {
   const denied = row.result === "DENIED";
   const verb = verbOf(row, items);
   const text = describe(row, items);
   return (
-    <div className={`flex w-full items-center gap-[12px] border-b border-line px-[20px] py-[12px] last:border-b-0 ${denied ? "bg-denied-tint" : ""}`}>
+    <div className={`flex w-full items-center gap-[12px] border-b border-line px-[20px] py-[12px] last:border-b-0 ${denied ? "bg-denied-tint" : ""} ${fresh ? "row-new" : ""}`}>
       <span className={`${LOG_COLS.time} shrink-0 font-mono text-[12px] text-code`}>{clock(row.at)}</span>
       {/* As in the frame: chips sit at the top of a 30 px slot; the bordered gateway chip sets its own height. */}
       <span className={`${LOG_COLS.actor} flex shrink-0 items-start ${row.actor.startsWith("system") ? "" : "h-[30px]"}`}><ActorChip actor={row.actor} /></span>
