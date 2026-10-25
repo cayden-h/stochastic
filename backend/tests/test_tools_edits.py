@@ -515,3 +515,41 @@ def test_statement_feeds_on_the_fixture_balance_sheets(inputs):
         "Total Property and Equipment, at Cost", "Total Property and Equipment (at Depreciated Cost)", "Total Assets"]
     assert feeds(t, "Nu Aire", "Reserve for Uncertain Tax Positions") == [
         "Total Long-Term Liabilities", "Total Liabilities", "Total Liabilities and Stockholders' Equity"]
+
+
+def test_a_remap_lands_on_the_platform_line_of_its_own_section_when_a_name_repeats():
+    """remap_moves and consolidate used the first platform line with the name in any section. With an "Other" in
+    two statements, a remap onto the income statement's "Other" must join the income statement's subtotals."""
+    def line(i, company, name, section, amount=0.0, total=False):
+        return SourceLine(id=i, deal_id="d", company=company, line=name, section=section, period="FY", amount=amount,
+                          unit="USD thousands", source_ref="x", is_total=total)
+    platform = [
+        line("p1", "P", "Cash", "balance_sheet", 10), line("p2", "P", "Other", "balance_sheet", 5),
+        line("p3", "P", "Total Assets", "balance_sheet", 15, True),
+        line("p4", "P", "Net sales", "income_statement", 100), line("p5", "P", "Other", "income_statement", 7),
+        line("p6", "P", "Gross profit", "income_statement", 107, True),
+    ]
+    target = [
+        line("t1", "T", "Revenue", "income_statement", 50), line("t2", "T", "Misc", "income_statement", 3),
+        line("t3", "T", "Gross profit", "income_statement", 53, True),
+    ]
+    from app.core.models import Mapping
+    maps = [Mapping(id="m1", deal_id="d", target_line_id="t1", platform_line_id="p4", target_line="Revenue",
+                    platform_line="Net sales", confidence=1, reason="same"),
+            Mapping(id="m2", deal_id="d", target_line_id="t2", platform_line_id="p4", target_line="Misc",
+                    platform_line="Net sales", confidence=1, reason="same"),
+            Mapping(id="m3", deal_id="d", target_line_id="t3", platform_line_id="p6", target_line="Gross profit",
+                    platform_line="Gross profit", confidence=1, reason="same")]
+    remap = edit("ed_o", kind="remap", company="T", line="Misc", section="income_statement",
+                 new_platform_line="Other")
+    moved, _ = edit_tools.apply_remap_edits(maps, target, platform, [remap])
+    assert next(m for m in moved if m.id == "m2").platform_line_id == "p5"  # the income statement's Other
+    [move] = edit_tools.remap_moves(target, platform, [m for m in moved if m.id == "m2"], [remap])
+    assert [t.id for t, _ in move["new"]] == ["p6"]  # Gross profit, not Total Assets
+    # By id first: a mapping that names the balance sheet's Other lands there, whatever the target's section.
+    by_id = next(m for m in moved if m.id == "m2").model_copy(update={"platform_line_id": "p2"})
+    [move] = edit_tools.remap_moves(target, platform, [by_id], [remap])
+    assert [t.id for t, _ in move["new"]] == ["p3"]
+    out = finance.consolidate(platform, target, maps, edits=[remap])
+    other = {(r["section"], r["line"]): r["target"] for r in out["rows"]}
+    assert other[("income_statement", "Other")] == 3 and other[("balance_sheet", "Other")] == 0

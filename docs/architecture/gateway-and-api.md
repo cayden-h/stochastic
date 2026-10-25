@@ -363,6 +363,10 @@ tie_out(rows, tolerance=0.5)  # unchanged: no edits
   For example, Nu Aire's Research and Development (532) moved from Operating expenses to Cost of products sold lowers the target's Gross profit from 23,682 to 23,150 and leaves Operating profit, EBITDA, and leverage unchanged.
   On the balance sheet, a line feeds the first total after it, the later totals that nest that total (by name), and its side's total, so a remap from an asset onto a liability fails the tie-out.
   `consolidate` lists each moved subtotal under `remap_rollup` as `{edit_id, line, section, delta}`.
+  `remap_rollup` is a key the v3 edits added to the `consolidate` output; it is an empty list when no remap moved a subtotal.
+  The replay recordings hold the agents' typed outputs only, and the Preparer and the Reviewer re-run their tools on replay, so the new key needed no re-pin (checked 2026-10-24 with a replay run to 0.76x).
+  The pinned Mapper recording's input key already differed from the fixture's on origin/main; it replays all the same, and re-pinning it needs a live model.
+  A remapped line lands on the platform line the mapping's `platform_line_id` names, else the line of that name in the target line's section, else the first of that name (`platform_line_for` in `backend/app/tools/edits.py`), so a platform name used in two statements is never confused.
 - Each of the three tools returns `edits_applied: list[str]`, the ids of the edits it used.
   The gateway refuses the recompute (a DENIED `edit:apply` or `edit:revert` row) if the key is missing, names an edit it was not given, repeats an id, or, for `consolidate`, leaves out any live edit.
 The old approval item becomes `SUPERSEDED` (a new `State`) and stays in the log.
