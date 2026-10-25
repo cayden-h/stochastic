@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { Companion } from "@/components/companion";
+import { MathPanel } from "@/components/math-panel";
 import { MAPPING_COLS, MappingSheet, mappingLayout } from "@/components/review-mapping";
 import { Shape } from "@/components/ui";
 import {
@@ -114,6 +115,7 @@ function ReviewScreen() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [runs, setRuns] = useState<ToolRun[]>([]);
+  const [math, setMath] = useState(false);
   const download = useDownloadFinal(kase?.deal ?? null);
 
   const edits = ctx.edits;
@@ -233,6 +235,11 @@ function ReviewScreen() {
         <div className="flex items-center gap-[8px]">
           {note ? <span role="alert" className="max-w-[360px] truncate text-[12px] font-semibold text-denied" title={note}>{note}</span> : null}
           {download.text ? <span role="status" className={`text-[12px] ${download.bad ? "text-escalation" : "text-sheet-muted"}`}>{download.text}</span> : null}
+          {result ? (
+            <button type="button" className={SECONDARY} onClick={() => setMath(true)} data-testid="check-math" title="How code made each figure, re-checked in your browser">
+              Check the math
+            </button>
+          ) : null}
           {result ? (
             <Chip tone="mint">
               <span className={result.tie_out_ok ? "" : "text-denied"}><Shape kind={result.tie_out_ok ? "check" : "cross"} size={10} /></span>
@@ -400,12 +407,15 @@ function ReviewScreen() {
           </span>
         ) : verdict ? (
           <span className="self-center truncate pr-[16px] pl-[12px] text-[12px] text-sheet-muted">
-            Covenant leverage {fmtX(verdict.leverage)} against {fmtX(verdict.limit)} &middot; every figure is a tool run &middot; USD thousands
+            Covenant leverage {fmtX(verdict.leverage)} against {fmtX(verdict.limit)} &middot;{" "}
+            <button type="button" onClick={() => setMath(true)} className="underline-offset-4 hover:text-forest hover:underline">every figure is a tool run</button>
+            {" "}&middot; USD thousands
           </span>
         ) : null}
       </footer>
 
       <Companion />
+      {math ? <MathPanel kase={kase} onClose={() => setMath(false)} /> : null}
     </>
   );
 }
