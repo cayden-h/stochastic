@@ -141,6 +141,9 @@ class Deal(BaseModel):
     # company's books, not a real deal), or "upload" (sent through POST /deals). `note` is one line for the Dashboard.
     data_source: Literal["filings", "sample", "upload"] = "upload"
     note: str = ""
+    # The fixture version a seeded Dashboard case was built from (cases.SEED_VERSION); None for every other deal. A
+    # seeded case whose version differs from the code's is rebuilt at startup (cases.seed_cases).
+    seed_version: str | None = None
 
 
 class SourceLine(BaseModel):

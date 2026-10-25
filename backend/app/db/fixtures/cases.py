@@ -15,13 +15,15 @@ reference mapping (`DealPlan`), the Preparer and the Reviewer call the tools thr
 steps go through the same gateway calls the console makes. So every figure is a tool run and every case has its
 mappings, conversation, audit log, and review.
 
-`seed_cases` is idempotent: a case whose deal id is already in the store (a Postgres ledger that loaded it) is left as
-it is. The app runs it in a background thread after startup (`DEMO_CASES`, on by default; off under pytest unless a
+`seed_cases` is idempotent: a case already in the store (a Postgres ledger that loaded it) and built from this code's
+fixtures (its `Deal.seed_version` is `SEED_VERSION`) is left as it is. A case built from other fixtures is rebuilt:
+its record and the memory learned on it are removed in a new ledger, as a demo reset does, and it is seeded again. The app runs it in a background thread after startup (`DEMO_CASES`, on by default; off under pytest unless a
 test calls it). No case teaches a policy that covers Kewaunee or Nu Aire, so the live demo deal still asks its two
 questions on a fresh run (checked by `assert_demo_deal_untouched` and the tests).
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import sys
 from pathlib import Path
@@ -295,6 +297,16 @@ def scenario_sample(gw: Gateway) -> None:
     _stage(gw, SAMPLE_ID, "posted")
 
 
+# The version stored on each seeded deal. It hashes the fixture modules, this module, and the sample's QuickBooks files,
+# so a change to a case's lines or its seeded actions rebuilds the case on the next start. Bump SEED_REVISION for a
+# change elsewhere (a gateway or tool change) that should rebuild them too.
+SEED_REVISION = 1
+_SEED_SOURCES = (*(Path(m.__file__) for m in FILED), Path(__file__), QBO / "trial_balance.xlsx",
+                 QBO / "account_list.xlsx")
+SEED_VERSION = f"{SEED_REVISION}-" + hashlib.sha256(
+    b"".join(p.read_bytes() for p in _SEED_SOURCES if p.exists())).hexdigest()[:12]
+REBUILD_REASON = "seeded cases rebuilt: their fixtures changed"
+
 # The order matters: the sample reads the posted DLH case.
 CASES = [(dlh_grsi.DEAL_ID, lambda gw: (create_filed_case(gw, dlh_grsi), scenario_dlh(gw))),
          (mamas_crown.DEAL_ID, lambda gw: (create_filed_case(gw, mamas_crown), scenario_mamas(gw))),
@@ -303,10 +315,44 @@ CASES = [(dlh_grsi.DEAL_ID, lambda gw: (create_filed_case(gw, dlh_grsi), scenari
 CASE_IDS = tuple(i for i, _ in CASES)
 
 
-def seed_cases(gw: Gateway) -> list[str]:
-    """Seed every case not in the store yet, in order. Each runs as a job for its deal (`gw.running`), so a Run
-    click on it meanwhile gets 409 and a reset of the demo deal is not held up. A case that fails is logged and
-    left at the stage it reached; the others still run. Returns the ids seeded now."""
+def remove_stale_cases(gw: Gateway, version: str | None = None) -> list[str]:
+    """Remove each seeded case whose `seed_version` is not `version` (default SEED_VERSION), so `seed_cases` builds
+    it again. The sample goes with a stale DLH case, because its platform lines are that case's posted books.
+
+    The removal is the demo reset's: the store starts a new ledger (on Postgres; the old ledger and its audit rows stay,
+    since the audit log refuses deletes) that carries every other deal, the demo deal and uploads included, with their
+    audit rows chained again. The policies, adjustments, and approved Briefs learned on a removed case go too. Nothing
+    is removed while one of the cases runs. Returns the ids removed."""
+    version = version or SEED_VERSION
+    store = gw.store
+    stale = {d for d in CASE_IDS if d in store.deals and store.deals[d].seed_version != version}
+    if dlh_grsi.DEAL_ID in stale and SAMPLE_ID in store.deals:
+        stale.add(SAMPLE_ID)
+    if not stale:
+        return []
+    with gw.running_lock:
+        if stale & gw.running:
+            log.warning("stale seeded cases not rebuilt, a run is in flight: %s", ", ".join(sorted(stale & gw.running)))
+            return []
+        with gw.lock:
+            keep = {d for d in store.deals if d not in stale}
+            store.reset_deals(keep_memory=True, keep_deals=keep, rechain=gw.rechain, reason=REBUILD_REASON)
+            for memory in (store.policies, store.adjustments, store.approved_briefs):
+                for k in [k for k, v in memory.items() if v.deal_id in stale]:
+                    del memory[k]
+            store.commit()
+    removed = [d for d in CASE_IDS if d in stale]
+    log.info("seeded cases built from other fixtures, rebuilding: %s", ", ".join(removed))
+    return removed
+
+
+def seed_cases(gw: Gateway, version: str | None = None) -> list[str]:
+    """Seed every case not in the store yet, in order, after removing the cases built from other fixtures
+    (`remove_stale_cases`). Each runs as a job for its deal (`gw.running`), so a Run click on it meanwhile gets 409
+    and a reset of the demo deal is not held up. A case that fails is logged and left at the stage it reached, without
+    a seed version, so the next start rebuilds it; the others still run. Returns the ids seeded now."""
+    version = version or SEED_VERSION
+    remove_stale_cases(gw, version)
     done = []
     for deal_id, build in CASES:
         if deal_id in gw.store.deals:
@@ -318,6 +364,9 @@ def seed_cases(gw: Gateway) -> list[str]:
         try:
             build(gw)
             if deal_id in gw.store.deals:
+                with gw.lock:
+                    gw.store.deals[deal_id].seed_version = version
+                    gw.store.commit()
                 done.append(deal_id)
         except Exception:  # noqa: BLE001 - one case must not stop the others or the app
             log.exception("seeding case %s failed", deal_id)
@@ -341,4 +390,4 @@ def assert_demo_deal_untouched(gw: Gateway) -> None:
             raise RuntimeError(f"adjustment {a.id} from seeded case {a.deal_id} covers the demo deal")
 
 
-__all__ = ["CASES", "CASE_IDS", "DEAL_PLANS", "SAMPLE_ID", "seed_cases"]
+__all__ = ["CASES", "CASE_IDS", "DEAL_PLANS", "SAMPLE_ID", "SEED_VERSION", "remove_stale_cases", "seed_cases"]

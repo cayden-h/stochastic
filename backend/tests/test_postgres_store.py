@@ -301,6 +301,37 @@ def test_the_seeded_cases_survive_a_restart_and_a_reset_of_the_demo_deal(schema)
     third.close()
 
 
+def test_cases_seeded_from_other_fixtures_are_rebuilt_in_a_new_ledger_after_a_restart(schema):
+    """Seeded at version A, restarted at version B: the cases are rebuilt in ledger 2 (the old ledger keeps its audit
+    rows, which the database refuses to delete), the demo deal is carried over, and the chain is valid. A restart at
+    the same version rebuilds nothing."""
+    from app.db.fixtures import cases
+    store = open_store(schema)
+    gw = Gateway(store)
+    seed(store, gw)
+    assert cases.seed_cases(gw, version="A") == list(cases.CASE_IDS)
+    assert store.flush()
+    old_rows = len(store.audit)
+    store.close()
+
+    again = open_store(schema)
+    gw2 = Gateway(again)
+    assert cases.seed_cases(gw2, version="B") == list(cases.CASE_IDS)
+    assert again.ledger == 2 and gw2.verify_chain() and again.deals[DEAL_ID].stage == "new"
+    assert len([e for e in again.edits.values() if e.status == "reasoned"]) == 4
+    assert again.flush() and again.status()["last_error"] is None
+    before = snapshot(again)
+    again.close()
+
+    third = open_store(schema)
+    assert snapshot(third) == before and third.ledger == 2 and Gateway(third).verify_chain()
+    assert cases.seed_cases(Gateway(third), version="B") == []
+    with psycopg.connect(URL, options=f"-c search_path={schema},public") as conn:
+        assert conn.execute("SELECT count(*) FROM audit_log WHERE ledger = 1").fetchone()[0] == old_rows
+        assert conn.execute("SELECT reason FROM ledger WHERE id = 2").fetchone()[0] == cases.REBUILD_REASON
+    third.close()
+
+
 def test_a_fresh_reset_retires_a_covering_policy_and_the_retirement_survives_a_restart(schema):
     """`/dev/reset?keep_memory=false` retires a policy learned on another deal that covers the demo deal's companies
     (found on the demo laptop, 2026-10-24); the retirement and its audit row are in Postgres after a restart."""
