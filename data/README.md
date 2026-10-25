@@ -8,6 +8,21 @@ Rules:
 - Send a real contact email in the SEC User-Agent. Do not exceed 10 requests per second.
 - The SEC redistribution wording is unresolved, so do not publish the cached files.
 
+## The Dashboard's seeded cases
+
+The four cases besides the live demo deal are built from cached filings the same way as the Kewaunee fixture (`backend/app/db/fixtures/cases.py`).
+Only the extracted line values, the Brief, and the source references are committed, in each fixture module; each module's header lists the EDGAR URL of every filing it read.
+
+| Fixture | Deal | Raw cache (local only) |
+| --- | --- | --- |
+| `backend/app/db/fixtures/dlh_grsi.py` | DLH Holdings acquires GRSi, 2022-12-08 | `data/raw/dlh_grsi/` |
+| `backend/app/db/fixtures/mamas_crown.py` | Mama's Creations acquires Crown I, 2025-09-02 | `data/raw/mamas_crown/` |
+| `backend/app/db/fixtures/sstk_envato.py` | Shutterstock acquires Envato, 2024-07-22 | `data/raw/sstk_envato/` |
+| `backend/app/db/fixtures/cases.py` (`d_dlh_craigs`) | Sample: DLH's next add-on, the QuickBooks Online sample company | `scripts/samples/qbo/` (committed) |
+
+Values the filings do not give are marked inferred in the fixtures, and each fixture's `test_period_note` says what the Brief schema could not hold (step-downs, cash netting, a second covenant).
+The raw files were fetched with the `SEC_USER_AGENT` from `.env` on 2026-10-24 and stay out of git.
+
 ## CSV columns for POST /deals
 
 The API parses uploads with `backend/app/db/loader.py`. The export from `scripts/load_lines.py export` is in this format, with two extra columns (`company`, `note`) that the API ignores; `scripts/load_lines.py` is for exporting the fixture, checking the round-trip, and reading accounting-system exports, not for the API.

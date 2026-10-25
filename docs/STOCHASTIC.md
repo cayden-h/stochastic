@@ -25,6 +25,7 @@ Build status on 2026-10-24, 02:30: the backend runs the whole deal end to end on
 The Droid backend ran the whole deal live with Claude Sonnet 5.5 at 03:30 (recorded in `backend/recordings/`). The Anthropic backend ran later on Eric's key (one full recorded run, about 50 Mapper trials); the demo laptop has no key, so it is not in the stage fallback chain. [verified: `evals/README.md`]
 Status on 2026-10-24 evening: 167 tests pass offline and 176 with Tiger. The whole-line reading is computed as filed (2.84x), and the gateway guards against model-made exclusions, borrowed run ids, and unbacked review passes (D18). [verified: `backend/tests/test_gateway_guards.py`]
 The console still implements the earlier workflow. Josie is rebuilding it against `GET /deals/{id}/case`.
+Status on 2026-10-24 night: a 15-second demo pace (`"pace": "demo"` on Run: 6.25 s to the questions, 6.64 s from the answer to the approval, measured), a `notify` event for each question, a learn message with the policy id after each answer, and four more Dashboard cases seeded through the real pipeline: three real deals from their filings (DLH and GRSi, Mama's Creations and Crown I, Shutterstock and Envato) and one QuickBooks sample. [verified: `backend/tests/test_demo_pace.py`, `backend/tests/test_demo_cases.py`; details in `architecture/gateway-and-api.md` and `demo-script.md`]
 
 ## 2. The pitch rules
 
@@ -199,6 +200,7 @@ Whether we may redistribute cached filings is unresolved, so the cached files st
 The proof deal is Kewaunee Scientific buying Nu Aire, closed 2024-11-01, for $55M. [verified: `research/real-deal-candidates.md`]
 Kewaunee is the platform (fiscal year ends April 30). Nu Aire is the target (fiscal year ends September 30).
 Backups, in the agent's ranking: DLH and GRSi, Mama's Creations and Crown I, Shutterstock and Envato.
+All three are now seeded Dashboard cases built from their filings (`backend/app/db/fixtures/`), with a fourth sample case; `/dev/reset` resets only the Kewaunee deal.
 
 What the filings give us, and what is loaded in `backend/app/db/fixtures/kewaunee.py` [verified: read from EDGAR on 2026-10-24]:
 - Kewaunee's balance sheet at 2024-10-31 (10-Q), 38 lines, and its fiscal 2024 income statement (Ex 99.2 historical column) and depreciation of $3,125K (10-K cash flow).

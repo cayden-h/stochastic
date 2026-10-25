@@ -31,7 +31,7 @@ def stop_mid_mapping(monkeypatch, after: int = 10):
     """Stop the process after `after` mappings are stored, the way a restart cuts a paced Mapper off."""
     seen = {"n": 0}
 
-    def pause(step, backend=None):
+    def pause(step, backend=None, **kw):
         if step == "mapping":
             seen["n"] += 1
             if seen["n"] >= after:
@@ -72,6 +72,14 @@ def test_a_deal_left_mid_run_is_run_failed_after_a_reload_and_runs_again(monkeyp
     assert log[-1] == "waiting on a flag"
     assert restarted.store.deals[DEAL_ID].stage == "awaiting_flag"
     assert len(restarted.open_flags(DEAL_ID)) == 2
+    # The cut-off run's mappings were replaced, not added to: each target line is mapped once, so the books combine.
+    targets = [m.target_line_id for m in store.deal_mappings(DEAL_ID)]
+    assert len(targets) == len(set(targets)) == len(store.lines(DEAL_ID, store.deals[DEAL_ID].target))
+    assert any(r.action == "mapping:discard" for r in store.audit)
+    for flag in restarted.open_flags(DEAL_ID):
+        restarted.answer("human:controller", flag.id, flag.default)
+    advance(restarted, DEAL_ID, backend="scripted")
+    assert store.deals[DEAL_ID].stage == "awaiting_approval" and restarted.verify_chain()
 
 
 def test_a_deal_with_a_job_running_is_left_alone():

@@ -137,6 +137,10 @@ class Deal(BaseModel):
     # "covenant" (the agreement's EBITDA) unless the controller chose the as-filed whole-line reading on a flag.
     ebitda_basis: Literal["covenant", "as_filed"] = "covenant"
     situation: str = "PE add-on integration"
+    # Where the lines come from: "filings" (a real deal, every figure from a public filing), "sample" (a sample
+    # company's books, not a real deal), or "upload" (sent through POST /deals). `note` is one line for the Dashboard.
+    data_source: Literal["filings", "sample", "upload"] = "upload"
+    note: str = ""
 
 
 class SourceLine(BaseModel):
@@ -477,6 +481,7 @@ class ConversationMessage(BaseModel):
     item_id: str | None = None
     run_id: str | None = None
     line_id: str | None = None
+    policy_id: str | None = None  # the policy a message is about (what an answer taught); null otherwise
 
 
 # ---------------------------------------------------------------------------
