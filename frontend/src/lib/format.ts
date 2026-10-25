@@ -187,3 +187,14 @@ export function describe(row: AuditRow, items: WorkItem[]): string {
   if (verb === "reverse") return `Reversed. ${row.reason ?? ""}`.trim();
   return row.reason ?? row.action;
 }
+
+/** The model card's name for a recorded Claude run on the replay backend: "claude-haiku-5-5" reads "Claude Haiku 5.5".
+ * Null for anything else, so a scripted run, a live run, or a replay that is not a recorded Haiku run never shows a
+ * model name it did not use. */
+export function recordedModelName(run: { backend?: string | null; model?: string | null; recorded?: boolean | null } | null | undefined): string | null {
+  if (!run || run.backend !== "replay" || run.recorded !== true || !run.model) return null;
+  const m = /haiku(?:[-_ .]?(\d+)(?:[-_.](\d+))?)?/i.exec(run.model);
+  if (!m) return null;
+  const version = m[1] ? ` ${m[1]}${m[2] ? `.${m[2]}` : ""}` : "";
+  return `Claude Haiku${version}`;
+}

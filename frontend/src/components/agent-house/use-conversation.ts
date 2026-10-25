@@ -104,7 +104,14 @@ export function useConversationPlayer(opts: {
   useEffect(() => {
     if (!loaded || !dealId) return;
     const r = run.current;
-    if (r.deal === dealId) { void pump(); return; }
+    if (r.deal === dealId) {
+      void pump();
+      // The first pass's timer below can be cleared before it fires (the events change again at once, or a dev
+      // double mount), which left the record already played but never shown: an empty feed and timeline after a
+      // finished run. Show whatever is played but not yet on screen.
+      const t = setTimeout(() => setShown((s) => (s.size === r.played.size ? s : new Set(r.played))), 0);
+      return () => clearTimeout(t);
+    }
     r.deal = dealId; r.gen++; r.applied.clear();
     r.played = new Set(latest.current.events.map((e) => e.id));
     const t = setTimeout(() => {

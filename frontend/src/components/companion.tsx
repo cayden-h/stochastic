@@ -10,7 +10,7 @@
  * The look follows the V3-7 Review frames (Figma 670:44) and Josie's Reason popover (545:408).
  */
 
-import Image from "next/image";
+import { Avatar } from "./ui";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useEdits, type LeverageMove, type PendingConfirm } from "@/lib/edit-context";
 import { editAnchor, findAnchor, num, oldestUnreasoned } from "@/lib/edits";
@@ -450,7 +450,7 @@ export function Companion() {
       >
         {anchor ? <span className="companion-pulse absolute inset-0 rounded-full border border-reviewer/22 bg-reviewer-tint/95" aria-hidden="true" /> : null}
         <span className="absolute top-[7px] left-[7px] size-[26px] opacity-[var(--mark-opacity,0.7)] drop-shadow-[0_1px_3px_rgba(64,38,102,0.22)]" aria-hidden="true">
-          <Image src="/agents/reviewer-avatar.png" alt="" width={26} height={26} className="size-full object-contain" priority />
+          <Avatar role="reviewer" size={26} className="size-full" />
         </span>
         {waiting && waitingEdit ? (
           <button

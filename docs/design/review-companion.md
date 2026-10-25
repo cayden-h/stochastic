@@ -8,9 +8,11 @@ The base screens are Hi-fi v3 in Figma (`design/README.md` has the frame links).
 Update, 2026-10-24 night: editing moved to its own page.
 The Review page (`/review`, Figma section "Review flow (D19)", frames V3-7.1 to V3-7.8) holds every edit, the reason bubble, Your edits, Approve and Reject, and Download final files.
 It is a full-window workbook with no sidebar: a title bar, a ribbon (Review, Combined, Mapping, Log), a formula bar, the sheet (A line, B platform, C target, D combined, E change), the verdict and Your edits strips, and the sheet tabs (Combined, Edits, Audit).
-The Case (V3-3) is read-only: flags, verdict, read-only combined books, conversation, and pipeline; after the Reviewer's hand-off, "Review the books" is its primary action, and the header's Approve is a link, "Review and approve".
+The Case (V3-3) is read-only: the flags, the pipeline, the verdict's four figure tiles, and the read-only combined books, hidden until Show combined books.
+It has no conversation and no verdict sentence, and Download final files is on the Review page only.
+After the Reviewer's hand-off, "Review the books" is its primary action, and the header's Approve is a link, "Review and approve".
 Mapping (V3-4) is read-only too; a remap is made from the line cell's menu on Review (V3-7.7a and 7.7b).
-The companion is the Reviewer (`frontend/public/agents/reviewer-avatar.png`, 26 px) and lives on the Review page only.
+The companion is the Reviewer (`frontend/public/v3/agent-reviewer.png`, drawn by `Avatar` in `frontend/src/components/ui.tsx`, 26 px) and lives on the Review page only.
 Where the sections below say V3-3, V3-4, or the agent-blue dot, the Review page and the Reviewer now stand in their place.
 
 Update, 2026-10-25: the Review page keeps the sidebar, like every other page, and Review is last in it.
@@ -50,6 +52,7 @@ Changes per frame:
 - **V3-3 Case:** the Combined books table becomes editable for amounts (section 4). The **Your edits** section sits directly under the verdict, shown once there is at least one edit. After approval, the verdict shows **Download final files**. The table opens on the section with a change, so the edit stays in view.
 - **V3-4 Mapping:** the Platform line column becomes a dropdown, and that is where remaps happen. Add an **Edited** filter next to All, Unsure, and By policy.
 - **Sidebar:** "Always learning from" gains a third counter, **Edits**, next to Human answers and Policies. It goes up when an edit is saved with a reason.
+  The three counters count across every deal (`GET /health` `memory_counts`, the same as `GET /memory/counts`), so the seeded cases' 4 reasoned edits show as Edits 4 before the demo and 5 after its edit.
 - **V3-3 tiles:** the Review tile says "Re-checking your edit" for the second it takes after each edit.
 
 ### Header copy while editing

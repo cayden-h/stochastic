@@ -7,7 +7,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import type { Backend } from "./support/backend";
 import { expect, open, readCase, test } from "./support/fixtures";
-import { NUAIRE_GA, bubble, editAmount, flagOptions, handoff, nav, reviewVerdict } from "./support/flows";
+import { NUAIRE_GA, bubble, editAmount, expectCleanCase, flagOptions, handoff, nav, reviewVerdict } from "./support/flows";
 
 interface DealRow { deal_id: string; platform: string; target: string; stage: string; data_source?: string; note?: string; updated_at?: string }
 
@@ -126,6 +126,13 @@ test("run the demo: the notification, Decide, Learned, Ready, then Review and Ma
   expect(toQuestion).toBeLessThan(12);
   await expect(toast.getByRole("button", { name: "Decide" })).toBeVisible();
   await expect(page.locator("[data-badge]")).toBeVisible();
+  // The demo replays the recorded Claude Haiku 5.5 run, and the model card says so.
+  const model = page.getByRole("complementary").locator("[title]").filter({ hasText: "Claude Haiku 5.5" });
+  await expect(model).toContainText("recorded run");
+  // The learning counters count across every deal: the seeded cases hold 4 reasoned edits.
+  const counts = await (await fetch(`${backend.url}/memory/counts`)).json();
+  expect(counts.edits).toBe(4);
+  await expect(page.locator('[data-counter="Edits"]')).toContainText("4");
   await shot("notification");
   const item = await toast.getAttribute("data-notice");
   await toast.getByRole("button", { name: "Decide" }).click();
@@ -151,6 +158,8 @@ test("run the demo: the notification, Decide, Learned, Ready, then Review and Ma
   await expect(handoff(page)).toBeVisible({ timeout: 30_000 });
   expect((Date.now() - answered) / 1000).toBeLessThan(12);
   await shot("ready");
+  // The Case is clean: the pipeline and the figure tiles, no conversation or verdict sentence, the books hidden.
+  await expectCleanCase(page);
 
   // Review: the sidebar stays, two tabs, and Back to case works.
   await page.getByRole("link", { name: "Review the books" }).click();
@@ -170,6 +179,8 @@ test("run the demo: the notification, Decide, Learned, Ready, then Review and Ma
   await page.keyboard.press("1");
   await page.keyboard.press("Enter");
   await expect(bubble(page)).toHaveCount(0);
+  // The demo's reasoned edit is the fifth across every deal.
+  await expect(page.locator('[data-counter="Edits"]')).toContainText("5");
 
   // A remap on the Mapping tab: the Reviewer asks again.
   await page.getByRole("tablist", { name: "Review tabs" }).getByRole("tab", { name: "Mapping" }).click();
