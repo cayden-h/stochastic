@@ -11,7 +11,8 @@ import math
 from collections import OrderedDict
 
 from app.core.models import Brief, Mapping, SourceLine
-from app.tools.edits import active, apply_remap_edits, carry_amount_edits
+from app.tools.edits import (LIABILITIES_AND_EQUITY_TOTALS, active, apply_remap_edits, carry_amount_edits,
+                             remap_moves)
 
 THOUSANDS = "USD thousands"
 
@@ -52,7 +53,9 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
     A target subtotal (is_total) is added only onto a platform subtotal, never onto a detail line, so nothing
     is counted twice. Unmapped target detail lines are reported, never silently dropped.
     The deal's active edits are applied first: amount edits to both companies' lines, remap edits to the mappings.
-    A remapped target line lands on the platform line's own section when the platform has a line of that name.
+    A remapped target line lands on the platform line's own section when the platform has a line of that name, and
+    the target subtotals it fed move with it (the remap roll-up rule in app/tools/edits.py): each moved figure is
+    listed under remap_rollup as {edit_id, line, section, delta}, where line is the platform subtotal row.
     Returns rows in platform order, each with platform, target, combined (USD thousands), and edits_applied.
     """
     platform_lines, target_lines, amount_ids, carried = _with_amount_edits(platform_lines, target_lines, edits)
@@ -81,6 +84,7 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
     unmapped: list[dict] = []
     skipped_totals: list[str] = []
     used: set[str] = set()
+    landed: dict[str, str] = {}  # target subtotal id -> the platform subtotal row it was added to
     for m in mappings:
         if m.flagged and not m.approved_by:
             raise ValueError(f"mapping {m.id} is flagged and not approved")
@@ -106,9 +110,13 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
             continue
         row["target"] += tv
         row["target_lines"].append(t.line)
+        if t.is_total:
+            landed[t.id] = k
     for t in target_lines:
         if t.id not in used and not t.is_total:
             unmapped.append({"line": t.line, "amount": round(to_thousands(t.amount, t.unit), 3)})
+    remap_rollup = _carry_remaps(platform_rows, landed, target_lines, platform_lines,
+                                 [m for m in mappings if m.target_line_id in remapped], edits)
     rows = []
     for r in platform_rows.values():
         r["platform"] = round(r["platform"], 3)
@@ -116,7 +124,37 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
         r["combined"] = round(r["platform"] + r["target"], 3)
         rows.append(r)
     return {"rows": rows, "unmapped_target_lines": unmapped, "skipped_target_totals": skipped_totals,
-            "unit": THOUSANDS, "edits_applied": _in_edit_order(edits, set(amount_ids) | set(remap_ids)), **carried}
+            "unit": THOUSANDS, "edits_applied": _in_edit_order(edits, set(amount_ids) | set(remap_ids)), **carried,
+            "remap_rollup": remap_rollup}
+
+
+def _carry_remaps(platform_rows: "OrderedDict[str, dict]", landed: dict[str, str], target_lines: list[SourceLine],
+                  platform_lines: list[SourceLine], remapped: list[Mapping], edits) -> list[dict]:
+    """Move the target column of the platform subtotal rows by the remap roll-up rule (app/tools/edits.py).
+
+    A moved line leaves each target subtotal it fed, on the row that subtotal landed on, and joins each platform
+    subtotal its new platform line feeds, on rows a target subtotal landed on. The rows are changed in place.
+    Returns {edit_id, line, section, delta} per moved row, in edit order then row order, without zero moves."""
+    fed = set(landed.values())
+    order = {k: n for n, k in enumerate(platform_rows)}
+    out: list[dict] = []
+    for move in remap_moves(target_lines, platform_lines, remapped, edits):
+        v = to_thousands(move["line"].amount, move["line"].unit)
+        deltas: dict[str, float] = {}
+        for total, coef in move["old"]:
+            if total.id in landed:
+                deltas[landed[total.id]] = deltas.get(landed[total.id], 0.0) - coef * v
+        for total, coef in move["new"]:
+            k = _key(total.section, total.line)
+            if k in fed:
+                deltas[k] = deltas.get(k, 0.0) + coef * v
+        for k in sorted(deltas, key=order.__getitem__):
+            if round(deltas[k], 3) == 0:
+                continue
+            platform_rows[k]["target"] += deltas[k]
+            out.append({"edit_id": move["edit_id"], "line": platform_rows[k]["line"],
+                        "section": platform_rows[k]["section"], "delta": round(deltas[k], 3)})
+    return out
 
 
 def _find(rows: list[dict], section: str, names: tuple[str, ...]) -> dict | None:
@@ -132,11 +170,7 @@ def tie_out(rows: list[dict], tolerance: float = 0.5, edits=None) -> dict:
     The rows already carry any edits (consolidate applied them); edits_applied lists the active edit ids passed."""
     bad_rows = [r["line"] for r in rows if abs((r["platform"] + r["target"]) - r["combined"]) > tolerance]
     assets = _find(rows, "balance_sheet", ("total assets",))
-    liab_eq = _find(rows, "balance_sheet", ("total liabilities and stockholders' equity",
-                                             "total liabilities and stockholders’ equity",
-                                             "total liabilities and shareholders' equity",
-                                             "total liabilities and shareholders’ equity",
-                                             "total liabilities and equity"))
+    liab_eq = _find(rows, "balance_sheet", LIABILITIES_AND_EQUITY_TOTALS)
     balance_ok = None
     balance = None
     missing = []
@@ -345,8 +379,10 @@ EDIT_RULE = ("An amount edit on an income statement detail line carries into the
              "recomputed. An income statement detail edit with no later net income total line is refused. Every "
              "line the carry moved is listed in rollup. An edit on a total line replaces that line only. An amount "
              "edit on a balance sheet detail line is refused: its roll-up is not defined, so code cannot recompute "
-             "the totals. An edit that matches no line or several lines, or a remap onto a platform total or a line "
-             "the platform does not have, is refused.")
+             "the totals. A remap moves the target subtotals the line fed in the target's statement to the ones "
+             "its new platform line feeds in the platform's statement (each move is listed in remap_rollup), so a "
+             "remap across the balance sheet's sides fails the tie-out. An edit that matches no line or several "
+             "lines, or a remap onto a platform total or a line the platform does not have, is refused.")
 
 TOOL_DESCRIPTIONS = {
     "consolidate": "Add the target's statement lines onto the platform's lines using the approved mappings. "

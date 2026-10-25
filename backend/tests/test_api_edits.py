@@ -205,6 +205,78 @@ def test_a_remap_through_http_ties_out(c):
     assert len(out["reasons"]) == 3
 
 
+RD_REMAP = {"kind": "remap", "company": TARGET, "line": "Research and Development", "platform_line": "Cost of products sold"}
+
+
+def figures(result, section="income_statement"):
+    return {r["line"]: (r["target"], r["combined"]) for r in result["rows"] if r["section"] == section}
+
+
+def test_a_remap_into_cost_of_sales_recomputes_gross_profit_through_http(c):
+    """The console's reclass: R&D (532.092) moves from Operating expenses to Cost of products sold."""
+    agents = case(c)["result"]
+    r = c.post(f"/deals/{DEAL_ID}/edits", json=RD_REMAP)
+    assert r.status_code == 200, r.text
+    out = r.json()
+    was, now = figures(agents), figures(out["result"])
+    assert now["Gross profit"] == (23149.519, 75200.519)  # 23,681.611 - 532.092; 75,732.611 - 532.092
+    assert now["Cost of products sold"] == (51700.783, 203404.783)
+    assert now["Operating expenses"] == (17900.909, 51670.909)
+    for line in ("Operating profit", "Profit before income taxes", "Net earnings"):
+        assert now[line] == was[line], line  # a reclass within operating costs
+    v = out["verdict"]
+    assert (v["ebitda"], v["debt"], v["leverage"], v["tie_out_ok"]) == (28378.845, 21633.0, 0.762, True)
+    # the figure is the recompute's consolidate run, which names the edit and the moved subtotal
+    run = c.get(f"/runs/{out['result']['run_ids_by_tool']['consolidate']}").json()
+    assert run["outputs"]["edits_applied"] == [out["edit"]["id"]]
+    assert run["outputs"]["remap_rollup"] == [{"edit_id": out["edit"]["id"], "line": "Gross profit",
+                                               "section": "income_statement", "delta": -532.092}]
+    assert figures(case(c)["result"])["Gross profit"] == (23149.519, 75200.519)
+
+
+def test_a_cost_cut_moves_every_displayed_subtotal_through_http(c):
+    agents = figures(case(c)["result"])
+    now = figures(c.post(f"/deals/{DEAL_ID}/edits", json=AMOUNT).json()["result"])
+    for line in ("Operating profit", "Profit before income taxes", "Net earnings"):
+        assert (round(now[line][0] - agents[line][0], 3), round(now[line][1] - agents[line][1], 3)) == (500, 500), line
+    assert now["Gross profit"] == agents["Gross profit"]
+    assert now["Net earnings"] == (5938.271, 24995.271)  # 5,438.271 + 500; 24,495.271 + 500
+
+
+def test_a_balance_sheet_remap_that_breaks_the_tie_out_says_so(c):
+    """Certificates of Deposit (an asset) onto Accounts payable (a liability): assets 991.082 lower, liabilities and
+    equity 991.082 higher, so the console shows "Does not tie out" and the approval needs info."""
+    r = c.post(f"/deals/{DEAL_ID}/edits", json={"kind": "remap", "company": TARGET, "line": "Certificates of Deposit",
+                                                "platform_line": "Accounts payable"})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    bs = figures(out["result"], "balance_sheet")
+    assert bs["Total Assets"] == (46987.099, 181465.099)
+    assert bs["Total Liabilities and Stockholders' Equity"] == (48969.263, 183447.263)
+    assert out["verdict"]["tie_out_ok"] is False and out["result"]["tie_out_ok"] is False
+    assert out["approval"]["state"] == "NEEDS_INFO"
+
+
+def test_undo_of_every_kind_of_edit_restores_the_agents_books(c):
+    agents = case(c)["result"]
+    ids = []
+    for body in (RD_REMAP, AMOUNT, {"kind": "remap", "company": TARGET, "line": "Certificates of Deposit",
+                                    "platform_line": "Accounts payable"}):
+        r = c.post(f"/deals/{DEAL_ID}/edits", json=body)
+        assert r.status_code == 200, r.text
+        ids.append(r.json()["edit"]["id"])
+    assert case(c)["verdict"]["tie_out_ok"] is False
+    for eid in reversed(ids):
+        out = c.delete(f"/edits/{eid}").json()
+    assert out["result"]["edit_ids"] == []
+
+    def rows(result):
+        return [{k: v for k, v in row.items() if k != "run_id"} for row in result["rows"]]
+    assert rows(out["result"]) == rows(agents)
+    for k in ("ebitda", "debt", "leverage", "verdict", "tie_out_ok"):
+        assert out["result"][k] == agents[k], k
+
+
 def test_the_edit_stream_event():
     from app.agents.jobs import advance
     from app.core.models import CONTROLLER
