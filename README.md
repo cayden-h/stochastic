@@ -182,6 +182,7 @@ stochastic/
   frontend/            Console: Next.js, Tailwind (being rebuilt on GET /deals/{id}/case)
   evals/               Answer key and scoring (Eric, planned)
   data/                Cached public filings and CSVs (git-ignored)
+  e2e/                 Playwright end-to-end suite: the demo path in the browser and in the Mac app
   scripts/             droid_probe.py (can Droid run Claude?) and record_run.py (run and record a backend)
 ```
 
@@ -216,6 +217,7 @@ curl -X POST localhost:8000/dev/reset && curl -X POST localhost:8000/deals/d_keq
 ```
 
 Or from the command line: `backend/.venv/bin/python scripts/record_run.py --backend scripted`.
+End-to-end tests over the whole demo path, in the browser and in the Mac app: `cd e2e && npm ci && npm run e2e` (about 3 minutes, scripted agents only, on free ports; see `e2e/README.md`).
 The console reads `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`) and `GET /deals/{id}/case`.
 `POST /dev/reset` reseeds the deal and keeps the agents' memory; add `?keep_memory=false` to clear it.
 The Droid backend needs the `droid` CLI on PATH: `curl -fsSL https://app.factory.ai/cli | sh`.
