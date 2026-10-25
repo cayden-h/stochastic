@@ -1,0 +1,27 @@
+/* The Agent House labels, bubbles, and bar, as in the Figma Make prototype (frame V3-6 Agents). The fonts are the
+   prototype's IBM Plex Mono and Public Sans, self-hosted by next/font in agent-house.tsx. */
+.agent-house { position: relative; overflow: hidden; background: #fff; font-family: var(--ah-sans), system-ui, sans-serif; }
+.agent-house-canvas { display: block; position: absolute; inset: 0; }
+.agent-house-overlay { position: absolute; inset: 0; pointer-events: none; }
+.agent-house-label { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; will-change: transform; }
+.agent-house-pill { display: flex; align-items: center; gap: 7px; padding: 6px 12px 6px 10px; border-radius: 999px; background: rgba(255,255,255,.92); box-shadow: 0 4px 12px rgba(38,38,64,.12), inset 0 0 0 1px rgba(0,0,0,.05); font: 600 11px var(--ah-mono), ui-monospace, monospace; letter-spacing: .08em; color: #2C3A31; text-transform: uppercase; white-space: nowrap; transition: box-shadow .3s; }
+.agent-house-pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--tint); }
+.agent-house-pill em { font-style: normal; font-weight: 400; color: #7E857B; letter-spacing: .06em; }
+.agent-house-label:not([data-state="idle"]) .agent-house-pill { box-shadow: 0 4px 14px rgba(38,38,64,.16), inset 0 0 0 1.5px var(--tint); }
+.agent-house-bubble { opacity: 0; transform: translateY(6px) scale(.96); transition: opacity .25s, transform .25s; padding: 9px 14px; border-radius: 14px; background: rgba(255,253,247,.96); box-shadow: 0 10px 24px -8px rgba(40,40,60,.25), inset 0 0 0 1px rgba(0,0,0,.05); text-align: center; }
+.agent-house-bubble b { display: block; font: 600 9px var(--ah-mono), ui-monospace, monospace; letter-spacing: .14em; color: #2C3A31; white-space: nowrap; }
+/* The prototype's lines were short; the live ones can be a whole question, so they wrap to two lines at most. */
+.agent-house-bubble span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; max-width: 250px; margin-top: 3px; font: 400 12px/1.35 var(--ah-sans), system-ui, sans-serif; color: #2C3A31; }
+.agent-house-label[data-state="working"] .agent-house-bubble,
+.agent-house-label[data-state="talking"] .agent-house-bubble,
+.agent-house-label[data-state="asking"] .agent-house-bubble,
+.agent-house-label[data-state="done"] .agent-house-bubble { opacity: 1; transform: none; }
+.agent-house-label[data-state="asking"] .agent-house-bubble { box-shadow: 0 10px 24px -8px rgba(40,40,60,.25), inset 0 0 0 1.5px var(--tint); }
+.agent-house-label[data-state="asking"], .agent-house-label[data-state="talking"] { z-index: 2; }
+.agent-house-bar { z-index: 3; position: absolute; left: 16px; bottom: 14px; display: flex; gap: 12px; align-items: center; font: 400 10px var(--ah-mono), ui-monospace, monospace; letter-spacing: .06em; color: #A3A89E; }
+.agent-house-bar button { font: 500 12px var(--ah-sans), system-ui, sans-serif; padding: 6px 12px; border-radius: 999px; border: 1px solid #E4E1D8; background: #fff; color: #2C3A31; cursor: pointer; }
+.agent-house-bar button:hover { background: #F7F5EF; }
+.agent-house-bar button:focus-visible { outline: 2px solid #7FCAD5; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .agent-house-bubble, .agent-house-pill { transition: none; }
+}
