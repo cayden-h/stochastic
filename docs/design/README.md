@@ -13,7 +13,7 @@ Every screen is 1440 by 900, with a 240 px sidebar (deal, Dashboard, Case, Revie
 | V3-3 Case | The flag card with the three readings, the verdict, the combined books, and Mapping, Review, and Log tiles | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-35 |
 | V3-4 Mapping | Target line, platform line, and confidence, filtered by All, Unsure, or By policy | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-195 |
 | V3-5 Log | The audit log | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-379 |
-| V3-6 Agents | The three agents | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=146-149 |
+| V3-6 Agents | The four agents in the live 3D Agent House (code layer 736:1282), each actor's latest line, and the agent timeline | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=146-149 |
 | V3-7.N Review | The Review workbook flow (section "Review flow (D19)") | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=670-44 |
 
 Josie's teal pass (2026-10-24 evening) changed the whole look, and the console follows it:
@@ -21,6 +21,11 @@ Josie's teal pass (2026-10-24 evening) changed the whole look, and the console f
 - Each agent has its own character and tint: the Mapper a teal star (#DCEFF1, #0F6674), the Preparer a blue flower (#E2E9F7, #2E55A3), the Reviewer a violet character (#ECE5F6, #6A4C9C), and the Brief Reader a plum character.
 - The page wash is the page's agent tint: teal for Dashboard, Mapping, Agents, and Review, blue for the Case, violet for the Log.
 - The frames put the page's character in the brand row. The console keeps the Stochastic mark there (`brand.md`) and puts the page's character 24 px to the right of the page title instead.
+
+The Agents page builds the frame's 3D layer from its Figma Make code (`frontend/src/components/agent-house/`).
+The four characters are rigged and animated in Blender (`art/blender/README.md`), and the page plays the deal's conversation through them live: the speaker talks or asks, a note flies to the listener, and every agent settles where the record says it is.
+`/agents?demo=1` runs the prototype's canned loop instead, for the pitch preview.
+The frame titles the page "Agent"; the console keeps "Agents", the name in the sidebar.
 
 Other pages in the same file:
 - `Components` (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=487-1681): the components behind v3.
