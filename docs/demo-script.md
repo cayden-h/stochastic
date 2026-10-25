@@ -89,6 +89,29 @@ What runs for real: the gateway (state changes, maker-checker, permissions), the
 What the model writes: the mappings, the flag question, and the option labels, on the backend the model card names.
 What is a fallback: the scripted rules, used when the model run fails or the gateway refuses its result twice. See section 5.
 
+### The paced run: agents talking, live mapping, the escalation
+
+For a demo on the scripted or replay backend, start the API with `DEMO_PACE=1`, so the run plays at a speed people can follow instead of finishing in a blink.
+Do not put it in `.env` for live Droid: a live model gets no added wait anyway, and the variable only matters for `scripted` and `replay`.
+
+```text
+cd backend
+AGENT_BACKEND=replay DEMO_PACE=1 .venv/bin/uvicorn app.main:app --port 8000
+```
+
+What the room sees, with the times measured on 2026-10-24 (scripted, `DEMO_PACE=1`):
+- 0 s, Run: the Gateway hands the Mapper its work item, and 2.5 s later the Mapper proposes 53 mappings and 2 questions.
+- 3 to 19 s: the mapping view fills line by line, about 0.3 s per line (`mapping` events).
+- 19 to 23 s: the Gateway checks and accepts the mappings, then the Mapper asks the controller two questions, 1.5 s apart. The flag cards open.
+- The controller answers. The conversation shows each answer going back to the Mapper and the policies it taught.
+- 0 to 12 s after the last answer: the Mapper hands off to the Preparer, the Preparer's four tool runs arrive about 1 s apart with their figures, the Preparer reports the draft books (leverage 0.76x against 2.50x, with the run id), the Gateway confirms every figure traces to a run, the Reviewer checks the tie-out and the limit test, and hands off: "Ready for your approval".
+- After: open the Log for the audit rows, then the Review page for the books and the edits.
+
+`DEMO_PACE=0.5` plays it twice as fast; `DEMO_PACE=2` twice as slow.
+Every line of the conversation is written by the gateway when the thing happens, from the record (see `architecture/gateway-and-api.md`, "Live events").
+The pace only spaces it out; it changes no figure, no check, and no message.
+The pace on replay is honest to say: "the recorded run's text, played at reading speed, with every tool run live".
+
 ### Who clicks what
 
 - Presenter: speaks only.

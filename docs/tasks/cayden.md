@@ -239,6 +239,14 @@ The bubble follows Josie's Reason popover (Figma 545:408) for looks and section 
 The demo beat runs headless through the shim in about 3 seconds, from opening the income statement to approved, with Download in the browser.
 Waiting on: the run on the demo laptop, and T1 and T2 for the real routes.
 
+## Live events (2026-10-24 night, `cayden/v3-live`)
+
+Built: the deal's conversation (`conversation` SSE events and `GET /deals/{id}/conversation`), per-line `mapping` events with partial mappings in `/case` during the run, and `DEMO_PACE` for the scripted and replay backends.
+The gateway writes every message in the same write as the thing it describes, and stores it as a `conversation` record in memory and Postgres.
+Contract: `architecture/gateway-and-api.md`, "Live events" and "Demo pace". How to run it: `demo-script.md` section 2, "The paced run".
+Tests: `backend/tests/test_live_events.py`.
+Open for the console (other agents): render the conversation as a chat between the roles, fill the mapping view from `mapping` events, and open the flag card from the `question` message's `item_id`.
+
 ## Logo and launch splash (D21, 2026-10-24 evening)
 
 Built in `cayden/launch-mark`: the mark in the sidebar, the favicon, the app icon, the browser splash, and the desktop splash in `desktop/splash.html` (Eric's folder; he has a note in `eric.md`). Spec: `design/brand.md`.
