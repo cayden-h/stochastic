@@ -24,7 +24,7 @@ The current code implements an earlier workflow and is being updated per `docs/T
 ```
 
 The normal run uses the memory store and never touches the network.
-The Tiger tests skip unless `TEST_DATABASE_URL` is set: 392 pass offline with 16 skipped (verified on 2026-10-24 evening, with the 15-second demo and the seeded cases).
+The Tiger tests skip unless `TEST_DATABASE_URL` is set: 411 pass offline with 17 skipped (verified on 2026-10-25, with the replayed Haiku 5.5 demo paces, the Factory pace, and the seeded edits).
 To run them against Tiger Cloud, use your own schema so you do not take the demo schema's advisory lock:
 
 ```
@@ -33,7 +33,7 @@ TEST_DATABASE_URL="$DATABASE_URL" DB_SCHEMA=stochastic_<you> .venv/bin/python -m
 ```
 
 Run this before every merge that touches the store, the gateway, or the API.
-Expect 405 passed and 3 skipped (verified against Tiger Cloud on 2026-10-24 evening), and about 95 seconds.
+Expect 425 passed and 3 skipped (verified against Tiger Cloud on 2026-10-25, schema `stochastic_cayden_demo2`), and about 100 seconds.
 
 ## Status
 

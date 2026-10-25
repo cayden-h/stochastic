@@ -75,9 +75,45 @@ One function, `run_agent(role, item)` in `backend/app/agents/runner.py`.
 | `droid` | Factory Droid Python SDK 0.5.0: `run(prompt, output=Model, config=SessionConfig(mcp_servers, restrict_tools, autonomy=HIGH, system_prompt))`, one resumed session per role in its own empty folder | `droid` CLI on PATH, `FACTORY_API_KEY` | The Factory track. Say "built with the Droid SDK" only about these runs. |
 | `anthropic` | Anthropic SDK, `messages.create` with the role's tools and a `submit` tool typed as the output model, up to 12 turns | `ANTHROPIC_API_KEY` | The real model path without Droid. Ran on Eric's key (one full recorded run in `recordings/anthropic-haiku-5-5/`, 0.76x, Reviewer pass, 32 of 33; about 50 Mapper trials scoring 27 to 33). The demo laptop has no key, so it is out of the default fallback chain since 2026-10-24 08:00; add it to `AGENT_FALLBACK` when a key is in `.env`. |
 | `scripted` | Deterministic rules: policies, synonyms (accounting practice and Ex 99.2 Note 2), name similarity, flags below 0.6 | nothing | Last fallback and the reference answer. |
-| `replay` | Recorded outputs from `backend/recordings/`; the Preparer and Reviewer re-run their tools so run ids are real | the recordings | No-network fallback. |
+| `replay` | Recorded outputs from `backend/recordings/`; the Preparer and Reviewer re-run their tools so run ids are real | the recordings | No-network fallback, and the backend of the two demo paces (section 7a). |
 
 The runner tries `AGENT_BACKEND`, then each entry of `AGENT_FALLBACK` (default `scripted`), and every result carries the backend that produced it (`result.backend`, the audit log, `GET /health`). [verified: `runner.run_agent`]
+
+## 7a. The demo paces replay the recorded Haiku 5.5 run
+
+Since 2026-10-25 (D22) the two demo paces replay a real recorded Claude Haiku 5.5 run, not the scripted rules (`backend/app/agents/demo_replay.py`).
+Before, pace `demo` forced the scripted backend, and the model card said "Scripted rules, no model".
+
+| Pace | Where | Backend | To the questions | Last answer to approval |
+| --- | --- | --- | --- | --- |
+| `demo` | Run the demo (the Hyphenate beat, about 15 s) | replay of `haiku-5-5-run2`, forced | 6.2 s measured (6.0 s fake clock) | 7.2 s measured (6.6 s) |
+| `factory` | Upload then Begin (the Factory beat, about 30 s) | the same replay, forced | 14.2 s measured (14.0 s) | 14.5 s measured (13.3 s) |
+| `human` | `DEMO_PACE=1` timings | `AGENT_BACKEND` and its fallback chain | 20.1 s (scripted) | 12.1 s (scripted) |
+| `off` | no waits | `AGENT_BACKEND` and its fallback chain | the backend's own time | the backend's own time |
+
+Measured on uvicorn on 2026-10-25 at 00:05, memory store, the four cases seeded, agent time only, polling `/case` every 50 ms. [verified: `backend/tests/test_demo_replay.py` for the fake-clock figures]
+
+Which recording: `backend/recordings/haiku-5-5-run2/`, the live Droid run of the demo deal with `DROID_MODEL=claude-haiku-5-5`, committed on 2026-10-24 at 03:40 PDT (commit 8b914db, "score it 33 of 33").
+Its `recording.json` holds the model, the backend, the time, and `model_confirmed: false`: the served-model check from the droid session record (section 8) came later that day, so the model is the one requested. [verified: git log; inferred: that Droid served Haiku 5.5, from every later checked Haiku run]
+It reproduces the demo beat through today's gateway: the Mapper asks two questions, the covenant reading of six Kewaunee lines (agreement 0.76x, as filed 2.84x over, short-term arrangements unsecured 0.73x) and where six Nu Aire lines go, led by the certificates of deposit; the answers teach the policies; the Preparer and the Reviewer finish at 0.76x, Reviewer pass. [verified: `test_demo_replay.py`]
+The texts on screen are the model's own, so they differ from the scripted rules' texts: the second question bundles the certificates of deposit with five other lines, and its default leaves the certificates unmapped and listed.
+The other Haiku 5.5 recording, `anthropic-haiku-5-5/` (Anthropic API, 2026-10-24 08:28), asks three questions, so the demo does not use it.
+`haiku-5-5/` (the 04:30 row of section 9) is refused by today's gateway (an option leaves a line unclear).
+
+The forced backend rule: a `demo` or `factory` run with no `backend` of its own pins every role to one backend with no fallback chain, so it never makes a live call, whatever `.env` says.
+That backend is the replay when it fits the deal, and the scripted rules when it does not:
+- The deal's statements must be the recorded ones, by a content hash (role, section, line name, amount, total flag).
+  The live demo deal and an upload of the same two statements pass; the recorded line ids are translated to the deal's own ids by that content.
+- No live policy from outside this run may cover the deal, since the recording was made with no memory.
+  After a reset that keeps memory, the second run is scripted, asks nothing, and applies the policies.
+- The Brief Reader has no Haiku recording, so a Brief step runs the rules.
+When the rules run, the Mapper gets a system note with the reason, and `backend` says `scripted`.
+
+Honesty: the model card says "Claude Haiku 5.5 · recorded run", read from `last_runs[].model` and `recorded` on `/health`.
+That is true for the Mapper, whose mappings, tags, questions, and options are the model's typed output from that run.
+The Preparer and the Reviewer are mechanical: on replay they re-run the recorded tool sequence, so every figure is live, and their text is the rules' (the Preparer's note says "Replay of the recorded ... run").
+Say: "a recorded Claude Haiku 5.5 run, replayed; the gateway, the math, and the log are live".
+Never say it is a live model call.
 
 Settings (all in `.env`, read by `backend/app/agents/settings.py`):
 
@@ -111,7 +147,7 @@ Reading a run:
 - `result.backend` says which backend produced the shown result.
 - `GET /deals/{id}/runs` lists every tool run; `GET /runs/{run_id}` shows one run's inputs and outputs. Every number on screen names one.
 - The audit log shows `propose:map_lines`, `ask:flag`, `tool:<name>`, `answer`, `policy:learn`, `policy:apply`, `session:turn`, `approve`, `post`, and any `DENIED` row with the reason.
-- `backend/recordings/<role>.json` is the default replay: the Sonnet 5.5 run of 2026-10-24, 03:30 (a copy stays in `backend/recordings/sonnet-5-5/`). `backend/recordings/haiku-5-5/` keeps the Haiku 5.5 run of 04:30, which the gateway now rejects at the Mapper step because its default option left "Short-term borrowings" unclear. `backend/recordings/haiku-5-5-run2/` is the Haiku 5.5 run of 2026-10-24 evening, which passes the rule and replays through. Replay a specific run with `RECORDINGS_DIR=$PWD/backend/recordings/<name>`.
+- `backend/recordings/<role>.json` is the default replay: the Sonnet 5.5 run of 2026-10-24, 03:30 (a copy stays in `backend/recordings/sonnet-5-5/`). `backend/recordings/haiku-5-5/` keeps the Haiku 5.5 run of 04:30, which the gateway now rejects at the Mapper step because its default option left "Short-term borrowings" unclear. `backend/recordings/haiku-5-5-run2/` is the Haiku 5.5 run committed on 2026-10-24 at 03:40, which passes the rule and replays through; since 2026-10-25 it is what the demo paces replay (section 7a). Replay a specific run with `RECORDINGS_DIR=$PWD/backend/recordings/<name>`.
 
 Failure switch, rehearsed on 2026-10-24, 04:50 [verified]: the API was started with the `droid` CLI missing from PATH. The run returned `mapper ran on scripted`; `GET /health` listed the attempts: droid failed ("Droid executable was not found"), anthropic failed ("ANTHROPIC_API_KEY is not set"), scripted ran. The same chain runs if the droid process dies mid-run or the timeout fires.
 
@@ -136,7 +172,7 @@ Haiku 5.5 is the default for that reason. A full deal on Haiku 5.5 is three Droi
 | 2026-10-24 03:30 | droid, claude-sonnet-5-5, prompt with "exclusions are the controller's call" | 1 covenant flag with 3 readings (0.77x, 1.76x, 2.57x), 1 mapping flag | ran, pass | 0.77x OK, recorded in `recordings/sonnet-5-5/` |
 | 2026-10-24 04:00 | droid, claude-haiku-5-5, before line notes | 1 covenant flag but the default reading counted the financing liability as debt (did not know it was Statesville); 2 bundled mapping flags using line ids | Preparer ran; Reviewer returned needs-attention over an unnamed leverage run id | 1.76x, review needs-attention |
 | 2026-10-24 04:30 | droid, claude-haiku-5-5, with line notes, named run ids, and the tightened prompts | 1 covenant flag with 3 readings (agreement 0.77x, short-term borrowings excluded 0.74x, all counted 2.57x over), 2 mapping flags of three lines each, by name | ran, pass, with reasons citing the run ids | 0.77x OK, recorded in `recordings/haiku-5-5/`; no longer the default replay, see section 7 |
-| 2026-10-24 evening | droid, claude-haiku-5-5, after the settle-every-line rule, the add-backs, and the console rebuild | 1 covenant flag over six lines with 3 readings, every option settling every line (agreement 0.76x, none excluded 2.54x, short-term arrangements unsecured 0.73x); 1 mapping flag over six lines | ran, pass, reasons cite the tie-out and limit_test run ids | 0.76x OK, recorded in `recordings/haiku-5-5-run2/`; Mapper scored 33 of 33 against Note 2 |
+| 2026-10-24, before 03:40 PDT (the commit time of the recording) | droid, claude-haiku-5-5, after the settle-every-line rule, the add-backs, and the console rebuild | 1 covenant flag over six lines with 3 readings, every option settling every line (agreement 0.76x, none excluded 2.54x, short-term arrangements unsecured 0.73x); 1 mapping flag over six lines | ran, pass, reasons cite the tie-out and limit_test run ids | 0.76x OK, recorded in `recordings/haiku-5-5-run2/`; Mapper scored 33 of 33 against Note 2 |
 | 2026-10-24 late | droid, claude-haiku-5-5 at medium effort, model confirmed from the session record | same flags | ran, pass | 0.76x OK, not recorded. Credits: Mapper 5,845, Preparer 5,045, Reviewer 1,052, so 11,942 for the whole deal on Haiku 5.5 |
 | 2026-10-24 evening | droid, claude-haiku-5-5 at medium, sessions resumed: two deals in a row on one store | deal 1: same flags; deal 2: none, 6 policies applied | ran, pass on both | 0.76x OK on both, not recorded. All three roles resumed their deal-1 session on deal 2. Credits deal 1: 5,169 + 3,992 + 1,128 = 10,289; deal 2: 2,950 + 4,000 + 341 = 7,291 |
 

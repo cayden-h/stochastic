@@ -5,9 +5,11 @@ Two ways to turn it on:
   `DEMO_PACE=1` is human speed (the `human` profile), about 21 s from Run to the controller's questions on the demo
   deal and about 13 s from the last answer to the approval. 0.5 halves every wait and 2 doubles it (capped at 5).
 - `POST /deals/{id}/run` with `"pace"` sets it for that run only, and for the run that the controller's answer
-  continues: `"demo"` (the 15-second demo, about 6 s to the question and 7 s from the answer to the approval),
-  `"human"` (the DEMO_PACE=1 timings), or `"off"`. It overrides DEMO_PACE (`using`). A `"demo"` run with no backend
-  of its own is always scripted, whatever AGENT_BACKEND says (app/agents/jobs.py, `advance`).
+  continues: `"demo"` (the 15-second Hyphenate demo, about 6 s to the questions and 7 s from the last answer to the
+  approval), `"factory"` (the 30-second Factory demo, twice the demo's waits with a longer mapping stream: about 14 s
+  and 13 s), `"human"` (the DEMO_PACE=1 timings), or `"off"`. It overrides DEMO_PACE (`using`). A `"demo"` or
+  `"factory"` run with no backend of its own replays the recorded Claude Haiku 5.5 run when it fits the deal, and
+  runs the scripted rules otherwise, whatever AGENT_BACKEND says (app/agents/demo_replay.py, app/agents/jobs.py).
 
 The waits sit in the job runner only: before an agent's turn, before each tool call an agent makes, while the
 mappings are stored (a fixed time for the whole list in the `demo` profile, a fixed time per line in `human`), once
@@ -26,7 +28,7 @@ import time
 from typing import Iterator, Literal
 
 PACED_BACKENDS = ("scripted", "replay")
-PaceName = Literal["demo", "human", "off"]
+PaceName = Literal["demo", "factory", "human", "off"]
 
 # Seconds per step, per profile. `human` is the DEMO_PACE=1 timing and is scaled by DEMO_PACE.
 PROFILES: dict[str, dict[str, float]] = {
@@ -47,6 +49,15 @@ PROFILES: dict[str, dict[str, float]] = {
         "question": 0.8,
         "after": 0.6,
     },
+    # The 30-second Factory demo: every demo wait doubled, and the mapping stream 10 s instead of 8, so the questions
+    # open at 14 s (2.4 + 10 + 1.6) and the approval is ready about 13 s after the last answer (twice the demo's).
+    "factory": {
+        "turn": 2.4,
+        "tool": 1.2,
+        "mapping_total": 10.0,
+        "question": 1.6,
+        "after": 1.2,
+    },
 }
 STEPS = PROFILES["human"]  # kept for the callers and tests that read the human timings
 MAX_FACTOR = 5.0
@@ -61,9 +72,9 @@ _run_pace: contextvars.ContextVar[str | None] = contextvars.ContextVar("run_pace
 
 @contextlib.contextmanager
 def using(name: str | None) -> Iterator[None]:
-    """Run the block at this pace ("demo", "human", "off"), or at DEMO_PACE when name is None."""
+    """Run the block at this pace ("demo", "factory", "human", "off"), or at DEMO_PACE when name is None."""
     if name is not None and name not in (*PROFILES, "off"):
-        raise ValueError(f"unknown pace '{name}': use demo, human, or off")
+        raise ValueError(f"unknown pace '{name}': use demo, factory, human, or off")
     token = _run_pace.set(name)
     try:
         yield

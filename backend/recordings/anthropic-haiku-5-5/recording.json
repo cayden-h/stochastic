@@ -1,0 +1,10 @@
+{
+  "name": "anthropic-haiku-5-5",
+  "model": "claude-haiku-5-5",
+  "model_label": "Claude Haiku 5.5",
+  "backend": "anthropic",
+  "recorded_at": "2026-10-24T08:28:29-07:00",
+  "source": "commit 2ad04c9, 'Stream the Anthropic backend with a 64K output cap; record and score the first Anthropic run'",
+  "model_confirmed": false,
+  "note": "The Anthropic API run on a teammate's key with ANTHROPIC_MODEL=claude-haiku-5-5. It asks three questions (the covenant reading, five Nu Aire lines with the certificates of deposit, and the interest income line), so the demo paces do not use it."
+}

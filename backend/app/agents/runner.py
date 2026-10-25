@@ -70,18 +70,35 @@ def _scripted(role: Role, inp: BaseModel, call_tool) -> BaseModel:
     raise TypeError(f"no scripted agent for {type(inp).__name__}")
 
 
+def _replay_note(about: dict, recorded_backend: str) -> str:
+    who = about.get("model_label") or about.get("model") or "the recorded"
+    return (f"Replay of the recorded {who} run on {recorded_backend} ({recording.folder().name}): the recorded tool "
+            f"sequence, consolidate, ebitda, covenant_debt, leverage, re-run through the gateway, so every figure is a "
+            f"fresh run")
+
+
 def _attempt(backend: str, role: Role, inp: BaseModel, call_tool, session,
              rewind_to: str | None = None) -> tuple[BaseModel, dict]:
     if backend == "scripted":
         return _scripted(role, inp, call_tool), {}
     if backend == "replay":
+        about = recording.info()
+        meta = {"recording": recording.folder().name, "model": about.get("model"),
+                "recorded_at": about.get("recorded_at"), "model_confirmed": about.get("model_confirmed")}
         if isinstance(inp, (PreparerInput, ReviewerInput)):
             # Tool-calling roles cannot replay stored numbers: run ids belong to the store that made them.
             # The replay re-runs the same deterministic tool sequence, so every number is a fresh gateway run.
             _, recorded_backend, _ = recording.load(role.name, role.output_type)
-            return _scripted(role, inp, call_tool), {"recorded_backend": recorded_backend, "tools_rerun": True}
+            out = _scripted(role, inp, call_tool)
+            if isinstance(inp, PreparerInput):
+                out = out.model_copy(update={"note": _replay_note(about, recorded_backend)})
+            return out, {"recorded_backend": recorded_backend, "tools_rerun": True, **meta}
         out, recorded_backend, matches = recording.load(role.name, role.output_type, inp)
-        return out, {"recorded_backend": recorded_backend, "input_matches": matches}
+        if isinstance(inp, MapperInput) and recording.line_ids():
+            from app.agents.demo_replay import translate
+            out = translate(out, recording.line_ids())
+            meta["line_ids_translated"] = True
+        return out, {"recorded_backend": recorded_backend, "input_matches": matches, **meta}
     if backend == "anthropic":
         if not os.getenv("ANTHROPIC_API_KEY"):
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
@@ -95,6 +112,22 @@ def _attempt(backend: str, role: Role, inp: BaseModel, call_tool, session,
         return run_droid(role, inp, call_tool, session.session_id if session else None,
                          session.session_key if session else None, **extra)
     raise RuntimeError(f"unknown backend '{backend}'")
+
+
+def _model_of(backend: str, role: Role, meta: dict) -> dict:
+    """What produced the output, for the model card: the model id (None for the scripted rules) and whether it is a
+    recorded run. A replay names the model of its recording; a live run the model it asked for (and was served, when
+    the backend says)."""
+    from app.agents import settings
+    if backend == "replay":
+        return {"model": meta.get("model"), "recorded": True, "recording": meta.get("recording"),
+                "recorded_at": meta.get("recorded_at"), "recorded_backend": meta.get("recorded_backend")}
+    if backend == "droid":
+        return {"model": meta.get("model_served") or meta.get("model_requested") or settings.role_model("DROID_MODEL", role.name),
+                "recorded": False}
+    if backend == "anthropic":
+        return {"model": settings.role_model("ANTHROPIC_MODEL", role.name), "recorded": False}
+    return {"model": None, "recorded": False}
 
 
 def run_agent(role: Role, inp: BaseModel, call_tool, session=None, backend: str | None = None,
@@ -121,7 +154,7 @@ def run_agent(role: Role, inp: BaseModel, call_tool, session=None, backend: str 
                     pass
             run = AgentRun(output=out, backend=b, attempts=attempts, seconds=round(time.time() - start, 2))
             LAST_RUNS.append({"role": role.name, "backend": b, "asked": chosen, "attempts": attempts, "meta": meta,
-                              "at": time.strftime("%H:%M:%S")})
+                              "at": time.strftime("%H:%M:%S"), **_model_of(b, role, meta)})
             TOTALS["runs"] += 1
             usage = meta.get("usage", meta) if isinstance(meta, dict) else {}
             for k in ("factory_credits", "input_tokens", "output_tokens"):

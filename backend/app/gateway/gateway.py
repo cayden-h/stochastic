@@ -767,17 +767,30 @@ class Gateway:
                 basis = " as filed" if o.basis == "as_filed" else ""
                 side = "under" if o.ok else "over"
                 if not out:
-                    out.append(f"{o.id}) {o.label}: leverage {o.leverage:.2f}x{basis}, {side} the {limit:.2f}x limit")
+                    out.append(f"{o.id}) {o.label.rstrip('.')}: leverage {o.leverage:.2f}x{basis}, {side} the "
+                               f"{limit:.2f}x limit")
                 else:
-                    out.append(f"{o.id}) {o.label}: {o.leverage:.2f}x{basis}, {side}")
+                    out.append(f"{o.id}) {o.label.rstrip('.')}: {o.leverage:.2f}x{basis}, {side}")
             elif item.payload.get("kind") == "mapping":
                 action = item.payload.get("option_actions", {}).get(o.id, {})
-                where = action.get("platform_line") or (", ".join(sorted(set((action.get("mappings") or {}).values())))
-                                                        if action.get("mappings") else None)
-                out.append(f"{o.id}) {where}" if where else f"{o.id}) {o.label}")
+                out.append(f"{o.id}) {self._mapping_option_where(action) or o.label.rstrip('.')}")
             else:
                 out.append(f"{o.id}) {o.label}: {o.effect.rstrip('.')}")
         return out
+
+    @staticmethod
+    def _mapping_option_where(action: dict) -> str | None:
+        """Where a mapping option puts its lines, by platform line name. A multi-line option may leave some lines
+        unmapped (None), as the Haiku 5.5 run of 2026-10-24 evening did; they are counted, not named. None when the
+        option names no platform line, so the caller states the option's label instead."""
+        if action.get("platform_line"):
+            return action["platform_line"]
+        targets = list((action.get("mappings") or {}).values())
+        named = sorted({t for t in targets if t})
+        if not named:
+            return None
+        unmapped = sum(1 for t in targets if not t)
+        return ", ".join(named) + (f"; {_count(unmapped, 'line')} left unmapped" if unmapped else "")
 
     def _say_question(self, deal: Deal, item: WorkItem, n: int, of: int) -> None:
         """The Mapper's question to the controller, stated exactly: what is decided, each option with its effect from
