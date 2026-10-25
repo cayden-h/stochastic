@@ -350,7 +350,10 @@ def test_timeline_buckets_floor_to_the_time_bucket_origin():
     from app.core.models import AuditRow
     from app.db.memory import MemoryStore
     store = MemoryStore()
-    t = lambda s: datetime(2026, 10, 24, 18, 0, 0, tzinfo=timezone.utc).replace(minute=s // 60, second=s % 60)
+
+    def t(s):
+        return datetime(2026, 10, 24, 18, 0, 0, tzinfo=timezone.utc).replace(minute=s // 60, second=s % 60)
+
     rows = [(5, "agent:mapper", "propose:map_lines", "ALLOWED"), (59, "agent:mapper", "tool:consolidate", "DENIED"),
             (59, "agent:mapper", "propose:map_lines", "ALLOWED"), (60, "human:controller", "answer", "ALLOWED")]
     for i, (s, actor, action, result) in enumerate(rows):

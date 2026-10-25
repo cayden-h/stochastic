@@ -721,8 +721,11 @@ def _edit_aware(tool, applied):
 def test_a_recompute_is_refused_when_a_tool_misreports_its_edits(world, monkeypatch, tool, applied, words):
     store, gw = world
     approval = run_to_approval(gw)
+
+    def right(edits):
+        return [e.id for e in edits]
+
     for name in EDIT_TOOLS:
-        right = (lambda edits: [e.id for e in edits])
         monkeypatch.setitem(finance.TOOLS, name, _edit_aware(finance.TOOLS[name], applied if name == tool else right))
     with pytest.raises(Invalid, match=words):
         amount_edit(gw)
