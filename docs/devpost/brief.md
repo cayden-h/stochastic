@@ -3,6 +3,7 @@
 Owner: Eric.
 Checked 2026-10-24 against the filings in `data/raw/`.
 The brief is the third input to Stochastic, next to the two statement files.
+Since D20 the Brief Reader drafts it from the credit agreement, a code verifier checks every field (D23), and the controller approves it; the demo deal starts from a committed extract of Ex 10.1 (`data/brief/kewaunee_ex101_extract.txt`).
 It states the lender's limit and the agreement's own definitions of debt and EBITDA, so the tools test the limit the way the lender does.
 This file holds it as short prose for the Devpost, and as text for one slide.
 Tags: [verified] means a filing or a test shows it.
@@ -37,13 +38,20 @@ Title: The lender's own rules
 - EBITDA: net income, plus interest, taxes, depreciation, and amortization, less interest income and extraordinary gains.
 - Add back: pension termination, stock compensation, deal costs up to $4M, integration costs up to $1M.
 - Also: Nu Aire's four quarters to October 31, 2024, less Statesville cash rent.
-- Footer: Figures from public SEC filings. Covenant EBITDA is preliminary.
+- Footer: Figures from public SEC filings.
+  Covenant EBITDA is preliminary.
 
 Speaker line: "The tools use the agreement's definitions, not the balance sheet's labels. That is where the flag comes from."
 
 ## What the brief does not settle
 
-- Whether the failed sale-leaseback counts as a "capitalized lease obligation" under the exclusion. We read it as yes. [inferred]
-- The Statesville cash rent for the tested period. We use $1,970K, the 10-K's obligation due within one year. [inferred]
-- Transaction and integration costs. The demo applies $0. Ex 99.2 Note 5(b) estimates $698K of expected transaction expenses after 2024-10-31, which may or may not fall in the tested period. It moves only the agreement's reading, which stays far under the limit. [verified: Ex 99.2, Note 5(b); timing inferred]
-- Nu Aire's EBITDA for the exact four quarters the agreement names. We use its audited year to 2024-09-30, one month off. [inferred]
+- Whether the failed sale-leaseback counts as a "capitalized lease obligation" under the exclusion.
+  We read it as yes. [inferred]
+- The Statesville cash rent for the tested period.
+  We use $1,970K, the 10-K's obligation due within one year. [inferred]
+- Transaction and integration costs.
+  The demo applies $0.
+  Ex 99.2 Note 5(b) estimates $698K of expected transaction expenses after 2024-10-31, which may or may not fall in the tested period.
+  It moves only the agreement's reading, which stays far under the limit. [verified: Ex 99.2, Note 5(b); timing inferred]
+- Nu Aire's EBITDA for the exact four quarters the agreement names.
+  We use its audited year to 2024-09-30, one month off. [inferred]

@@ -10,7 +10,7 @@ Not read: the YC afterparty thread (7 replies), the Jane Street card thread (5 r
 
 ### Hyphenate (`#cohost-hyphenate`)
 
-- Nothing new on the rules beyond the workshop (see `../Stochastic/hyphenate-workshop.md`).
+- Nothing new on the rules beyond the workshop (see `../hyphenate-workshop.md`).
 - A Hyphenate rep answered "how do we register for the track": participate normally, and the Devpost submission form asks you to select your track.
   So no separate sign-up is needed, but select the Hyphenate track at submission. [Rudraksh Awasthi, Hyphenate]
 - Abdul, a Hyphenate founding engineer, said they will be judging as part of the Hyphenate team.
@@ -57,7 +57,7 @@ Not read: the YC afterparty thread (7 replies), the Jane Street card thread (5 r
 
 - ASI:One Agent Challenge "From Intent to Action": build an agent, register it on Agentverse, implement the Agent Chat Protocol, and make it discoverable and usable through ASI:One.
 - Prize pool "$10,000": 1st $1,250 plus an internship interview, 2nd $750 plus interview, 3rd $500 plus interview, two special recognition prizes at $250.
-  Discrepancy: `../tracks.md` lists $1,500 / $1,000 / $500, so use the Slack amounts as newer, and confirm.
+  Discrepancy: `CalHacks/ideation/tracks.md` lists $1,500 / $1,000 / $500, so use the Slack amounts as newer, and confirm.
 - Extras: fun ASI:One challenges with gadget prizes, a grand prize holiday trip, and surprise prizes at the opening ceremony.
 
 ### Creao (`#spons-creao-ai`)
@@ -82,7 +82,7 @@ Not read: the YC afterparty thread (7 replies), the Jane Street card thread (5 r
 
 - $5,000 in prizes: 1st $2,000, 2nd $1,000, 3rd $800, 4th $400, 5th $400, plus Best Actor built with AI Chat $400.
 - The project must use Apify "in a meaningful way".
-  $200 in credits with a promo code (already in `../../logistics.md`).
+  $200 in credits with a promo code (already in `CalHacks/logistics.md`).
 - Workshop Saturday 11:00am to 12:00pm Pacific, and the MCP server is at `mcp.apify.com`.
 
 ### Bitdeer AI (`#spons-bitdeer`)
@@ -133,13 +133,14 @@ Not read: the YC afterparty thread (7 replies), the Jane Street card thread (5 r
 
 ## Empty (no sponsor post yet)
 
-a16z, Adobe, Annapurna Labs, Armadin, Canva, Citadel (only "interested in Citadel" replies), Context.dev, Convex, D.E. Shaw, Decagon, Elastic, Factory, Greptile, Illumio, Mana, MoonPay, Notability, Opal Electronics, Savvy, Scale AI, SpaceXAI, The House Fund.
+a16z, Adobe, Annapurna Labs, Armadin, Canva, Citadel (only "interested in Citadel" replies), Context.dev, Convex, D.E.
+Shaw, Decagon, Elastic, Factory, Greptile, Illumio, Mana, MoonPay, Notability, Opal Electronics, Savvy, Scale AI, SpaceXAI, The House Fund.
 
 ## General logistics found (`#0-general`, `#0-announcements`)
 
 - Judging is Sunday 10:30am to 12:30pm.
   Winners are announced at the closing ceremony, not before, and some sponsors want to meet winning teams after, so plan to stay for it. [Sumin and Allison, Cal Hacks]
-- The app has team matching (Airline Adventures tab) and a crash workaround ("check for updates"), already in `../../logistics.md`.
+- The app has team matching (Airline Adventures tab) and a crash workaround ("check for updates"), already in `CalHacks/logistics.md`.
 - A mentor ("George") posted a third-party "winning guide" with Claude Code skills and GitHub repos.
   Treat it as unvetted marketing, not an organizer resource.
 - Microsoft, Bitdeer, Coinbase, Fetch.ai, and Bright Data reposted their blurbs in `#0-general`.

@@ -7,7 +7,8 @@ Does not repeat the Buyers Edge facts, the Morgan Stanley Tactical Value facts, 
 ## Label key
 
 - "verified (URL)" means I fetched that page or filing and read the fact there.
-- "verified (URL, search summary)" means the fact came from a web search summary of that URL, and I did not read the page myself. Re-open before quoting in a deck.
+- "verified (URL, search summary)" means the fact came from a web search summary of that URL, and I did not read the page myself.
+  Re-open before quoting in a deck.
 - "self-reported" means a company or vendor press release.
 - "inferred" means my judgment.
 - Blackstone Tactical Opportunities returned HTTP 403 and Morgan Stanley is already in `research.md`, so neither is used here.
@@ -96,17 +97,20 @@ For each example, size and instruments are as stated in the cited source.
   Caveat: it is a mortgage and financial company, not consumer or foodservice.
 - Example B: Teamshares, $225M preferred equity investment from accounts advised by T. Rowe Price, reported as a 2026 deal.
   verified (https://www.morningstar.com/news/globe-newswire/9832782/teamshares-announces-225-million-preferred-equity-investment, search summary; direct fetch returned 403).
-  Self-reported. Date and terms not read.
+  Self-reported.
+  Date and terms not read.
 - Anchor already in the repo: Buyers Edge (April 2024), see `../research.md`.
 - Documents on EDGAR: the Certificate of Designations and registration rights agreement are public for Example A (Exhibits 3.1 and 10.1 per the 8-K).
-- Agent role: analyze the existing credit agreement for consent and restricted-payment limits, structure the pref (dividend, PIK toggle, step-ups, redemption), simulate common-equity dilution and coverage, draft a term-sheet summary for approval. Inferred.
+- Agent role: analyze the existing credit agreement for consent and restricted-payment limits, structure the pref (dividend, PIK toggle, step-ups, redemption), simulate common-equity dilution and coverage, draft a term-sheet summary for approval.
+  Inferred.
 
 ### C2 Junior debt: second lien, mezzanine, delayed-draw tranches
 
 - Example A: TEAM, Inc. (industrial services), March 12, 2025.
   Second Amended and Restated Second Lien Term Loan Credit Agreement with Corre Partners affiliates, Cantor Fitzgerald as agent.
   About $107.4M: $97.4M term loan plus $10.0M delayed-draw tranche available to April 15, 2026 if pro forma liquidity is no more than $20M.
-  Matures June 10, 2030. Interest 13.5%, stepping up 0.25% per quarter to a 14.5% cap.
+  Matures June 10, 2030.
+  Interest 13.5%, stepping up 0.25% per quarter to a 14.5% cap.
   Interest is all PIK at first lien net leverage of 3.50x or higher, 50/50 cash and PIK between 3.00x and 3.50x, and all cash below 3.00x.
   Maximum first lien net leverage of 6.00x, tested quarterly.
   The same filing amends the ABL to permit new first lien debt and intercreditor liens.
@@ -117,8 +121,10 @@ For each example, size and instruments are as stated in the cited source.
   Both mature August 2031.
   No warrants mentioned.
   verified (https://www.sec.gov/Archives/edgar/data/874396/000087439626000046/ex99108172026.htm). Self-reported.
-- Why it matters: Example A gives a leverage-linked PIK/cash switch, which couples directly to a Monte Carlo of EBITDA. Inferred.
-- Agent role: read basket and lien capacity in the first lien and ABL, size the junior tranche inside the capacity map, model the PIK/cash schedule under stress, flag intercreditor limits, draft the amendment checklist. Inferred.
+- Why it matters: Example A gives a leverage-linked PIK/cash switch, which couples directly to a Monte Carlo of EBITDA.
+  Inferred.
+- Agent role: read basket and lien capacity in the first lien and ABL, size the junior tranche inside the capacity map, model the PIK/cash schedule under stress, flag intercreditor limits, draft the amendment checklist.
+  Inferred.
 
 ### C3 Convertibles and equity-linked instruments, PIPEs
 
@@ -134,7 +140,8 @@ For each example, size and instruments are as stated in the cited source.
   $10M convertible note from an existing strategic investor, 5-year maturity, 6.0% PIK interest, plus a warrant for up to 550,000 shares at $0.125.
   Existing credit facility principal cut by $10M in the same deal.
   verified (https://www.sec.gov/Archives/edgar/data/1840780/000184078025000031/exhibit991pressrelease.htm). Self-reported.
-- Agent role: price the conversion feature against share-price paths, compute dilution and ownership, check whether new equity-linked paper is allowed under existing debt and preferred rights, draft the term sheet. Inferred.
+- Agent role: price the conversion feature against share-price paths, compute dilution and ownership, check whether new equity-linked paper is allowed under existing debt and preferred rights, draft the term sheet.
+  Inferred.
 
 ### C4 Refinancing, amend and extend, covenant relief
 
@@ -142,34 +149,42 @@ For each example, size and instruments are as stated in the cited source.
   Wells Fargo is administrative agent.
   Facility cut from $400M to $325M, accordion (to $450M) removed, maturity extended to January 29, 2027, dividends and share repurchases prohibited.
   verified (https://www.sec.gov/Archives/edgar/data/852772/000119312525262835/d40219d8k.htm).
-  Context: on November 3, 2025 Denny's agreed to a $6.25 per share cash sale (about $620M enterprise value), closed January 2026. See C10.
+  Context: on November 3, 2025 Denny's agreed to a $6.25 per share cash sale (about $620M enterprise value), closed January 2026.
+  See C10.
 - Example B: Good Times Restaurants, Third Amendment to the Amended and Restated Credit Agreement (originally April 20, 2023), event date September 30, 2025.
   Cadence Bank is agent and lender.
   Consents to closing two Bad Daddy's restaurants and ending the leases, revises the definitions of Applicable Rate, Consolidated EBITDA and Consolidated Fixed Charge Coverage Ratio, and amends the leverage covenant (Section 7.11(a)) and restricted payments (Section 7.06).
   verified (https://www.sec.gov/Archives/edgar/data/825324/000121465925014561/u1022508k.htm).
   Earlier amendments (May 22 and May 30, 2024) and a 2021 Fifth Amendment with a waiver give a chain of amendments to the same agreement.
-- Agent role: compare base agreement with each amendment, compute covenant headroom before and after, simulate whether the reset survives a downside, draft a lender request with the exact sections to amend, route to approver. Inferred.
+- Agent role: compare base agreement with each amendment, compute covenant headroom before and after, simulate whether the reset survives a downside, draft a lender request with the exact sections to amend, route to approver.
+  Inferred.
 
 ### C5 Liability management exercises
 
 - Example A: J.Crew, December 2016.
   Intellectual property moved through a chain of assignments to a non-guarantor subsidiary, lenders holding $1.57B sued in June 2017.
   Press coverage also says about $250M was borrowed against the IP.
-  verified (https://www.courthousenews.com/j-crew-lenders-balk-intellectual-property-transfer/, search summary). Weak source quality, confirm in 8-Ks before quoting.
+  verified (https://www.courthousenews.com/j-crew-lenders-balk-intellectual-property-transfer/, search summary).
+  Weak source quality, confirm in 8-Ks before quoting.
 - Example B: Rackspace Technology, private exchange March 12, 2024.
   Creditors holding over 72% of first lien term loans and over 64% of first lien notes participated, with $275M of new money.
   $1,312.0M of new "first lien second out" term loans issued by a new subsidiary.
   The company said it eliminated more than $375M of net debt.
-  verified (https://www.sec.gov/Archives/edgar/data/1810019/000181001924000029/rxt-20240307.htm and https://www.sec.gov/Archives/edgar/data/1810019/000181001924000055/rxt-20240326.htm, search summary). Technology company, not consumer.
+  verified (https://www.sec.gov/Archives/edgar/data/1810019/000181001924000029/rxt-20240307.htm and https://www.sec.gov/Archives/edgar/data/1810019/000181001924000055/rxt-20240326.htm, search summary).
+  Technology company, not consumer.
 - Legal reference: the Fifth Circuit reversed Serta Simmons' 2020 uptier on December 31, 2024, holding it was not an open market purchase.
   A Mayer Brown alert reports a July 7, 2026 remand ruling awarding $261.13M in damages.
   verified (https://www.mayerbrown.com/zh-hans/insights/publications/2026/07/serta-simmons-bedding-the-fifth-circuits-uptier-decision-and-the-landmark-damages-ruling-on-remand, search summary).
-- Agent role: detect which clauses block or permit a transaction (pro rata sharing, unrestricted subsidiary capacity, required-lender thresholds), map participating versus excluded lenders, simulate recovery by class. Also a defensive use for lenders. Inferred. Adversarial and legally contested, so poor for a safe demo.
+- Agent role: detect which clauses block or permit a transaction (pro rata sharing, unrestricted subsidiary capacity, required-lender thresholds), map participating versus excluded lenders, simulate recovery by class.
+  Also a defensive use for lenders.
+  Inferred.
+  Adversarial and legally contested, so poor for a safe demo.
 
 ### C6 Rescue, bridge, DIP and exit financing
 
 - Example A: Bed Bath and Beyond, financing completed around August 31, 2022.
-  $375M first-in-last-out (FILO) facility with Sixth Street as lender and agent, plus an upsized $1.13B ABL led by J.P. Morgan.
+  $375M first-in-last-out (FILO) facility with Sixth Street as lender and agent, plus an upsized $1.13B ABL led by J.P.
+  Morgan.
   verified (https://abladvisor.com/news/34939/bed-bath-beyond-completes-abl-facility-upsizing-and-new-filo-loan-with-j-p-mor and https://storebrands.com/bed-bath-beyond-secures-new-financing, search summary).
   A February 7, 2023 waiver and amendment cut the revolver from $1.13B to $565M, added a $100M FILO, and raised margins by 100 bps.
   verified (https://docoh.com/filing/886158/0001193125-23-027117/BBBYQ-8K, search summary; my direct fetch returned empty).
@@ -181,7 +196,8 @@ For each example, size and instruments are as stated in the cited source.
 - Also: Big Lots, September 9, 2024, $707.5M DIP financing, $35M new money, Nexus Capital stalking horse.
   verified (https://www.sec.gov/Archives/edgar/data/768835/000076883524000062/exhibit991-pressrelease992.htm).
   The split into a $157.5M term loan (Gordon Brothers affiliate agent) and $550M ABL (PNC agent) is search summary only.
-- Agent role: build a 13-week liquidity forecast, size new money versus roll-up, test milestone covenants, compare lender offers, draft DIP term summary. Inferred.
+- Agent role: build a 13-week liquidity forecast, size new money versus roll-up, test milestone covenants, compare lender offers, draft DIP term summary.
+  Inferred.
 
 ### C7 Distressed M&A, loan-to-own, post-reorganization equity
 
@@ -191,9 +207,12 @@ For each example, size and instruments are as stated in the cited source.
   verified (https://www.davispolk.com/experience/party-city-emerges-chapter-11 and https://www.paulweiss.com/insights/client-news/party-city-emerges-after-prearranged-bankruptcy, search summary).
 - Example B: Del Monte Foods, Chapter 11 filed July 1, 2025, $912.5M DIP ($500M ABL plus $412.5M term loan, of which $165M new money and $247.5M roll-up), sum-of-the-parts sale.
   Winning bidders reported on January 15, 2026 (Fresh Del Monte, Pacific Coast Producers, B&G Foods).
-  verified (https://abasto.com/en/news/del-monte-files-for-bankruptcy-starts-chapter-11-sale-process/ and https://elevenflo.com/cases/2115, search summary). The January 2026 bidder list is from a single case tracker.
+  verified (https://abasto.com/en/news/del-monte-files-for-bankruptcy-starts-chapter-11-sale-process/ and https://elevenflo.com/cases/2115, search summary).
+  The January 2026 bidder list is from a single case tracker.
 - Red Lobster (C6) is also loan-to-own, since the term lenders credit-bid.
-- Agent role: waterfall and recovery analysis by class, credit-bid sizing, equity valuation after reorganization. Inferred. Heavy on court documents, light on a single credit agreement.
+- Agent role: waterfall and recovery analysis by class, credit-bid sizing, equity valuation after reorganization.
+  Inferred.
+  Heavy on court documents, light on a single credit agreement.
 
 ### C8 Carve-outs and spin-off financing
 
@@ -204,8 +223,11 @@ For each example, size and instruments are as stated in the cited source.
 - Example B: WK Kellogg Co spin-off from Kellogg (Kellanova), fall 2023.
   Credit agreement with a $500M term loan, $250M delayed-draw term loan and $350M revolver, SOFR + 1.75%, five years.
   $663M of proceeds distributed to Kellanova as a dividend.
-  verified (https://www.sec.gov/Archives/edgar/data/1959348/000162828024009949/klg-20231230.htm, search summary). Sources disagree on the agreement date (September 12 versus September 29, 2023).
-- Agent role: size debt so each entity meets its leverage target, allocate debt and cash between parent and spinco, simulate standalone coverage. Inferred. These are large caps, not mid-size, and the debt is investment-bank syndicated, not a special-situations placement.
+  verified (https://www.sec.gov/Archives/edgar/data/1959348/000162828024009949/klg-20231230.htm, search summary).
+  Sources disagree on the agreement date (September 12 versus September 29, 2023).
+- Agent role: size debt so each entity meets its leverage target, allocate debt and cash between parent and spinco, simulate standalone coverage.
+  Inferred.
+  These are large caps, not mid-size, and the debt is investment-bank syndicated, not a special-situations placement.
 
 ### C9 Asset-based financing on unusual collateral
 
@@ -215,23 +237,31 @@ For each example, size and instruments are as stated in the cited source.
   Reuters coverage describes the loan as backed by Nvidia H100 chips, with a schedule weighing depreciation against repayment.
   verified (https://gwern.net/doc/www/www.reuters.com/51ae002d5241506804199afbb8027fa44a653103.html, search summary).
 - Example B: Lambda, April 2, 2024, up to $500M GPU-backed special purpose vehicle led by Macquarie with Industrial Development Funding.
-  verified (https://www.businesswire.com/news/home/20240402148086/en/Lambda-Announces-$500M-GPU-Backed-Facility-to-Expand-Cloud-for-AI, search summary). Self-reported.
-- Neither has a public credit agreement on EDGAR that I found. Inferred: both are private companies at the time.
-- Agent role: model collateral value as a depreciating asset against a repayment schedule, test advance rates, run Monte Carlo on utilization and GPU resale value. Inferred. Good story, poor documents.
+  verified (https://www.businesswire.com/news/home/20240402148086/en/Lambda-Announces-$500M-GPU-Backed-Facility-to-Expand-Cloud-for-AI, search summary).
+  Self-reported.
+- Neither has a public credit agreement on EDGAR that I found.
+  Inferred: both are private companies at the time.
+- Agent role: model collateral value as a depreciating asset against a repayment schedule, test advance rates, run Monte Carlo on utilization and GPU resale value.
+  Inferred.
+  Good story, poor documents.
 
 ### C10 Event-driven equity: merger arbitrage, activism, spin-off investing
 
 - Example A (merger arbitrage): Denny's, merger agreement announced November 3, 2025.
   $6.25 cash per share, 52.1% premium to prior close, about $620M enterprise value, buyers TriArtisan, Treville and Yadav Enterprises.
-  Termination fees $10.32M (Denny's) and $17.2M (Parent). Closed with trading ending January 16, 2026.
+  Termination fees $10.32M (Denny's) and $17.2M (Parent).
+  Closed with trading ending January 16, 2026.
   verified (https://www.sec.gov/Archives/edgar/data/852772/000119312525263393/d17512dex991.htm and https://www.sec.gov/Archives/edgar/data/852772/000119312525303004/d74771ddefm14a.htm, search summary).
 - Example B (activism combined with structured equity): Papa John's and Starboard in C3 above, because the preferred came with board seats and a standstill.
 - Spin-off investing: Vestis and WK Kellogg in C8 are the investable events.
-- Agent role: spread and probability-of-close models. No financing structure is produced, so this does not serve the four deep problems. Inferred.
+- Agent role: spread and probability-of-close models.
+  No financing structure is produced, so this does not serve the four deep problems.
+  Inferred.
 
 ## Part 3 - Fit against the four deep problems
 
-Rating: H high, M medium, L low. These are inferred judgments, based on what each category's public documents contain.
+Rating: H high, M medium, L low.
+These are inferred judgments, based on what each category's public documents contain.
 
 | Cat | Clause reading | Structure search | Monte Carlo | Approvals and memory | Document availability for a demo |
 | --- | --- | --- | --- | --- | --- |
@@ -270,8 +300,10 @@ That uses C4 to fix the blocker and C2 to fill the gap, and shows C1 as one cand
 
 ## Caveats and next steps
 
-- I read only 8-K bodies and press releases, not the exhibits. Open the TEAM exhibits (credit agreements and the ABL amendment) before building the clause-reading corpus.
+- I read only 8-K bodies and press releases, not the exhibits.
+  Open the TEAM exhibits (credit agreements and the ABL amendment) before building the clause-reading corpus.
 - Several facts are marked "search summary" and should be re-read at the cited URL before they go on a slide.
-- The J.Crew source is weak. Replace it with an EDGAR 8-K or a law-firm explainer if used.
+- The J.Crew source is weak.
+  Replace it with an EDGAR 8-K or a law-firm explainer if used.
 - Dividend recap and bridge loans have no verified example here.
 - Blackstone Tactical Opportunities, Ares, and the Apollo public strategy page were not reached.

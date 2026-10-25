@@ -36,82 +36,106 @@ Hyphenate's four questions are shortened to: Real, Hire, New, Moment.
 Impact and feasibility are 1 to 5, my judgment (inferred).
 
 ### P1. Answer-key eval harness
-- Problem: nobody can tell if the clause-reader catches the traps. Hyphenate wants an answer key and a score.
+- Problem: nobody can tell if the clause-reader catches the traps.
+  Hyphenate wants an answer key and a score.
 - Who feels it: the reviewer, who needs to trust the catch rate.
 - Why agents help: a second agent plants traps and scores the first, so the demo ends with "caught 7 of 8, missed 1, here is why".
 - Data: a real credit agreement from EDGAR exhibits (to verify it is usable) with our own planted edits and a key.
-- 36-hour demo: yes, very. Impact 4, feasibility 5.
+- 36-hour demo: yes, very.
+  Impact 4, feasibility 5.
 - Fit: Real yes, Hire yes (precision matters, the workshop said so), New medium, Moment medium (a score on stage).
 - Source for the workshop wanting this: `hyphenate-workshop.md` in this folder (verified there).
 
 ### P2. Consent and waiver pathway
-- Problem: when the plan is blocked, the choices are redesign (already in core), or ask existing lenders for a consent. The agent should work out which vote threshold applies, which lenders are pivotal, what it will likely cost (fee, spread), and draft the consent request.
-- Who feels it: the borrower CFO and the deal team. Required Lender thresholds are typically 50.1 percent, sometimes 66.67 percent, and unanimity for protected terms (verified, search summary: https://www.sec.gov/Archives/edgar/data/0001366649/000095012310092775/a57545exv99w3.htm).
+- Problem: when the plan is blocked, the choices are redesign (already in core), or ask existing lenders for a consent.
+  The agent should work out which vote threshold applies, which lenders are pivotal, what it will likely cost (fee, spread), and draft the consent request.
+- Who feels it: the borrower CFO and the deal team.
+  Required Lender thresholds are typically 50.1 percent, sometimes 66.67 percent, and unanimity for protected terms (verified, search summary: https://www.sec.gov/Archives/edgar/data/0001366649/000095012310092775/a57545exv99w3.htm).
 - Why agents help: it reads the amendments clause, does the vote arithmetic in code, and compares "redesign" against "ask for consent" on cost.
 - Data: the amendments section of the same credit agreement, a synthetic lender holder list (labeled synthetic), fee ranges as labeled assumptions.
-- 36-hour demo: yes. Impact 4, feasibility 4.
+- 36-hour demo: yes.
+  Impact 4, feasibility 4.
 - Fit: Real yes, Hire yes, New yes (most tools extract and flag, few price the way out), Moment yes (the agent finds a second path and the reviewer chooses).
 - Fee ranges found are weak: 25 to 100 bps for fees and 50 to 100 bps for spread, from secondary sites, so keep them as ranges (verified as weak: the ibinterviewquestions and abfjournal pages above).
 
 ### P3. Term sheet normalization and bid comparison
-- Problem: lender offers differ in coupon, PIK, OID, fees, warrants, call protection, covenants. Raw coupons are not comparable.
+- Problem: lender offers differ in coupon, PIK, OID, fees, warrants, call protection, covenants.
+  Raw coupons are not comparable.
 - Who feels it: the borrower and the placement agent.
 - Why agents help: extract terms into one schema, compute all-in cost and dilution in code, then feed each into the Monte Carlo.
 - Data: 2 or 3 synthetic term sheets built from instrument ranges in `research.md`.
-- 36-hour demo: yes. Impact 3, feasibility 5.
+- 36-hour demo: yes.
+  Impact 3, feasibility 5.
 - Fit: Real medium (synthetic offers), Hire yes, New low to medium, Moment low.
 
 ### P4. Cross-document conflict detector (term sheet vs credit agreement vs intercreditor)
-- Problem: the new instrument can conflict with the existing agreement: lien priority, payment blockage, consent rights, transfer limits. Mayer Brown names intercreditor dynamics, consents under existing facilities, and change of control as where capital solutions deals get stuck (verified: https://www.mayerbrown.com/en/insights/publications/2026/10/the-rise-of-private-capital-capital-solutions-and-the-new-architecture-of-credit).
+- Problem: the new instrument can conflict with the existing agreement: lien priority, payment blockage, consent rights, transfer limits.
+  Mayer Brown names intercreditor dynamics, consents under existing facilities, and change of control as where capital solutions deals get stuck (verified: https://www.mayerbrown.com/en/insights/publications/2026/10/the-rise-of-private-capital-capital-solutions-and-the-new-architecture-of-credit).
 - Who feels it: counsel and the senior reviewer.
-- Why agents help: it matches clauses across documents and cites both. This is the Hyphenate "sources that disagree" requirement, made concrete.
+- Why agents help: it matches clauses across documents and cites both.
+  This is the Hyphenate "sources that disagree" requirement, made concrete.
 - Data: an existing agreement plus a drafted term sheet and a short intercreditor excerpt.
-- 36-hour demo: partly. A pair of conflicting clauses is feasible. Full intercreditor review is not. Impact 4, feasibility 3.
+- 36-hour demo: partly.
+  A pair of conflicting clauses is feasible.
+  Full intercreditor review is not.
+  Impact 4, feasibility 3.
 - Fit: Real yes, Hire yes, New yes, Moment yes.
 
 ### P5. Conformed-agreement builder (original plus amendments)
-- Problem: the operative text is the original agreement modified by several amendments. Ontra's page says the pain is finding the latest agreement "including the most recent amendments" (verified: https://www.ontra.ai/blog/ontra-introducing-insight-for-credit/). The page does not claim amendment functionality.
+- Problem: the operative text is the original agreement modified by several amendments.
+  Ontra's page says the pain is finding the latest agreement "including the most recent amendments" (verified: https://www.ontra.ai/blog/ontra-introducing-insight-for-credit/). The page does not claim amendment functionality.
 - Who feels it: anyone reading the agreement.
 - Why agents help: apply amendment text to the base clause and show the current definition.
 - Data: EDGAR filings usually include amendments as separate exhibits (inferred, to verify on the chosen company).
-- 36-hour demo: yes for one or two amendments. Impact 3, feasibility 4.
+- 36-hour demo: yes for one or two amendments.
+  Impact 3, feasibility 4.
 - Fit: Real yes, Hire yes, New low to medium, Moment medium (a definition changed by amendment makes the plan legal or illegal).
 - Best folded into core problem 1 as a trap rather than built separately.
 
 ### P6. Stress-path option generator (amend-and-extend, PIK toggle, equity cure)
 - Problem: when the Monte Carlo shows a bad tail, the reviewer wants alternatives that avoid default.
-- Who feels it: the borrower and its lenders. Private credit defaults hit a record 6 percent in the 12 months to April 2026 (Fitch, reported by Bloomberg Law, verified: https://news.bloomberglaw.com/bankruptcy-law/us-private-credit-defaults-hit-new-record-of-6-in-april-fitch), and more than half came from interest deferrals and PIK.
+- Who feels it: the borrower and its lenders.
+  Private credit defaults hit a record 6 percent in the 12 months to April 2026 (Fitch, reported by Bloomberg Law, verified: https://news.bloomberglaw.com/bankruptcy-law/us-private-credit-defaults-hit-new-record-of-6-in-april-fitch), and more than half came from interest deferrals and PIK.
 - Why agents help: enumerate relief tools, re-run the seeded simulation, rank by cost and tail risk.
 - Data: the same simulation engine and the cost table.
-- 36-hour demo: yes if core problem 3 exists. Impact 4, feasibility 3.
+- 36-hour demo: yes if core problem 3 exists.
+  Impact 4, feasibility 3.
 - Fit: Real medium, Hire yes, New medium, Moment yes.
-- Caution: this drifts toward after-close restructuring, which the 2026-10-23 decision excluded. Keep it inside the live deal as "what if the tail case happens before close".
+- Caution: this drifts toward after-close restructuring, which the 2026-10-23 decision excluded.
+  Keep it inside the live deal as "what if the tail case happens before close".
 
 ### P7. Pro forma covenant headroom
 - Problem: does the proposed structure leave enough headroom on each maintenance test across the next quarters?
 - Who feels it: the borrower treasury team.
 - Why agents help: compute headroom per path in the simulation and warn when a path breaches.
 - Data: the covenant definitions plus the model.
-- 36-hour demo: yes, as an output of the simulation. Impact 3, feasibility 4.
+- 36-hour demo: yes, as an output of the simulation.
+  Impact 3, feasibility 4.
 - Fit: Real yes, Hire yes, New low (crowded, see section 3), Moment low.
 - Treat as a chart in the simulator, not a standalone product.
 
 ### P8. Lender outreach and process tracker
 - Problem: shortlisting lenders by mandate, sending teasers, tracking responses.
-- Who feels it: the placement agent. The Buyers Edge case used a placement agent (verified in `research.md`: https://www.williamblair.com/News/Buyers-Edge-Platform-and-Atlantic-Park-Fund-Transaction).
+- Who feels it: the placement agent.
+  The Buyers Edge case used a placement agent (verified in `research.md`: https://www.williamblair.com/News/Buyers-Edge-Platform-and-Atlantic-Park-Fund-Transaction).
 - Why agents help: drafting and tracking.
-- Data: a lender database. We have none that is real, so it would be synthetic.
-- 36-hour demo: weak. Impact 3, feasibility 2.
+- Data: a lender database.
+  We have none that is real, so it would be synthetic.
+- 36-hour demo: weak.
+  Impact 3, feasibility 2.
 - Fit: Real low, Hire medium, New low, Moment low.
 
 ### P9. Reviewer rejection to learned policy with backtest
-- Problem: today a rejection is just noted. Hyphenate wants a rejection turned into a general policy, with evidence, backtested, approved by a controller (verified in `hyphenate-workshop.md`).
+- Problem: today a rejection is just noted.
+  Hyphenate wants a rejection turned into a general policy, with evidence, backtested, approved by a controller (verified in `hyphenate-workshop.md`).
 - Who feels it: the senior reviewer, who stops repeating the same corrections.
 - Why agents help: search past deals in Postgres for precedents, propose a rule, show which past decisions it would have changed.
 - Data: a seeded table of 10 to 20 past deals and decisions (synthetic, labeled).
-- 36-hour demo: yes. Impact 4, feasibility 3.
+- 36-hour demo: yes.
+  Impact 4, feasibility 3.
 - Fit: Real medium, Hire yes, New yes, Moment yes.
-- This likely belongs to core problem 4. List it here so it is not dropped.
+- This likely belongs to core problem 4.
+  List it here so it is not dropped.
 
 ## 3. Novelty check
 
@@ -134,12 +158,18 @@ Already common (many products):
 - Credit document intelligence from Octus and Covenant Review (secondary, search summary: https://workwisesolutions.org/guides/ai-credit-agreement-covenant-review.html). That site is a consultant guide, so weak.
 
 Looks open (no product found in these searches, absence of evidence only, searches were shallow):
-- Borrower-side or structuring-side agents that build the capital stack and test it against the existing agreement. Searches for AI capital structure optimization returned only startup venture debt explainers.
-- Consent and waiver pathway planning with vote math and pricing. Ontra's page does not mention waivers (verified).
-- Term sheet normalization across lender offers. Ontra compares terms against past agreements, which is close but not offers.
-- Cross-document conflict detection with an intercreditor. Nothing found.
-- Agents with a logged approval gate and learned policies. Not searched for beyond the above, so treat as unknown.
-- The search tool is weak. Expect that some products exist that we did not find, so claim "we did not find" and never "nobody does this".
+- Borrower-side or structuring-side agents that build the capital stack and test it against the existing agreement.
+  Searches for AI capital structure optimization returned only startup venture debt explainers.
+- Consent and waiver pathway planning with vote math and pricing.
+  Ontra's page does not mention waivers (verified).
+- Term sheet normalization across lender offers.
+  Ontra compares terms against past agreements, which is close but not offers.
+- Cross-document conflict detection with an intercreditor.
+  Nothing found.
+- Agents with a logged approval gate and learned policies.
+  Not searched for beyond the above, so treat as unknown.
+- The search tool is weak.
+  Expect that some products exist that we did not find, so claim "we did not find" and never "nobody does this".
 
 Honest read (inferred): covenant monitoring and abstraction is the crowded half of the field.
 The open half is acting on what the documents say: finding the path around a blocker, pricing it, and routing it for approval.
@@ -162,18 +192,27 @@ Score is impact times feasibility (inferred).
 | 9 | P8 Lender outreach | 6 |
 
 Recommended additions to the core four:
-1. P1 Answer-key eval harness. It is cheap, and Hyphenate asked for it.
-2. P2 Consent and waiver pathway. It extends the hero moment: the agent finds two ways out and prices both.
-3. P4 Cross-document conflict detector, scoped to one term sheet clause against one credit agreement clause. It scores lower than P3 on the raw numbers but wins on "did we see something new" and "sources that disagree". Fold P3's all-in cost table into core problem 2 instead of building it as its own agent.
+1. P1 Answer-key eval harness.
+   It is cheap, and Hyphenate asked for it.
+2. P2 Consent and waiver pathway.
+   It extends the hero moment: the agent finds two ways out and prices both.
+3. P4 Cross-document conflict detector, scoped to one term sheet clause against one credit agreement clause.
+   It scores lower than P3 on the raw numbers but wins on "did we see something new" and "sources that disagree".
+   Fold P3's all-in cost table into core problem 2 instead of building it as its own agent.
 - Fold P5 into core problem 1 as a trap, P7 into core problem 3 as a chart, and P9 into core problem 4.
 - Keep P6 as a stretch only if the simulator is done early.
 
 Avoid:
-- A standalone covenant monitoring dashboard. Crowded, and the team decided there is no after-close monitoring.
-- P8 lender outreach. No real lender data, and it looks like a CRM.
-- Final legal drafting of full loan documents. It invites a "would a lawyer sign this" test we cannot pass.
-- Any claim of real lender pricing or real fund behavior. Use labeled ranges.
-- Adding more agents than the core four plus a scorer. The workshop warned about ten shallow roles (verified in `hyphenate-workshop.md`).
+- A standalone covenant monitoring dashboard.
+  Crowded, and the team decided there is no after-close monitoring.
+- P8 lender outreach.
+  No real lender data, and it looks like a CRM.
+- Final legal drafting of full loan documents.
+  It invites a "would a lawyer sign this" test we cannot pass.
+- Any claim of real lender pricing or real fund behavior.
+  Use labeled ranges.
+- Adding more agents than the core four plus a scorer.
+  The workshop warned about ten shallow roles (verified in `hyphenate-workshop.md`).
 
 ## 5. Value at stake (cited only)
 
@@ -184,13 +223,17 @@ Avoid:
 - Amendment volume: 47 liability management exercises tracked in 2025, 37 with an uptier (Covenant Review via Ropes & Gray, secondary, search summary: https://www.ropesgray.com/en/insights/alerts/2026/02/distressed-debt-legal-insights-2025-takeaways-and-2026-outlook). Lincoln International reports 26 percent of tracked amendments included a sponsor infusion (secondary, date unclear, search summary: https://cdn.lincolninternational.com/wp-content/uploads/Perspective_LME-Predictions-and-Strategies.pdf).
 - Time cost: 62 percent of teams lose four or more days per deal to manual re-checks (Hebbia's own research, self-reported: https://www.hebbia.com/resources/credit-agreement-software).
 - Amendment pricing: fees of 25 to 100 bps and spread increases of 50 to 100 bps (weak secondary sources, search summaries).
-  - Illustration, inferred arithmetic only: a 50 bps fee on a $200M loan is $1M. A 75 bps spread step-up on $200M is $1.5M a year. These are our numbers, not sourced figures.
-- Not found: any sourced total of annual advisory or legal spend on special-situations structuring, or any cited total cost of waivers. Do not state one.
+  - Illustration, inferred arithmetic only: a 50 bps fee on a $200M loan is $1M.
+    A 75 bps spread step-up on $200M is $1.5M a year.
+    These are our numbers, not sourced figures.
+- Not found: any sourced total of annual advisory or legal spend on special-situations structuring, or any cited total cost of waivers.
+  Do not state one.
 - One unverified claim to avoid: "80 percent or more of covenant violations end in amendments" came from an unverified secondary page (search summary: https://altstreet.investments/reference/mechanics/covenant-breaches).
 
 ## Gaps
 
 - No practitioner has confirmed the stage map.
-- Searches were broad and shallow. Several results were vendor or SEO pages.
+- Searches were broad and shallow.
+  Several results were vendor or SEO pages.
 - Not read in full: Lincoln, Moody's, Houlihan Lokey, Ropes & Gray, 9fin LME pages.
 - Next check: confirm that the chosen company's EDGAR exhibits include amendments, and ask a reviewer which of P2 and P4 they would actually pay for.

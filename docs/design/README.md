@@ -4,17 +4,18 @@
 
 The latest UI is the `Hi-fi - v3` page of the team file, Schocastic: https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-2 [verified: Cayden, 2026-10-24 evening]
 Use it whenever you need to look back at the UI.
-Every screen is 1440 by 900, with a 240 px sidebar (deal, Dashboard, Case, Review, Mapping, Agents, Log, the model, and the "Always learning from" counters for human answers, policies, and edits).
+Every screen is 1440 by 900, with a 240 px sidebar: the deal, the pages, the model card, and the "Always learning from" counters for human answers, policies, and edits.
+The console's page order is Dashboard, Case, Mapping, Agents, Log, Review, and there is no top bar. [verified: `frontend/src/components/sidebar.tsx`]
 
 | Frame | Shows | Link |
 | --- | --- | --- |
 | V3-1 Dashboard | The cases, with stage, verdict, and updated time; the header has Upload and Run the demo (the console has no Begin there) | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-3 |
 | V3-2 Dashboard, upload | The upload modal | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-119 |
-| V3-3 Case | The flag card with the three readings, the verdict, the combined books, and Mapping, Review, and Log tiles. The console (2026-10-25) shows the flag card, the pipeline, and the verdict's four figure tiles only, with no verdict sentence and no conversation, and the combined books start hidden behind Show combined books | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-35 |
-| V3-4 Mapping | Target line, platform line, and confidence, filtered by All, Unsure, or By policy | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-195 |
-| V3-5 Log | The audit log | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-379 |
+| V3-3 Case | The flag card with the three readings, the verdict, the combined books, and Mapping, Review, and Log tiles. The console (2026-10-25) shows the Brief card, the flag card, the pipeline, and the verdict's four figure tiles only, with no verdict sentence and no conversation, and the combined books start hidden behind Show combined books. The Case is read-only: edits, approval, and Download final files are on Review | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-35 |
+| V3-4 Mapping | Target line, platform line, and confidence, filtered by All, Unsure, or By policy. Read-only: remaps are made on Review's Mapping tab | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-195 |
+| V3-5 Log | The audit log, with a toggle to the agents' conversation; read-only | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-379 |
 | V3-6 Agents | The four agents in the live 3D Agent House (code layer 736:1282), each actor's latest line, and the agent timeline | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=146-149 |
-| V3-7.N Review | The Review workbook flow (section "Review flow (D19)") | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=670-44 |
+| V3-7.N Review | The Review workbook flow (`review-companion.md`): two tabs, Review and Mapping, the Reviewer companion that follows the cursor (on this page only), Approve, and Download final files | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=670-44 |
 
 Josie's teal pass (2026-10-24 evening) changed the whole look, and the console follows it:
 - One teal, #0F6674, for the brand, headings, body text, labels, figures, and the primary button.
@@ -33,13 +34,15 @@ The frame titles the page "Agent"; the console keeps "Agents", the name in the s
 
 Other pages in the same file:
 - `Components` (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=487-1681): the components behind v3.
-- `Technologies Used` (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2): material for the pitch deck and the pitches, not the UI. See "Team board" below.
+- `Technologies Used` (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2): material for the pitch deck and the pitches, not the UI.
+  See "Team board" below.
 - `Hi-fi - v1`, `Hi-fi - v2`, `Wireframes + Ideation`, `Ideation`, and `3D Mockup`: earlier work, kept as history.
 
-The D19 additions (editable cells, the reason bubble, the companion) are specified in `review-companion.md` and go on top of V3-3 and V3-4.
+The D19 additions (editable cells, the reason bubble, the companion) are specified in `review-companion.md` and live on the Review page (V3-7), not on the Case or Mapping.
 The logo, the name, and the launch splash are specified in `brand.md` (D21).
 The splash shows only the circle and the name, centered, on a transparent background, until the whole app has loaded.
-The tokens and rules below still apply.
+The rules for adding to the UI below still apply.
+The tokens and type below are the first file's: the console keeps their names in `frontend/src/app/globals.css` under the v3 teal ones, with `clear` now teal (#0F6674), and its type is DM Sans, Instrument Serif for the name, IBM Plex Mono, and Public Sans (`frontend/src/app/layout.tsx`).
 
 ## Earlier four-screen design (history)
 
@@ -62,12 +65,15 @@ File: https://www.figma.com/design/KDbPUruO6f5oPLyzyLgUZh (Stochastic - Reviewer
 | Foundations | Components | https://www.figma.com/design/KDbPUruO6f5oPLyzyLgUZh?node-id=2-2 |
 
 The file holds one variable collection (`Tokens`), seven text styles, and five local components: Actor Chip, Button, Source Chip, Verdict, and Log Row.
-All numbers in the mockups are illustrative placeholders. They are not engine output and not from real filings.
+All numbers in the mockups are illustrative placeholders.
+They are not engine output and not from real filings.
 
 ## Team board (Schocastic)
 
-File: https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi (Schocastic). It holds the current UI (Hi-fi v3, above) and the pitch material.
-Its `Technologies Used` page is for the pitch deck and the pitches. It (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2) holds one area per track: Tiger Data, Factory, Workflow, Tech stack, Research, and How it works.
+File: https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi (Schocastic).
+It holds the current UI (Hi-fi v3, above) and the pitch material.
+Its `Technologies Used` page is for the pitch deck and the pitches.
+It (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=135-2) holds one area per track: Tiger Data, Factory, Workflow, Tech stack, Research, and How it works.
 Each item there is a card: a real screenshot (12 px corners, light stroke, soft shadow, dark backing at FIT), a DM Sans SemiBold 20 title, and a DM Sans Regular 15 description.
 Add new evidence as cards in the same style, by cloning an existing card.
 
@@ -115,7 +121,8 @@ Type:
 - Newsreader for verdict headlines and clause quotes.
 - IBM Plex Mono for run ids, hashes, and clause numbers.
 
-Sizes: verdict 40, heading 26, body 18, quote 20, label 14, mono 14. Nothing is smaller than 14.
+Sizes: verdict 40, heading 26, body 18, quote 20, label 14, mono 14.
+Nothing is smaller than 14.
 Spacing scale: 4, 8, 12, 16, 24, 32, 48.
 Radius: 4 for chips and buttons, 8 for cards.
 State is always a color plus a word plus a shape: square (agent), circle (human), triangle (escalation), cross (denied), check (clear).

@@ -1,13 +1,15 @@
 # evals
 
-Home of the answer key and the scoring. Owner: Eric.
+Home of the answer key and the scoring.
+Owner: Eric.
 
 ## Contents
 
 - `fixture_check.md`: every fixture figure checked against the filings.
 - `answer_key.csv`: each Nu Aire detail line and its Kewaunee line, from Note 2 of the pro forma filing (8-K/A Ex 99.2).
 - `score_mapper.py`: runs the deal in-process and scores the Mapper's mappings against the key.
-- `mapper_trials.py`: runs the Mapper alone N times on the Anthropic backend and reports acceptance, score, flags, and cost. It spends real API credit.
+- `mapper_trials.py`: runs the Mapper alone N times on the Anthropic backend and reports acceptance, score, flags, and cost.
+  It spends real API credit.
 - The deal-math tests with the real figures live in `backend/tests/test_trust_rules.py` (tie-out, naive versus covenant leverage).
 
 ## The answer key is preliminary and matches in shape only
@@ -20,8 +22,10 @@ Columns: `target_line` and `platform_line` use the exact fixture names in `backe
 Total and subtotal rows are left out.
 The `basis` column says how firm each answer is:
 - `note2` (23 rows): Note 2 maps the line directly (verified).
-- `note2_total` (10 rows): Note 2 maps only the total, and the fixture carries the parts, so each part goes to the line the total goes to (inferred). These are the six gross PP&E lines and accumulated depreciation (Note 2 maps net PP&E only) and the three operating expense lines (Note 2 maps Total Operating Expense only).
-- `none` (4 rows): Note 2 does not cover the line, so `platform_line` is blank and `comment` says why. These are Certificates of Deposit, Noncompete Agreement, Net, Reserve for Uncertain Tax Positions, and the cash flow line Depreciation and Amortization.
+- `note2_total` (10 rows): Note 2 maps only the total, and the fixture carries the parts, so each part goes to the line the total goes to (inferred).
+  These are the six gross PP&E lines and accumulated depreciation (Note 2 maps net PP&E only) and the three operating expense lines (Note 2 maps Total Operating Expense only).
+- `none` (4 rows): Note 2 does not cover the line, so `platform_line` is blank and `comment` says why.
+  These are Certificates of Deposit, Noncompete Agreement, Net, Reserve for Uncertain Tax Positions, and the cash flow line Depreciation and Amortization.
 
 Three Note 2 footnotes move only part of a line: (b) $77K of Accounts Payable and (d) $0.2 million of Accrued Compensation move to other lines, and (e) $0.6 million of Other Accrued Expenses moves to Deferred revenue (verified).
 The key gives each line its main home and notes the partial move in `comment`.
@@ -49,9 +53,9 @@ Both recorded Droid runs were scored without a key, by replaying the Mapper's re
 
 | Recording | Model (requested) | `note2` | `note2_total` | All scored |
 | --- | --- | --- | --- | --- |
-| `backend/recordings/` (the default replay; a copy is in `sonnet-5-5/`) | Claude Sonnet 5.5 | 23 of 23 | 10 of 10 | 33 of 33 |
+| `backend/recordings/` (the pinned replay for plain `AGENT_BACKEND=replay`; a copy is in `sonnet-5-5/`) | Claude Sonnet 5.5 | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/haiku-5-5/` | Claude Haiku 5.5 (04:30) | 23 of 23 | 10 of 10 | 33 of 33 |
-| `backend/recordings/haiku-5-5-run2/` | Claude Haiku 5.5 (evening, after the settle-every-line rule) | 23 of 23 | 10 of 10 | 33 of 33 |
+| `backend/recordings/haiku-5-5-run2/` | Claude Haiku 5.5 (evening, after the settle-every-line rule; what the demo paces replay since 2026-10-25) | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/droid-console-0751/` | Droid run from the console on 2026-10-24 at 07:51 (model not stored in the recording; the backend default was Haiku 5.5) | 23 of 23 | 10 of 10 | 33 of 33 |
 | `backend/recordings/anthropic-haiku-5-5/` | Claude Haiku 5.5 on the Anthropic backend (the first Anthropic run) | 22 of 23 | 10 of 10 | 32 of 33 |
 
@@ -69,7 +73,8 @@ The score covers the line-to-line mapping only, not the covenant tags. [verified
 
 Why the Haiku run is not the default: its Mapper tagged "Short-term borrowings" unclear and put it in the financing liability flag, but the default option left it unclear, so after the controller's answer the Preparer refused with "covenant tag is unclear for: Short-term borrowings". [verified: replay run of `score_mapper.py`, 2026-10-24]
 Since 2026-10-24 the gateway rejects any covenant flag whose option leaves a flagged line unsettled, so a Mapper output like that fails at the Mapper step and the runner falls back. [verified: `test_flag_option_that_leaves_a_line_unclear_is_refused`]
-The Sonnet recording runs through and is the default replay.
+The Sonnet recording runs through and is the pinned replay for plain `AGENT_BACKEND=replay`.
+The demo paces (`demo` and `factory`) replay `haiku-5-5-run2/` instead, which also runs through (D22). [verified: `backend/app/agents/demo_replay.py`]
 The Mapper is scored on what it proposed before any human answer; the default flag answers changed no mappings in this run.
 
 ## Mapper consistency on the Anthropic backend (2026-10-24)
@@ -92,8 +97,10 @@ With both fixes, no run hit either failure, and no Mapper retry was needed. [ver
 
 The covenant flag in combined batch 2, which recorded the lines each flag asks about:
 - Every run raised one covenant flag on the Statesville sale-leaseback lines (current and long-term portion of financing liability) and the 8% seller notes, and tagged the PNC revolver and term loan as debt. [verified]
-- 5 of 10 runs also put "Short-term borrowings" ($805K) in the flag. When the controller excludes it, leverage shows 0.74x instead of 0.76x; the verdict does not change. [verified: run output; figures from `docs/devpost/flag-card.md`]
-- 1 run flagged the three lines without tagging them unclear; the gateway accepted it, and the controller's answer sets the tags. Combined batch 1 showed the same pattern in 2 runs, which did not record flag lines. [verified for batch 2; inferred for batch 1]
+- 5 of 10 runs also put "Short-term borrowings" ($805K) in the flag.
+  When the controller excludes it, leverage shows 0.74x instead of 0.76x; the verdict does not change. [verified: run output; figures from `docs/devpost/flag-card.md`]
+- 1 run flagged the three lines without tagging them unclear; the gateway accepted it, and the controller's answer sets the tags.
+  Combined batch 1 showed the same pattern in 2 runs, which did not record flag lines. [verified for batch 2; inferred for batch 1]
 
 The most common miss is "Accrued Commissions" mapped to "Other accrued expenses", where Note 2 says "Employee compensation and amounts withheld". [verified]
 A live Anthropic run now reliably reaches the financing flag and the same verdict, but the exact flag lines and the leverage shown can differ between runs, so the recorded replay stays the stage default. [inferred]

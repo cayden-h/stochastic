@@ -62,6 +62,7 @@ The output is a draft built from the approved result, not advice and not a signe
 | Decisions | Each flag the controller answered, the option, and its computed effect | Not in the agreement; the audit trail behind the calculation [inferred] |
 | Approval | The approval item, audit row count, chain check, denied attempts | Not in the agreement [inferred] |
 | Mappings | How many lines were mapped and how many came from a learned policy | Not in the agreement [inferred] |
+| Edits in review | Each edit the controller made on the Review page, with its old and new value and its reason (D19) | Not in the agreement [inferred] |
 
 Every figure in the draft is followed by the run id of the tool run that produced it, for example `28,378.845 [run_014]`. [verified: `backend/tests/test_certificate.py`]
 

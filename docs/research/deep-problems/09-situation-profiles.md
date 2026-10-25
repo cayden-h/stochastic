@@ -49,7 +49,7 @@ Each type has (a) first diligence requests, (b) objectives and trade-offs, (c) i
   Springing revolver covenants usually apply only when the revolver is drawn past about 40 percent.
   verified (https://www.proskauer.com/alert/private-credit-deep-dives-leverage-covenants-and-auto-resets)
 - Covenant-lite was 41 percent of large deals in 1H 2026 but under 4 percent below $50M EBITDA.
-  verified in `../README.md` (Houlihan Lokey, search summary), not re-checked.
+  verified in `CalHacks/ideation/Stochastic/README.md` (Houlihan Lokey, search summary), not re-checked.
 - Amendment and waiver voting in a real credit agreement (Organogenesis, Aug 2021): ordinary amendments and waivers need Required Lenders, defined as at least two unaffiliated lenders holding more than 50 percent.
   Extending maturity or amortization, cutting rate, or raising a commitment needs each directly affected lender.
   Releasing all or substantially all collateral, or changing the voting percentages, needs all lenders.
@@ -257,7 +257,7 @@ Each type has (a) first diligence requests, (b) objectives and trade-offs, (c) i
 - The Bankruptcy Court approves DIP financing after notice and a hearing, and priming liens need findings on adequate protection.
   verified (Stout URL)
 - The product does not run this type.
-  Detect, stop, and escalate to the human, as set in `../README.md`.
+  Detect, stop, and escalate to the human, as set in `CalHacks/ideation/Stochastic/README.md`.
 
 ### Type 7 - Borrowing against assets (ABL, equipment, receivables, GPU-backed)
 

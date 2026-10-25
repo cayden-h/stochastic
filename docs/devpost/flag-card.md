@@ -30,7 +30,8 @@ Detail on each part:
 - PNC: the revolver and term loan "mature on the 5-year anniversary of the Closing". [verified: Ex 99.2, Description of the Financing]
 - Seller notes: they "will accrue interest at 8% per annum". [verified: Ex 99.2, Description of the Financing]
 - Seller notes: the sellers' payment rights are "subordinate to the rights of PNC under the Loan Agreement". [verified: Ex 99.2, Description of the Financing]
-- Seller notes: the Note 4(h) table shows $22,540K, while the narrative says $23 million. We use the table figure. [verified: Ex 99.2; the gap is likely a fair value or discount, inferred]
+- Seller notes: the Note 4(h) table shows $22,540K, while the narrative says $23 million.
+  We use the table figure. [verified: Ex 99.2; the gap is likely a fair value or discount, inferred]
 - The pro forma puts all of the closing financing on the financing liability lines, which is why one line holds all three. [verified: Ex 99.2, Note 4(h) table headers]
 
 ## What the agreement says
@@ -51,14 +52,17 @@ Exclusion 1, Subordinated Debt:
 Exclusion 2, the Statesville lease:
 - The definition excludes "capitalized lease obligations relating to the real property located at 2700 West Front Street". [verified: Ex 10.1, definitions, Senior Funded Bank Debt]
 - 2700 West Front Street is the Statesville sale-leaseback property. [verified: 10-Q, Note G]
-- Reading the failed sale-leaseback as a "capitalized lease obligation" is our reading. The 10-Q calls the lease a finance lease but books a financing liability. A practitioner should confirm it. [inferred]
+- Reading the failed sale-leaseback as a "capitalized lease obligation" is our reading.
+  The 10-Q calls the lease a finance lease but books a financing liability.
+  A practitioner should confirm it. [inferred]
 
 ## The three options and their effect
 
 Senior Funded Bank Debt below includes $1,070K that is not on the flagged line and counts in every option: $805K of short-term borrowings at the international subsidiaries and $265K of finance leases for vehicles and IT equipment. [verified: fixture and 10-Q, Notes F and H]
 Options b and c use covenant EBITDA, $28,379K, with the agreement's add-backs and rent deduction applied. [verified: `test_naive_and_covenant_leverage_differ_on_real_figures`]
 Option a is computed as filed: the same debt over reported EBITDA, $25,312K, with no add-back and no rent deduction. [verified: `test_choosing_the_whole_line_reading_is_as_filed_end_to_end`]
-Changed 2026-10-24 evening: before, option a used covenant EBITDA (2.54x). That counted the Statesville financing as debt while still deducting its rent, which mixes two readings; made consistent it would be 2.37x. [verified: arithmetic]
+Changed 2026-10-24 evening: before, option a used covenant EBITDA (2.54x).
+That counted the Statesville financing as debt while still deducting its rent, which mixes two readings; made consistent it would be 2.37x. [verified: arithmetic]
 The gateway computes each effect with the tools.
 No model writes these numbers. [verified: `test_mapper_flags_the_financing_liability_and_effects_are_computed`]
 
@@ -76,11 +80,15 @@ If the controller chooses a, the deal goes on the as-filed basis, the result is 
 The headroom in b is a covenant figure: the next add-on is still capped by the $5M acquisition basket (Section 5.8(ii)) and the undrawn revolver, about $14.4M. [verified: Ex 10.1; arithmetic]
 
 The table above is the flag the scripted backend raises. [verified: scripted run of the fixture]
-The recorded Droid runs raised the same flag, but neither offered option c. Their figures below were computed at the time, before the EBITDA definition items and before the as-filed whole-line reading; replayed today, the all-counted option shows 2.84x:
+The recorded Droid runs raised the same flag, but neither offered option c.
+Their figures below were computed at the time, before the EBITDA definition items and before the as-filed whole-line reading; replayed today, the all-counted option shows 2.84x:
 - Sonnet 5.5, 2026-10-24, 03:30: 0.77x (the agreement), 1.76x, and 2.57x (all counted). [verified: `docs/agents.md`, run log]
   The 1.76x matches PNC plus the Statesville lease, without the seller notes. [inferred: arithmetic]
 - Haiku 5.5, 2026-10-24, 04:30: 0.77x (the agreement), 0.74x (short-term borrowings also excluded), and 2.57x (all counted). [verified: `docs/agents.md`, run log]
 
+The demo beats replay a third run, Haiku 5.5 at 03:40 (`backend/recordings/haiku-5-5-run2/`, D22).
+Its covenant flag covers six lines and offers the agreement's reading, every line counted, and the agreement's reading with the short-term overdraft and loan arrangements also excluded; the gateway computes each effect with the tools when it is replayed. [verified: `backend/recordings/haiku-5-5-run2/mapper.json`]
+The same run asks a second question, where six Nu Aire lines led by the certificates of deposit belong, and both are answered together (D23).
 So the middle option on screen depends on which run is shown.
 Read the card on screen before the pitch.
 
@@ -88,7 +96,8 @@ Read the card on screen before the pitch.
 
 Every amount in the fixture matches its filing. [verified: `evals/fixture_check.md`]
 The debt figures in options a, b, and c do not change with the open items below.
-Covenant EBITDA can change, and with it the leverage in options b and c. Option a uses reported EBITDA, which none of the open items touch.
+Covenant EBITDA can change, and with it the leverage in options b and c.
+Option a uses reported EBITDA, which none of the open items touch.
 
 Open with Cayden and Tri, from `evals/fixture_check.md`:
 1. Done 2026-10-24: Nu Aire interest income ($514K) is subtracted, as the definition says "less interest income". [verified: `test_ebitda_subtracts_interest_income`]
@@ -99,11 +108,14 @@ New item found while writing this card:
 4. Transaction costs are applied as $0, but Ex 99.2 Note 5(b) lists $698K of "Expected transaction expenses", item (i). [verified: Ex 99.2, Note 5(b)]
    The agreement adds back transaction costs "not exceeding $4,000,000 in the aggregate". [verified: Ex 10.1, definitions, EBITDA]
    Item (i) describes costs incurred after 2024-10-31, so whether they fall in the tested period is a judgment. [inferred]
-   We keep it at zero: the costs fall after the period of the statements in the fixture. It would move only options b and c, slightly lower. [verified: arithmetic; timing inferred]
-5. The definition takes Nu Aire EBITDA "for the four quarter period commencing on November 1, 2023". The fixture uses Nu Aire's year to 2024-09-30, one month off, and Kewaunee's fiscal year to 2024-04-30, six months off the last twelve months to the closing quarter. [verified: Ex 10.1, definitions; the period is the next step]
+   We keep it at zero: the costs fall after the period of the statements in the fixture.
+   It would move only options b and c, slightly lower. [verified: arithmetic; timing inferred]
+5. The definition takes Nu Aire EBITDA "for the four quarter period commencing on November 1, 2023".
+   The fixture uses Nu Aire's year to 2024-09-30, one month off, and Kewaunee's fiscal year to 2024-04-30, six months off the last twelve months to the closing quarter. [verified: Ex 10.1, definitions; the period is the next step]
 
 The margin:
-- Option a, as filed, stays over the limit while reported EBITDA is below $28,782K. Reported EBITDA is $25,312K, so it would need $3,470K more to pass. [verified: arithmetic, the `limit_test` sensitivity run]
+- Option a, as filed, stays over the limit while reported EBITDA is below $28,782K.
+  Reported EBITDA is $25,312K, so it would need $3,470K more to pass. [verified: arithmetic, the `limit_test` sensitivity run]
 - No add-back or rent figure moves option a, because it uses none. [verified: `ebitda` with `as_filed`]
 - Options b and c stay far under the limit in every case above. [verified: arithmetic]
 

@@ -1,6 +1,7 @@
 # scripts
 
-Helper scripts. Owner: Eric (data pulls) and Cayden (agent probes).
+Helper scripts.
+Owner: Eric (data pulls) and Cayden (agent probes).
 
 | Script | What it does |
 | --- | --- |
@@ -13,5 +14,7 @@ Helper scripts. Owner: Eric (data pulls) and Cayden (agent probes).
 | `droid_rewind_live_check.py` | Runs the demo deal on Droid, forces the gateway to refuse the Mapper's result, and checks Factory's session records: the old session holds the refused turn, the successor the retry uses does not. Spends Factory credits. |
 | `droid_rewind_api_check.py` | End-to-end check through the real API server on Droid with the demo's models: a forced refusal, the rewind, the whole deal through approval, then a second deal that resumes the successor session, and Factory's session records. 20 checks; passed on 2026-10-24. With `STORE=postgres DB_SCHEMA=<your own schema>` it runs on Tiger Cloud and adds a restart that loads everything back from Postgres (22 checks; passed on 2026-10-24 in schema `eric_rewind_check`). Never point it at the demo's schema. Spends Factory credits. |
 | `droid_probe.py` | Lists the models our Factory key can run and makes one `run()` call with structured output in an empty directory. Answers "can Droid run Claude?" |
-| `record_run.py` | Runs the whole deal on a chosen backend and saves each agent's output to `backend/recordings/`, the replay fallback for the demo. |
+| `record_run.py` | Runs the whole deal on a chosen backend and saves each agent's output to `backend/recordings/`, the pinned run that plain `AGENT_BACKEND=replay` reads (the demo paces read `backend/recordings/haiku-5-5-run2/` instead). |
+| `demo.sh` | Stage shortcuts for a terminal, sourced once (`source scripts/demo.sh`): `demo_fresh` (reset with memory cleared), `demo_again` (reset with memory kept), `demo_run <backend>`, and `demo_health`. |
+| `tiger_bench.py` | Times the Tiger read side (BM25 search and the `audit_activity` continuous aggregate) against plain SQL, read-only, with `EXPLAIN ANALYZE`. Needs `DATABASE_URL`. |
 | `run_unseen_deal.py` | Runs the whole deal with a QuickBooks trial balance as the target, in memory, on `AGENT_BACKEND`, and prints the flags, mappings and verdict. For a judge's own scenario. The live Droid run on the sample company is in `evals/unseen-input-quickbooks.md`. |

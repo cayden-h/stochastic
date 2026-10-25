@@ -2,7 +2,7 @@
 
 The gateway is the only writer.
 The console, the job runner, and the agents all call it.
-This file describes the code in `backend/app/gateway/gateway.py` and `backend/app/api/routes.py` as of 2026-10-24.
+This file describes the code in `backend/app/gateway/gateway.py` and `backend/app/api/routes.py` as of 2026-10-25.
 Shapes are the Pydantic models in `backend/app/core/models.py`.
 
 ## Actors
@@ -110,7 +110,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /runs/{run_id}` | any | One tool run: tool, inputs, outputs |
 | `GET /agents/memory` | any | Policies and sessions |
 | `GET /deals/{id}/conversation` | any | The deal's whole conversation in order: what the agents, the gateway, and the controller told each other (shape in "Live events" below). The same messages the stream sends as `conversation` events, for a page opened late or after a restart. 404 for an unknown deal. |
-| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, `stage`, `run`, `edit`, `conversation`, and `mapping` events (shapes below) |
+| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, `stage`, `run`, `edit`, `conversation`, `notify`, and `mapping` events (shapes in "The stream" below) |
 | `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, files `platform_csv` and `target_csv`, and exactly one of `brief` (a JSON string of the Brief; the reader is skipped) or `agreement_txt` (the credit agreement as a UTF-8 `.txt` file, same 2 MB limit; the deal starts with `brief_status` `none` and the run starts with the Brief Reader, unless an approved Brief for the same agreement hash is reused). Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}, "brief_status"}`. 422 when neither or both of `brief` and `agreement_txt` are sent, for an empty or non-UTF-8 agreement or a name not ending in `.txt`, and naming the file, row, and column for a bad CSV. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
 | `POST /deals/{id}/brief/amounts` | `human:controller` only | Set fields of the draft Brief (D20), most often an adjustment amount from the books with its source. Any draft field can be set by its path (the limit, the lender, the definitions, `debt_excludes[k]`, an adjustment's name, amount, or cap); only an amount needs a `source_ref`. Body `{"amounts": [{"field": "ebitda_addbacks[2].amount", "value": 698.0, "source_ref": "...", "inferred": false, "note": ""}]}` (a new adjustment is added by its `.name` at the next index). Every entry is checked first (path, index, type, source); a bad entry refuses the whole list with 422 naming `amounts[i]`, nothing applied, and a DENIED row. The entries are then applied in order through `gateway.amend_brief` under the gateway lock. The gateway cannot roll back: if it still refuses entry i, the 422 names `amounts[i]` and lists the earlier entries, which stay applied. Returns `{"brief", "brief_draft", "brief_status", "stage"}` (response model `BriefAmountsResponse`). 404 unknown deal; 422 for an empty list, a field path that is not `name[i].attr`, or a `value` that is a boolean, non-finite, too big for a float, 1e12 or more in size, or a number sent as text for an amount, a cap, or the limit (loc `amounts[i].value`, the message names the field path); 403 with a DENIED row for any actor but `human:controller` (an agent, `human:intern`), before any write; 409 when there is no draft or the Brief is approved. |
 | `POST /deals/{id}/brief/approve` | `human:controller` only | Approve the draft Brief through `gateway.approve_brief`; it is locked and the deal is back at stage `new`. Since D23 it continues the run in the background at the run's pace when the deal has been run (`?auto_advance=false` leaves it stopped), so the approval is one click. Returns the deal (response model `Deal`, `brief_status` `approved`, `stage` `new`). 404 unknown deal; 403 with a DENIED row for any actor but `human:controller`, or while a `brief_field` flag is open; 409 when there is no draft (a second approve, or a deal whose Brief came as JSON). |
@@ -128,7 +128,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 
 ## The case shape
 
-`GET /deals/{id}/case` returns everything the one screen needs.
+`GET /deals/{id}/case` returns everything a deal's pages need in one read.
 
 ```json
 {
@@ -156,7 +156,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 `edits`, `adjustments`, and `brief_draft` are the phase 2 additions (shapes in the next section).
 They are on `/case` and `CaseResponse` now (verified by `backend/tests/test_case_phase2.py`).
 The edit routes (`POST /deals/{id}/edits`, `POST /edits/{id}/reason`, `DELETE /edits/{id}`) fill `edits` and `adjustments` (verified by `backend/tests/test_api_edits.py`); `brief_draft` is the live draft from `gateway.brief_draft` (the Brief, its citations, its flag ids, `removed`), null for a deal whose Brief came as JSON or before the reader ran (verified by `backend/tests/test_api_brief.py`).
-`brief_verification` (D23) is the verifier's report on that draft, `BriefVerification`: `item_id`, `sha256`, `checks` (each `{field, value, section, quote, ok, reason, checks}`), `passed`, `failed`, `filled`, `scope_notes`, `escalated`, `auto_approved`, and `at`; null before the verifier ran (verified by `backend/tests/test_case_phase2.py` and `backend/tests/test_brief_verifier.py`).
+`brief_verification` (D23) is the verifier's report on that draft, `BriefVerification`: `item_id`, `sha256`, `checks` (each `{field, value, section, quote, ok, reason, checks}`), `passed`, `failed`, `filled`, `scope_notes`, `escalated`, and `at`; null before the verifier ran (verified by `backend/tests/test_case_phase2.py` and `backend/tests/test_brief_verifier.py`).
 `deal.book_amounts` is on the deal itself: the demo deal's, and an upload of the demo agreement extract with the demo statements (`kewaunee.is_demo_twin`), hold the fixture's sourced amounts.
 `deal.brief` is null while a deal from agreement text has no draft yet.
 `reason_chips` holds the chips the edit bubble offers, per kind (`amount`, `remap`), from the gateway's `reason_chips`; they are hardcoded per deal for the demo.
@@ -191,10 +191,13 @@ They come from a separate `limit_test` run the gateway makes as `system:gateway`
 `naive_debt` and `naive_ebitda` are the whole-line reading as filed, read from the `covenant_debt` and as-filed `ebitda` runs behind the covenant flag option that counts every flagged line as debt (option a on the demo deal).
 When no covenant flag opened (for example the second demo run, where a policy settles the financing lines), there is no such run, so the keys are absent and no run is made.
 If the gateway refuses the sensitivity run, the keys are absent and `/case` still answers; the refusal is audited once and not retried.
-`naive_flip_addback` is the EBITDA increase at which that reading reaches the limit (debt / limit - reported EBITDA): positive means that much more EBITDA is needed, zero or negative means it already passes. On the demo deal it is $3,470K.
-`naive_flip_rent` is no longer returned on `/case`: the as-filed reading has no rent deduction. The `limit_test` tool still computes it when given `ebitda_run_id`.
+`naive_flip_addback` is the EBITDA increase at which that reading reaches the limit (debt / limit - reported EBITDA): positive means that much more EBITDA is needed, zero or negative means it already passes.
+On the demo deal it is $3,470K.
+`naive_flip_rent` is no longer returned on `/case`: the as-filed reading has no rent deduction.
+The `limit_test` tool still computes it when given `ebitda_run_id`.
 `result.run_ids_by_tool` maps `consolidate`, `ebitda`, `covenant_debt`, and `leverage` to their run ids, so the console can link each figure to `GET /runs/{run_id}`.
-`source_lines[].note` is what the filing says about a line (for example the 10-Q note that the financing liability is the Statesville sale-leaseback). Show it on the flag card's evidence.
+`source_lines[].note` is what the filing says about a line (for example the 10-Q note that the financing liability is the Statesville sale-leaseback).
+Show it on the flag card's evidence.
 A mapping flag may cover several target lines; its options then carry `mappings` (target line id to platform line) in `payload.option_actions`, and the option `effect` text lists each line.
 `GET /health` returns `backend.settings` with the configured backend, the fallback chain, and the model per role on each backend.
 On the Postgres store, `GET /health` `store` also has `writes` (batches written), `avg_write_ms`, and `last_write_ms`: the time from queueing a batch to its commit on Tiger Cloud, rounded to 0.1 ms.
@@ -206,7 +209,7 @@ The three closing financing lines (term loan, revolver, seller notes) carry `per
 ## Phase 2 shapes: review edits (D19) and the Brief Reader (D20)
 
 The models are in `backend/app/core/models.py`.
-The routes that use them are planned: `design/review-companion.md` section 10 for edits, `brief-reader.md` section 7 for the reader.
+The routes that use them are built: the edit routes (spec in `design/review-companion.md` section 10) and the Brief Reader routes (`brief-reader.md` section 7), both in the routes table above.
 Amounts are in USD thousands.
 
 ### Edit
@@ -341,12 +344,11 @@ Only the gateway may pass `edit_ids` to a tool, and only to `consolidate`, `ebit
 If those tools do not take `edits` yet (Tri's T1), the edit is refused with 503 ("edit-aware tools not installed (T1)") and nothing is kept.
 When a covenant flag gave the whole-line reading, the recompute also runs that what-if again on the edited books: `covenant_debt` naive with the flagged lines tagged debt (restored after), `ebitda` as filed, and `leverage`, each with `what_if: "whole_line"`.
 The new result has `supersedes` (the result it replaces), `edit_ids`, a `review` read from the `tie_out` and `limit_test` runs, and `run_ids_by_tool` for the six tools plus `naive_covenant_debt`, `naive_ebitda`, and `naive_leverage` when the what-if ran.
-For Tri: `_whole_line_runs` in `routes.py` still reads the whole-line runs from the covenant flag's option, so the `/case` sensitivity figures do not show edits yet.
+Open (Tri): `_whole_line_runs` in `routes.py` still reads the whole-line runs from the covenant flag's option, so the `/case` sensitivity figures do not show edits yet.
 It should prefer `result.run_ids_by_tool["naive_covenant_debt"]` and `["naive_ebitda"]` when the latest result has them.
 The new approval item is proposed by `system:gateway`, because the revision is the gateway's recompute; the controller approves it, so maker-checker holds.
 It is `PROPOSED` when both checks pass, `NEEDS_INFO` otherwise.
 
-For Tri (T2): `/case` should add `edits` (`store.deal_edits`), `adjustments`, and `reason_chips` (`gw.reason_chips(deal_id)`), so the console can open the bubble without a second call.
 If a recompute fails for any reason (a tool error included), the edit is refused with 422 and a DENIED row: `apply_edit` keeps nothing, and `revert_edit` leaves the edit live.
 `run_tool` turns any tool exception into a 422 with an audit row that names it.
 
@@ -411,8 +413,8 @@ Audit rows: `ask:flag` (the Preparer) and `adjustment:propose` when it opens, `a
 ## The Brief Reader in the gateway (D20)
 
 The functions are in `backend/app/gateway/gateway.py`; the text helpers (normalization, the hash, the section and definition indexes) are in `backend/app/core/agreement.py`.
-The routes over them are Tri's (T4): `POST /deals` with `agreement_txt` calls `create_deal_from_agreement`, the amounts route calls `amend_brief`, `POST /deals/{id}/brief/approve` calls `approve_brief`, and `/case` reads `brief_draft`.
-The amounts route should accept any field path, not only amounts: `amend_brief` is generic, so the console can also correct a limit or a text field.
+The routes over them are Tri's (T4): `POST /deals` with `agreement_txt` calls `create_deal_from_agreement`, `POST /deals/{id}/brief/amounts` calls `amend_brief`, `POST /deals/{id}/brief/approve` calls `approve_brief`, and `/case` reads `brief_draft` and `brief_verification`.
+The amounts route accepts any field path, not only amounts: `amend_brief` is generic, so the console can also correct a limit or a text field.
 
 | Function | What it does |
 | --- | --- |
@@ -578,7 +580,7 @@ data: {"mapping_id": "m_001", "line_id": "sl_055", "company": "Nu Aire", "sectio
 The gateway checks the Mapper's whole result first, so a refused result sends no mapping event.
 It then stores the mappings one by one, and `/case` shows the mappings stored so far while the Mapper's result is being written.
 A mapping is sent again when it changes (a mapping flag's answer sets `platform_line` and `approved_by`).
-A live model returns all its mappings at once, so they are sent in the order the gateway stores them, a few milliseconds apart; with `DEMO_PACE` on a scripted or replay run, about 0.3 s apart.
+A live model returns all its mappings at once, so they are sent in the order the gateway stores them, a few milliseconds apart; on a paced scripted or replay run they are spread out (0.3 s apart at `human`, 1.4 s for the whole list at `demo`).
 
 ### Demo pace
 
@@ -590,13 +592,15 @@ Two switches:
 
 | Wait | `human` | `demo` | `factory` |
 | --- | --- | --- | --- |
+| The Brief Reader reads the agreement (D23) | 2.0 s | 1.2 s | 2.4 s |
 | An agent picks up its work item | 2.5 s | 1.2 s | 2.4 s |
 | Before each tool call it makes | 1.0 s | 0.6 s | 1.2 s |
-| While the mappings are stored | 0.3 s after each | 4.0 s for the whole list | 10.0 s for the whole list |
-| Once, before the questions open | 1.5 s | 0.8 s | 1.6 s |
+| While the mappings are stored | 0.3 s after each | 1.4 s for the whole list | 2.8 s for the whole list |
+| While the verifier checks the Brief (D23) | 0.3 s after each check | 1.0 s for the whole list | 2.0 s for the whole list |
+| Once, before the questions open | 1.5 s | 0.6 s | 1.2 s |
 | After a result is stored | 1.0 s | 0.6 s | 1.2 s |
 
-`factory` is every `demo` wait doubled, except the mapping stream, which is 10 s instead of 8 s so the questions open at 14 s.
+`factory` is every `demo` wait doubled (`PROFILES` in `backend/app/agents/pace.py`).
 
 #### The backend of the two demo paces: the recorded Claude Haiku 5.5 run
 
@@ -625,11 +629,12 @@ A scripted run has `model` null and `recorded` false; a live droid run has the s
 `backend.demo_recording` on `/health` and `/case` describes the recording itself.
 So the card can say "Claude Haiku 5.5 · recorded run", and that is true: the questions on screen are the ones the model wrote on that run.
 
-Measured on uvicorn on 2026-10-25, 00:05 (replay, memory store, the four cases seeded, `AGENT_BACKEND=droid` with no key, agent time only, polling `/case` every 50 ms):
-- `demo`: 6.23 s and 6.28 s from Run to the two questions, 7.25 s and 7.23 s from the last answer to "Ready for your approval", 13.5 s in all.
-- `factory`: 14.23 s to the questions and 14.46 s after the last answer, 28.7 s in all; the same on an upload of the two statements with the Brief as JSON (14.29 s and 14.48 s).
-- `human` (scripted, 2026-10-24 evening): 20.1 s and 12.1 s.
-The fake-clock tests (`test_demo_replay.py`, `test_demo_pace.py`) give 6.0 s and 6.6 s for `demo`, and 14.0 s and 13.3 s for `factory`; the HTTP polling adds the rest.
+Measured on uvicorn on 2026-10-25, after D23 put the Brief read and the verifier in the run (agent time only, `decisions.md` D23):
+- `demo`: the read 2.4 s and the verifier 1.6 s, then, after the controller's Brief approval, about 4 s to the two questions and about 7 s from the last answer to "Ready for your approval", 15.5 s in all.
+- `factory`: every wait doubled, 30.5 s in all.
+- `human` (scripted, 2026-10-24 evening, before D23): 20.1 s and 12.1 s.
+The fake-clock tests (`test_demo_replay.py`, `test_demo_pace.py`) bound `demo` at 13 to 15.5 s and `factory` at 27 to 30.5 s of agent time; the HTTP polling adds the rest.
+An upload with the Brief as JSON skips the read and the verifier.
 
 The waits are never inside the gateway's checks and never under its lock: `store_mapping` writes the checks, each mapping, and the questions as separate writes and waits between them, so an answer or a read is never kept waiting by the stream (verified by `test_demo_pace.py`, whose fake clock tries the lock during every wait).
 A live model backend (`droid`, `anthropic`) gets none, and under pytest the pace is off unless a test turns it on.
@@ -637,7 +642,7 @@ If a Mapper run is cut off mid-write (a restart), the next Mapper result replace
 
 ### Seeded cases
 
-`backend/app/db/fixtures/cases.py` seeds four cases besides the live demo deal, in a background thread after startup, so `/health` answers at once.
+`backend/app/db/fixtures/cases.py` seeds four cases besides the live demo deal, so the Dashboard lists five, in a background thread after startup, so `/health` answers at once.
 `DEMO_CASES` (default on; `0` turns it off) controls it; under pytest it is off unless a test asks (`create_app(demo_cases=True)`).
 Each case runs through the real pipeline on the scripted backend with no pace: the scripted Mapper reads the case's reference mapping (`DealPlan` in `backend/app/agents/backends/scripted.py`, with policies applied first), the Preparer and the Reviewer call the tools, and the controller's steps are the gateway calls the console makes.
 
@@ -660,9 +665,9 @@ The sources of each real case are in its fixture's header; the sample's platform
 
 ## Stages
 
-`new` (loaded), `reading_brief`, `verifying_brief`, `awaiting_brief`, `brief_ready`, `awaiting_flag`, `flags_answered`, `mapped`, `awaiting_review`, `needs_attention`, `awaiting_approval`, `posted`, and `run_failed`.
+`new` (loaded), `reading_brief`, `verifying_brief`, `awaiting_brief`, `brief_ready`, `mapping`, `awaiting_flag`, `flags_answered`, `mapped`, `preparing`, `awaiting_review`, `needs_attention`, `awaiting_approval`, `posted`, and `run_failed`.
 A deal from agreement text goes `reading_brief`, `verifying_brief`, `awaiting_brief` (open Brief flags), `brief_ready` (all answered), then back to `new` on approval, and maps from there.
-The demo deal goes `reading_brief`, `verifying_brief`, then straight to `new` when the verifier approves its Brief (D23).
+The demo deal goes `reading_brief`, `verifying_brief`, then `brief_ready` when every one of the verifier's 22 checks passed; the verifier never approves, so the controller approves in one click and the deal is back at `new` (D23).
 A run that stops on an error is `run_failed`, on the sync route as well as in the background, with one `run:failed` row.
 Jobs live in the API process, so none survives a restart.
 On start, a deal the store loaded at a working stage (`reading_brief`, `verifying_brief`, `mapping`, `mapped`, `flags_answered`, `preparing`, or `awaiting_review`) is moved to `run_failed`, with a `run:failed` row whose reason is "the app restarted mid-run" and a message to the controller, so Run again picks up where it stopped (`Gateway.recover_interrupted_runs`).
@@ -671,13 +676,15 @@ After an edit, the stage is `awaiting_approval` or `needs_attention` again, from
 
 ## Errors
 
-- 403: the actor may not do this. The gateway also writes a DENIED row.
+- 403: the actor may not do this.
+  The gateway also writes a DENIED row.
 - 404: the deal, item, or run does not exist.
 - 409: the state change is not legal, or `POST /deals/{id}/run` while a run of that deal is in progress (answering the last flag starts one).
 
 Fields the gateway sets, never a model:
 - `Option.added_by` is `system:gateway` on the baseline reading the gateway adds to a covenant flag (every flagged line counted as debt) when the Mapper did not offer it; `null` on the Mapper's options.
-- `Mapping.policy_id` and `SourceLine.covenant_policy_id` name the learned policy that decided the line, and are set only when the cited policy exists and decided the same thing. The console's Learned chip reads them.
+- `Mapping.policy_id` and `SourceLine.covenant_policy_id` name the learned policy that decided the line, and are set only when the cited policy exists and decided the same thing.
+  The console's Learned chip reads them.
 - 422: the payload is not valid, such as a number with no run id, or a tool called while a flag is open.
 
 ## run_agent(role, item)

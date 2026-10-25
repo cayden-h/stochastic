@@ -1,6 +1,7 @@
 # Eric: data and facts
 
-Branch: `eric/data`. Pull `main` into it first; it is behind.
+Branch: `eric/data`.
+Pull `main` into it first; it is behind.
 Folders: `data/`, `scripts/`, `evals/`, and the Devpost text in `docs/devpost/`.
 
 ## Done (2026-10-24, merged in PR #2)
@@ -14,18 +15,27 @@ Folders: `data/`, `scripts/`, `evals/`, and the Devpost text in `docs/devpost/`.
 
 ## Open
 
-On 2026-10-24 at 08:20 Cayden moved Eric's open tasks to Cayden and Tri. The list below is kept as history; the owners are in `cayden.md` and `tri.md`.
+On 2026-10-24 at 08:20 Cayden moved Eric's open tasks to Cayden and Tri.
+The list below is kept as history; the owners are in `cayden.md` and `tri.md`.
 
-1. (Cayden) **Submit the Devpost first draft on devpost.com by Saturday night.** The organizers ask for a draft Saturday night and allow edits until 10am Sunday.
+1. (Cayden) **Submit the Devpost first draft on devpost.com by Saturday night.**
+   The organizers ask for a draft Saturday night and allow edits until 10am Sunday.
    - Add all four teammates, and opt in to Hyphenate, Factory, Figma, and Tiger Data (the MLH opt-in field).
    - Fill in which backend produced the shown run (`devpost.md`, the line that asks Cayden).
    - Replace the line about placeholder mockups once Josie's design is in.
-2. (Tri) **Wording for the compliance certificate** (Tri builds the route, his task 2). Find what Ex 10.1 says the compliance certificate must contain, and the test period and delivery deadline. Write the sections and the fixed wording into `docs/devpost/certificate.md`, with the exhibit and section for each and quotes under 15 words. About 1 hour.
-3. (Tri) **Check the two inferred inputs again.** The pitch rests on them.
-   - The Statesville cash rent ($1,970K): is the 10-K obligations-table figure right for the test period? Write the source, or a better figure, into `evals/fixture_check.md`.
-   - Transaction costs ($698K expected, kept at zero): does the 8-K/A or Ex 10.1 say whether they count in the test period? Before 2026-10-24 evening, applying them would have put the whole-line reading under 2.50x; now they move only the agreement's reading (see the note at the end).
+2. (Tri) **Wording for the compliance certificate** (Tri builds the route, his task 2).
+   Find what Ex 10.1 says the compliance certificate must contain, and the test period and delivery deadline.
+   Write the sections and the fixed wording into `docs/devpost/certificate.md`, with the exhibit and section for each and quotes under 15 words.
+   About 1 hour.
+3. (Tri) **Check the two inferred inputs again.**
+   The pitch rests on them.
+   - The Statesville cash rent ($1,970K): is the 10-K obligations-table figure right for the test period?
+     Write the source, or a better figure, into `evals/fixture_check.md`.
+   - Transaction costs ($698K expected, kept at zero): does the 8-K/A or Ex 10.1 say whether they count in the test period?
+     Before 2026-10-24 evening, applying them would have put the whole-line reading under 2.50x; now they move only the agreement's reading (see the note at the end).
    - Give any change to Tri; the tools recompute, and Cayden updates the pitch words.
-4. (Cayden) **The honest-limits card and a one-page summary**, printable, for the table: what is real, what is inferred, what is cut (purchase accounting, the five-month fiscal year gap), and the four tracks. Base it on `demo-script.md` section 6 and the real-versus-simulated list.
+4. (Cayden) **The honest-limits card and a one-page summary**, printable, for the table: what is real, what is inferred, what is cut (purchase accounting, the five-month fiscal year gap), and the four tracks.
+   Base it on `demo-script.md` section 6 and the real-versus-simulated list.
 5. (Everyone) **Answer three judge questions without notes** on the filings, Note 2, and the brief (`demo-script.md` section 8).
 
 ## Open: Droid rewind and a permission spike (assigned by Cayden, 2026-10-24 10:47)
@@ -41,7 +51,8 @@ Do not edit `docs/STOCHASTIC.md`; give Cayden the decision text and the results 
 When the gateway refuses the Mapper's result, `jobs.py` (the `except Invalid` block in `advance`) runs the Mapper again with `previous_refusal`.
 On the Droid backend that second turn resumes the same session, so the refused answer stays in the agent's memory and is carried into later deals.
 The pitch line we want is "when the gateway rejects an answer, we rewind the session, so a mistake never becomes memory".
-Today that line is false. This task makes it true.
+Today that line is false.
+This task makes it true.
 
 ### Task A: rewind the Mapper's session before the retry (the main task)
 
@@ -50,7 +61,8 @@ What the SDK has [verified: `droid_sdk` 0.5.0 in `backend/.venv`, read the sourc
 - `Session.rewind(message_id, *, restore=(), delete=(), title)` in `droid_sdk/_high_level/_session_operations.py`.
   It returns a `RewindOutcome` whose first field is a successor `Session`.
   The successor has a NEW session id, because rewind forks the session (`fork_title`).
-- `Session.rewind_info(message_id)` lists file snapshots. We use no files, so `restore` and `delete` stay empty.
+- `Session.rewind_info(message_id)` lists file snapshots.
+  We use no files, so `restore` and `delete` stay empty.
 - Message ids are on the message objects in `droid_sdk/_high_level/messages.py` (the classes with `message_id: str`, around line 228).
   Find which streamed message gives the id of the user prompt that starts a turn.
 
@@ -60,16 +72,22 @@ Unknowns to settle first with a small probe script (put it in `scripts/` or a sc
    We need the session as it was before the refused turn's prompt.
 2. Which message id do you pass: the user prompt of the bad turn, or the last assistant message of the turn before it?
 3. Can you rewind a session that is resumed with `Session.resume(...)`, or only one that is still open from the same process?
-4. Probe: turn 1 says a codeword ("remember PELICAN"). Turn 2 asks for a different codeword. Rewind to before turn 2. Turn 3 asks for both codewords. Expected: it knows PELICAN and not the second one.
+4. Probe: turn 1 says a codeword ("remember PELICAN").
+   Turn 2 asks for a different codeword.
+   Rewind to before turn 2.
+   Turn 3 asks for both codewords.
+   Expected: it knows PELICAN and not the second one.
    Use Haiku 5.5 (`DROID_MODEL=claude-haiku-5-5`) to keep credits low.
 
 Then build it:
 
 1. In `droid_backend.py`, record the message id that starts each turn, and return it in the meta (for example `turn_message_id`).
-2. Add a way to ask for a rewind before the turn. One option: `run_droid(..., rewind_to=<message id>)`, passed from `runner.py` (`_attempt` and `run_agent`) as an optional argument that every other backend ignores.
+2. Add a way to ask for a rewind before the turn.
+   One option: `run_droid(..., rewind_to=<message id>)`, passed from `runner.py` (`_attempt` and `run_agent`) as an optional argument that every other backend ignores.
    When `rewind_to` is set and the session can be resumed: open it, rewind, close the old one, and run the turn on the successor.
 3. The meta must say what happened: `rewound: true`, the old session id, the rewound-to message id, and the successor's id as `session_id`.
-   `_remember` in `jobs.py` saves `session_id` from the meta, so the store then points at the successor. Check that this is so.
+   `_remember` in `jobs.py` saves `session_id` from the meta, so the store then points at the successor.
+   Check that this is so.
 4. If the rewind fails, do not fail the job.
    Run the retry in the same session as today, and put the reason in the meta (`rewind_error`), the same way `resume_error` works.
    The audit and the demo must show honestly whether the rewind happened.
@@ -77,14 +95,16 @@ Then build it:
    Keep `previous_refusal` in the retry input: the agent forgets its bad answer but still learns why it was refused.
    Read `turn_message_id` from the run's last successful attempt, the same way `_remember` reads `session_id`.
 6. The Anthropic, scripted, and replay backends do not change.
-   Check that the Anthropic backend's transcript does not hold the refused answer either (`_remember` is not called before the retry, so it should not). Write down what you find.
+   Check that the Anthropic backend's transcript does not hold the refused answer either (`_remember` is not called before the retry, so it should not).
+   Write down what you find.
 7. Update the module docstring of `droid_backend.py`, and mark each claim `[verified: ...]` or `[inferred]`, as the rest of that docstring does.
 
 Tests:
 
 - Extend `backend/tests/test_mapper_retry.py`: on a refusal, the retry is called with `rewind_to` equal to the first run's `turn_message_id`, and the saved session id is the successor's.
 - A unit test in `test_droid_meta.py` (or a new file) with a fake session: a rewind that raises falls back to the same session and sets `rewind_error`.
-- Run all of `backend/.venv/bin/python -m pytest` in `backend/`. Fix any failure or flaky test you see, even outside this task.
+- Run all of `backend/.venv/bin/python -m pytest` in `backend/`.
+  Fix any failure or flaky test you see, even outside this task.
 
 Live check (required before we say it in the pitch):
 
@@ -101,13 +121,15 @@ Question: can Droid's permission system act as the gateway's front door, with ev
 What we know [verified from the SDK source]:
 
 - `PermissionHandler` and `QuestionHandler` exist (`droid_sdk/_high_level/interactions.py`, around line 290), and the high-level `Session` sets one through `InteractionHandlers(on_permission=...)`.
-- Our sessions use `Autonomy.HIGH`, which the SDK describes as "Allow all commands without prompts". So the handler probably never runs today. [inferred]
+- Our sessions use `Autonomy.HIGH`, which the SDK describes as "Allow all commands without prompts".
+  So the handler probably never runs today. [inferred]
 - `restrict_tools` already allows each role only its own tools, so the Mapper cannot see the math tools at all.
 
 Run a scratch script (not in the app) and answer each question with evidence:
 
 1. With `Autonomy.HIGH`, does the handler run for a call to one of our MCP tools?
-2. With a lower autonomy (`Off`, then `Low`), does the handler run for our MCP tools? What is in the `PermissionRequest` (tool name, arguments)?
+2. With a lower autonomy (`Off`, then `Low`), does the handler run for our MCP tools?
+   What is in the `PermissionRequest` (tool name, arguments)?
 3. If the handler denies a call, what does the model see, and does the turn still finish with a typed result?
 4. For a tool that is NOT in `restrict_tools`, does the handler ever see the call, or is the tool just invisible to the model?
 5. Does the handler still run on a session reopened with `Session.resume`?
@@ -124,18 +146,23 @@ It opens a session in an empty temp folder with an in-process MCP server `spike`
 The handler prints every `PermissionRequest` and answers `proceed_once`, or `cancel` in the deny case.
 Six runs, one turn each: high, off, low, deny, hidden, resume.
 
-1. With `Autonomy.HIGH`, the handler never runs. The model called `spike___lookup_rate`, our tool function ran, and the handler was called 0 times. [verified: run on 2026-10-24]
+1. With `Autonomy.HIGH`, the handler never runs.
+   The model called `spike___lookup_rate`, our tool function ran, and the handler was called 0 times. [verified: run on 2026-10-24]
    So in our backend today the handler would be dead code.
 2. With `Autonomy.OFF` and with `Autonomy.LOW`, the handler runs once per call to our MCP tool, before the tool function runs. [verified: run on 2026-10-24]
    The request holds one `McpToolAction` with `tool_name='spike___lookup_rate'`, `server_name='spike'`, `actual_tool_name='lookup_rate'`, `impact_level='high'`, and `tool_use`, which carries the tool call id and the full arguments (`{'code': 'SOFR'}`).
-   The options offered were `proceed_once`, `proceed_always`, `proceed_always_tools`, `proceed_always_server`, and `cancel`. `associated_session_ids` was empty.
+   The options offered were `proceed_once`, `proceed_always`, `proceed_always_tools`, `proceed_always_server`, and `cancel`.
+   `associated_session_ids` was empty.
    The built-in `ToolSearch` call the model makes to load our deferred tool did not reach the handler. [verified: run on 2026-10-24]
    Because Droid rates every MCP tool `impact_level='high'`, `Autonomy.MEDIUM` probably asks too. [inferred]
 3. When the handler denies (`cancel`), our tool function does not run, and the model sees a tool result `Error: Tool execution cancelled by user` with `is_error=True`. [verified: run on 2026-10-24]
    The comment we passed with the deny did not appear in that tool result. [verified: run on 2026-10-24]
    The turn does not finish with a typed result: it stops right after the cancel, and the result is `success=False` with `Structured output failed local validation`. [verified: run on 2026-10-24]
-   So a deny ends the turn. It cannot tell the model "not that, try something else". `cancel` is the only deny option offered.
-4. A tool that is NOT in `restrict_tools` is invisible to the model, and the handler never sees it. The model's `ToolSearch` for `hidden_rate` returned `Error: Tool(s) not found`, the model reported it could see only `ToolSearch` and `spike___lookup_rate`, and the handler was called 0 times. [verified: run on 2026-10-24]
+   So a deny ends the turn.
+   It cannot tell the model "not that, try something else".
+   `cancel` is the only deny option offered.
+4. A tool that is NOT in `restrict_tools` is invisible to the model, and the handler never sees it.
+   The model's `ToolSearch` for `hidden_rate` returned `Error: Tool(s) not found`, the model reported it could see only `ToolSearch` and `spike___lookup_rate`, and the handler was called 0 times. [verified: run on 2026-10-24]
 5. On a session reopened with `Session.resume(..., interactions=handlers)`, the handler still runs, and the resumed session keeps `Autonomy.OFF`. [verified: run on 2026-10-24]
    `Session.resume` takes its own `interactions` argument, so every resume must pass the handler again.
    If the handler is missing or raises, the SDK reports an error and answers `cancel`, so it fails closed. [verified from the SDK source, `interaction_adapter.py` lines 254-283; not run]
@@ -157,7 +184,8 @@ Pitch line we can defend: "Each agent can only see its own tools (Droid `restric
 
 ### Not in scope
 
-- Forking Droid sessions per what-if option, and `QuestionHandler`. We decided not to build these for now.
+- Forking Droid sessions per what-if option, and `QuestionHandler`.
+  We decided not to build these for now.
 
 ## Changed on 2026-10-24 evening (Cayden's agent, commits 0e3829f and 3938ca9 on `cayden/risk-fixes`)
 
@@ -177,16 +205,20 @@ New folder for this phase: `desktop/` (the Electron shell), which Eric owns.
 
 Spec: `design/review-companion.md` section 11.
 - `desktop/package.json`, `desktop/main.ts` (or `main.js`), and `desktop/preload.ts`, on Electron's current stable release.
-- On launch, `main` starts the backend (`backend/.venv/bin/uvicorn app.main:app --port 8000` in `backend/`) and the console (`npm run start` in `frontend/`, after `next build`) as child processes. It waits for `GET /health` and the console to answer, then opens the window. On quit, it stops both.
+- On launch, `main` starts the backend (`backend/.venv/bin/uvicorn app.main:app --port 8000` in `backend/`) and the console (`npm run start` in `frontend/`, after `next build`) as child processes.
+  It waits for `GET /health` and the console to answer, then opens the window.
+  On quit, it stops both.
   - `STOCHASTIC_DEV=1` loads `http://localhost:3000` from an already running `next dev` instead, and starts nothing.
   - If the backend or the console does not answer within 30 seconds, show a plain error window that names which one failed.
 - Window: 1440 by 900 by default, 1280 by 800 minimum, `titleBarStyle: "hiddenInset"` with the traffic lights at x 20 and y 20, and `backgroundColor: "#F7F4EC"` so there is no white flash.
 - Preload exposes `window.stochastic` through `contextBridge`, with `contextIsolation` on and `nodeIntegration` off:
   - `saveFiles([{ url, name }])`: opens `dialog.showOpenDialog` for a folder, downloads each file from the API, writes it, and shows the folder in Finder.
   - `isDesktop: true`.
-- The app name and menu say "Stochastic". The macOS app icon is a simple mark from Josie.
+- The app name and menu say "Stochastic".
+  The macOS app icon is a simple mark from Josie.
 - `desktop/README.md`: install, `npm run desktop`, dev mode, and how to quit cleanly.
 Done when: `npm run desktop` on the demo laptop opens the console with no browser chrome, the full demo runs inside it, and quitting leaves no process on ports 8000 or 3000.
+Built as `desktop/main.js` and `desktop/preload.js` (no TypeScript), on Electron 45; `desktop/README.md` is the reference.
 
 Added on top of E1 on 2026-10-24 evening (Cayden's agent, branch `cayden/launch-mark`, D21): the launch splash now lives in your folder, in `desktop/splash.html`, opened by `createSplash` in `desktop/main.js` before the main window.
 The main window now shows only after the console calls `window.stochastic.appReady()` (new in `preload.js`).
@@ -196,11 +228,18 @@ The spec is `design/brand.md` section 4.
 ### E2. The demo edit figure (about 1 hour)
 
 - Find one believable one-time cost in the Kewaunee or Nu Aire filings (for example acquisition-related costs) for the demo's amount edit.
-- Write the line, the amount in USD thousands, the filing, and the page into `design/review-companion.md` section 9. Tell Cayden, because the hardcoded chips cite it.
-- Pick the remap line for the second deal: a target line that the Mapper maps confidently but wrongly, so that the remap catches what the flags miss. Check it against the Note 2 answer key in `evals/`.
+- Write the line, the amount in USD thousands, the filing, and the page into `design/review-companion.md` section 9.
+  Tell Cayden, because the hardcoded chips cite it.
+- Pick the remap line for the second deal: a target line that the Mapper maps confidently but wrongly, so that the remap catches what the flags miss.
+  Check it against the Note 2 answer key in `evals/`.
 
 ### E3. Brief Reader data (about 2 hours)
 
-- `data/brief/kewaunee_quotes.json`: for each fixture Brief field, the exact quote from Ex 10.1 (under 15 words), its section, and the field path. The scripted reader returns these (Cayden's C3).
-- `backend/tests/fixtures/agreement_synthetic.txt` (ask Tri, it is his folder): a short synthetic agreement with one leverage covenant, two definitions, and one add-back cap. It feeds the tests.
+- `data/brief/kewaunee_quotes.json`: for each fixture Brief field, the exact quote from Ex 10.1 (under 15 words), its section, and the field path.
+  The scripted reader returns these (Cayden's C3).
+- `backend/tests/fixtures/agreement_synthetic.txt` (ask Tri, it is his folder): a short synthetic agreement with one leverage covenant, two definitions, and one add-back cap.
+  It feeds the tests.
 - `evals/brief_key/`: the hand-written Briefs for PNC and Kewaunee, and Noble Roman's (`architecture/brief-reader.md` section 9), field by field with sections, and a scorer that reports right, wrong, and flagged counts.
+
+Status on 2026-10-25: `data/brief/kewaunee_quotes.json` was written by Cayden's agent (`cayden.md`, C3), and `agreement_synthetic.txt` and `evals/brief_key/` were never added.
+The tests use `backend/tests/fixtures/kewaunee_ex101_excerpt.txt` and agreements written inside the tests, and the demo deal reads `data/brief/kewaunee_ex101_extract.txt` (D23).
