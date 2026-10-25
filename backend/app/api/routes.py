@@ -16,13 +16,14 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
+from app.agents import demo_replay, recording
 from app.agents import runner as agent_runner
 from app.agents import settings as agent_settings
 from app.agents.jobs import advance
 from app.api import certificate as cert_doc
 from app.api import export as export_doc
 from app.api.events import next_events
-from app.api.schemas import (BriefAmountsBody, BriefAmountsResponse, CaseResponse, DealCreated, EditBody,
+from app.api.schemas import (BriefAmountsBody, BriefAmountsResponse, CaseResponse, DealCreated, EditBody, MemoryCounts,
                              EditReasonBody, EditResponse, HealthResponse)
 from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, Edit, State
 from app.db.fixtures.kewaunee import DEAL_ID
@@ -50,8 +51,10 @@ class RunBody(BaseModel):
     backend: str | None = None  # anthropic, droid, scripted, replay; default from AGENT_BACKEND
     sync: bool = True
     # The pace of this run and of the run the controller's answer continues, on the scripted and replay backends:
-    # "demo" (the 15-second demo), "human" (the DEMO_PACE=1 timings), "off"; None follows DEMO_PACE.
-    pace: Literal["demo", "human", "off"] | None = None
+    # "demo" (the 15-second Hyphenate demo), "factory" (the 30-second Factory demo), "human" (the DEMO_PACE=1
+    # timings), "off"; None follows DEMO_PACE. "demo" and "factory" with no backend replay the recorded Claude
+    # Haiku 5.5 run when it fits the deal, else the scripted rules (app/agents/demo_replay.py).
+    pace: Literal["demo", "factory", "human", "off"] | None = None
 
 
 def _debt_capacity(store, result) -> tuple[float | None, str | None]:
@@ -177,7 +180,22 @@ def build_router(gw: Gateway) -> APIRouter:
             "last_runs": agent_runner.LAST_RUNS[-6:],
             "totals_this_process": agent_runner.TOTALS,
             "settings": agent_settings.summary(),
+            "demo_recording": {"name": demo_replay.DEMO_RECORDING, **recording.info(demo_replay.recording_folder())},
         }
+
+    def memory_counts() -> dict:
+        """The learning counters across all deals: the flags a human answered (and, for a live policy whose deal was
+        reset with memory kept, the answer it came from), the live policies, and the reasoned edits."""
+        answers = {(i.deal_id, i.id) for i in store.items.values() if i.type == "flag" and i.answer}
+        live = [p for p in store.policies.values() if not p.retired_by]
+        answers |= {(p.deal_id, p.learned_from) for p in live if p.learned_from.startswith("wi_")}
+        edits = [e for e in store.edits.values() if e.status == "reasoned"]
+        by_deal: dict[str, dict[str, int]] = {}
+        for key, rows in (("human_answers", [d for d, _ in answers]), ("policies", [p.deal_id for p in live]),
+                          ("edits", [e.deal_id for e in edits])):
+            for d in rows:
+                by_deal.setdefault(d, {"human_answers": 0, "policies": 0, "edits": 0})[key] += 1
+        return {"human_answers": len(answers), "policies": len(live), "edits": len(edits), "by_deal": by_deal}
 
     # One job per deal at a time. Answering the last flag starts the job runner, so a Run click at the same moment
     # would start a second Preparer; the gateway would deny its result, but the click should get a clear 409 instead.
@@ -219,7 +237,13 @@ def build_router(gw: Gateway) -> APIRouter:
     def health():
         forks = gw.forks.status() if gw.forks else {"enabled": False}
         return {"ok": True, "chain_valid": gw.verify_chain(), "backend": backend_status(),
-                "store": {**store.status(), "forks": forks}, "running": bool(running)}
+                "store": {**store.status(), "forks": forks}, "running": bool(running), "memory_counts": memory_counts()}
+
+    @r.get("/memory/counts", response_model=MemoryCounts)
+    def counts():
+        """The sidebar's counters across every deal: human answers, live policies, reasoned edits (and per deal)."""
+        with gw.lock:
+            return memory_counts()
 
     def deal_card(d: Deal) -> dict:
         """One Dashboard row: the deal, plus its verdict (from the latest result's tool runs, or null), the time of its

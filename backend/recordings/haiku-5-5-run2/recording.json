@@ -1,0 +1,10 @@
+{
+  "name": "haiku-5-5-run2",
+  "model": "claude-haiku-5-5",
+  "model_label": "Claude Haiku 5.5",
+  "backend": "droid",
+  "recorded_at": "2026-10-24T03:40:02-07:00",
+  "source": "commit 8b914db, 'Record a Haiku 5.5 Droid run that passes the settle-every-line rule; score it 33 of 33'",
+  "model_confirmed": false,
+  "note": "The live Droid run on the Kewaunee and Nu Aire deal with DROID_MODEL=claude-haiku-5-5 (the requested model). The served-model check from the droid session record was added later that day, so this run's model is the one requested; every later Haiku 5.5 Droid run that was checked served claude-haiku-5-5 (docs/agents.md, section 8). The Mapper's typed output is replayed as recorded; the Preparer and the Reviewer re-run the recorded tool sequence through the gateway, so every figure is a fresh run."
+}
