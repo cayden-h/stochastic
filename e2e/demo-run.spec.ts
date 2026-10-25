@@ -17,12 +17,17 @@ async function deals(backend: Backend): Promise<DealRow[]> {
   return r.json();
 }
 
-/** Why this backend cannot run these tests, or null when it has the demo contract. */
+/** Why this backend cannot run these tests, or null when it has the demo contract. The cases seed in the background
+ * after startup, so a backend with the contract gets a moment to list all five. */
 async function missingContract(backend: Backend): Promise<string | null> {
-  const list = await deals(backend);
-  if (list.length < 5) return `GET /deals has ${list.length} deals, not 5`;
+  let list = await deals(backend);
   if (!list.every((d) => d.deal_id && "data_source" in d && "updated_at" in d)) return "GET /deals rows have no deal_id, data_source, or updated_at";
-  return null;
+  const deadline = Date.now() + 30_000;
+  while (list.length < 5 && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 250));
+    list = await deals(backend);
+  }
+  return list.length < 5 ? `GET /deals has ${list.length} deals, not 5` : null;
 }
 
 /** Answers every open question with its Suggested option, one card after the other. */
@@ -37,6 +42,8 @@ async function answerAll(page: Page): Promise<number> {
     await expect(page.getByRole("main").getByRole("heading", { level: 2, name: heading, exact: true })).toHaveCount(0);
   }
 }
+
+test.use({ cases: true });
 
 test.beforeEach(async ({ backend }) => {
   const missing = await missingContract(backend);

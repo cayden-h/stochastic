@@ -28,7 +28,7 @@ function caseName(d: DealSummary): string {
  * and plays it in about 15 seconds; Begin runs the current deal at its normal pace; Upload loads a new one. */
 export default function Dashboard() {
   const router = useRouter();
-  const { deals, kase, audit, select, startRun, runDemo, running } = useDeal();
+  const { deals, kase, audit, select, startRun, runDemo, running, reloadDeals } = useDeal();
   const [upload, setUpload] = useState(false);
   const [busy, setBusy] = useState<"begin" | "demo" | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -37,6 +37,12 @@ export default function Dashboard() {
     const t = setInterval(() => setNow(Date.now()), 30_000);  // "just now" turns into "1 min ago" on its own
     return () => clearInterval(t);
   }, []);
+  // The other cases move without an event on this page's stream (the gateway seeds them after it starts, and their
+  // runs go on), so the list is read again every few seconds while the Dashboard is open.
+  useEffect(() => {
+    const t = setInterval(() => void reloadDeals(), 4_000);
+    return () => clearInterval(t);
+  }, [reloadDeals]);
 
   if (!kase) return null;
   const current = kase.deal.id;

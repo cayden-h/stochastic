@@ -15,11 +15,13 @@ function Who({ party, size }: { party: string; size: number }) {
   return role ? <Avatar role={role} size={size} /> : <span className="text-code"><Shape kind="square" size={size * 0.6} /></span>;
 }
 
-/** "Learned p_007: Financing liability ..." becomes "The Mapper learned p_007: Financing liability ...". */
+/** The agent's message in the agent's voice: "Learned p_007: ..." becomes "The Mapper learned p_007: ...", and
+ * "Learned p_013 to p_017 (...): ..." keeps its range. A message in other words is quoted after the policy id. */
 export function learnedSentence(n: Pick<LearnedNotice, "from" | "policy_id" | "text">): string {
-  const rest = n.text.replace(/^\s*learned\s+[\w-]+\s*[:.-]?\s*/i, "").trim();
   const who = actorOf(n.from).kind === "Agent" ? `The ${agentName(n.from)}` : "The gateway";
-  return `${who} learned ${n.policy_id}${rest ? `: ${rest}` : "."}`;
+  const text = n.text.trim();
+  if (/^learned\s+/i.test(text)) return `${who} learned ${text.replace(/^learned\s+/i, "")}`;
+  return `${who} learned ${n.policy_id}${text ? `: ${text}` : "."}`;
 }
 
 /** A question for the controller: who asks, what, and one button that opens the flag card. */

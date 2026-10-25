@@ -42,6 +42,8 @@ interface DealData {
   stageSince: number;
   /** Reads the case again. True when this read, or a later one, committed fresh data. */
   refresh: () => Promise<boolean>;
+  /** Reads GET /deals again, alone: the other cases change without an event on this page's stream. */
+  reloadDeals: () => Promise<void>;
   /** Make another deal the current one (the Dashboard rows and a new upload). */
   select: (id: string) => Promise<boolean>;
   /** The live conversation of the current deal, in the gateway's order (the stream, and GET /conversation on load). */
@@ -144,6 +146,10 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const reloadDeals = useCallback(async () => {
+    try { setDeals(await api.deals()); } catch { /* the next full read says what is wrong */ }
   }, []);
 
   const select = useCallback(async (id: string) => {
@@ -316,7 +322,7 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <Ctx.Provider value={{
-      deals, kase, health, audit, error, loading, refresh, select, stageSince: stageSeen?.at ?? 0,
+      deals, kase, health, audit, error, loading, refresh, reloadDeals, select, stageSince: stageSeen?.at ?? 0,
       messages, received: conversation.received, agentStates: agents,
       conversationLoaded: conversation.deal === id && conversation.loaded,
       conversationSupported: conversation.deal === id && conversation.supported, liveMappings, mappings, now, startRun, starting, reset, running,
