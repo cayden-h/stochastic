@@ -384,3 +384,134 @@ def test_an_income_statement_edit_that_cannot_reach_net_income_is_refused():
     lines[-1] = _is_line("sl_n", "Net income", 40.0, is_total=True)
     out, applied, rollup, _ = edit_tools.carry_amount_edits(lines, [cut])
     assert [x.amount for x in out] == [100.0, 50.0, 50.0, 50.0] and applied == ["ed_23"]
+
+
+# The remap roll-up rule (app/tools/edits.py): a remapped line leaves the target subtotals it fed and joins the ones
+# its new platform line feeds. Research and Development: 532,092 dollars = 532.092.
+RD_REMAP = dict(kind="remap", company="Nu Aire", line="Research and Development",
+                old_platform_line="Operating expenses", new_platform_line="Cost of products sold")
+
+
+def test_remap_of_research_and_development_into_cost_of_sales_moves_gross_profit_only(inputs):
+    before = run_all(inputs)
+    out = run_all(inputs, [edit("ed_rd", **RD_REMAP)])
+    rows, was = rows_by_line(out["consolidate"]), rows_by_line(before["consolidate"])
+
+    def fig(key):
+        return rows[("income_statement", key)]["target"], rows[("income_statement", key)]["combined"]
+    # Cost of products sold target 51,168.691 + 532.092 = 51,700.783, combined 151,704 + 51,700.783 = 203,404.783
+    assert fig("Cost of products sold") == (51700.783, 203404.783)
+    # Operating expenses target 18,433.001 - 532.092 = 17,900.909, combined 33,770 + 17,900.909 = 51,670.909
+    assert fig("Operating expenses") == (17900.909, 51670.909)
+    # Gross profit target 23,681.611 - 532.092 = 23,149.519, combined 75,732.611 - 532.092 = 75,200.519
+    assert fig("Gross profit") == (23149.519, 75200.519)
+    assert was[("income_statement", "Gross profit")]["combined"] - fig("Gross profit")[1] == pytest.approx(532.092)
+    # a reclass within operating costs: Operating profit and every later total are unchanged
+    for key in ("Operating profit", "Profit before income taxes", "Net earnings",
+                "Net earnings attributable to Kewaunee Scientific Corporation"):
+        assert rows[("income_statement", key)] == was[("income_statement", key)], key
+    assert out["consolidate"]["remap_rollup"] == [
+        {"edit_id": "ed_rd", "line": "Gross profit", "section": "income_statement", "delta": -532.092}]
+    assert out["consolidate"]["edits_applied"] == ["ed_rd"]
+    assert out["tie_out"]["ok"] is True
+    # EBITDA and debt read the lines, which a remap does not touch: 28,378.845 and 21,633, leverage 0.762
+    assert strip(out["ebitda"]) == strip(before["ebitda"]) and out["ebitda"]["ebitda"] == 28378.845
+    assert strip(out["covenant_debt"]) == strip(before["covenant_debt"])
+    assert finance.leverage(out["covenant_debt"]["debt"], out["ebitda"]["ebitda"])["leverage"] == 0.762
+    # reverted, it changes nothing
+    assert strip(run_all(inputs, [edit("ed_rd", status="reverted", **RD_REMAP)])["consolidate"]) == strip(
+        before["consolidate"])
+
+
+def test_a_remap_and_an_amount_edit_on_the_same_line_carry_together(inputs):
+    # R&D cut to 432.092 (-100) and moved into cost of sales: the amount edit carries in Nu Aire's own statement
+    # (Total Operating Expense -100, Income from Operations, Income Before Income Taxes, Net Income +100; R&D has no
+    # cost word, so it is treated as a cost), then the remap moves 432.092. Gross profit target 23,681.611 - 432.092
+    # = 23,249.519; Operating profit target 5,248.61 + 100 = 5,348.61; Net earnings 5,438.271 + 100 = 5,538.271.
+    cut = edit("ed_c", company="Nu Aire", line="Research and Development", section="income_statement",
+               new_value=432.092)
+    out = run_all(inputs, [cut, edit("ed_rd", **RD_REMAP)])
+    rows = rows_by_line(out["consolidate"])
+    assert rows[("income_statement", "Gross profit")]["target"] == 23249.519
+    assert rows[("income_statement", "Operating profit")]["target"] == 5348.61
+    assert rows[("income_statement", "Net earnings")]["target"] == 5538.271
+    assert rows[("income_statement", "Cost of products sold")]["target"] == 51600.783  # 51,168.691 + 432.092
+    assert out["consolidate"]["edits_applied"] == ["ed_c", "ed_rd"]
+    assert out["ebitda"]["ebitda"] == 28478.845  # 28,378.845 + 100
+
+
+def test_a_cost_cut_shows_in_every_displayed_subtotal(inputs):
+    # Nu Aire General and Administrative 6,162.806 -> 5,662.806: the combined rows the console shows
+    out = run_all(inputs, [edit("ed_ga", company="Nu Aire", line="General and Administrative",
+                                section="income_statement", new_value=5662.806)])
+    rows = rows_by_line(out["consolidate"])
+    figs = {k: (rows[("income_statement", k)]["target"], rows[("income_statement", k)]["combined"])
+            for k in ("Gross profit", "Operating expenses", "Operating profit", "Profit before income taxes",
+                      "Net earnings")}
+    assert figs == {"Gross profit": (23681.611, 75732.611),  # above the line: unchanged
+                    "Operating expenses": (17933.001, 51703.001),  # 18,433.001 - 500; 52,203.001 - 500
+                    "Operating profit": (5748.61, 24029.61),  # 5,248.61 + 500; 23,529.61 + 500
+                    "Profit before income taxes": (6452.22, 19571.22),  # 5,952.22 + 500; 19,071.22 + 500
+                    "Net earnings": (5938.271, 24995.271)}  # 5,438.271 + 500; 24,495.271 + 500
+    assert out["ebitda"]["ebitda"] == 28878.845 and out["consolidate"]["remap_rollup"] == []
+
+
+def test_a_balance_sheet_remap_across_sides_moves_both_side_totals_and_breaks_the_tie_out(inputs):
+    # Certificates of Deposit (an asset, 991.082) moved onto Accounts payable (a current liability)
+    e = edit("ed_ap", kind="remap", company="Nu Aire", line="Certificates of Deposit",
+             new_platform_line="Accounts payable")
+    out = run_all(inputs, [e])
+    rows = rows_by_line(out["consolidate"])
+
+    def fig(key):
+        return rows[("balance_sheet", key)]["target"], rows[("balance_sheet", key)]["combined"]
+    assert fig("Total Current Assets") == (37547.53, 133983.53)  # 38,538.612 - 991.082; 134,974.612 - 991.082
+    assert fig("Total Assets") == (46987.099, 181465.099)  # 47,978.181 - 991.082; 182,456.181 - 991.082
+    assert fig("Total Current Liabilities") == (11510.504, 47981.504)  # 10,519.422 + 991.082
+    assert fig("Total Liabilities") == (16887.072, 90708.072)  # nests Total Current Liabilities: 15,895.99 + 991.082
+    assert fig("Total Stockholders' Equity") == (32082.191, 92739.191)  # unchanged
+    assert fig("Total Liabilities and Stockholders' Equity") == (48969.263, 183447.263)  # 47,978.181 + 991.082
+    tie = out["tie_out"]
+    assert tie["ok"] is False and tie["balance_sheet_balances"] is False and tie["bad_rows"] == []
+    assert tie["balance"] == {"total_assets": 181465.099, "total_liabilities_and_equity": 183447.263}
+
+
+def test_a_balance_sheet_remap_out_of_current_assets_moves_only_that_group(inputs):
+    # Certificates of Deposit onto Other assets: still an asset, no longer a current one
+    out = run_all(inputs, [edit("ed_oa", kind="remap", company="Nu Aire", line="Certificates of Deposit",
+                                new_platform_line="Other assets")])
+    rows = rows_by_line(out["consolidate"])
+    assert rows[("balance_sheet", "Total Current Assets")]["target"] == 37547.53  # 38,538.612 - 991.082
+    assert rows[("balance_sheet", "Other assets")]["target"] == 1018.776  # 27.694 + 991.082
+    assert rows[("balance_sheet", "Total Assets")]["target"] == 47978.181  # unchanged
+    assert out["consolidate"]["remap_rollup"] == [
+        {"edit_id": "ed_oa", "line": "Total Current Assets", "section": "balance_sheet", "delta": -991.082}]
+    assert out["tie_out"]["ok"] is True
+
+
+def test_a_balance_sheet_line_remapped_onto_revenue_leaves_the_assets(inputs):
+    # Certificates of Deposit onto Net sales: total assets lose 991.082, every income statement running total gains it
+    out = run_all(inputs, [edit("ed_x", kind="remap", company="Nu Aire", line="Certificates of Deposit",
+                                new_platform_line="Net sales")])
+    moved = {r["line"]: r["delta"] for r in out["consolidate"]["remap_rollup"]}
+    assert moved == {"Total Current Assets": -991.082, "Total Assets": -991.082, "Gross profit": 991.082,
+                     "Operating profit": 991.082, "Profit before income taxes": 991.082, "Net earnings": 991.082}
+    assert out["tie_out"]["ok"] is False
+
+
+def test_statement_feeds_on_the_fixture_balance_sheets(inputs):
+    p, t, m, brief = inputs
+
+    def feeds(lines, company, name):
+        own = [x for x in lines if x.company == company and x.section == "balance_sheet"]
+        i = next(k for k, x in enumerate(own) if x.line == name)
+        return [own[j].line for j, c in edit_tools.statement_feeds(own, i)]
+    assert feeds(p, "Kewaunee", "Accounts payable") == [
+        "Total Current Liabilities", "Total Liabilities", "Total Liabilities and Stockholders' Equity"]
+    assert feeds(p, "Kewaunee", "Retained earnings") == [
+        "Total Stockholders' Equity", "Total Liabilities and Stockholders' Equity"]
+    assert feeds(p, "Kewaunee", "Other assets") == ["Total Assets"]
+    assert feeds(t, "Nu Aire", "Machinery and Equipment") == [
+        "Total Property and Equipment, at Cost", "Total Property and Equipment (at Depreciated Cost)", "Total Assets"]
+    assert feeds(t, "Nu Aire", "Reserve for Uncertain Tax Positions") == [
+        "Total Long-Term Liabilities", "Total Liabilities", "Total Liabilities and Stockholders' Equity"]
