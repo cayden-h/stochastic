@@ -277,3 +277,35 @@ def test_an_agreement_upload_reads_the_brief_with_the_rules_then_replays_the_map
     c.post(f"/deals/{did}/run", json={"sync": True, "pace": "factory"})
     assert runner.LAST_RUNS[-1]["role"] == "mapper" and runner.LAST_RUNS[-1]["backend"] == "replay"
     assert len(gw.open_flags(did)) == 2
+
+
+def test_an_upload_of_the_demo_agreement_and_statements_reads_verifies_and_replays_in_about_30_s(paced):
+    """The Factory beat from the agreement (D23): the demo deal's extract and statements uploaded. The verifier fills
+    the book amounts and approves the Brief, so the first thing the controller sees is the Mapper's one escalation."""
+    from tests.test_api_brief import fixture_csv, post_deal
+    from app.db.fixtures.kewaunee import agreement_text
+    from tests.test_demo_fresh import answer_all
+    c = TestClient(create_app())
+    r = post_deal(c, agreement=agreement_text(), agreement_name="kewaunee_ex101_extract.txt",
+                  plat=fixture_csv(PLATFORM), targ=fixture_csv(TARGET), platform=PLATFORM, target=TARGET)
+    did = r.json()["deal_id"]
+    c.post(f"/deals/{did}/run", json={"sync": True, "pace": "factory"})
+    body = c.get(f"/deals/{did}/case").json()
+    assert body["deal"]["brief_status"] == "approved" and body["brief_verification"]["auto_approved"]
+    assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 2
+    asked = paced.now
+    assert 15.5 <= asked <= 18.5, asked
+    answer_all(c, did)
+    assert c.get(f"/deals/{did}/case").json()["stage"] == "awaiting_approval"
+    assert 28.5 <= paced.now <= 32.5, paced.now
+    assert [(r["role"], r["backend"]) for r in runner.LAST_RUNS] == [
+        ("brief_reader", "scripted"), ("mapper", "replay"), ("preparer", "replay"), ("reviewer", "replay")]
+
+
+def test_another_agreement_upload_is_not_auto_approved(paced):
+    from tests.test_api_brief import EXCERPT, fixture_csv, post_deal
+    c = TestClient(create_app())
+    r = post_deal(c, agreement=EXCERPT, agreement_name="excerpt.txt", plat=fixture_csv(PLATFORM),
+                  targ=fixture_csv(TARGET), platform=PLATFORM, target=TARGET)
+    deal = c.app.state.gateway.store.deals[r.json()["deal_id"]]
+    assert not deal.brief_auto_approve and deal.book_amounts == []

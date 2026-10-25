@@ -213,6 +213,18 @@ def seed(store: MemoryStore, gw: Gateway, from_agreement: bool = False) -> Deal:
     return gw.create_deal_from_agreement(CONTROLLER, deal, build_lines(store), agreement_text(), AGREEMENT_SOURCE)
 
 
+def is_demo_twin(lines: list[SourceLine], platform: str, text: str) -> bool:
+    """An upload of the demo deal itself: the committed agreement extract and the same statements (by the replay's
+    content hash). Its adjustments then have the same sourced book amounts, so the upload gets them, and the
+    verifier's auto-approval, like the demo deal (D23). Any other upload is asked and approved by the controller."""
+    from app.agents import demo_replay
+    from app.core.agreement import agreement_sha256
+    if agreement_sha256(text) != agreement_sha256(agreement_text()):
+        return False
+    return demo_replay.content_digest(lines, platform) == demo_replay.content_digest(build_lines(MemoryStore()),
+                                                                                    PLATFORM)
+
+
 def seed_demo(store: MemoryStore, gw: Gateway) -> Deal:
     """The live demo deal as the app seeds it: from the agreement (D23)."""
     return seed(store, gw, from_agreement=True)

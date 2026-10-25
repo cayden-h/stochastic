@@ -484,6 +484,10 @@ def build_router(gw: Gateway) -> APIRouter:
             lines = loaded["platform_csv"] + loaded["target_csv"]
             if agreement_text is not None:
                 deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=None, brief_status="none")
+                from app.db.fixtures import kewaunee
+                if kewaunee.is_demo_twin(lines, platform, agreement_text):  # the demo deal uploaded (D23)
+                    deal = deal.model_copy(update={"brief_auto_approve": True, "book_amounts": [
+                        a.model_copy(deep=True) for a in kewaunee.BOOK_AMOUNTS]})
                 source = (agreement_name or "agreement.txt").strip()[:200]
                 created = guard(lambda: gw.create_deal_from_agreement(x_actor, deal, lines, agreement_text,
                                                                       source=source))
