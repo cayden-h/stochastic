@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/api";
 import { type AgentInfo, type AgentKey, type ConversationMessage, CONTROLLER, agentKey } from "@/lib/conversation";
 import { clock } from "@/lib/format";
 import { SilhouetteIcon } from "./icons";
-import { ActorChip, Avatar, Card, Label, Mono, type Role, ROLES, Shape } from "./ui";
+import { ActorChip, Avatar, Label, Mono, type Role, ROLES, Shape } from "./ui";
 
 /** The agents in pipeline order, with the role key the v3 art uses. */
 const PIPELINE: { key: AgentKey; role: Role; name: string; party: string }[] = [
@@ -192,45 +191,26 @@ function MessageRow({ m, fresh }: { m: ConversationMessage; fresh: boolean }) {
 }
 
 /**
- * The live conversation: what the agents, the gateway, and the controller told each other, newest at the bottom.
- * It follows new messages unless the reader scrolled up to read an earlier one.
+ * What the agents and the controller told each other, oldest first, on the Log page (its Conversation view). The
+ * Case shows only the pipeline.
  */
-export function Conversation({ messages, received, live, className = "", full = false }: {
+export function Conversation({ messages, received, live, className = "" }: {
   messages: ConversationMessage[]; received: Record<string, number>; live: boolean; className?: string;
-  /** The whole list on the page (the Log), instead of a scrolling box (the Case). */
-  full?: boolean;
 }) {
-  const box = useRef<HTMLOListElement>(null);
-  const pinned = useRef(true);
   const [mounted] = useState(() => Date.now());
-  const last = messages[messages.length - 1]?.id;
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (el && pinned.current) el.scrollTop = el.scrollHeight;
-  }, [last]);
   return (
-    <Card className={`flex w-full flex-col ${className}`}>
+    <section aria-label="Conversation" className={`flex w-full flex-col overflow-hidden rounded-card border border-line bg-white ${className}`}>
       <div className="flex w-full items-center gap-[10px] border-b border-line px-[16px] py-[10px]">
         <Label>Conversation</Label>
         {live ? <span className="flex items-center gap-[6px] text-[12px] font-semibold text-forest"><LiveDot tone="bg-forest" />Live</span> : null}
         <span className="flex-1" />
         <Mono>{messages.length === 1 ? "1 message" : `${messages.length} messages`}</Mono>
-        {full ? null : <Link href="/log?view=conversation" className="text-[13px] font-semibold text-slate underline-offset-4 hover:text-forest hover:underline">Open in the log</Link>}
       </div>
-      <ol
-        ref={box}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-        }}
-        className={`flex flex-col ${full ? "" : "max-h-[360px] overflow-y-auto"}`}
-        aria-live="polite"
-        aria-relevant="additions"
-      >
+      <ol className="flex flex-col" aria-live="polite" aria-relevant="additions">
         {messages.map((m) => <MessageRow key={`${m.id}-${m.at}`} m={m} fresh={(received[m.id] ?? 0) > mounted} />)}
         {!messages.length ? <li className="px-[16px] py-[14px] text-[14px] text-slate">The agents start talking when the run begins.</li> : null}
       </ol>
-    </Card>
+    </section>
   );
 }
 
