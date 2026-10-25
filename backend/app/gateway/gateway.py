@@ -767,9 +767,10 @@ class Gateway:
                 basis = " as filed" if o.basis == "as_filed" else ""
                 side = "under" if o.ok else "over"
                 if not out:
-                    out.append(f"{o.id}) {o.label}: leverage {o.leverage:.2f}x{basis}, {side} the {limit:.2f}x limit")
+                    out.append(f"{o.id}) {o.label.rstrip('.')}: leverage {o.leverage:.2f}x{basis}, {side} the "
+                               f"{limit:.2f}x limit")
                 else:
-                    out.append(f"{o.id}) {o.label}: {o.leverage:.2f}x{basis}, {side}")
+                    out.append(f"{o.id}) {o.label.rstrip('.')}: {o.leverage:.2f}x{basis}, {side}")
             elif item.payload.get("kind") == "mapping":
                 action = item.payload.get("option_actions", {}).get(o.id, {})
                 out.append(f"{o.id}) {self._mapping_option_where(action) or o.label.rstrip('.')}")

@@ -127,6 +127,8 @@ def test_the_replayed_mapper_raises_the_covenant_and_the_certificates_of_deposit
                                                                   "unsecured_short_term": 0.73}
     msgs = gw.conversation(DEAL_ID)
     assert "Scripted rules" not in " ".join(m.text for m in msgs)
+    q1 = next(m.text for m in msgs if m.kind == "question" and m.item_id == cov.id)
+    assert "count as debt: leverage 0.76x, under the 2.50x limit; no_exclusions)" in q1  # no "debt.:"
     for f in flags:
         gw.answer(CONTROLLER, f.id, f.default)
     taught = [p for p in store.policies.values() if p.deal_id == DEAL_ID]
