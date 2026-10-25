@@ -362,11 +362,12 @@ class PostgresStore(MemoryStore):
             if not batch.empty():
                 self._queue.put(batch)
 
-    def reset_deals(self, keep_memory: bool = True) -> None:
-        """Start a new ledger. The old ledger and its audit log stay in the database."""
+    def reset_deals(self, keep_memory: bool = True, keep_deals: set[str] | None = None, rechain=None) -> None:
+        """Start a new ledger. The old ledger and its audit log stay in the database. The kept deals' records and
+        audit rows are written into the new ledger, chained again (`rechain`) before the commit."""
         with self._lock:
             self.commit()
-            super().reset_deals(keep_memory=keep_memory)
+            super().reset_deals(keep_memory=keep_memory, keep_deals=keep_deals, rechain=rechain)
             self.ledger += 1
             self._new_ledger = (self.ledger, "reset, agent memory kept" if keep_memory else "reset, agent memory cleared")
             self._written = {k: v for k, v in self._written.items() if k[0] == MEMORY_LEDGER}

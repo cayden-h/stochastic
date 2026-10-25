@@ -1,0 +1,173 @@
+"""The Dashboard's five cases: the live demo deal plus four seeded through the real pipeline.
+
+backend/app/db/fixtures/cases.py seeds them; docs/architecture/gateway-and-api.md ("GET /deals", "Seeded cases") is
+the contract. The seeding is off under pytest unless a test asks, as these do.
+"""
+import os
+
+os.environ["AGENT_BACKEND"] = "scripted"
+os.environ["AGENT_FALLBACK"] = "scripted"
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.db.fixtures import cases, dlh_grsi, mamas_crown, sstk_envato  # noqa: E402
+from app.db.fixtures.kewaunee import DEAL_ID, PLATFORM, TARGET  # noqa: E402
+from app.main import create_app  # noqa: E402
+from app.tools.finance import to_thousands  # noqa: E402
+
+STAGES = {DEAL_ID: "new", dlh_grsi.DEAL_ID: "posted", mamas_crown.DEAL_ID: "awaiting_approval",
+          sstk_envato.DEAL_ID: "awaiting_flag", cases.SAMPLE_ID: "posted"}
+SOURCES = {DEAL_ID: "filings", dlh_grsi.DEAL_ID: "filings", mamas_crown.DEAL_ID: "filings",
+           sstk_envato.DEAL_ID: "filings", cases.SAMPLE_ID: "sample"}
+
+
+@pytest.fixture
+def seeded():
+    app = create_app(demo_cases=True, demo_cases_background=False)
+    return app, TestClient(app)
+
+
+def test_get_deals_returns_the_five_cases_with_the_dashboard_fields(seeded):
+    _, c = seeded
+    deals = c.get("/deals").json()
+    assert [d["deal_id"] for d in deals] == [DEAL_ID, *cases.CASE_IDS]  # the live demo deal first
+    for d in deals:
+        assert {"deal_id", "platform", "target", "stage", "verdict", "updated_at", "data_source", "note"} <= set(d)
+        assert d["deal_id"] == d["id"] and d["stage"] == STAGES[d["deal_id"]]
+        assert d["data_source"] == SOURCES[d["deal_id"]] and d["note"] and d["updated_at"]
+        if d["verdict"] is not None:
+            assert set(d["verdict"]) == {"leverage", "limit", "verdict"}
+    by_id = {d["deal_id"]: d for d in deals}
+    assert by_id[DEAL_ID]["verdict"] is None and by_id[sstk_envato.DEAL_ID]["verdict"] is None
+    assert by_id[dlh_grsi.DEAL_ID]["verdict"] == {"leverage": pytest.approx(3.741, abs=0.0005), "limit": 4.5,
+                                                  "verdict": "ok"}
+    assert by_id[mamas_crown.DEAL_ID]["verdict"] == {"leverage": pytest.approx(1.898, abs=0.0005), "limit": 3.75,
+                                                     "verdict": "ok"}
+    assert by_id[cases.SAMPLE_ID]["verdict"]["verdict"] == "ok"
+
+
+def test_every_seeded_case_is_fully_viewable_with_a_valid_audit_chain(seeded):
+    _, c = seeded
+    for deal_id in cases.CASE_IDS:
+        body = c.get(f"/deals/{deal_id}/case").json()
+        assert body["stage"] == STAGES[deal_id] and body["audit"]["chain_valid"] and body["audit"]["denied"] == 0
+        targets = [sl for sl in body["source_lines"] if sl["company"] == body["deal"]["target"]]
+        assert len(body["mappings"]) == len(targets)  # the Mapping tab: every target line
+        msgs = c.get(f"/deals/{deal_id}/conversation").json()
+        assert [m for m in msgs if m["kind"] == "question"] and [m for m in msgs if m["policy_id"]]
+        assert c.get(f"/deals/{deal_id}/audit").json()["chain_valid"]
+        if body["result"]:  # the Review tab: a Reviewer pass read from tie_out and limit_test runs
+            assert body["verdict"]["review"]["verdict"] == "pass" and body["verdict"]["tie_out_ok"]
+            for rid in body["verdict"]["review"]["run_ids"]:
+                assert c.get(f"/runs/{rid}").json()["tool"] in ("tie_out", "limit_test")
+    for deal_id in (dlh_grsi.DEAL_ID, cases.SAMPLE_ID):  # posted: the final files download
+        assert c.get(f"/deals/{deal_id}/certificate?format=json").status_code == 200
+        assert c.get(f"/deals/{deal_id}/export.xlsx").status_code == 200
+
+
+def test_the_dlh_case_has_one_reasoned_remap_and_the_sample_reuses_its_learned_policy(seeded):
+    app, c = seeded
+    store = app.state.gateway.store
+    dlh = c.get(f"/deals/{dlh_grsi.DEAL_ID}/case").json()
+    (edit,) = dlh["edits"]
+    assert (edit["kind"], edit["line"], edit["new_platform_line"], edit["status"]) == (
+        "remap", "Indirect costs", "Contract costs", "reasoned")
+    assert store.policies[edit["policy_id"]].scope == "platform" and store.policies[edit["policy_id"]].platform == "DLH"
+    loan = next(p for p in store.policies.values()
+                if p.deal_id == dlh_grsi.DEAL_ID and p.company == "DLH" and p.decision == "not_debt")
+    sample_log = c.get(f"/deals/{cases.SAMPLE_ID}/audit").json()["rows"]
+    assert any(r["action"] == "policy:apply" and r["target"] == loan.id for r in sample_log)
+    sample = c.get(f"/deals/{cases.SAMPLE_ID}/case").json()
+    reused = next(sl for sl in sample["source_lines"] if sl["line"] == loan.pattern.capitalize()
+                  or sl["line"].lower() == loan.pattern)
+    assert reused["covenant_tag"] == "not_debt" and reused["covenant_policy_id"] == loan.id
+    flags = [f for f in sample["flags"] if f["payload"]["kind"] == "covenant_tag"]
+    assert len(flags) == 1 and "Mastercard" in flags[0]["question"]  # only the new line is asked
+    assert all(sl["source_ref"].startswith("Posted combined books of") for sl in sample["source_lines"]
+               if sl["company"] == "DLH")
+
+
+def test_the_open_case_is_answerable_and_finishes(seeded):
+    _, c = seeded
+    body = c.get(f"/deals/{sstk_envato.DEAL_ID}/case").json()
+    (fid,) = body["open_flags"]
+    flag = next(f for f in body["flags"] if f["id"] == fid)
+    assert "IFRS 16" in flag["question"] and flag["default"] == "b"
+    assert {o["id"]: round(o["leverage"], 2) for o in flag["options"]} == {"a": 1.18, "b": 0.99}
+    assert c.post(f"/work-items/{fid}/answer", json={"option_id": "b"}).status_code == 200
+    after = c.get(f"/deals/{sstk_envato.DEAL_ID}/case").json()
+    assert after["stage"] == "awaiting_approval" and after["verdict"]["leverage"] == pytest.approx(0.994, abs=0.0005)
+
+
+@pytest.mark.parametrize("keep_memory", [True, False])
+def test_reset_resets_only_the_live_deal_and_the_seeded_cases_stay(seeded, keep_memory):
+    app, c = seeded
+    gw = app.state.gateway
+    before = {d: (c.get(f"/deals/{d}/case").json(), c.get(f"/deals/{d}/conversation").json()) for d in cases.CASE_IDS}
+    rows_before = {d: [(r["action"], r["target"], r["reason"]) for r in c.get(f"/deals/{d}/audit").json()["rows"]]
+                   for d in cases.CASE_IDS}
+    c.post(f"/deals/{DEAL_ID}/run")  # the live deal moves on, then is reset
+    r = c.post(f"/dev/reset?keep_memory={str(keep_memory).lower()}").json()
+    assert r["ok"] and r["kept_deals"] == sorted(cases.CASE_IDS)
+    assert gw.verify_chain()
+    for d in cases.CASE_IDS:
+        case, msgs = c.get(f"/deals/{d}/case").json(), c.get(f"/deals/{d}/conversation").json()
+        assert case["stage"] == before[d][0]["stage"] and case["result"] == before[d][0]["result"]
+        assert case["mappings"] == before[d][0]["mappings"] and msgs == before[d][1]
+        assert [(x["action"], x["target"], x["reason"]) for x in c.get(f"/deals/{d}/audit").json()["rows"]] \
+            == rows_before[d]
+    seeded_policies = [p for p in gw.store.policies.values() if p.deal_id in cases.CASE_IDS]
+    assert seeded_policies  # the memory learned on the cases stays in both modes
+    assert c.get(f"/deals/{DEAL_ID}/case").json()["stage"] == "new"
+    # The fresh demo run still asks both questions: no seeded policy covers Kewaunee or Nu Aire.
+    if not keep_memory:
+        assert c.post(f"/deals/{DEAL_ID}/run").json()["stage"] == "awaiting_flag"
+        assert len(c.get(f"/deals/{DEAL_ID}/case").json()["open_flags"]) == 2
+    ids = [m["id"] for d in [DEAL_ID, *cases.CASE_IDS] for m in c.get(f"/deals/{d}/mappings").json()]
+    assert len(ids) == len(set(ids))  # the reset deal's new ids never repeat a kept record's
+
+
+def test_the_live_deal_still_escalates_on_a_fresh_run_after_seeding(seeded):
+    app, c = seeded
+    assert c.post(f"/deals/{DEAL_ID}/run").json()["stage"] == "awaiting_flag"
+    body = c.get(f"/deals/{DEAL_ID}/case").json()
+    assert len(body["open_flags"]) == 2 and not [m for m in body["mappings"] if m["policy_id"]]
+    demo = {PLATFORM.casefold(), TARGET.casefold()}
+    for p in app.state.gateway.store.policies.values():
+        assert (p.company or "").casefold() not in demo and (p.platform or "").casefold() not in demo
+
+
+def test_seeding_is_idempotent_and_never_touches_existing_records(seeded):
+    app, c = seeded
+    gw = app.state.gateway
+    snapshot = (len(gw.store.audit), len(gw.store.tool_runs), len(gw.store.messages))
+    assert cases.seed_cases(gw) == []
+    assert (len(gw.store.audit), len(gw.store.tool_runs), len(gw.store.messages)) == snapshot
+
+
+def test_seeding_runs_in_the_background_so_health_answers_at_once():
+    app = create_app(demo_cases=True)
+    c = TestClient(app)
+    assert c.get("/health").status_code == 200
+    app.state.cases_thread.join(60)
+    assert {d["deal_id"] for d in c.get("/deals").json()} == {DEAL_ID, *cases.CASE_IDS}
+
+
+def test_seeding_is_off_under_pytest_by_default():
+    c = TestClient(create_app())
+    assert [d["deal_id"] for d in c.get("/deals").json()] == [DEAL_ID]
+
+
+@pytest.mark.parametrize("module", [dlh_grsi, mamas_crown, sstk_envato])
+def test_each_filed_fixture_balances_and_names_its_sources(module):
+    assert module.SOURCES and all(u.startswith("https://www.sec.gov/") for u in module.SOURCES.values())
+    for blocks in (module.PLATFORM_BLOCKS, module.TARGET_BLOCKS):
+        bs = [(line, to_thousands(a, unit), tot) for section, _, unit, _, rows in blocks if section == "balance_sheet"
+              for line, a, tot in rows]
+        totals = {line.lower(): v for line, v, tot in bs if tot}
+        assets = totals["total assets"]
+        le = next(v for k, v in totals.items() if k.startswith("total liabilities and"))
+        assert assets == pytest.approx(le, abs=0.5)
+    names = {line for section, _, _, _, rows in module.TARGET_BLOCKS for line, _, _ in rows}
+    assert names <= set(module.MAPPING)  # the scripted Mapper has an answer for every target line

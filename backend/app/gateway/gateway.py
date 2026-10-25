@@ -231,6 +231,20 @@ class Gateway:
         self.store.audit.append(row)
         return row
 
+    def rechain(self) -> None:
+        """Number and chain the audit rows again, in order, after a reset kept some deals' rows (the store's
+        `reset_deals` with keep_deals). The rows' content is unchanged; each row's id and hashes are its place in the
+        new ledger. On Postgres the old ledger keeps the original rows."""
+        prev = GENESIS
+        rows = []
+        for n, row in enumerate(self.store.audit, 1):
+            base = dict(id=n, at=row.at, deal_id=row.deal_id, actor=row.actor, action=row.action, target=row.target,
+                        result=row.result, reason=row.reason, evidence=[e.model_dump() for e in row.evidence])
+            h = _hash(base, prev)
+            rows.append(row.model_copy(update={"id": n, "prev_hash": prev, "hash": h}))
+            prev = h
+        self.store.audit[:] = rows
+
     def verify_chain(self) -> bool:
         prev = GENESIS
         for row in self.store.audit:
@@ -524,8 +538,8 @@ class Gateway:
                     rents = [d["amount"] for d in erun.outputs["deductions"]
                              if re.search(r"\brent(al)?\b", d["name"], re.I)]
                     rent = sum(rents) if rents else None
-                outputs = fn(float(lev), deal.brief.limit, ebitda_value=eb, debt=debt, naive_debt=naive,
-                             rent_deduction=rent, naive_ebitda=naive_eb)
+                outputs = fn(float(lev), deal.brief.limit, wording=finance.wording_of(deal.brief.limit_wording),
+                             ebitda_value=eb, debt=debt, naive_debt=naive, rent_deduction=rent, naive_ebitda=naive_eb)
             else:
                 raise ValueError(f"no argument binding for {name}")
             if ekw:
@@ -728,7 +742,7 @@ class Gateway:
             lev = self.store.tool_runs.get(test.inputs.get("leverage_run_id", "")) if test else None
             if test and lev:
                 figures = dict(leverage=lev.outputs["debt"] / lev.outputs["ebitda"], ok=bool(test.outputs["ok"]),
-                               basis="as_filed" if self._whole_line(flag, opt.tags) else "covenant")
+                               basis="as_filed" if self._as_filed(flag, opt.id, opt.tags) else "covenant")
             options.append(Option(id=opt.id, label=opt.label, effect=effect, run_id=run_id,
                                   added_by=SYSTEM if opt is flag.options[-1] and baseline_added else None, **figures))
         item = WorkItem(id=self.store.next_id("wi"), deal_id=deal.id, type="flag", state=State.NEEDS_INFO,
@@ -812,6 +826,13 @@ class Gateway:
         line_ids = flag.line_ids if isinstance(flag, FlagProposal) else flag.payload.get("line_ids", [])
         return bool(line_ids) and all(tags.get(lid) == "debt" for lid in line_ids)
 
+    @classmethod
+    def _as_filed(cls, flag: FlagProposal | WorkItem, option_id: str, tags: dict[str, str]) -> bool:
+        """The whole-line option is computed as filed (reported EBITDA, no add-backs), the reading of someone who has
+        not read the agreement, unless it is the flag's default: when the agreement itself counts every flagged line
+        (Mama's finance leases), that reading is the agreement's, and its EBITDA is the agreement's too."""
+        return cls._whole_line(flag, tags) and option_id != flag.default
+
     def _flag_effect(self, deal: Deal, flag: FlagProposal, opt) -> tuple[str, str | None]:
         """What-if for one option, run by the system through the same tools. Tags are restored afterwards.
 
@@ -826,7 +847,7 @@ class Gateway:
                     if lid in lines:
                         lines[lid].covenant_tag = tag
                 # Any other unclear line is counted as debt for the what-if, so the figure is a ceiling.
-                as_filed = self._whole_line(flag, opt.tags)
+                as_filed = self._as_filed(flag, opt.id, opt.tags)
                 debt = self.run_tool(SYSTEM, deal.id, "covenant_debt", {"naive": True, "what_if": opt.id})
                 eb = self.run_tool(SYSTEM, deal.id, "ebitda", {"what_if": opt.id, "as_filed": as_filed})
                 lev = self.run_tool(SYSTEM, deal.id, "leverage", {"debt_run_id": debt.run_id, "ebitda_run_id": eb.run_id})
@@ -912,33 +933,36 @@ class Gateway:
             return
         deal = self._deal(item.deal_id)
         ids = _id_list([p.id for p in learned])
-        company = learned[0].company or "this company"
+        companies = _and(list(dict.fromkeys(p.company or "this company" for p in learned)))
         names = {lid: self.store.source_lines[lid].line for lid in item.payload.get("line_ids", [])
                  if lid in self.store.source_lines}
         if item.payload.get("kind") == "covenant_tag":
             groups: dict[str, list[str]] = {}
             for p in learned:
                 line = next((n for n in names.values() if n.strip().lower() == p.pattern), p.pattern)
-                groups.setdefault(p.decision, []).append(f"'{line}'")
+                if f"'{line}'" not in groups.setdefault(p.decision, []):
+                    groups[p.decision].append(f"'{line}'")
             term = deal.brief.debt_term if deal.brief else "covenant debt"
             said = []
             for tag in sorted(groups, key=lambda t: t != "debt"):
                 lines = groups[tag]
                 many = len(lines) > 1
-                verb = ("count" if many else "counts") if tag == "debt" else ("do not" if many else "does not")
+                verb = ("count" if many else "counts") if tag == "debt" else ("do not count" if many else "does not count")
                 said.append(f"{_and(lines)} {verb}")
-            text = f"Learned {ids} ({company}, {term}): {'; '.join(said)}."
+            text = f"Learned {ids} ({companies}, {term}): {'; '.join(said)}."
+            these = "these lines" if len(learned) > 1 else "this line"
         else:
             p = learned[0]
             line = next(iter(names.values()), p.pattern)
             where = f"goes to '{p.decision}'" if p.decision else "stays unmapped and listed"
-            text = f"Learned {ids}: {company}'s '{line}' {where}."
+            text = f"Learned {ids}: {companies}'s '{line}' {where}."
+            these = "this line"
         open_now = [f.id for f in self.open_flags(item.deal_id) if f.id != item.id]
         if open_now:
             nxt = (f" Applying it now; {_count(len(open_now), 'question')} still open ({', '.join(open_now)}), and the "
                    f"Preparer starts once {'it is' if len(open_now) == 1 else 'they are'} answered.")
         else:
-            nxt = " Applying it now, and to this line on later deals without asking. The Preparer is next."
+            nxt = f" Applying it now, and to {these} on later deals without asking. The Preparer is next."
         self._say(item.deal_id, item.proposed_by, CONTROLLER, "message", text + nxt, item_id=item.id,
                   policy_id=learned[0].id, limit=QUESTION_TEXT_LIMIT)
 
@@ -948,7 +972,7 @@ class Gateway:
         label = next((o.label for o in item.options if o.id == option_id), option_id)
         if kind == "covenant_tag":
             deal = self._deal(item.deal_id)
-            basis = "as_filed" if self._whole_line(item, action.get("tags", {})) else "covenant"
+            basis = "as_filed" if self._as_filed(item, option_id, action.get("tags", {})) else "covenant"
             if basis != deal.ebitda_basis:
                 deal.ebitda_basis = basis
                 self._log(item.deal_id, SYSTEM, "basis", "ALLOWED", deal.id,
@@ -1177,7 +1201,7 @@ class Gateway:
                            "propose:prepare_result", item.id)
         if abs(out.limit - deal.brief.limit) > 1e-9:
             self._deny(Invalid("limit must come from the brief"), deal.id, actor, "propose:prepare_result", item.id)
-        test = finance.limit_test(out.leverage, deal.brief.limit)
+        test = finance.limit_test(out.leverage, deal.brief.limit, wording=finance.wording_of(deal.brief.limit_wording))
         by_tool = {k: v for k, v in (("consolidate", out.consolidate_run_id), ("ebitda", out.ebitda_run_id),
                                       ("covenant_debt", out.debt_run_id), ("leverage", out.leverage_run_id)) if v}
         for tool, rid in list(by_tool.items()):
@@ -1432,9 +1456,9 @@ class Gateway:
         for item in reversed(self.store.deal_items(deal_id, "flag")):
             if item.payload.get("kind") != "covenant_tag":
                 continue
-            for action in item.payload.get("option_actions", {}).values():
+            for oid, action in item.payload.get("option_actions", {}).items():
                 tags = action.get("tags") or {}
-                if tags and all(t == "debt" for t in tags.values()):
+                if tags and all(t == "debt" for t in tags.values()) and oid != item.default:
                     return tags
         return None
 

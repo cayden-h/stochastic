@@ -87,7 +87,7 @@ def _whole_line_runs(store, deal_id: str) -> tuple[str, str] | None:
             lev = store.tool_runs.get(test.inputs.get("leverage_run_id", "")) if test else None
             debt = store.tool_runs.get(lev.inputs.get("debt_run_id", "")) if lev else None
             eb = store.tool_runs.get(lev.inputs.get("ebitda_run_id", "")) if lev else None
-            if debt and debt.tool == "covenant_debt" and eb and eb.tool == "ebitda":
+            if debt and debt.tool == "covenant_debt" and eb and eb.tool == "ebitda" and eb.inputs.get("as_filed"):
                 return debt.run_id, eb.run_id
     return None
 

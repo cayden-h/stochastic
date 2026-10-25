@@ -48,20 +48,44 @@ class MemoryStore:
         self.audit: list[AuditRow] = []  # append only, in order
         self._seq: dict[str, int] = {}
 
-    def reset_deals(self, keep_memory: bool = True) -> None:
+    # The per-deal record: every collection whose rows carry a deal_id (the deal itself is keyed by its id).
+    RECORD = ("source_lines", "mappings", "items", "results", "tool_runs", "edits", "agreements", "messages")
+
+    def reset_deals(self, keep_memory: bool = True, keep_deals: set[str] | None = None, rechain=None) -> None:
         """Clear the record. Agent memory (policies, learned adjustments, approved Briefs, sessions) is kept unless
         asked otherwise.
 
         Edits and agreements are per-deal record and are cleared. The counters that memory refers to keep counting,
         so a new id never repeats one a kept record names: policies (p), adjustments (a), and the edits (e) and work
-        items (wi) in learned_from and edit_id."""
+        items (wi) in learned_from and edit_id.
+
+        `keep_deals` names deals whose whole record stays: the Dashboard's seeded cases, when only the live demo deal
+        is reset. Their audit rows stay too, in order, and `rechain` (the gateway's `rechain`) chains them again; with
+        keep_memory=False only the memory learned on the other deals is cleared, the sessions included; and every id
+        counter keeps counting, so the reset deal's new ids never repeat a kept record's."""
+        keep = set(keep_deals or ())
         memory = (self.policies, self.adjustments, self.approved_briefs, self.sessions)
+        kept_deals = {k: v for k, v in self.deals.items() if k in keep}
+        kept = {name: {k: v for k, v in getattr(self, name).items() if v.deal_id in keep} for name in self.RECORD}
+        kept_audit = [row for row in self.audit if row.deal_id in keep]
         seq = dict(self._seq)
         self._clear()
         if keep_memory:
             self.policies, self.adjustments, self.approved_briefs, self.sessions = memory
             for prefix in ("p", "a", "e", "wi"):
                 self._seq[prefix] = seq.get(prefix, 0)
+        elif keep:
+            self.policies = {k: v for k, v in memory[0].items() if v.deal_id in keep}
+            self.adjustments = {k: v for k, v in memory[1].items() if v.deal_id in keep}
+            self.approved_briefs = {k: v for k, v in memory[2].items() if v.deal_id in keep}
+        if keep:
+            self.deals = kept_deals
+            for name, rows in kept.items():
+                setattr(self, name, rows)
+            self.audit = kept_audit
+            self._seq = seq
+            if rechain is not None:
+                rechain()
 
     def commit(self) -> None:
         """Called by the gateway after every write. Nothing to do in memory."""
