@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { useDeal } from "@/lib/deal-context";
 import { parseAmount } from "@/lib/edits";
 import { fmtK, fmtX, plural } from "@/lib/format";
-import type { Brief, BriefAdjustment, Evidence, BriefCitation, BriefDraft, Deal, WorkItem } from "@/lib/types";
+import type { Brief, BriefAdjustment, Evidence, BriefCitation, BriefDraft, BriefVerification, Deal, WorkItem } from "@/lib/types";
+import { VerificationCard } from "./verification-card";
 import { ActorChip, Button, Label, Mono, Shape, Tag } from "./ui";
 
 /** "4.8(a)" reads as Section 4.8(a); "Addendum I" and "preamble" read as they are. */
@@ -206,13 +206,14 @@ function AdjustmentRow({
  * the adjustment amounts from the books with their source, and approves. Approval locks the Brief; then the Mapper runs.
  */
 export function BriefCard({
-  deal, draft, flags, busy, onAct,
+  deal, draft, flags, busy, onAct, verification = null,
 }: {
   deal: Deal; draft: BriefDraft; flags: WorkItem[]; busy: boolean;
+  /** The verifier's report on this draft (D23), once it ran. */
+  verification?: BriefVerification | null;
   /** Runs one write and reads the case again; returns false on failure (the page shows the error). */
   onAct: (fn: () => Promise<unknown>) => Promise<boolean>;
 }) {
-  const { startRun } = useDeal();
   const b = draft.brief;
   const cite = (field: string) => draft.citations.find((c) => c.field === field);
   const mine = flags.filter((f) => draft.flags.includes(f.id));
@@ -241,10 +242,13 @@ export function BriefCard({
       <div className="flex flex-col gap-[6px]">
         <h2 className="text-[22px] font-semibold text-forest">Check the Brief before the agents map.</h2>
         <p className="text-[14px] leading-[20px] text-slate">
-          The Brief Reader read {b.agreement_ref}. Each field below is quoted from the agreement, and the gateway checked every quote is in it.
+          The Brief Reader read {b.agreement_ref}. Each field below is quoted from the agreement, and the verifier checked every quote, section, and number against it.
+          {verification?.filled.length ? ` The ${plural(verification.filled.length, "adjustment amount")} came from the books, each with its source.` : ""}
           {draft.amendments_supplied ? "" : " Base agreement only: no amendments were supplied."}
         </p>
       </div>
+
+      {verification ? <VerificationCard report={verification} /> : null}
 
       {questions.length ? (
         <div className="flex flex-col gap-[10px]">
@@ -335,12 +339,12 @@ export function BriefCard({
             <Shape kind="check" size={10} />Every question answered
           </span>
         )}
-        <span className="min-w-0 flex-1 text-[13px] text-slate">Approving locks the Brief on this deal; then the Mapper starts.</span>
+        <span className="min-w-0 flex-1 text-[13px] text-slate">Approving locks the Brief on this deal; the run goes on and the Mapper starts.</span>
         {!draft.amendments_supplied ? <Tag tone="agent">Base agreement only</Tag> : null}
         <Button
           kind="primary"
           disabled={busy || left > 0}
-          onClick={() => void onAct(async () => { await api.approveBrief(deal.id); await startRun(deal.id); })}
+          onClick={() => void onAct(() => api.approveBrief(deal.id))}
         >
           Approve the Brief and map
         </Button>

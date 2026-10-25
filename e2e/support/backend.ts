@@ -34,7 +34,7 @@ export interface Backend {
   stop: (opts?: { dumpThreads?: boolean }) => Promise<void>;
 }
 
-export async function startBackend({ port, consolePort, pace, cases = false, logFile }: { port: number; consolePort: number; pace: number; cases?: boolean; logFile: string }): Promise<Backend> {
+export async function startBackend({ port, consolePort, pace, cases = false, fromAgreement = false, logFile }: { port: number; consolePort: number; pace: number; cases?: boolean; fromAgreement?: boolean; logFile: string }): Promise<Backend> {
   if (!fs.existsSync(PYTHON)) {
     throw new Error(`the backend is not installed: ${PYTHON} is missing (README.md, "Getting started", or set E2E_PYTHON)`);
   }
@@ -46,7 +46,7 @@ export async function startBackend({ port, consolePort, pace, cases = false, log
   const child: ChildProcess = spawn(
     PYTHON,
     ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", String(port), "--timeout-graceful-shutdown", "1"],
-    { cwd: BACKEND_DIR, env: { ...backendEnv(pace, consolePort, cases), PYTHONFAULTHANDLER: "1" }, detached: true, stdio: ["ignore", out, out] },
+    { cwd: BACKEND_DIR, env: { ...backendEnv(pace, consolePort, cases, fromAgreement), PYTHONFAULTHANDLER: "1" }, detached: true, stdio: ["ignore", out, out] },
   );
   let exited: string | null = null;
   const done = new Promise<void>((resolve) => child.once("exit", (code, signal) => { exited = `${signal ?? code}`; resolve(); }));

@@ -61,8 +61,9 @@ export const ports = () => ({
 export const apiUrl = () => `http://localhost:${ports().backend}`;
 
 /** The backend's environment: the scripted agents only, the memory store, no keys, no Tiger. Never a live model.
- * `cases` seeds the Dashboard's sample cases (DEMO_CASES) beside the demo deal. */
-export function backendEnv(pace: number, consolePort: number, cases = false): NodeJS.ProcessEnv {
+ * `cases` seeds the Dashboard's sample cases (DEMO_CASES) beside the demo deal. `fromAgreement` starts the demo deal from
+ * its agreement text (DEMO_FROM_AGREEMENT, D23): the Brief Reader, the verifier, and the one-click Brief approval. */
+export function backendEnv(pace: number, consolePort: number, cases = false, fromAgreement = false): NodeJS.ProcessEnv {
   return {
     ...process.env,
     AGENT_BACKEND: "scripted",
@@ -75,6 +76,7 @@ export function backendEnv(pace: number, consolePort: number, cases = false): No
     ANTHROPIC_API_KEY: "",
     DEMO_PACE: pace ? String(pace) : "0",
     DEMO_CASES: cases ? "1" : "0",
+    DEMO_FROM_AGREEMENT: fromAgreement ? "1" : "0",
     CORS_ORIGINS: `http://localhost:${consolePort},http://127.0.0.1:${consolePort}`,
     PYTHONUNBUFFERED: "1",
   };

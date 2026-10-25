@@ -11,6 +11,9 @@ export interface Options {
   /** DEMO_CASES for this test's backend: the Dashboard's seeded cases beside the demo deal. Off by default, so a test
    * sees only the demo deal and the policies it teaches; demo-run.spec.ts turns it on. */
   cases: boolean;
+  /** DEMO_FROM_AGREEMENT: the demo deal starts from its agreement text (D23). Off by default, so the other specs start
+   * at the Mapper as before; demo-run.spec.ts turns it on. */
+  fromAgreement: boolean;
 }
 
 interface Fixtures {
@@ -26,12 +29,13 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(
 export const test = base.extend<Fixtures & Options>({
   pace: [0, { option: true }],
   cases: [false, { option: true }],
+  fromAgreement: [false, { option: true }],
 
-  backend: [async ({ pace, cases }, use, testInfo) => {
+  backend: [async ({ pace, cases, fromAgreement }, use, testInfo) => {
     const logDir = ensureDir(path.join(ARTIFACTS, "logs"));
     const logFile = path.join(logDir, `${slug(path.basename(testInfo.file, ".spec.ts"))}-${slug(testInfo.title)}-r${testInfo.retry}.log`);
     fs.writeFileSync(logFile, "");
-    const backend = await startBackend({ port: ports().backend, consolePort: ports().console, pace, cases, logFile });
+    const backend = await startBackend({ port: ports().backend, consolePort: ports().console, pace, cases, fromAgreement, logFile });
     await use(backend);
     await backend.stop({ dumpThreads: testInfo.status !== testInfo.expectedStatus });
     if (testInfo.status !== testInfo.expectedStatus) await testInfo.attach("backend.log", { path: logFile, contentType: "text/plain" });

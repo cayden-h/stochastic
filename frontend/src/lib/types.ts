@@ -3,7 +3,7 @@
 export type State = "NEW" | "PROPOSED" | "NEEDS_INFO" | "APPROVED" | "REJECTED" | "POSTED" | "REVERSED" | "SUPERSEDED";
 /** The deal stages the gateway and the job runner set (backend/app/gateway, backend/app/agents/jobs.py). */
 export type Stage =
-  | "new" | "reading_brief" | "awaiting_brief" | "brief_ready"
+  | "new" | "reading_brief" | "verifying_brief" | "awaiting_brief" | "brief_ready"
   | "mapping" | "awaiting_flag" | "mapped" | "flags_answered" | "preparing"
   | "awaiting_review" | "awaiting_approval" | "needs_attention" | "posted" | "run_failed";
 export type Backend = "scripted" | "anthropic" | "droid" | "replay" | string;
@@ -79,7 +79,7 @@ export interface BriefVerification {
   scope_notes: string[];
   /** The flag ids left for the controller. */
   escalated: string[];
-  auto_approved: boolean; at: string;
+  at: string;
 }
 
 export interface SourceLine {

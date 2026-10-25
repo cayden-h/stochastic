@@ -22,16 +22,24 @@ def mapping_event(store, m) -> dict:
 
 
 ROLE_NAMES = {"agent:mapper": "Mapper", "agent:preparer": "Preparer", "agent:reviewer": "Reviewer",
-              "agent:brief_reader": "Brief Reader", "system:gateway": "Gateway"}
+              "agent:brief_reader": "Brief Reader", "system:gateway": "Gateway", "system:verifier": "Verifier"}
 
 
 def notify_event(store, msg) -> dict | None:
     """The `notify` event's body for a question to the controller, or None when the message is not one or its item
     is no longer waiting (answered while the page was away), so a reconnecting page never re-notifies an old
     question. `body` is the one-line question of the work item; the conversation message has the options."""
+    item = store.items.get(msg.item_id) if msg.item_id else None
+    if (msg.kind == "handoff" and msg.sender == "system:verifier" and msg.to == "human:controller" and item is not None
+            and item.type == "draft_brief" and item.state == State.PROPOSED and item.payload.get("verification")):
+        # The Brief approval (D23): the verifier checked every field; the controller approves in one click.
+        report = item.payload["verification"]
+        return {"id": msg.id, "deal_id": msg.deal_id, "at": msg.model_dump(mode="json", include={"at"})["at"],
+                "kind": "brief_approval", "item_id": item.id, "item_ids": [item.id], "from": msg.sender,
+                "title": "The Verifier checked the Brief",
+                "body": f"{report['passed']} of {len(report['checks'])} checks passed. " + msg.text}
     if msg.kind != "question" or msg.to != "human:controller":
         return None
-    item = store.items.get(msg.item_id) if msg.item_id else None
     if item is None or item.state != State.NEEDS_INFO:
         return None
     # One escalation, however many decisions (D23): the questions an agent opens together (one parent work item)

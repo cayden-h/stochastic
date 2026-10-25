@@ -8,6 +8,7 @@ import { Page } from "@/components/shell";
 import { Avatar, Button, Card, Label, Mono, PageHeader, Shape, Tag } from "@/components/ui";
 import { VerdictFigures } from "@/components/verdict-figures";
 import { BriefCard } from "@/components/brief-card";
+import { VerificationCard } from "@/components/verification-card";
 import { AskingBanner, Pipeline, agentName } from "@/components/process-flow";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
@@ -163,7 +164,11 @@ export default function CaseScreen() {
             </Card>
           ) : null}
 
-          {draft ? <BriefCard deal={deal} draft={draft} flags={flags} busy={busy} onAct={act} /> : null}
+          {draft ? (
+            <BriefCard deal={deal} draft={draft} flags={flags} busy={busy} onAct={act} verification={kase.brief_verification ?? null} />
+          ) : kase.brief_verification ? (
+            <VerificationCard report={kase.brief_verification} />
+          ) : null}
 
           {current ? (
             <div ref={flagRef} className="scroll-mt-[20px]">
@@ -204,7 +209,17 @@ export default function CaseScreen() {
           {showProcess ? (
             <section className="flex w-full flex-col gap-[12px]" aria-label="The process">
               <Card className="p-[8px]">
-                <Pipeline agents={agentStates} readerUsed={fromAgreement} posted={Boolean(verdict?.posted)} approvalWaiting={approvalWaiting} />
+                <Pipeline
+                  agents={agentStates}
+                  readerUsed={fromAgreement}
+                  posted={Boolean(verdict?.posted)}
+                  approvalWaiting={approvalWaiting || stage === "brief_ready"}
+                  verifier={{
+                    state: stage === "verifying_brief" ? "working" : kase.brief_verification ? (kase.brief_verification.failed ? "failed" : "done") : "idle",
+                    passed: kase.brief_verification?.passed ?? 0,
+                    total: kase.brief_verification?.checks.length ?? 0,
+                  }}
+                />
               </Card>
             </section>
           ) : null}

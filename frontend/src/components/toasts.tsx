@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { type LearnedNotice, useDeal } from "@/lib/deal-context";
 import type { Notice } from "@/lib/types";
+import { LockIcon } from "./icons";
 import { agentName } from "./process-flow";
 import { Avatar, Shape, Tag, actorOf } from "./ui";
 
@@ -12,7 +13,8 @@ const LEARNED_MS = 6000;
 /** The agent's character, or the gateway's lock-grey square when no agent sent it. */
 function Who({ party, size }: { party: string; size: number }) {
   const role = actorOf(party).role;
-  return role ? <Avatar role={role} size={size} /> : <span className="text-code"><Shape kind="square" size={size * 0.6} /></span>;
+  if (role) return <Avatar role={role} size={size} />;
+  return party.startsWith("system:") ? <LockIcon size={size} /> : <span className="text-code"><Shape kind="square" size={size * 0.6} /></span>;
 }
 
 /** The agent's message in the agent's voice: "Learned p_007: ..." becomes "The Mapper learned p_007: ...", and
@@ -37,7 +39,7 @@ function DecisionToast({ notice, more, onDecide, onLater }: { notice: Notice; mo
       <div className="flex min-w-0 flex-1 flex-col gap-[6px]">
         <span className="inline-flex items-center gap-[6px] text-[11px] font-semibold tracking-[0.88px] text-escalation uppercase">
           <Shape kind="triangle" size={10} />
-          Needs your decision
+          {notice.kind === "brief_approval" ? "Needs your approval" : "Needs your decision"}
         </span>
         <strong className="text-[16px] leading-[21px] font-semibold text-forest">{notice.title}</strong>
         {notice.body ? <p className="line-clamp-3 text-[13px] leading-[18px] text-slate" title={notice.body}>{notice.body}</p> : null}
@@ -47,7 +49,7 @@ function DecisionToast({ notice, more, onDecide, onLater }: { notice: Notice; mo
             onClick={onDecide}
             className="inline-flex min-h-[36px] items-center justify-center rounded-chip bg-forest px-[16px] font-ui text-[14px] font-semibold text-paper transition-colors duration-150 hover:bg-forest-deep"
           >
-            Decide
+            {notice.kind === "brief_approval" ? "Review the Brief" : "Decide"}
           </button>
           <button type="button" onClick={onLater} className="text-[13px] font-semibold text-slate underline-offset-4 hover:text-forest hover:underline">
             Later
@@ -103,9 +105,11 @@ export function Toasts() {
   const onCase = path.startsWith("/case");
   const open = notices.filter((n) => {
     if (onCase && n.deal_id === deciding && n.deal_id === kase?.deal.id) return false;
+    if (onCase && n.kind === "brief_approval" && n.deal_id === kase?.deal.id) return false; // the Brief card is on screen
     if (!kase || n.deal_id !== kase.deal.id || !n.item_id) return true;
     const item = kase.flags.find((f) => f.id === n.item_id) ?? kase.work_items.find((w) => w.id === n.item_id);
-    return !item || item.state === "NEEDS_INFO";
+    // The Brief approval (D23) waits while the draft is proposed; a question while it needs info.
+    return !item || item.state === (n.kind === "brief_approval" ? "PROPOSED" : "NEEDS_INFO");
   });
   if (!open.length && !learned.length) return null;
 

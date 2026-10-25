@@ -34,7 +34,7 @@ function CheckRow({ c }: { c: BriefCheck }) {
       </span>
       <span className="flex w-[190px] shrink-0 flex-col gap-[2px]">
         <span className="text-[14px] font-semibold text-ink">{fieldName(c.field)}</span>
-        <Mono className="truncate" >{c.value}{amount && c.value !== "0" ? "K" : ""}</Mono>
+        <Mono className="truncate">{c.value}{amount && c.value !== "0" ? "K" : ""}</Mono>
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-[4px]">
         {c.quote ? (
@@ -42,7 +42,7 @@ function CheckRow({ c }: { c: BriefCheck }) {
         ) : null}
         <span className={`text-[12px] ${c.ok ? "text-slate" : "font-semibold text-denied"}`}>{c.reason}</span>
       </span>
-      <Mono className="w-[150px] shrink-0 truncate text-right" >{amount ? "From the books" : sectionName(c.section)}</Mono>
+      <Mono className="w-[150px] shrink-0 truncate text-right">{amount ? "From the books" : sectionName(c.section)}</Mono>
     </li>
   );
 }
@@ -56,7 +56,7 @@ export function VerificationCard({ report }: { report: BriefVerification }) {
   const total = report.checks.length;
   const allOk = report.failed === 0;
   return (
-    <Card className="flex w-full flex-col" >
+    <Card className="flex w-full flex-col">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -75,9 +75,9 @@ export function VerificationCard({ report }: { report: BriefVerification }) {
             </span>
           </span>
           <span className="truncate text-[13px] text-slate">
-            {report.auto_approved
-              ? "Every quote is word for word in its section, every number matches its quote, and the amounts come from the books. Approved by the verifier."
-              : allOk ? "Every field checks out against the agreement." : `${report.failed} failed; the controller decides.`}
+            {allOk
+              ? "Every quote is word for word in its section, every number matches its quote, and every amount has its source."
+              : `${report.failed} failed; answer the questions below before you approve.`}
           </span>
         </span>
         <span className="text-[13px] font-semibold text-slate">{open ? "Hide" : "Show"} the checks</span>

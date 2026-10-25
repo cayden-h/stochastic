@@ -58,7 +58,7 @@ export function ago(iso: string, now = Date.now()): string {
 
 /** The Brief comes first on a deal made from agreement text (D20): these stages are the Brief Reader's. */
 export function isBriefStage(stage: Stage): boolean {
-  return stage === "reading_brief" || stage === "awaiting_brief" || stage === "brief_ready";
+  return stage === "reading_brief" || stage === "verifying_brief" || stage === "awaiting_brief" || stage === "brief_ready";
 }
 
 /** A run can start from a new deal or from a run that stopped. */
@@ -78,6 +78,7 @@ export function stageWords(stage: Stage): { text: string; tone: "you" | "work" |
   switch (stage) {
     case "new": return { text: "Not started", tone: "idle" };
     case "reading_brief": return { text: "Reading the agreement", tone: "work" };
+    case "verifying_brief": return { text: "Verifying the Brief", tone: "work" };
     case "awaiting_brief": case "brief_ready": return { text: "Brief \u00b7 needs you", tone: "you" };
     case "mapping": return { text: "Mapping", tone: "work" };
     case "awaiting_flag": return { text: "Mapping \u00b7 needs you", tone: "you" };

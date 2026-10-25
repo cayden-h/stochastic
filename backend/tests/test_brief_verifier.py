@@ -248,3 +248,17 @@ def test_a_reader_flag_on_a_field_still_reaches_the_controller(world):
     report = gw.verify_brief(VERIFIER, DEAL_ID)
     assert [f.payload["field"] for f in gw._brief_flags(DEAL_ID)] == ["lender"]
     assert store.items[report.escalated[0]].state == State.NEEDS_INFO
+
+
+def test_the_brief_approval_is_one_notification(world):
+    import json as _json
+    from app.api.events import next_events
+    store, gw = world
+    jobs.advance(gw, DEAL_ID, backend="scripted")
+    events, _, _ = next_events(store, DEAL_ID, 0, None, live_seen={})
+    notes = [_json.loads(e.split("\n")[1].removeprefix("data: ")) for e in events if e.startswith("event: notify")]
+    assert [(n["kind"], n["title"]) for n in notes] == [("brief_approval", "The Verifier checked the Brief")]
+    assert notes[0]["body"].startswith("22 of 22 checks passed.")
+    gw.approve_brief(CONTROLLER, DEAL_ID)
+    late, _, _ = next_events(store, DEAL_ID, 0, None, live_seen={})
+    assert not [e for e in late if e.startswith("event: notify")]  # approved: no notification on a reconnect
