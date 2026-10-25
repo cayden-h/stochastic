@@ -91,7 +91,8 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 
 | Method and path | Who | Purpose |
 | --- | --- | --- |
-| `GET /health` | any | `ok`, `chain_valid`, the backend status, and `running` (a job is running for some deal in this process) (typed response) |
+| `GET /health` | any | `ok`, `chain_valid`, the backend status, `running` (a job is running for some deal in this process), and `memory_counts` (the same body as `GET /memory/counts`) (typed response) |
+| `GET /memory/counts` | any | The sidebar's learning counters across every deal in the record: `{"human_answers", "policies", "edits", "by_deal": {deal_id: {"human_answers", "policies", "edits"}}}` (response model `MemoryCounts`). `human_answers` counts the flags a human answered, plus the answer behind each live policy whose deal was reset with memory kept; `policies` counts live policies (not retired); `edits` counts the controller's edits saved with a reason (`status` `reasoned`). After seeding: 4 edits (see "Seeded cases"); the live demo deal adds to the counts as it runs, and `/dev/reset?keep_memory=false` takes its answers, policies, and edits back out. |
 | `GET /deals?include_uploads=false` | any | The deals for the Dashboard, the live demo deal first, then the seeded cases ("Seeded cases" below) and the deals uploaded since the API process started. Uploads already in the record when the process started (a Postgres ledger keeps them) are hidden from this list, not deleted: `include_uploads=true` lists them too, and their own routes still answer. Each is the `Deal` (`id`, `name`, `platform`, `target`, `stage`, `brief`, `brief_status`, `ebitda_basis`, `situation`, `data_source`, `note`) plus `deal_id` (same as `id`), `verdict` (`{"leverage", "limit", "verdict"}` from the latest result, or null before the Preparer ran), and `updated_at` (the time of the deal's latest audit row, ISO). `data_source` is `filings` (a real deal, every figure from a public filing), `sample` (a sample company's books, not a real deal), or `upload` (sent through `POST /deals`). `note` is one line for the card. |
 | `GET /deals/{id}` | any | One deal, with its brief |
 | `GET /deals/{id}/case` | any | The whole screen in one read (shape below; response model `CaseResponse`, visible at `/docs`) |
@@ -111,7 +112,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, files `platform_csv` and `target_csv`, and exactly one of `brief` (a JSON string of the Brief; the reader is skipped) or `agreement_txt` (the credit agreement as a UTF-8 `.txt` file, same 2 MB limit; the deal starts with `brief_status` `none` and the run starts with the Brief Reader, unless an approved Brief for the same agreement hash is reused). Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}, "brief_status"}`. 422 when neither or both of `brief` and `agreement_txt` are sent, for an empty or non-UTF-8 agreement or a name not ending in `.txt`, and naming the file, row, and column for a bad CSV. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
 | `POST /deals/{id}/brief/amounts` | `human:controller` only | Set fields of the draft Brief (D20), most often an adjustment amount from the books with its source. Any draft field can be set by its path (the limit, the lender, the definitions, `debt_excludes[k]`, an adjustment's name, amount, or cap); only an amount needs a `source_ref`. Body `{"amounts": [{"field": "ebitda_addbacks[2].amount", "value": 698.0, "source_ref": "...", "inferred": false, "note": ""}]}` (a new adjustment is added by its `.name` at the next index). Every entry is checked first (path, index, type, source); a bad entry refuses the whole list with 422 naming `amounts[i]`, nothing applied, and a DENIED row. The entries are then applied in order through `gateway.amend_brief` under the gateway lock. The gateway cannot roll back: if it still refuses entry i, the 422 names `amounts[i]` and lists the earlier entries, which stay applied. Returns `{"brief", "brief_draft", "brief_status", "stage"}` (response model `BriefAmountsResponse`). 404 unknown deal; 422 for an empty list, a field path that is not `name[i].attr`, or a `value` that is a boolean, non-finite, too big for a float, 1e12 or more in size, or a number sent as text for an amount, a cap, or the limit (loc `amounts[i].value`, the message names the field path); 403 with a DENIED row for any actor but `human:controller` (an agent, `human:intern`), before any write; 409 when there is no draft or the Brief is approved. |
 | `POST /deals/{id}/brief/approve` | `human:controller` only | Approve the draft Brief through `gateway.approve_brief`; it is locked and the deal is back at stage `new`. The run does not continue by itself: the console calls `POST /deals/{id}/run` next. Returns the deal (response model `Deal`, `brief_status` `approved`, `stage` `new`). 404 unknown deal; 403 with a DENIED row for any actor but `human:controller`, or while a `brief_field` flag is open; 409 when there is no draft (a second approve, or a deal whose Brief came as JSON). |
-| `POST /deals/{id}/run` | human | Run the job runner until the deal waits on a human. Body `{"backend": "droid", "sync": true, "pace": "demo"}` is optional. `pace` is `demo` (the 15-second demo), `human` (the `DEMO_PACE=1` timings), `off`, or null (follow `DEMO_PACE`); it overrides `DEMO_PACE` for this run and for the run the controller's answer continues, on the scripted and replay backends only (422 for another value). Pace `demo` with no `backend` always runs the scripted backend for every role of the run, with no fallback chain and no live call, whatever `AGENT_BACKEND` says. See "Demo pace". |
+| `POST /deals/{id}/run` | human | Run the job runner until the deal waits on a human. Body `{"backend": "droid", "sync": true, "pace": "demo"}` is optional. `pace` is `demo` (the 15-second Hyphenate demo), `factory` (the 30-second Factory demo), `human` (the `DEMO_PACE=1` timings), `off`, or null (follow `DEMO_PACE`); it overrides `DEMO_PACE` for this run and for the run the controller's answer continues, on the scripted and replay backends only (422 for another value). Pace `demo` or `factory` with no `backend` pins every role of the run to one backend, with no fallback chain and no live call, whatever `AGENT_BACKEND` says: the replay of the recorded Claude Haiku 5.5 run when it fits the deal, else the scripted rules. See "Demo pace". |
 | `POST /work-items/{id}/answer` | human | `{"option_id": "b"}`. Posts the flag and, if no flag is open, continues the run in the background. `?auto_advance=false` turns that off. |
 | `POST /work-items/{id}/approve` | human | Approve the result. The gateway posts it. |
 | `POST /work-items/{id}/reject` | human | `{"reason": "..."}` |
@@ -141,7 +142,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
   "policies": [ "..." ],
   "sessions": [ "..." ],
   "audit": { "rows": 12, "chain_valid": true, "denied": 0 },
-  "backend": { "configured": "scripted", "fallback": "scripted", "anthropic_key": false, "factory_key": true, "last_runs": [ "..." ] },
+  "backend": { "configured": "scripted", "fallback": "scripted", "anthropic_key": false, "factory_key": true, "last_runs": [ "..." ], "demo_recording": { "name": "haiku-5-5-run2", "model": "claude-haiku-5-5", "backend": "droid", "recorded_at": "2026-10-24T03:40:02-07:00", "model_confirmed": false, "...": "..." } },
   "edits": [],
   "adjustments": [],
   "brief_draft": null,
@@ -576,23 +577,52 @@ A live model returns all its mappings at once, so they are sent in the order the
 
 The job runner waits a little on the scripted and replay backends, so a demo run plays at a speed people can follow (`backend/app/agents/pace.py`).
 Two switches:
-- `"pace"` on `POST /deals/{id}/run`: `demo`, `human`, or `off` for that run and for the run the controller's answer continues (kept per deal in `Gateway.run_pace`).
-  `demo` with no `backend` also pins every role of the run to the scripted backend, with no fallback chain (`runner.only`), so the 15-second demo never makes a live call, even when `.env` says `AGENT_BACKEND=droid`.
-  Each `last_runs` entry in `GET /health` says the backend the run asked for (`asked`) as well as the one that ran (`backend`), and the model card reads "Scripted rules, no model", not a fallback.
+- `"pace"` on `POST /deals/{id}/run`: `demo`, `factory`, `human`, or `off` for that run and for the run the controller's answer continues (kept per deal in `Gateway.run_pace`).
   `human` and `off` follow `AGENT_BACKEND` as before.
 - `DEMO_PACE` (default off), for runs that ask no pace: a factor on the `human` profile; 1 is human speed, 0.5 halves each wait and 2 doubles it (capped at 5).
 
-| Wait | `human` | `demo` |
-| --- | --- | --- |
-| An agent picks up its work item | 2.5 s | 1.2 s |
-| Before each tool call it makes | 1.0 s | 0.6 s |
-| While the mappings are stored | 0.3 s after each | 4.0 s for the whole list |
-| Once, before the questions open | 1.5 s | 0.8 s |
-| After a result is stored | 1.0 s | 0.6 s |
+| Wait | `human` | `demo` | `factory` |
+| --- | --- | --- | --- |
+| An agent picks up its work item | 2.5 s | 1.2 s | 2.4 s |
+| Before each tool call it makes | 1.0 s | 0.6 s | 1.2 s |
+| While the mappings are stored | 0.3 s after each | 4.0 s for the whole list | 10.0 s for the whole list |
+| Once, before the questions open | 1.5 s | 0.8 s | 1.6 s |
+| After a result is stored | 1.0 s | 0.6 s | 1.2 s |
 
-Measured on uvicorn on 2026-10-24 evening on the demo deal (scripted, memory store, agent time only):
-- `demo`: 6.25 s from Run to the two questions and 6.64 s from the last answer to "Ready for your approval", 12.9 s in all.
-- `human`: 20.1 s and 12.1 s.
+`factory` is every `demo` wait doubled, except the mapping stream, which is 10 s instead of 8 s so the questions open at 14 s.
+
+#### The backend of the two demo paces: the recorded Claude Haiku 5.5 run
+
+Since 2026-10-25 (D22), `demo` and `factory` with no `backend` replay a real recorded model run instead of the scripted rules (`backend/app/agents/demo_replay.py`).
+The recording is `backend/recordings/haiku-5-5-run2/`: the live Droid run of the demo deal with `DROID_MODEL=claude-haiku-5-5`, committed on 2026-10-24 at 03:40 PDT (commit 8b914db); its `recording.json` says so.
+The model is the one requested; the served-model check from the droid session record was added later that day, so `model_confirmed` is false for this run.
+What is replayed and what is live:
+- The Mapper's typed output (53 mappings, 78 covenant tags, two flags with the model's own questions and options) is the one Haiku 5.5 returned.
+  The gateway checks it like any other result; every option's figure is a fresh what-if tool run.
+- The Preparer and the Reviewer re-run the recorded tool sequence (consolidate, ebitda, covenant_debt, leverage; tie_out, limit_test) through the gateway, so every figure is a fresh run with a new run id.
+  Their text is the rules' text, and the Preparer says so ("Replay of the recorded Claude Haiku 5.5 run on droid ...").
+- The answers, the policies they teach, the hand-offs, and the audit log are live.
+The replay applies only when it is honest to show it:
+- The deal's lines must be the recorded Kewaunee and Nu Aire lines: the same role (platform or target), section, line name, amount in USD thousands, and total flag, by a content hash.
+  That holds for the live demo deal and for an upload of the same two statements, under any company name case.
+  The store gives out new line ids after every reset and every upload, so the recorded ids are translated to the deal's own ids by that content (`last_runs[].meta.line_ids_translated`).
+- No live policy learned outside this run may cover the deal.
+  The recording was made with no memory, so after a reset that keeps memory it would ask questions the agents have learned to answer.
+Otherwise the run uses the scripted rules at the same pace, `backend` reads `scripted`, and the Mapper gets a system note that starts "Scripted rules for this run, not the recorded Claude Haiku 5.5 run: " with the reason.
+A Brief Reader step (an upload with the agreement as text) always runs the scripted rules, since no Haiku recording of the reader exists; the Mapper then replays once the Brief is approved.
+The input key stored with the recording does not match today's Mapper input (`input_matches` false): the input has gained fields since 03:40 (line notes and Brief fields).
+The output is still the one the model returned, and the gateway re-checks every mapping, tag, and flag against the current lines, so a mismatch that matters is refused.
+
+What the model card reads from: each `last_runs` entry has `backend` and `asked` (both `replay`), `model` (`claude-haiku-5-5`), `recorded` (true), `recording` (`haiku-5-5-run2`), `recorded_at`, and `recorded_backend` (`droid`).
+A scripted run has `model` null and `recorded` false; a live droid run has the served or requested model and `recorded` false.
+`backend.demo_recording` on `/health` and `/case` describes the recording itself.
+So the card can say "Claude Haiku 5.5 · recorded run", and that is true: the questions on screen are the ones the model wrote on that run.
+
+Measured on uvicorn on 2026-10-25, 00:05 (replay, memory store, the four cases seeded, `AGENT_BACKEND=droid` with no key, agent time only, polling `/case` every 50 ms):
+- `demo`: 6.23 s and 6.28 s from Run to the two questions, 7.25 s and 7.23 s from the last answer to "Ready for your approval", 13.5 s in all.
+- `factory`: 14.23 s to the questions and 14.46 s after the last answer, 28.7 s in all; the same on an upload of the two statements with the Brief as JSON (14.29 s and 14.48 s).
+- `human` (scripted, 2026-10-24 evening): 20.1 s and 12.1 s.
+The fake-clock tests (`test_demo_replay.py`, `test_demo_pace.py`) give 6.0 s and 6.6 s for `demo`, and 14.0 s and 13.3 s for `factory`; the HTTP polling adds the rest.
 
 The waits are never inside the gateway's checks and never under its lock: `store_mapping` writes the checks, each mapping, and the questions as separate writes and waits between them, so an answer or a read is never kept waiting by the stream (verified by `test_demo_pace.py`, whose fake clock tries the lock during every wait).
 A live model backend (`droid`, `anthropic`) gets none, and under pytest the pace is off unless a test turns it on.
@@ -606,10 +636,14 @@ Each case runs through the real pipeline on the scripted backend with no pace: t
 
 | Deal id | Case | `data_source` | Stage |
 | --- | --- | --- | --- |
-| `d_dlh_grsi` | DLH Holdings acquires GRSi | `filings` | `posted`, after the covenant answer and one reasoned remap edit (a platform policy for DLH) |
+| `d_dlh_grsi` | DLH Holdings acquires GRSi | `filings` | `posted`, after the covenant answer and two reasoned remap edits: Indirect costs to Contract costs (Ex 99.3 note 3b, remembered as a platform policy for DLH), and Other current liabilities to Deferred revenue (Ex 99.2 Note 1: the $209 are contract liabilities) |
 | `d_mama_crown` | Mama's Creations acquires Crown I | `filings` | `awaiting_approval` |
 | `d_sstk_envato` | Shutterstock acquires Envato | `filings` | `awaiting_flag` (the IFRS 16 lease question) |
-| `d_dlh_craigs` | DLH acquires Craig's Design and Landscaping | `sample` | `posted`; the Mapper reuses DLH's prior-loan policy from `d_dlh_grsi` (`policy:apply`) |
+| `d_dlh_craigs` | DLH acquires Craig's Design and Landscaping | `sample` | `posted`; the Mapper reuses DLH's prior-loan policy from `d_dlh_grsi` (`policy:apply`), and two reasoned remap edits from the QuickBooks account list: Equipment Rental to General and administrative costs (its own Expenses account, not the Job Expenses:Equipment Rental job cost), and Undeposited Funds to Other current assets (an Other Current Assets account, not a Bank account) |
+
+That is four reasoned edits across the cases, each made with `apply_edit` and `reason_edit` and citing its source in the reason text; only the first is remembered, so the other three teach nothing a later deal is offered.
+Mama's and Crown I has none: the gateway refuses amount edits on subtotals and on balance sheet detail lines, and no Crown I line has a filing-sourced correction or remap that fits those rules.
+`GET /memory/counts` reads `"edits": 4` after seeding (verified: `test_demo_cases.py`).
 
 Seeding is idempotent: a case already in the store, such as one a Postgres ledger loaded, is never touched.
 While a case seeds, its deal id is in `Gateway.running`, so a Run on it gets 409.

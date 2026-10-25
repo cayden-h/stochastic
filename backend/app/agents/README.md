@@ -10,7 +10,9 @@ The three agent roles (Mapper, Preparer, Reviewer), the backends that run them, 
 | `backends/anthropic_backend.py` | Claude with tool use. The real model path and the stage fallback for Droid. |
 | `backends/droid_backend.py` | Factory Droid Python SDK: one session per role, in-process MCP tools that call the gateway, `restrict_tools`, empty working directory. |
 | `backends/scripted.py` | Deterministic logic with no model: policies, synonyms, name similarity, flags. The last-resort fallback and the reference answer. |
-| `recording.py` | Save and replay agent outputs (`backend/recordings/`). |
+| `recording.py` | Save and replay agent outputs (`backend/recordings/`); a folder's `recording.json` says which model made it, where, and when. |
+| `demo_replay.py` | The backend of the `demo` and `factory` paces: the recorded Claude Haiku 5.5 run when the deal's lines are the recorded ones and no earlier memory covers it, with the line ids translated; else the scripted rules, with the reason. |
+| `pace.py` | The waits of a paced run: the `human`, `demo`, and `factory` profiles. |
 
 Agents are stateful.
 Each role has an `AgentSession` in the store (backend session id, turn count, a short transcript), and the Mapper reads the `Policy` rows the gateway wrote from the controller's answers.
