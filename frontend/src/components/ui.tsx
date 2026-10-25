@@ -135,15 +135,15 @@ function pageRole(path: string): Role {
   return "mapper";
 }
 
-/** The page title row: the page's character and the serif title on the left, the page's actions on the right.
+/** The page title row: the serif title with the page's character 24 px after it, the page's actions on the right.
  * The row drags the window. */
 export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
   const role = pageRole(usePathname());
   return (
     <header className="drag flex w-full shrink-0 items-center gap-[12px]">
-      <span className="flex items-center gap-[10px]">
-        <Avatar role={role} size={30} />
+      <span className="flex items-center gap-[24px]">
         <h1 className="font-serif text-[32px] whitespace-nowrap text-forest">{title}</h1>
+        <Avatar role={role} size={30} />
       </span>
       <span className="flex-1" />
       {children}
