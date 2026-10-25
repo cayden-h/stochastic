@@ -62,7 +62,8 @@ def demo_from_agreement_wanted() -> bool:
 
 def start_demo_cases(gateway: Gateway, background: bool = True) -> threading.Thread | None:
     """Seed the cases through the real pipeline (scripted backend, no pace). In a background thread, so /health
-    answers at once; a case already in the store (a Postgres ledger that loaded it) is never touched."""
+    answers at once; a case already in the store (a Postgres ledger that loaded it) is kept while its seed version
+    matches the fixtures, and rebuilt when it does not (cases.remove_stale_cases)."""
     from app.db.fixtures.cases import seed_cases
 
     def run():

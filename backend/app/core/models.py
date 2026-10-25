@@ -149,6 +149,9 @@ class Deal(BaseModel):
     # drafts the Brief, the verifier fills an adjustment of the same name from here, with this source, so the
     # controller is not asked for a figure the deal already holds. Empty for an upload unless the controller sends it.
     book_amounts: list[Adjustment] = Field(default_factory=list)
+    # The fixture version a seeded Dashboard case was built from (cases.SEED_VERSION); None for every other deal. A
+    # seeded case whose version differs from the code's is rebuilt at startup (cases.seed_cases).
+    seed_version: str | None = None
 
 
 class SourceLine(BaseModel):

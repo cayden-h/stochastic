@@ -652,7 +652,8 @@ That is four reasoned edits across the cases, each made with `apply_edit` and `r
 Mama's and Crown I has none: the gateway refuses amount edits on subtotals and on balance sheet detail lines, and no Crown I line has a filing-sourced correction or remap that fits those rules.
 `GET /memory/counts` reads `"edits": 4` after seeding (verified: `test_demo_cases.py`).
 
-Seeding is idempotent: a case already in the store, such as one a Postgres ledger loaded, is never touched.
+Seeding is idempotent: a case already in the store, such as one a Postgres ledger loaded, is left as it is while its `Deal.seed_version` matches `cases.SEED_VERSION` (a hash of the case fixtures, `cases.py`, and the QuickBooks sample files, plus `SEED_REVISION` to bump by hand).
+A case with another version is rebuilt at startup the way `/dev/reset` resets the demo deal: a new ledger carries every other deal (the demo deal and uploads untouched, the old ledger's audit rows kept), the case's record and the memory learned on it are dropped, and it is seeded again (a stale `d_dlh_grsi` takes `d_dlh_craigs` with it).
 While a case seeds, its deal id is in `Gateway.running`, so a Run on it gets 409.
 No case's policy or adjustment covers Kewaunee or Nu Aire (`assert_demo_deal_untouched`), so the live demo deal always asks its questions on a fresh run.
 The sources of each real case are in its fixture's header; the sample's platform lines are the posted `d_dlh_grsi` books, read from that case's consolidate run.

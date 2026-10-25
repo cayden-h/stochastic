@@ -51,7 +51,8 @@ class MemoryStore:
     # The per-deal record: every collection whose rows carry a deal_id (the deal itself is keyed by its id).
     RECORD = ("source_lines", "mappings", "items", "results", "tool_runs", "edits", "agreements", "messages")
 
-    def reset_deals(self, keep_memory: bool = True, keep_deals: set[str] | None = None, rechain=None) -> None:
+    def reset_deals(self, keep_memory: bool = True, keep_deals: set[str] | None = None, rechain=None,
+                    reason: str | None = None) -> None:
         """Clear the record. Agent memory (policies, learned adjustments, approved Briefs, sessions) is kept unless
         asked otherwise.
 
@@ -62,7 +63,8 @@ class MemoryStore:
         `keep_deals` names deals whose whole record stays: the Dashboard's seeded cases, when only the live demo deal
         is reset. Their audit rows stay too, in order, and `rechain` (the gateway's `rechain`) chains them again; with
         keep_memory=False only the memory learned on the other deals is cleared, the sessions included; and every id
-        counter keeps counting, so the reset deal's new ids never repeat a kept record's."""
+        counter keeps counting, so the reset deal's new ids never repeat a kept record's. `reason` is for the Postgres
+        store's new ledger."""
         keep = set(keep_deals or ())
         memory = (self.policies, self.adjustments, self.approved_briefs, self.sessions)
         kept_deals = {k: v for k, v in self.deals.items() if k in keep}
