@@ -65,8 +65,9 @@ export const api = {
   revert: (editId: string) => post<EditResponse>(`/edits/${editId}`, undefined, "DELETE"),
   // The Brief Reader (D20, Tri's T4): set one field of the draft by path (an adjustment amount from the books with its
   // source, or a correction to any field the reader got wrong), then approve the Brief.
+  // The route takes a list of fields ({"amounts": [...]}, applied in order); the console sends one at a time.
   amendBrief: (dealId: string, body: { field: string; value: number | string; source_ref?: string; inferred?: boolean; note?: string }) =>
-    post<Brief>(`/deals/${dealId}/brief/amounts`, body),
+    post<{ brief: Brief; brief_status: string; stage: string }>(`/deals/${dealId}/brief/amounts`, { amounts: [body] }),
   approveBrief: (dealId: string) => post<Deal>(`/deals/${dealId}/brief/approve`),
 };
 

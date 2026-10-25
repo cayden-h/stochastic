@@ -35,6 +35,9 @@ const SPLASH_FADE_MS = 200;
 const APP_READY_CAP_MS = 8_000;
 
 app.setName("Stochastic");
+// STOCHASTIC_USER_DATA puts the app's profile (and its single-instance lock) in another folder, so the e2e suite can
+// run a copy while the installed Stochastic.app is open (e2e/electron.spec.ts).
+if (process.env.STOCHASTIC_USER_DATA) app.setPath("userData", process.env.STOCHASTIC_USER_DATA);
 
 // ---- running from Finder ----
 
@@ -172,7 +175,8 @@ async function startEverything() {
   if (await portBusy(BACKEND_PORT)) throw new ServiceError("backend", `port ${BACKEND_PORT} is already in use. Stop the other backend, then open Stochastic again.`);
   if (await portBusy(CONSOLE_PORT)) throw new ServiceError("console", `port ${CONSOLE_PORT} is already in use. Stop the other console (or use STOCHASTIC_DEV=1), then open Stochastic again.`);
 
-  if (!fs.existsSync(path.join(FRONTEND_DIR, ".next", "BUILD_ID"))) {
+  // NEXT_DIST_DIR (frontend/next.config.ts) points at another build, as the e2e suite does.
+  if (!fs.existsSync(path.join(FRONTEND_DIR, process.env.NEXT_DIST_DIR || ".next", "BUILD_ID"))) {
     log("[console] no build found, running next build first");
     await runToEnd("console build", next, ["build"], FRONTEND_DIR);
   }

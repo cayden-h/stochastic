@@ -76,6 +76,9 @@ cd desktop && STOCHASTIC_BACKEND_PORT=8010 STOCHASTIC_CONSOLE_PORT=3010 NEXT_PUB
 
 The app passes the console's origin to the backend as `CORS_ORIGINS`, unless that is already set.
 
+Two more settings are for the e2e suite (`e2e/README.md`), which runs a copy of the app next to the installed one:
+`NEXT_DIST_DIR` serves another console build (the suite builds into `frontend/.next-e2e`), and `STOCHASTIC_USER_DATA` gives the copy its own profile folder, and so its own single-instance lock.
+
 ## Quit cleanly
 
 Quit with Cmd+Q, by closing the window, or with Ctrl+C in the terminal.

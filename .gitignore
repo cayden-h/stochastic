@@ -11,7 +11,7 @@ data/*
 # python
 __pycache__/
 *.pyc
-.venv/
+.venv
 venv/
 .pytest_cache/
 .ruff_cache/
@@ -19,6 +19,7 @@ venv/
 # node
 node_modules/
 .next/
+.next-e2e/
 dist/
 build/
 *.tsbuildinfo
@@ -36,3 +37,7 @@ docs/diagrams/render.log
 # private local notes
 notes/
 backend/recordings/latest/
+
+# e2e output (screenshots, traces, the report, downloads)
+e2e/artifacts/
+e2e/test-results/
