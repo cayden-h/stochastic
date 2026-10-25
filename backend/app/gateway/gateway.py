@@ -31,6 +31,7 @@ from app.core.models import (
     BriefDraft,
     BriefReaderInput,
     BriefReaderOutput,
+    ConversationMessage,
     Deal,
     AgentSession,
     Edit,
@@ -48,6 +49,7 @@ from app.core.models import (
     ResultRow,
     Review,
     ReviewerOutput,
+    ROLES,
     SourceLine,
     State,
     ToolRun,
@@ -144,6 +146,19 @@ def _brief_number_problem(brief: Brief, limit_may_be_missing: bool = False) -> s
     return None
 
 
+def _plain(text: str, limit: int = 300) -> str:
+    """One line of plain text for the conversation: plain hyphens only, single spaces, at most `limit` characters.
+    A model's reason can hold an em dash or a newline; the conversation never shows either."""
+    t = re.sub(r"\s+", " ", (text or "").replace("\u2014", "-").replace("\u2013", "-")).strip()
+    return t if len(t) <= limit else t[:limit - 3].rstrip() + "..."
+
+
+def _ratio(debt: float, ebitda: float) -> str:
+    """Leverage as the console shows it: from the unrounded quotient of the run's debt and EBITDA, like the flag
+    effects, so a message and the card it sits next to never differ in the second decimal."""
+    return f"{debt / ebitda:.2f}x" if ebitda else "n/a"
+
+
 def _signed(x: float) -> str:
     """A change as accountants write it: +500, or (500) for a decrease."""
     return f"({abs(x):,.0f})" if x < 0 else f"+{x:,.0f}"
@@ -193,9 +208,90 @@ class Gateway:
             prev = row.hash
         return True
 
+    # ------------------------------------------------------------------ the conversation
+    def _say(self, deal_id: str, sender: str, to: str, kind: str, text: str, item_id: str | None = None,
+             run_id: str | None = None, line_id: str | None = None) -> ConversationMessage | None:
+        """Write one conversation message (gateway-and-api.md, "Live events"). Only the gateway calls it, in the same
+        write as the thing it describes, so a message is never ahead of or different from the record. An actor
+        outside the six roles (a test's other human, a malformed header) is not part of the conversation."""
+        if deal_id not in self.store.deals or sender not in ROLES or to not in ROLES:
+            return None
+        text = _plain(text)
+        if not text:
+            return None
+        msg = ConversationMessage(id=self.store.next_id("msg"), deal_id=deal_id, sender=sender, to=to, kind=kind,
+                                  text=text, item_id=item_id, run_id=run_id, line_id=line_id)
+        self.store.messages[msg.id] = msg
+        return msg
+
+    def conversation(self, deal_id: str) -> list[ConversationMessage]:
+        self._deal(deal_id)
+        return self.store.deal_messages(deal_id)
+
+    @_writes
+    def note(self, deal_id: str, to: str, text: str, item_id: str | None = None) -> ConversationMessage | None:
+        """A message from the system to an agent about the run itself, such as a fallback to the scripted backend.
+        The job runner calls it; it changes nothing but the conversation."""
+        return self._say(deal_id, SYSTEM, to, "message", text, item_id=item_id)
+
+    def _handoff(self, deal: Deal, item: WorkItem) -> None:
+        """Who hands the new work item to whom, from the record as it stands when the item opens."""
+        if item.type == "draft_brief":
+            self._say(deal.id, SYSTEM, BRIEF_READER, "handoff",
+                      "Read the credit agreement and draft the Brief, with a quote for every field", item_id=item.id)
+        elif item.type == "map_lines":
+            n = _count(len(self._target_lines(deal)), "line")
+            draft = self._draft_item(deal.id)
+            if draft is not None and draft.proposed_by == BRIEF_READER and deal.brief is not None:
+                self._say(deal.id, BRIEF_READER, MAPPER, "handoff",
+                          f"Brief approved: limit {deal.brief.limit:.2f}x, {deal.brief.debt_term}. Map the {n} of "
+                          f"{deal.target} to {deal.platform}", item_id=item.id)
+            else:
+                limit = f", limit {deal.brief.limit:.2f}x" if deal.brief else ""
+                self._say(deal.id, SYSTEM, MAPPER, "handoff",
+                          f"Map the {n} of {deal.target} to {deal.platform}{limit}", item_id=item.id)
+        elif item.type == "prepare_result":
+            maps = self._usable_mappings(deal.id)
+            answered = [i for i in self.store.deal_items(deal.id, "flag")
+                        if i.payload.get("kind") in ("covenant_tag", "mapping") and i.answer]
+            self._say(deal.id, MAPPER, PREPARER, "handoff",
+                      f"Mappings posted: {_count(len(maps), 'line')} ready to combine"
+                      + (f"; the controller answered {_count(len(answered), 'question')}" if answered else ""),
+                      item_id=item.id)
+        elif item.type == "review_result":
+            result = self.store.results.get(item.payload.get("result_id", ""))
+            if result is not None:
+                self._say(deal.id, PREPARER, REVIEWER, "handoff",
+                          f"Draft books {result.id} ready for review: leverage {_ratio(result.debt, result.ebitda)} "
+                          f"against {result.limit:.2f}x", item_id=item.id,
+                          run_id=result.run_ids_by_tool.get("leverage"))
+
+    def _tool_message(self, deal: Deal, run: ToolRun) -> None:
+        """What a tool run gave the agent that asked for it, in a few words, with the run id."""
+        o, name = run.outputs, run.tool
+        if name == "consolidate":
+            text = f"consolidate: {_count(len(o.get('rows', [])), 'combined row')}"
+        elif name == "ebitda":
+            text = f"ebitda: {_fmt(o['ebitda'])}K" + (" as filed" if run.inputs.get("as_filed") else "")
+        elif name == "covenant_debt":
+            text = (f"covenant_debt: {'whole-line debt' if run.inputs.get('naive') else o.get('term') or 'debt'} "
+                    f"{_fmt(o['debt'])}K")
+        elif name == "leverage":
+            text = f"leverage: {_ratio(o['debt'], o['ebitda'])}"
+        elif name == "tie_out":
+            text = "tie_out: the books tie" if o.get("ok") else "tie_out: the books do not tie"
+        elif name == "limit_test":
+            text = f"limit_test: {'passes' if o.get('ok') else 'fails'} against {o['limit']:.2f}x"
+        else:
+            text = f"{name} ran"
+        self._say(deal.id, SYSTEM, run.actor, "message", text, run_id=run.run_id)
+
     def _deny(self, error: GatewayError, deal_id: str, actor: str, action: str, target: str | None = None,
               evidence: list[Evidence] | None = None) -> None:
         self._log(deal_id, actor, action, "DENIED", target, error.message, evidence)
+        if actor != SYSTEM:  # the refused agent or person hears why, in the conversation too
+            self._say(deal_id, SYSTEM, actor, "refusal", f"Refused: {error.message}",
+                      item_id=target if target and target.startswith("wi_") else None)
         raise error
 
     def _allowed(self, actor: str, action: str) -> bool:
@@ -274,6 +370,7 @@ class Gateway:
                         proposed_by=proposed_by, payload=payload or {})
         self.store.items[item.id] = item
         self._log(deal_id, SYSTEM, f"create:{type_}", "ALLOWED", item.id)
+        self._handoff(self._deal(deal_id), item)
         working = {"draft_brief": "reading_brief", "map_lines": "mapping", "prepare_result": "preparing"}.get(type_)
         if working:  # the console shows which agent is working during a 30 to 60 s model run
             self._deal(deal_id).stage = working
@@ -289,6 +386,7 @@ class Gateway:
         if last and last.action == "run:failed" and last.reason == error[:300]:
             return  # the runner already noted this failure; the background route notes it again
         self._log(deal_id, SYSTEM, "run:failed", "ALLOWED", deal_id, reason=error[:300])
+        self._say(deal_id, SYSTEM, CONTROLLER, "message", f"The run stopped: {error}. Press Run to continue.")
 
     # ------------------------------------------------------------------ tools
     @_writes
@@ -395,6 +493,8 @@ class Gateway:
                       outputs=outputs)
         self.store.tool_runs[run.run_id] = run
         self._log(deal_id, actor, f"tool:{name}", "ALLOWED", run.run_id)
+        if actor != SYSTEM:  # the system's what-ifs and recomputes are summed up by the message that uses them
+            self._tool_message(deal, run)
         return run
 
     def _edits_kwarg(self, actor: str, deal_id: str, name: str, fn, inputs: dict[str, Any]) -> dict[str, Any]:
@@ -440,7 +540,10 @@ class Gateway:
 
     # ------------------------------------------------------------------ mapper result
     @_writes
-    def store_mapping(self, actor: str, item_id: str, out: MapperOutput) -> WorkItem:
+    def store_mapping(self, actor: str, item_id: str, out: MapperOutput, progress=None) -> WorkItem:
+        """Check the Mapper's whole result, then write it. `progress(step)`, when given, is called after each
+        mapping is stored ("mapping") and before each question opens ("question"); the job runner uses it to pace a
+        demo run, so the live view fills line by line. It is never called during the checks."""
         item = self._item(item_id)
         self._require(actor, "propose:map_lines", item.deal_id, item.id)
         if item.type != "map_lines" or item.state != State.NEW:
@@ -451,6 +554,11 @@ class Gateway:
             self._deny(IllegalTransition(f"mapping waits for the approved Brief (the Brief is {deal.brief_status})"),
                        deal.id, actor, "propose:map_lines", item.id)
         out = MapperOutput.model_validate(out.model_dump())  # the gateway re-validates the typed result
+        self._say(deal.id, actor, SYSTEM, "message",
+                  f"Proposing {_count(len(out.mappings), 'mapping')} and {_count(len(out.tags), 'covenant tag')}, "
+                  f"{_count(len(out.flags), 'question')} for the controller", item_id=item.id)
+        if out.note:
+            self._say(deal.id, actor, SYSTEM, "message", out.note, item_id=item.id)
         target_by_id = {l.id: l for l in self._target_lines(deal)}
         flagged_ids = {lid for f in out.flags if f.kind == "mapping" for lid in f.line_ids}
         try:  # check the whole result before writing any of it, so a refused result leaves nothing behind
@@ -468,6 +576,8 @@ class Gateway:
             m.policy_id = self._cited_policy(p.policy_id, "mapping", m.platform_line, t)
             self.store.mappings[m.id] = m
             stored.append(m)
+            if progress:
+                progress("mapping")
         for tag in out.tags:
             line = self.store.source_lines[tag.line_id]
             line.covenant_tag = tag.tag
@@ -483,7 +593,14 @@ class Gateway:
                         "note": out.note}
         self._log(deal.id, actor, "propose:map_lines", "ALLOWED", item.id,
                   reason=f"{_count(len(out.mappings), 'mapping')}, {_count(len(out.flags), 'flag')}")
+        by_policy = sum(1 for m in stored if m.policy_id) + sum(
+            1 for tag in out.tags if self.store.source_lines[tag.line_id].covenant_policy_id)
+        self._say(deal.id, SYSTEM, actor, "check",
+                  f"Checked and accepted {_count(len(stored), 'mapping')} and {_count(len(out.tags), 'covenant tag')}"
+                  + (f"; {by_policy} decided by a learned policy" if by_policy else ""), item_id=item.id)
         for flag in out.flags:
+            if progress:
+                progress("question")
             self._open_flag(deal, item, flag)
         self._post(item)
         deal.stage = "awaiting_flag" if self.open_flags(deal.id) else "mapped"
@@ -543,6 +660,8 @@ class Gateway:
                                  "option_actions": {o.id: o.model_dump() for o in flag.options}})
         self.store.items[item.id] = item
         self._log(deal.id, MAPPER, "ask:flag", "ALLOWED", item.id, reason=flag.question, evidence=flag.evidence)
+        self._say(deal.id, MAPPER, CONTROLLER, "question", flag.question, item_id=item.id,
+                  line_id=flag.line_ids[0] if len(flag.line_ids) == 1 else None)
         if self.forks:
             self.forks.flag_opened(item)
         return item
@@ -644,7 +763,9 @@ class Gateway:
             return self._answer_brief_field(actor, item, option_id)
         item.answer = option_id
         if item.type == "flag":
+            self._say_answer(actor, item, option_id)
             self._apply_flag_answer(actor, item, option_id)
+            self._say_learned(item)
             item.state = State.APPROVED
             self._log(item.deal_id, actor, "answer", "ALLOWED", item.id, reason=f"option {option_id}")
             self._post(item)
@@ -656,6 +777,22 @@ class Gateway:
             item.state = State.PROPOSED
             self._log(item.deal_id, actor, "answer", "ALLOWED", item.id, reason=f"option {option_id}")
         return item
+
+    def _say_answer(self, actor: str, item: WorkItem, option_id: str, text: str | None = None) -> None:
+        """The controller's answer, back to the agent that asked, with the option it chose."""
+        label = next((o.label for o in item.options if o.id == option_id), option_id)
+        self._say(item.deal_id, actor, item.proposed_by, "answer", text or f"Option {option_id}: {label}",
+                  item_id=item.id)
+
+    def _say_learned(self, item: WorkItem) -> None:
+        """One message for the policies an answer taught (one per flagged line), so the agent hears it once."""
+        learned = [p for p in self.store.policies.values() if p.learned_from == item.id and not p.retired_by]
+        if learned:
+            ids = ", ".join(p.id for p in learned)
+            word = "policy" if len(learned) == 1 else "policies"
+            self._say(item.deal_id, SYSTEM, learned[0].role, "message",
+                      f"Learned {len(learned)} {word} from the answer on {item.id} ({ids}): applied next time without "
+                      f"asking", item_id=item.id)
 
     def _apply_flag_answer(self, actor: str, item: WorkItem, option_id: str) -> None:
         action = item.payload.get("option_actions", {}).get(option_id, {})
@@ -793,6 +930,7 @@ class Gateway:
                        item.deal_id, actor, "hold", item.id)
         item.payload["held"] = True
         self._log(item.deal_id, actor, "hold", "ALLOWED", item.id, reason="controller is not sure")
+        self._say(item.deal_id, actor, item.proposed_by, "message", "Holding this one: not sure yet", item_id=item.id)
         return item
 
     @_writes
@@ -825,6 +963,10 @@ class Gateway:
         self._post(item)
         if item.type == "approve_result":
             self._deal(item.deal_id).stage = "posted"
+            rid = item.payload.get("result_id")
+            self._say(item.deal_id, actor, SYSTEM, "message", f"Approved result {rid}", item_id=item.id)
+            self._say(item.deal_id, SYSTEM, actor, "message",
+                      f"Result {rid} posted to the record. The workbook and the certificate are ready", item_id=item.id)
         return item
 
     @_writes
@@ -837,6 +979,7 @@ class Gateway:
         item.state = State.REJECTED
         item.reject_reason = reason
         self._log(item.deal_id, actor, "reject", "ALLOWED", item.id, reason=reason)
+        self._say(item.deal_id, actor, item.proposed_by, "message", f"Rejected {item.id}: {reason}", item_id=item.id)
         return item
 
     @_writes
@@ -854,6 +997,7 @@ class Gateway:
         item.state = State.REVERSED
         self._log(item.deal_id, actor, "reverse", "ALLOWED", item.id, reason=reason)
         self._log(item.deal_id, SYSTEM, "post", "ALLOWED", rev.id, reason=f"reverses {item.id}")
+        self._say(item.deal_id, actor, SYSTEM, "message", f"Reversed {item.id}: {reason}", item_id=item.id)
         if item.type == "flag":
             for p in self.store.policies.values():  # a reversed answer must not be applied to the next deal
                 if p.learned_from == item.id and not p.retired_by:
@@ -915,6 +1059,16 @@ class Gateway:
         item.state = State.PROPOSED
         self._log(deal.id, actor, "propose:prepare_result", "ALLOWED", item.id,
                   reason=f"result {result.id}: leverage {out.leverage:.2f}x against {out.limit:.2f}x")
+        self._say(deal.id, actor, SYSTEM, "message",
+                  f"Draft books {result.id}: EBITDA {_fmt(result.ebitda)}K, {deal.brief.debt_term} {_fmt(result.debt)}K, "
+                  f"leverage {_ratio(result.debt, result.ebitda)} against {result.limit:.2f}x", item_id=item.id,
+                  run_id=by_tool["leverage"])
+        if out.note:
+            self._say(deal.id, actor, SYSTEM, "message", out.note, item_id=item.id)
+        self._say(deal.id, SYSTEM, actor, "check",
+                  "Every figure traces to your runs: " + ", ".join(f"{t} {by_tool[t]}" for t in
+                                                                    ("consolidate", "ebitda", "covenant_debt", "leverage")),
+                  item_id=item.id, run_id=by_tool["leverage"])
         deal.stage = "awaiting_review"
         return result
 
@@ -996,7 +1150,7 @@ class Gateway:
         if result is None:
             raise Invalid("review item has no result")
         try:
-            tie, _ = self._check_review(deal, result, out)
+            tie, test = self._check_review(deal, result, out)
         except Invalid as error:
             self._deny(error, deal.id, actor, "propose:review_result", item.id)
         result.review = Review(verdict=out.verdict, reasons=out.reasons, run_ids=out.run_ids)
@@ -1015,10 +1169,31 @@ class Gateway:
         self.store.items[approval.id] = approval
         self._log(deal.id, SYSTEM, "create:approve_result", "ALLOWED", approval.id,
                   reason="ready for the controller" if out.verdict == "pass" else "needs attention")
+        self._say_review(actor, deal, result, out, item, approval, tie, test)
         deal.stage = "awaiting_approval" if out.verdict == "pass" else "needs_attention"
         if approval.state == State.PROPOSED:
             self._open_adjustment_offers(deal, self.store.items.get(result.work_item_id))
         return approval
+
+    def _say_review(self, sender: str, deal: Deal, result: Result, out: ReviewerOutput, item: WorkItem,
+                    approval: WorkItem, tie: ToolRun | None, test: ToolRun | None) -> None:
+        """The Reviewer's checks, told to the Preparer, then the hand-off to the controller or the question."""
+        lev = self.store.tool_runs.get(test.inputs.get("leverage_run_id", "")) if test else None
+        if out.verdict == "pass" and tie is not None and test is not None and lev is not None:
+            text = (f"Tie-out passes ({tie.run_id}), limit test passes ({test.run_id}): leverage "
+                    f"{_ratio(lev.outputs['debt'], lev.outputs['ebitda'])} against {test.outputs['limit']:.2f}x")
+            if out.reasons:
+                text += ". " + "; ".join(out.reasons)
+            self._say(deal.id, sender, PREPARER, "check", text, item_id=item.id, run_id=test.run_id)
+            self._say(deal.id, sender, CONTROLLER, "handoff",
+                      f"Ready for your approval: result {result.id}, leverage {_ratio(result.debt, result.ebitda)} "
+                      f"against {result.limit:.2f}x", item_id=approval.id, run_id=test.run_id)
+        else:
+            self._say(deal.id, sender, PREPARER, "check",
+                      "Needs attention: " + ("; ".join(out.reasons) or "no reason given"), item_id=item.id,
+                      run_id=test.run_id if test else None)
+            self._say(deal.id, sender, CONTROLLER, "question", approval.question or "The Reviewer found a problem",
+                      item_id=approval.id)
 
     def _open_adjustment_offers(self, deal: Deal, prep: WorkItem | None) -> None:
         """Open the Preparer's learned-adjustment offers, checked again now; approval waits until each is answered."""
@@ -1177,6 +1352,12 @@ class Gateway:
                   reason=f"result {result.id} after edit {edit.id}: leverage {result.leverage:.2f}x"
                          + ("" if passed else "; needs attention"))
         deal.stage = "awaiting_approval" if passed else "needs_attention"
+        self._say(deal.id, SYSTEM, CONTROLLER, "check",
+                  f"Recomputed after edit {edit.id}: tie-out {'passes' if tie.outputs.get('ok') else 'fails'}, leverage "
+                  f"{_ratio(lev.outputs['debt'], lev.outputs['ebitda'])} against {deal.brief.limit:.2f}x "
+                  f"(result {result.id})", item_id=new.id, run_id=lev.run_id)
+        if not passed:
+            self._say(deal.id, SYSTEM, CONTROLLER, "question", new.question, item_id=new.id)
         return result, new
 
     @staticmethod
@@ -1264,6 +1445,8 @@ class Gateway:
         self._log(deal_id, actor, action, "ALLOWED", edit.id,
                   reason=f"{kind} {src.company}, {src.line}: {summary}; leverage {before:.3f}x -> {result.leverage:.3f}x "
                          f"(result {result.id})")
+        self._say(deal_id, actor, SYSTEM, "message", f"Edit {edit.id}: {src.company}, {src.line}: {summary}",
+                  item_id=new_approval.id)
         return self._edit_response(edit, result, new_approval, self.reason_chips(deal_id, kind))
 
     @_writes
@@ -1294,6 +1477,8 @@ class Gateway:
         edit.status, edit.reason_chip, edit.reason_text, edit.remember = "reasoned", chip, label, bool(remember)
         self._log(deal.id, actor, action, "ALLOWED", edit.id,
                   reason=f"{label}" + ("; remember" if remember else "; not remembered"))
+        self._say(deal.id, actor, SYSTEM, "message", f"Why edit {edit.id}: {label}"
+                  + (" (remember it for the next add-on)" if remember else ""))
         if remember and edit.kind == "remap":
             edit.policy_id = self._learn_from_edit(actor, deal, edit).id
         elif remember and edit.kind == "amount":
@@ -1305,6 +1490,9 @@ class Gateway:
             self._log(deal.id, SYSTEM, "policy:learn", "ALLOWED", adj.id,
                       reason=f"source: edit {edit.id}; adjustment {_signed(edit.new_value - edit.old_value)} to {edit.company}, {edit.line}; "
                              f"proposed as a flag on a later deal, never applied silently")
+            self._say(deal.id, SYSTEM, PREPARER, "message",
+                      f"Learned adjustment {adj.id} from edit {edit.id}: {_signed(adj.amount)} to {edit.company}, "
+                      f"{edit.line}. Offer it as a question on a later deal, never apply it silently")
         return edit
 
     def _learn_from_edit(self, actor: str, deal: Deal, edit: Edit) -> Policy:
@@ -1318,6 +1506,9 @@ class Gateway:
         self.store.policies[policy.id] = policy
         self._log(deal.id, SYSTEM, "policy:learn", "ALLOWED", policy.id,
                   reason=f"source: edit {edit.id}; {key} -> {policy.decision} for every add-on of {deal.platform}")
+        self._say(deal.id, SYSTEM, MAPPER, "message",
+                  f"Learned policy {policy.id} from edit {edit.id}: {key} -> {policy.decision} on every add-on of "
+                  f"{deal.platform}")
         return policy
 
     @_writes
@@ -1338,6 +1529,7 @@ class Gateway:
             self._deny(self._recompute_error(error, "edit not reverted"), deal.id, actor, action, edit.id)
         edit.status = "reverted"
         self._log(deal.id, actor, action, "ALLOWED", edit.id, reason=f"{edit.kind} {edit.company}, {edit.line} undone")
+        self._say(deal.id, actor, SYSTEM, "message", f"Undo edit {edit.id}: {edit.company}, {edit.line}")
         p = self.store.policies.get(edit.policy_id) if edit.policy_id else None
         if p and not p.retired_by and p.learned_from == edit.id:
             p.retired_by = edit.id
@@ -1411,6 +1603,7 @@ class Gateway:
         self.store.items[item.id] = item
         adj.status = "proposed"
         self._log(deal.id, PREPARER, "ask:flag", "ALLOWED", item.id, reason=proposal.question, evidence=item.evidence)
+        self._say(deal.id, PREPARER, CONTROLLER, "question", proposal.question, item_id=item.id, line_id=line.id)
         self._log(deal.id, SYSTEM, "adjustment:propose", "ALLOWED", adj.id, reason=f"offered on flag {item.id}")
         return item
 
@@ -1423,6 +1616,7 @@ class Gateway:
         if option_id == "apply" and adj.status == "retired":
             self._deny(IllegalTransition(f"adjustment {adj.id} was retired; skip it"), item.deal_id, actor, "answer",
                        item.id)
+        self._say_answer(actor, item, option_id)
         if option_id == "apply":
             # The change, on this deal's own agent value: the source line, which an edit never overwrites.
             value = round(finance.to_thousands(line.amount, line.unit) + adj.amount, 3)
@@ -1500,6 +1694,8 @@ class Gateway:
         else:
             raise NotFound(f"tool {name} not found")
         self._log(deal_id, actor, f"tool:{name}", "ALLOWED", key)
+        self._say(deal_id, SYSTEM, actor, "message",
+                  f"{name}: {'section' if name == 'get_section' else 'definition of'} {key}")
         return ToolRun(run_id=f"read:{name}", deal_id=deal_id, tool=name, actor=actor, inputs=dict(args),
                        outputs=outputs)
 
@@ -1631,6 +1827,7 @@ class Gateway:
         self.store.items[item.id] = item
         self._log(deal.id, f["proposed_by"], "ask:flag", "ALLOWED", item.id, reason=f["question"],
                   evidence=f["evidence"])
+        self._say(deal.id, f["proposed_by"], CONTROLLER, "question", f["question"], item_id=item.id)
         return item
 
     def _draft_item(self, deal_id: str) -> WorkItem | None:
@@ -1667,6 +1864,14 @@ class Gateway:
             self._deny(error, deal.id, actor, "propose:draft_brief", item.id)
         brief = out.brief.model_copy(update={"agreement_ref": out.brief.agreement_ref or ag.source})
         deal.brief, deal.brief_status = brief, "draft"
+        self._say(deal.id, actor, SYSTEM, "message",
+                  f"Draft Brief: limit {brief.limit:.2f}x, {brief.debt_term or 'debt term not found'}; "
+                  f"{_count(len(out.citations), 'citation')}", item_id=item.id)
+        if out.note:
+            self._say(deal.id, actor, SYSTEM, "message", out.note, item_id=item.id)
+        self._say(deal.id, SYSTEM, actor, "check",
+                  f"Checked {_count(len(out.citations), 'citation')} against the agreement; "
+                  f"{_count(len(flags), 'field')} for the controller", item_id=item.id)
         opened = [self._open_brief_flag(deal, item, f) for f in flags]
         draft = BriefDraft(item_id=item.id, agreement_id=ag.id, sha256=ag.sha256, brief=brief,
                            citations=out.citations, flags=[i.id for i in opened], amendments_supplied=False)
@@ -1676,6 +1881,7 @@ class Gateway:
         self._log(deal.id, actor, "propose:draft_brief", "ALLOWED", item.id,
                   reason=f"{_count(len(out.citations), 'citation')}, {_count(len(opened), 'flag')}; base agreement "
                          f"only (no amendment supplied)")
+        self._say(deal.id, actor, CONTROLLER, "handoff", "Draft Brief ready for your review", item_id=item.id)
         deal.stage = "awaiting_brief"
         return item
 
@@ -1690,6 +1896,7 @@ class Gateway:
         if deal.brief_status == "approved":
             self._deny(IllegalTransition("the Brief is approved and locked"), deal.id, actor, "answer", item.id)
         field = item.payload["field"]
+        self._say_answer(actor, item, option_id)
         if option_id == "remove":
             draft = self.brief_draft(deal.id)
             self._sync_draft(deal, removed=sorted({*(draft.removed if draft else []), field}))
@@ -1777,6 +1984,7 @@ class Gateway:
             if flag.payload.get("field") == field:
                 flag.answer, flag.state = "amended", State.APPROVED
                 self._log(deal_id, actor, "answer", "ALLOWED", flag.id, reason=f"amended {field}")
+                self._say_answer(actor, flag, "amended", text=f"Amended {field}: {shown[:200]}")
                 self._post(flag)
         deal.stage = "awaiting_brief" if self._brief_flags(deal_id) else "brief_ready"
         return brief
@@ -1819,6 +2027,8 @@ class Gateway:
         self._log(deal_id, actor, action, "ALLOWED", item.id,
                   reason=f"Brief locked: limit {brief.limit:.2f}x, {brief.debt_term}; agreement sha256 "
                          f"{ag.sha256[:12] if ag else 'none'}; base agreement only")
+        self._say(deal_id, actor, item.proposed_by, "message",
+                  f"Brief approved: limit {brief.limit:.2f}x, {brief.debt_term}", item_id=item.id)
         self._post(item)
         deal.stage = "new"
         return deal
