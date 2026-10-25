@@ -104,6 +104,8 @@ The agent state rules: a `handoff` to an agent sets it working and the sender do
   Totals are not counted anywhere: they have no platform line by design ("Total, not mapped").
   A line the Mapper placed without asking, one you approved, and one a policy placed are sure, whatever the confidence.
 - The Log highlights rows that arrive while it is open and has a Conversation view (`/log?view=conversation`).
+- The Agents page opened after a run shows the record at once: each actor's latest line under the house and the whole timeline.
+  Before 2026-10-25 it could open empty ("The agents have not started") when the conversation changed right after the page mounted.
 - With `DEMO_PACE=1` the paced Mapper holds the gateway lock for about 16 s.
   Run, Upload, and the reset links stay disabled while a job runs, so no write waits on the lock.
   The console reads whether a job runs from the gateway (`running` on `/case`, and the stream's `run` event), never from the stage, so a deal left mid-run by a restart offers Run again.
