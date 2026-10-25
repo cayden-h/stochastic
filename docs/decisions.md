@@ -589,7 +589,7 @@ Decision:
    One escalation, two decisions: the recorded model's output is not changed to remove a question.
 6. The Brief Reader runs on the scripted rules in the demo paces.
    The pinned Sonnet 5.5 read (`backend/recordings/brief_reader.json`) passes all 25 of its verifier checks on the extract, but asks five questions of its own (two substantive), which would add human steps.
-7. Timings (agent time): pace `demo` reads in 2.4 s, verifies in 1.6 s, then after the approval reaches the questions in about 3.8 s and the approval about 6.6 s after the last answer, about 15 s in all; `factory` doubles every wait.
+7. Timings (agent time): pace `demo` reads in 2.4 s, verifies in 1.6 s, then after the approval reaches the questions in about 4 s and "Ready for your approval" about 7 s after the last answer, 15.5 s in all measured on uvicorn; `factory` doubles every wait (30.5 s).
 
 Why:
 - A model points and code decides: checking every quote and number in code is the claim we can defend, and showing each check makes it visible. [inferred]
