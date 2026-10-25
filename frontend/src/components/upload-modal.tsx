@@ -52,7 +52,7 @@ async function summarize(slot: Slot, file: File): Promise<string> {
  */
 export function UploadModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const { kase, select } = useDeal();
+  const { kase, select, startRun } = useDeal();
   const [picked, setPicked] = useState<Partial<Record<Slot, Picked>>>({});
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -148,9 +148,9 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         await select(created.current);  // the new deal is current even if the start below fails
       }
       if (created.current) {
-        await api.start(created.current);
+        await startRun(created.current);
       } else if (canStart(kase!.stage)) {
-        await api.start(deal.id);
+        await startRun(deal.id);
       }
       onClose();
       router.push("/case");

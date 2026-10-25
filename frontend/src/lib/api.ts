@@ -1,3 +1,4 @@
+import type { ConversationMessage } from "./conversation";
 import type { AuditResponse, Brief, Case, Deal, DealCreated, Edit, EditBody, EditResponse, Health, ToolRun, WorkItem } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -37,14 +38,17 @@ async function createDeal(form: FormData): Promise<DealCreated> {
   return res.json();
 }
 
-/** One read for the screen, three writes. Everything else is a link to the record. */
+/** The reads for the screen and the writes. Everything else is a link to the record. */
 export const api = {
   deals: () => get<Deal[]>("/deals"),
   case: (id: string) => get<Case>(`/deals/${id}/case`),
   health: () => get<Health>("/health"),
   audit: (id: string) => get<AuditResponse>(`/deals/${id}/audit`),
   run: (runId: string) => get<ToolRun>(`/runs/${runId}`),
-  start: (id: string) => post<{ ok: boolean; log: string[]; stage: string }>(`/deals/${id}/run`, {}),
+  conversation: (id: string) => get<ConversationMessage[]>(`/deals/${id}/conversation`),
+  // The run goes in the background ({"sync": false}): a paced run takes about 23 s, and the console follows it on the
+  // stream instead of waiting on the request.
+  start: (id: string) => post<{ ok: boolean; log: string[]; stage: string }>(`/deals/${id}/run`, { sync: false }),
   answer: (itemId: string, optionId: string) => post<WorkItem>(`/work-items/${itemId}/answer`, { option_id: optionId }),
   hold: (itemId: string) => post<WorkItem>(`/work-items/${itemId}/hold`),
   approve: (itemId: string) => post<WorkItem>(`/work-items/${itemId}/approve`),

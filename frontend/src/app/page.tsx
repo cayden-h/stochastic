@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { Page } from "@/components/shell";
 import { Button, Card, Label, PageHeader } from "@/components/ui";
 import { UploadModal } from "@/components/upload-modal";
-import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
 import { ago, canStart, fmtX, stageWords } from "@/lib/format";
 import type { Deal } from "@/lib/types";
@@ -27,7 +26,7 @@ function caseName(d: Deal): string {
 /** V3-1: every case with its stage, verdict, and last update. Begin runs the current deal; Upload loads a new one. */
 export default function Dashboard() {
   const router = useRouter();
-  const { deals, kase, audit, select, refresh } = useDeal();
+  const { deals, kase, audit, select, startRun, running } = useDeal();
   const [upload, setUpload] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -48,7 +47,8 @@ export default function Dashboard() {
   async function begin() {
     setBusy(true); setNote(null);
     try {
-      if (canStart(kase!.stage)) { await api.start(current); await refresh(); }
+      // The run goes in the background, so the Case opens at once and the judge watches it happen.
+      if (canStart(kase!.stage)) await startRun(current);
       router.push("/case");
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Could not start the run");
@@ -72,7 +72,7 @@ export default function Dashboard() {
   return (
     <Page>
       <PageHeader title="Dashboard">
-        <Button onClick={() => setUpload(true)}>Upload</Button>
+        <Button disabled={running} title={running ? "Wait for the agents to finish this step" : undefined} onClick={() => setUpload(true)}>Upload</Button>
         <Button kind="primary" disabled={busy} onClick={begin}>Begin</Button>
       </PageHeader>
 
