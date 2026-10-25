@@ -30,9 +30,9 @@ export default defineConfig<Options>({
   projects: [
     {
       // The functional branches, on a backend with no pacing: each run finishes in about a second. demo-run.spec.ts
-      // asks for pace "demo" on its run, the 15-second demo.
+      // asks for pace "demo" on its run, the 15-second demo, and factory-upload.spec.ts for pace "factory", the 30-second one.
       name: "fast",
-      testMatch: ["review-branches.spec.ts", "second-run.spec.ts", "agreement.spec.ts", "demo-run.spec.ts"],
+      testMatch: ["review-branches.spec.ts", "second-run.spec.ts", "agreement.spec.ts", "demo-run.spec.ts", "factory-upload.spec.ts"],
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, pace: 0 },
     },
     {

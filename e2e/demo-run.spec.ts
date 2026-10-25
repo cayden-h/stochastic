@@ -126,6 +126,13 @@ test("run the demo: the notification, Decide, Learned, Ready, then Review and Ma
   expect(toQuestion).toBeLessThan(12);
   await expect(toast.getByRole("button", { name: "Decide" })).toBeVisible();
   await expect(page.locator("[data-badge]")).toBeVisible();
+  // The demo replays the recorded Claude Haiku 5.5 run, and the model card says so.
+  const model = page.getByRole("complementary").locator("[title]").filter({ hasText: "Claude Haiku 5.5" });
+  await expect(model).toContainText("recorded run");
+  // The learning counters count across every deal: the seeded cases hold 4 reasoned edits.
+  const counts = await (await fetch(`${backend.url}/memory/counts`)).json();
+  expect(counts.edits).toBe(4);
+  await expect(page.locator('[data-counter="Edits"]')).toContainText("4");
   await shot("notification");
   const item = await toast.getAttribute("data-notice");
   await toast.getByRole("button", { name: "Decide" }).click();
@@ -172,6 +179,8 @@ test("run the demo: the notification, Decide, Learned, Ready, then Review and Ma
   await page.keyboard.press("1");
   await page.keyboard.press("Enter");
   await expect(bubble(page)).toHaveCount(0);
+  // The demo's reasoned edit is the fifth across every deal.
+  await expect(page.locator('[data-counter="Edits"]')).toContainText("5");
 
   // A remap on the Mapping tab: the Reviewer asks again.
   await page.getByRole("tablist", { name: "Review tabs" }).getByRole("tab", { name: "Mapping" }).click();

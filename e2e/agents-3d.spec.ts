@@ -1,7 +1,7 @@
 // The Agent House (frame V3-6) during a paced run: the WebGL canvas draws a real picture (not blank), the agents'
 // states follow the run, notes fly between rooms, and the page asks nothing of any host but localhost.
 import { inflateSync } from "node:zlib";
-import { expect, open, test } from "./support/fixtures";
+import { expect, open, readCase, test } from "./support/fixtures";
 import { begin, nav } from "./support/flows";
 
 /** Decodes an 8-bit RGB or RGBA PNG (what Chromium's screenshots are) into its pixels. */
@@ -29,7 +29,7 @@ function pixels(png: Buffer): { width: number; height: number; rgba: (x: number,
   return { width, height, rgba: (x, y) => [...out.subarray((y * width + x) * bpp, (y * width + x) * bpp + bpp)] };
 }
 
-test("the house renders, the agents change state, notes fly, and nothing leaves localhost", async ({ page, external, shot }) => {
+test("the house renders, the agents change state, notes fly, and nothing leaves localhost", async ({ page, backend, external, shot }) => {
   await open(page, "/");
   await begin(page);
   await nav(page, "Agents").click();
@@ -61,16 +61,29 @@ test("the house renders, the agents change state, notes fly, and nothing leaves 
   await expect.poll(async () => Number(await overlay.getAttribute("data-notes-sent") ?? 0)).toBeGreaterThan(0);
   await shot("mapper-asking");
 
-  for (let i = 0; i < 2; i++) {
-    await nav(page, "Case").click();
-    await page.getByRole("main").getByRole("button", { name: /^[a-e]\. .*Suggested/ }).click();
-    await expect(page.getByText("Answered").first()).toBeVisible();
-  }
-  await nav(page, "Agents").click();
+  // The controller's answers go to the gateway while the house stays open, so every hand-off after them is played
+  // live (a note flies) and none can finish while the page is away on the Case.
   const sent = Number(await overlay.getAttribute("data-notes-sent") ?? 0);
+  // A note is in the air for under a second, shorter than a poll's later intervals, so the page itself records the
+  // most notes it saw in flight at once.
+  await overlay.evaluate((el) => {
+    const w = window as unknown as { maxInFlight: number };
+    w.maxInFlight = 0;
+    new MutationObserver(() => { w.maxInFlight = Math.max(w.maxInFlight, Number((el as HTMLElement).dataset.notesInFlight ?? 0)); })
+      .observe(el, { attributes: true, attributeFilter: ["data-notes-in-flight"] });
+  });
+  const kase = await readCase(backend);
+  for (const id of kase.open_flags as string[]) {
+    const flag = (kase.flags as { id: string; default: string | null; options: { id: string }[] }[]).find((f) => f.id === id)!;
+    const r = await fetch(`${backend.url}/work-items/${id}/answer`, {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Actor": "human:controller" },
+      body: JSON.stringify({ option_id: flag.default ?? flag.options[0].id }),
+    });
+    expect(r.ok, `answer ${id}: ${r.status}`).toBe(true);
+  }
   await expect(label("Preparer")).not.toHaveAttribute("data-state", "idle", { timeout: 30_000 });
   // A note is in the air while the agents hand off.
-  await expect.poll(async () => Number(await overlay.getAttribute("data-notes-in-flight") ?? 0), { timeout: 30_000 }).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { maxInFlight: number }).maxInFlight), { timeout: 30_000 }).toBeGreaterThan(0);
   await shot("note-in-flight");
   await expect.poll(async () => Number(await overlay.getAttribute("data-notes-sent") ?? 0), { timeout: 30_000 }).toBeGreaterThan(sent);
   await expect(label("Reviewer")).toHaveAttribute("data-state", /working|talking|done/, { timeout: 40_000 });
