@@ -265,3 +265,37 @@ def test_the_timeline_falls_back_to_memory_on_a_database_error(schema):
     assert "nobody" not in out["error"] and "127.0.0.1" not in out["error"]  # host and user stay in the log
     assert sum(b["rows"] for b in out["buckets"]) == len([a for a in store.audit if a.deal_id == DEAL_ID])
     store.close()
+
+
+def test_the_seeded_cases_survive_a_restart_and_a_reset_of_the_demo_deal(schema):
+    """The Dashboard's cases go to Postgres like any record; a restart loads them and seeding skips them; a reset of
+    the demo deal starts a new ledger that carries the cases, re-chained, while the old ledger keeps its rows."""
+    from app.db.fixtures import cases
+    store = open_store(schema)
+    gw = Gateway(store)
+    seed(store, gw)
+    assert cases.seed_cases(gw) == list(cases.CASE_IDS)
+    assert store.flush() and store.status()["last_error"] is None
+    before = snapshot(store)
+    store.close()
+
+    again = open_store(schema)
+    gw2 = Gateway(again)
+    assert snapshot(again) == before and gw2.verify_chain()
+    assert cases.seed_cases(gw2) == []  # never overwrites what Postgres loaded
+    stages = {d: again.deals[d].stage for d in cases.CASE_IDS}
+    with gw2.lock:
+        again.reset_deals(keep_memory=False, keep_deals=set(cases.CASE_IDS), rechain=gw2.rechain)
+        seed(again, gw2)
+    assert again.flush()
+    again.close()
+
+    third = open_store(schema)
+    gw3 = Gateway(third)
+    assert third.ledger == 2 and gw3.verify_chain()
+    assert {d: third.deals[d].stage for d in cases.CASE_IDS} == stages and third.deals[DEAL_ID].stage == "new"
+    assert {p.deal_id for p in third.policies.values()} <= set(cases.CASE_IDS)  # the demo deal's memory is cleared
+    with psycopg.connect(URL, options=f"-c search_path={schema},public") as conn:
+        kept = conn.execute("SELECT count(*) FROM audit_log WHERE ledger = 2").fetchone()[0]
+    assert kept == len(third.audit)
+    third.close()

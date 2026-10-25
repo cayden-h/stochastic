@@ -10,6 +10,7 @@ from __future__ import annotations
 import difflib
 import json
 import re
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable
@@ -57,6 +58,30 @@ DEMO_REASON_CHIPS: dict[str, list[ReasonChip]] = {
               ReasonChip(id=2, label="Auditor's reclassification")],
 }
 REASON_CHIPS: dict[str, dict[str, list[ReasonChip]]] = {"d_kequ_nuaire": DEMO_REASON_CHIPS}
+
+
+@dataclass
+class DealPlan:
+    """The scripted Mapper's reference answer for one seeded deal (backend/app/db/fixtures/cases.py), from the deal's
+    filings: a mapping per target line name, covenant tags by line name, and the questions the filings leave open.
+    Policies still come first, exactly as for the demo deal, so a learned answer is applied instead of asked."""
+
+    mapping: dict[str, tuple[str | None, float, str]]
+    tags: dict[str, tuple[str, str]] = field(default_factory=dict)
+    covenant_flag: dict | None = None
+    mapping_flags: dict[str, dict] = field(default_factory=dict)
+    note: str = "scripted backend: the deal's reference mapping from its filings; policies applied first"
+
+
+# deal id -> plan, filled by backend/app/db/fixtures/cases.py when it loads (the fixtures import the gateway, which
+# imports this module, so the registry lives here and the fixtures fill it).
+DEAL_PLANS: dict[str, DealPlan] = {}
+
+
+def register_plan(deal_id: str, plan: DealPlan, chips: dict[str, list[ReasonChip]] | None = None) -> None:
+    DEAL_PLANS[deal_id] = plan
+    if chips:
+        REASON_CHIPS[deal_id] = chips
 
 
 def reason_chips(deal_id: str, kind: str) -> list[ReasonChip]:
@@ -145,7 +170,59 @@ def _platform_names(inp: MapperInput, section: str) -> list[str]:
     return [l.line for l in inp.platform_lines if l.section == section]
 
 
+def _planned_mapper(inp: MapperInput, plan: DealPlan) -> MapperOutput:
+    """The scripted Mapper on a seeded deal: the plan's mapping and tags, policies first, and a question for each
+    line the plan marks uncertain or unclear that no policy settles."""
+    mappings: list[MappingProposal] = []
+    flags: list[FlagProposal] = []
+    tags: list[LineTag] = []
+    for t in inp.target_lines:
+        key = t.line.strip().lower()
+        pol = _policy_for(inp, "mapping", t.company, key)
+        if pol:
+            mappings.append(MappingProposal(target_line_id=t.id, platform_line=pol.decision or None, confidence=0.98,
+                                            reason=_policy_reason(pol), policy_id=pol.id))
+            continue
+        platform_line, conf, reason = plan.mapping.get(t.line, (None, 0.0, "Not in the deal's reference mapping"))
+        mappings.append(MappingProposal(target_line_id=t.id, platform_line=platform_line, confidence=conf,
+                                        reason=reason))
+        spec = plan.mapping_flags.get(t.line)
+        if spec and not t.is_total:
+            flags.append(FlagProposal(
+                kind="mapping", line_ids=[t.id], question=spec["question"],
+                evidence=[Evidence(quote=t.note or t.line, document_id=t.source_ref)],
+                options=[FlagOption(id=oid, label=label, platform_line=pl) for oid, label, pl in spec["options"]],
+                default=spec.get("default", spec["options"][0][0])))
+    unclear: list = []
+    for line in list(inp.platform_lines) + list(inp.target_lines):
+        if line.section != "balance_sheet":
+            continue
+        pol = _policy_for(inp, "covenant_tag", line.company, line.line.strip().lower())
+        if pol:
+            tags.append(LineTag(line_id=line.id, tag=pol.decision, note=f"Policy {pol.id} from {pol.approved_by}",
+                                policy_id=pol.id))
+            continue
+        tag, note = plan.tags.get(line.line, ("na", ""))
+        if tag == "unclear":
+            unclear.append(line)
+        tags.append(LineTag(line_id=line.id, tag=tag, note=note))
+    spec = plan.covenant_flag
+    if unclear and spec:
+        ids = {l.line: [x.id for x in unclear if x.line == l.line] for l in unclear}
+        options = [FlagOption(id=oid, label=label, tags={lid: tag for name, tag in by_line.items()
+                                                          for lid in ids.get(name, [])})
+                   for oid, label, by_line in spec["options"]]
+        flags.insert(0, FlagProposal(
+            kind="covenant_tag", line_ids=[l.id for l in unclear], question=spec["question"],
+            evidence=[Evidence(quote=q, document_id=d) for q, d in spec.get("evidence", [])],
+            options=options, default=spec.get("default")))
+    return MapperOutput(mappings=mappings, tags=tags, flags=flags, note=plan.note)
+
+
 def scripted_mapper(inp: MapperInput) -> MapperOutput:
+    plan = DEAL_PLANS.get(inp.deal_id)
+    if plan is not None:
+        return _planned_mapper(inp, plan)
     mappings: list[MappingProposal] = []
     flags: list[FlagProposal] = []
     tags: list[LineTag] = []
@@ -198,8 +275,12 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
             if second:
                 options.append(FlagOption(id="b", label=f"Map to {second[0]}", platform_line=second[0]))
             options.append(FlagOption(id="c", label="Leave unmapped and list it", platform_line=None))
+            amount = f"{to_thousands(t.amount, t.unit):,.0f}K"
+            why = f" The Mapper's best match is {platform_line} at confidence {conf:.2f}: {reason}." if platform_line \
+                else " The Mapper found no platform line for it."
             flags.append(FlagProposal(kind="mapping", line_ids=[t.id],
-                                      question=f"Where does the target's '{t.line}' belong on the platform's chart?",
+                                      question=f"Where does {inp.target}'s '{t.line}' ({amount}) go on {inp.platform}'s "
+                                               f"chart of accounts?{why}",
                                       evidence=[Evidence(quote=t.line, document_id=t.source_ref)],
                                       options=options, default="a"))
 
@@ -236,10 +317,19 @@ def scripted_mapper(inp: MapperInput) -> MapperOutput:
         def option(oid: str, label: str, rule: str) -> FlagOption:
             return FlagOption(id=oid, label=label, tags={l.id: tag_for(l.line, rule) for l in unclear_lines})
 
+        def bucket(rule_line: str) -> str:
+            n = rule_line.lower()
+            return "sellers" if "seller" in n else "bank" if ("term loan" in n or "revolving" in n) else "lease"
+
+        parts = {k: sum(to_thousands(l.amount, l.unit) for l in unclear_lines if bucket(l.line) == k)
+                 for k in ("lease", "bank", "sellers")}
+        whole = sum(parts.values())
         flags.insert(0, FlagProposal(
             kind="covenant_tag", line_ids=unclear_ids,
-            question=f"'Financing liability' holds the Statesville sale-leaseback, the new PNC term loan and revolver, "
-                     f"and the 8% seller notes. Which parts count as {inp.brief.debt_term}?",
+            question=f"{inp.platform}'s 'Financing liability' ({whole:,.0f}K across {len(unclear_lines)} lines) holds "
+                     f"the Statesville sale-leaseback ({parts['lease']:,.0f}K), the new PNC term loan and revolver "
+                     f"({parts['bank']:,.0f}K), and the 8% seller notes ({parts['sellers']:,.0f}K). Which parts count "
+                     f"as {inp.brief.debt_term} under {inp.brief.limit_section}?",
             evidence=[Evidence(quote=inp.brief.limit_wording, document_id=f"{inp.brief.agreement_ref}, {inp.brief.limit_section}")]
                      + [Evidence(quote=x, document_id=inp.brief.agreement_ref) for x in inp.brief.debt_excludes],
             options=[

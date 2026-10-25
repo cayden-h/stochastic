@@ -101,10 +101,10 @@ cd backend
 AGENT_BACKEND=replay DEMO_PACE=1 .venv/bin/uvicorn app.main:app --port 8000
 ```
 
-What the room sees, with the times measured on 2026-10-24 (scripted, `DEMO_PACE=1`):
+What the room sees, with the times measured on 2026-10-24 (scripted, `DEMO_PACE=1`, or `"pace": "human"` on the run):
 - 0 s, Run: the Gateway hands the Mapper its work item, and 2.5 s later the Mapper proposes 53 mappings and 2 questions.
-- 3 to 19 s: the mapping view fills line by line, about 0.3 s per line (`mapping` events).
-- 19 to 23 s: the Gateway checks and accepts the mappings, then the Mapper asks the controller two questions, 1.5 s apart.
+- 3 to 18 s: the mapping view fills line by line, about 0.3 s per line (`mapping` events).
+- 18 to 20 s: the Gateway checks and accepts the mappings, then the Mapper asks the controller both questions at once (measured 20.1 s from Run on uvicorn, evening of 2026-10-24).
   The flag cards open.
 - The controller answers.
   The conversation shows each answer going back to the Mapper and the policies it taught.
@@ -115,6 +115,57 @@ What the room sees, with the times measured on 2026-10-24 (scripted, `DEMO_PACE=
 Every line of the conversation is written by the gateway when the thing happens, from the record (see `architecture/gateway-and-api.md`, "Live events").
 The pace only spaces it out; it changes no figure, no check, and no message.
 The pace on replay is honest to say: "the recorded run's text, played at reading speed, with every tool run live".
+
+### The 15-second demo: notified, decided, learned, finished
+
+For the pitch's live demo, run the deal at the `demo` pace: the same run, the same checks, and the same messages, with shorter waits.
+The console sends `POST /deals/d_kequ_nuaire/run` with `{"sync": false, "pace": "demo"}`; the answer's continuation keeps the pace.
+No `DEMO_PACE` is needed, and a live model backend gets no added wait.
+
+```text
+curl -X POST localhost:8000/dev/reset?keep_memory=false
+curl -X POST localhost:8000/deals/d_kequ_nuaire/run -H 'content-type: application/json' -d '{"sync": false, "pace": "demo"}'
+```
+
+Measured on uvicorn on 2026-10-24 evening (scripted, memory store), agent time only; the controller's thinking time is not counted:
+- 0 s, Run: the Gateway hands the Mapper its work item.
+- 0 to 1.2 s: the Mapper works.
+- 1.2 to 5.2 s: the 53 mappings stream into the mapping view.
+- 6.25 s: the Mapper asks both questions, and the stream sends a `notify` event for each ("The Mapper needs your decision"), which the console shows as a notification.
+- The controller answers. At once, the Mapper tells the controller what it learned, with the policy id, and the Mapper hands the books to the Preparer.
+- 6.64 s after the last answer: the Preparer's four tool runs (about 4.2 s), the Reviewer's two checks (about 2.4 s), and "Ready for your approval: result r_001, leverage 0.76x against 2.50x".
+- 12.9 s in all.
+
+The exact texts the room reads, from the run (every figure is from its tool run, or a filed line amount, or the Brief's limit):
+
+```text
+Decision 1 of 2: Kewaunee's 'Financing liability' (70,885K across 5 lines) holds the Statesville sale-leaseback (27,782K), the new PNC term loan and revolver (20,563K), and the 8% seller notes (22,540K). Which parts count as Senior Funded Bank Debt under Section 4.8(a)? a) The whole line counts: leverage 2.84x as filed, over the 2.50x limit; b) Only the PNC term loan and revolver count: 0.76x, under; c) PNC debt and the seller notes count: 1.56x, under. Default b, the agreement's reading. The Preparer waits for both answers.
+
+Decision 2 of 2: Where does Nu Aire's 'Certificates of Deposit' (991K) go on Kewaunee's chart of accounts? The Mapper's best match is Cash and cash equivalents at confidence 0.50: Kewaunee has no investments line; could be cash equivalents or other current assets. a) Cash and cash equivalents; b) Other assets; c) Leave unmapped and list it. Debt, EBITDA, and leverage do not change with this answer. The Preparer waits for both answers.
+
+Learned p_001 to p_005 (Kewaunee, Senior Funded Bank Debt): 'Financing liability: PNC Revolving Credit Facility' and 'Financing liability: PNC Term Loan' count; 'Current portion of financing liability', 'Long-term portion of financing liability', and 'Financing liability: 8% Seller Notes (subordinated)' do not count. Applying it now; 1 question still open (wi_003), and the Preparer starts once it is answered.
+
+Learned p_006: Nu Aire's 'Certificates of Deposit' goes to 'Cash and cash equivalents'. Applying it now, and to this line on later deals without asking. The Preparer is next.
+```
+
+The policy ids are those of a fresh process; after resets they keep counting.
+Say: "It asked, it waited, it learned your answer, and it finished: the waits are shortened for the demo; every check and every figure is the real run."
+
+### The other four cases on the Dashboard
+
+The Dashboard also lists four cases, seeded through the same pipeline when the API starts (`DEMO_CASES`, on by default).
+Each can be opened: Case, Mapping, Agents conversation, Log, and Review.
+`/dev/reset` resets only the live demo deal; these stay.
+
+| Case | Source | Stage | Verdict |
+| --- | --- | --- | --- |
+| DLH Holdings acquires GRSi (2022-12-08, $185M) | Filings (10-K FY2022, 8-K, credit agreement, 8-K/A Ex 99.1 to 99.4) | Posted: one covenant answer (the prior loans were repaid at close), one reasoned remap (GRSi's Indirect costs to Contract costs, Ex 99.3 note 3b), approved | 3.74x against 4.50x Total Leverage, OK |
+| Mama's Creations acquires Crown I (2025-09-02, $17.5M) | Filings (10-Q, 10-K, 8-K, M&T loan agreement, 8-K/A Ex 99.2 and 99.3) | Awaiting approval: three questions answered (finance leases count; Due from parent; Parent's net investment) | 1.90x against 3.75x Total Funded Debt, OK |
+| Shutterstock acquires Envato (2024-07-22, about $250M) | Filings (10-Q, 10-K, 8-K, credit agreement, 8-K/A Ex 99.1 to 99.3) | Waiting on the controller: do Envato's IFRS 16 lease liabilities count? (1.18x as filed if counted, 0.99x if not) | None yet; 0.99x on the agreement's reading |
+| DLH acquires Craig's Design and Landscaping | Sample, not a real deal: the QuickBooks Online sample company as DLH's next add-on, on the posted DLH and GRSi books | Posted: the Mapper reused the controller's answer on DLH's prior loan, asked only about the Mastercard balance | 3.74x against 4.50x, OK |
+
+Say for the sample: "This one is a sample company, not a real deal; it shows the answer from the GRSi deal applied to the next add-on."
+Say for Shutterstock: "The schema cannot net cash yet, so this is gross debt over EBITDA, which is at least the net figure."
 
 ### Who clicks what
 

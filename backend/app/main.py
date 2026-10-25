@@ -2,6 +2,7 @@
 import logging
 import os
 import shutil
+import threading
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -14,7 +15,7 @@ from app.api.body_limit import MAX_BODY_BYTES, BodyLimitMiddleware  # noqa: E402
 from app.api.errors import install_error_handlers  # noqa: E402
 from app.api.routes import build_router  # noqa: E402
 from app.core.config import settings  # noqa: E402
-from app.db.fixtures.kewaunee import seed  # noqa: E402
+from app.db.fixtures.kewaunee import DEAL_ID, seed  # noqa: E402
 from app.db.memory import MemoryStore  # noqa: E402
 from app.gateway.gateway import Gateway  # noqa: E402
 
@@ -39,7 +40,36 @@ def open_store() -> MemoryStore:
         return store
 
 
-def create_app() -> FastAPI:
+def demo_cases_wanted() -> bool:
+    """DEMO_CASES (default on) seeds the Dashboard's four cases after startup. Under pytest it is off unless a test
+    asks (create_app(demo_cases=True)), so the suite's deal ids and counters stay as they were."""
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
+    return (os.getenv("DEMO_CASES") or "1").strip().lower() not in ("0", "off", "false", "no")
+
+
+def start_demo_cases(gateway: Gateway, background: bool = True) -> threading.Thread | None:
+    """Seed the cases through the real pipeline (scripted backend, no pace). In a background thread, so /health
+    answers at once; a case already in the store (a Postgres ledger that loaded it) is never touched."""
+    from app.db.fixtures.cases import seed_cases
+
+    def run():
+        try:
+            seeded = seed_cases(gateway)
+            if seeded:
+                log.info("seeded the Dashboard cases: %s", ", ".join(seeded))
+        except Exception:  # noqa: BLE001 - the demo deal must work whatever happens to the cases
+            log.exception("seeding the Dashboard cases failed")
+
+    if not background:
+        run()
+        return None
+    t = threading.Thread(target=run, name="stochastic-demo-cases", daemon=True)
+    t.start()
+    return t
+
+
+def create_app(demo_cases: bool | None = None, demo_cases_background: bool = True) -> FastAPI:
     store = open_store()
     gateway = Gateway(store)
     if settings.forks == "tiger" and store.kind == "postgres" and settings.tiger_service_id:
@@ -62,25 +92,35 @@ def create_app() -> FastAPI:
     app.include_router(build_router(gateway))
     install_error_handlers(app)
     app.state.gateway = gateway
+    from app.db.fixtures import cases as _cases  # noqa: F401 - registers the cases' scripted plans and reason chips
+    app.state.cases_thread = None
+    if demo_cases if demo_cases is not None else demo_cases_wanted():
+        app.state.cases_thread = start_demo_cases(gateway, background=demo_cases_background)
 
     @app.post("/dev/reset")
     def reset(keep_memory: bool = True):
-        """Demo helper: reseed the deal. Agent memory (policies, sessions) is kept unless keep_memory=false,
+        """Demo helper: reseed the live demo deal. Agent memory (policies, sessions) is kept unless keep_memory=false,
         so a second run shows the Mapper applying what the controller taught it. Between judges, use
-        keep_memory=false so the next judge sees the flag. Refused while a run is in flight, because the run
-        would keep writing into the new deal; the fork slot is freed."""
+        keep_memory=false so the next judge sees the flag. Every other deal (the Dashboard's seeded cases, uploads)
+        keeps its whole record, its audit rows, and the memory learned on it, in both modes. Refused while a run of
+        the demo deal is in flight, because the run would keep writing into the new deal; the fork slot is freed."""
         # The running check and the reset hold the lock a run's claim takes (routes.claim), so a Run clicked at the
         # same moment either claims first and the reset is refused, or waits and starts on the new deal.
         with gateway.running_lock:
-            if gateway.running:
+            if DEAL_ID in gateway.running:
                 raise HTTPException(409, "a run is in progress; wait for it to finish, then reset")
             with gateway.lock:
-                store.reset_deals(keep_memory=keep_memory)
+                keep = {d for d in store.deals if d != DEAL_ID}
+                store.reset_deals(keep_memory=keep_memory, keep_deals=keep, rechain=gateway.rechain)
+                gateway.run_pace.pop(DEAL_ID, None)
                 seed(store, gateway)
                 if gateway.forks:
                     gateway.forks.reset()
-        return {"ok": True, "keep_memory": keep_memory, "policies": len(store.policies),
-                "sessions": len(store.sessions)}
+        demo = store.deals[DEAL_ID]
+        return {"ok": True, "keep_memory": keep_memory,
+                "policies": len([p for p in store.policies.values() if gateway._policy_applies(p, DEAL_ID, demo.platform)
+                                 or gateway._policy_applies(p, DEAL_ID, demo.target)]),
+                "sessions": len(store.sessions), "kept_deals": sorted(keep)}
 
     return app
 

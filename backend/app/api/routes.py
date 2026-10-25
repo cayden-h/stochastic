@@ -48,6 +48,9 @@ class ToolBody(BaseModel):
 class RunBody(BaseModel):
     backend: str | None = None  # anthropic, droid, scripted, replay; default from AGENT_BACKEND
     sync: bool = True
+    # The pace of this run and of the run the controller's answer continues, on the scripted and replay backends:
+    # "demo" (the 15-second demo), "human" (the DEMO_PACE=1 timings), "off"; None follows DEMO_PACE.
+    pace: Literal["demo", "human", "off"] | None = None
 
 
 def _debt_capacity(store, result) -> tuple[float | None, str | None]:
@@ -84,7 +87,7 @@ def _whole_line_runs(store, deal_id: str) -> tuple[str, str] | None:
             lev = store.tool_runs.get(test.inputs.get("leverage_run_id", "")) if test else None
             debt = store.tool_runs.get(lev.inputs.get("debt_run_id", "")) if lev else None
             eb = store.tool_runs.get(lev.inputs.get("ebitda_run_id", "")) if lev else None
-            if debt and debt.tool == "covenant_debt" and eb and eb.tool == "ebitda":
+            if debt and debt.tool == "covenant_debt" and eb and eb.tool == "ebitda" and eb.inputs.get("as_filed"):
                 return debt.run_id, eb.run_id
     return None
 
@@ -191,12 +194,12 @@ def build_router(gw: Gateway) -> APIRouter:
     def run_in_background(deal_id: str, backend: str | None, tasks: BackgroundTasks) -> bool:
         if not claim(deal_id):
             return False
-        tasks.add_task(_safe_advance, deal_id, backend)
+        tasks.add_task(_safe_advance, deal_id, backend, gw.run_pace.get(deal_id))
         return True
 
-    def _safe_advance(deal_id: str, backend: str | None):
+    def _safe_advance(deal_id: str, backend: str | None, pace_name: str | None = None):
         try:
-            advance(gw, deal_id, backend=backend)
+            advance(gw, deal_id, backend=backend, pace_name=pace_name)
         except Exception as error:  # keep the server up; the audit log and LAST_RUNS hold the trace
             agent_runner.LAST_RUNS.append({"role": "runner", "backend": backend, "error": str(error)[:300]})
             try:
@@ -213,9 +216,21 @@ def build_router(gw: Gateway) -> APIRouter:
         return {"ok": True, "chain_valid": gw.verify_chain(), "backend": backend_status(),
                 "store": {**store.status(), "forks": forks}, "running": bool(running)}
 
+    def deal_card(d: Deal) -> dict:
+        """One Dashboard row: the deal, plus its verdict (from the latest result's tool runs, or null), the time of its
+        latest audit row, and where its lines come from."""
+        result = store.latest_result(d.id)
+        last = next((a.at for a in reversed(store.audit) if a.deal_id == d.id), None)
+        return {**dump(d), "deal_id": d.id,
+                "verdict": ({"leverage": result.leverage, "limit": result.limit, "verdict": result.verdict}
+                            if result else None),
+                "updated_at": last.isoformat() if last else None}
+
     @r.get("/deals")
     def deals():
-        return [dump(d) for d in store.deals.values()]
+        """Every deal for the Dashboard, the live demo deal first: the deal's own fields (id, name, platform,
+        target, stage, brief, data_source, note, ...) plus deal_id, verdict, and updated_at."""
+        return [deal_card(d) for d in list(store.deals.values())]
 
     @r.get("/deals/{deal_id}")
     def deal(deal_id: str):
@@ -376,8 +391,8 @@ def build_router(gw: Gateway) -> APIRouter:
         (brief_status "none") and the run starts with the Brief Reader, unless an approved Brief for the same
         agreement text is reused by its hash.
 
-        The console calls POST /deals/{id}/run next. /dev/reset reseeds only the demo deal, so uploaded deals
-        are lost on reset, which is fine for the demo.
+        The console calls POST /deals/{id}/run next. /dev/reset reseeds only the demo deal; an uploaded deal keeps
+        its record across a reset, like the seeded cases.
         """
         def require():  # a denial is audited, before any file is parsed; a write, so under the lock and committed
             with gw.lock:
@@ -557,14 +572,21 @@ def build_router(gw: Gateway) -> APIRouter:
         if body.sync:
             if not claim(deal_id):
                 raise HTTPException(status_code=409, detail="a run is already in progress for this deal")
+            gw.run_pace[deal_id] = body.pace
             try:
-                return {"ok": True, "log": advance(gw, deal_id, backend=body.backend), "stage": store.deals[deal_id].stage}
+                return {"ok": True, "log": advance(gw, deal_id, backend=body.backend, pace_name=body.pace),
+                        "stage": store.deals[deal_id].stage}
             except GatewayError as error:
                 raise HTTPException(status_code=error.status, detail=error.message)
             except Exception as error:
                 raise HTTPException(status_code=500, detail=str(error)[:300])
             finally:
                 release(deal_id)
+        with running_lock:
+            busy = deal_id in running
+        if busy:
+            raise HTTPException(status_code=409, detail="a run is already in progress for this deal")
+        gw.run_pace[deal_id] = body.pace
         if not run_in_background(deal_id, body.backend, tasks):
             raise HTTPException(status_code=409, detail="a run is already in progress for this deal")
         return {"ok": True, "log": ["started"], "stage": store.deals[deal_id].stage}

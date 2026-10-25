@@ -6,6 +6,7 @@ every denied attempt, chained by hash. Rules are in docs/architecture/gateway-an
 """
 from __future__ import annotations
 
+import contextlib
 import functools
 import hashlib
 import inspect
@@ -163,6 +164,21 @@ def _ratio(debt: float, ebitda: float) -> str:
     return f"{debt / ebitda:.2f}x" if ebitda else "n/a"
 
 
+def _and(items: list[str]) -> str:
+    """'a', 'a and b', or 'a, b, and c'."""
+    if len(items) <= 2:
+        return " and ".join(items)
+    return ", ".join(items[:-1]) + ", and " + items[-1]
+
+
+def _id_list(ids: list[str]) -> str:
+    """Ids as the controller reads them: "p_001 to p_005" for a run of four or more, else listed."""
+    nums = [int(i.rsplit("_", 1)[1]) if i.rsplit("_", 1)[-1].isdigit() else None for i in ids]
+    if len(ids) >= 4 and None not in nums and nums == list(range(nums[0], nums[0] + len(ids))):
+        return f"{ids[0]} to {ids[-1]}"
+    return _and(ids)
+
+
 def _signed(x: float) -> str:
     """A change as accountants write it: +500, or (500) for a decrease."""
     return f"({abs(x):,.0f})" if x < 0 else f"+{x:,.0f}"
@@ -172,15 +188,12 @@ def _writes(method):
     """A public write holds the gateway lock, and the outermost one commits the store, also when it is denied."""
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
-        with self.lock:
-            self._depth += 1
-            try:
-                return method(self, *args, **kwargs)
-            finally:
-                self._depth -= 1
-                if self._depth == 0:
-                    self.store.commit()
+        with self._writing():
+            return method(self, *args, **kwargs)
     return wrapper
+
+
+QUESTION_TEXT_LIMIT = 700  # a question lists every option with its effect, and a learn message every line it taught
 
 
 class Gateway:
@@ -191,6 +204,22 @@ class Gateway:
         self.forks = None  # WhatIfForks when STORE=postgres and FORKS=tiger (app/gateway/whatif.py)
         self.running: set[str] = set()  # deal ids with a job in flight, shared with the API routes
         self.running_lock = threading.Lock()  # guards `running`; /dev/reset holds it across its check and the reset
+        # The pace a deal's last POST /deals/{id}/run asked for ("demo", "human", "off", or None for DEMO_PACE), so
+        # the run that the controller's answer continues plays at the same pace.
+        self.run_pace: dict[str, str | None] = {}
+
+    @contextlib.contextmanager
+    def _writing(self):
+        """One write under the gateway lock; the outermost one commits the store, also when it is denied.
+        `store_mapping` uses it for each of its steps, so a paced run never waits while holding the lock."""
+        with self.lock:
+            self._depth += 1
+            try:
+                yield
+            finally:
+                self._depth -= 1
+                if self._depth == 0:
+                    self.store.commit()
 
     # ------------------------------------------------------------------ audit log
     def _log(self, deal_id: str, actor: str, action: str, result: str, target: str | None = None,
@@ -201,6 +230,20 @@ class Gateway:
         row = AuditRow(**{**base, "evidence": evidence or []}, prev_hash=prev, hash=_hash(base, prev))
         self.store.audit.append(row)
         return row
+
+    def rechain(self) -> None:
+        """Number and chain the audit rows again, in order, after a reset kept some deals' rows (the store's
+        `reset_deals` with keep_deals). The rows' content is unchanged; each row's id and hashes are its place in the
+        new ledger. On Postgres the old ledger keeps the original rows."""
+        prev = GENESIS
+        rows = []
+        for n, row in enumerate(self.store.audit, 1):
+            base = dict(id=n, at=row.at, deal_id=row.deal_id, actor=row.actor, action=row.action, target=row.target,
+                        result=row.result, reason=row.reason, evidence=[e.model_dump() for e in row.evidence])
+            h = _hash(base, prev)
+            rows.append(row.model_copy(update={"id": n, "prev_hash": prev, "hash": h}))
+            prev = h
+        self.store.audit[:] = rows
 
     def verify_chain(self) -> bool:
         prev = GENESIS
@@ -215,17 +258,18 @@ class Gateway:
 
     # ------------------------------------------------------------------ the conversation
     def _say(self, deal_id: str, sender: str, to: str, kind: str, text: str, item_id: str | None = None,
-             run_id: str | None = None, line_id: str | None = None) -> ConversationMessage | None:
+             run_id: str | None = None, line_id: str | None = None, policy_id: str | None = None,
+             limit: int = 300) -> ConversationMessage | None:
         """Write one conversation message (gateway-and-api.md, "Live events"). Only the gateway calls it, in the same
         write as the thing it describes, so a message is never ahead of or different from the record. An actor
         outside the six roles (a test's other human, a malformed header) is not part of the conversation."""
         if deal_id not in self.store.deals or sender not in ROLES or to not in ROLES:
             return None
-        text = _plain(text)
+        text = _plain(text, limit)
         if not text:
             return None
         msg = ConversationMessage(id=self.store.next_id("msg"), deal_id=deal_id, sender=sender, to=to, kind=kind,
-                                  text=text, item_id=item_id, run_id=run_id, line_id=line_id)
+                                  text=text, item_id=item_id, run_id=run_id, line_id=line_id, policy_id=policy_id)
         self.store.messages[msg.id] = msg
         return msg
 
@@ -494,8 +538,8 @@ class Gateway:
                     rents = [d["amount"] for d in erun.outputs["deductions"]
                              if re.search(r"\brent(al)?\b", d["name"], re.I)]
                     rent = sum(rents) if rents else None
-                outputs = fn(float(lev), deal.brief.limit, ebitda_value=eb, debt=debt, naive_debt=naive,
-                             rent_deduction=rent, naive_ebitda=naive_eb)
+                outputs = fn(float(lev), deal.brief.limit, wording=finance.wording_of(deal.brief.limit_wording),
+                             ebitda_value=eb, debt=debt, naive_debt=naive, rent_deduction=rent, naive_ebitda=naive_eb)
             else:
                 raise ValueError(f"no argument binding for {name}")
             if ekw:
@@ -559,72 +603,100 @@ class Gateway:
         return run
 
     # ------------------------------------------------------------------ mapper result
-    @_writes
     def store_mapping(self, actor: str, item_id: str, out: MapperOutput, progress=None) -> WorkItem:
         """Check the Mapper's whole result, then write it. `progress(step)`, when given, is called after each
-        mapping is stored ("mapping") and before each question opens ("question"); the job runner uses it to pace a
-        demo run, so the live view fills line by line. It is never called during the checks."""
-        item = self._item(item_id)
-        self._require(actor, "propose:map_lines", item.deal_id, item.id)
-        if item.type != "map_lines" or item.state != State.NEW:
-            self._deny(IllegalTransition(f"cannot store a mapping on {item.type} in state {item.state.value}"),
-                       item.deal_id, actor, "propose:map_lines", item.id)
-        deal = self._deal(item.deal_id)
-        if deal.brief_status != "approved":
-            self._deny(IllegalTransition(f"mapping waits for the approved Brief (the Brief is {deal.brief_status})"),
-                       deal.id, actor, "propose:map_lines", item.id)
-        out = MapperOutput.model_validate(out.model_dump())  # the gateway re-validates the typed result
-        self._say(deal.id, actor, SYSTEM, "message",
-                  f"Proposing {_count(len(out.mappings), 'mapping')} and {_count(len(out.tags), 'covenant tag')}, "
-                  f"{_count(len(out.flags), 'question')} for the controller", item_id=item.id)
-        if out.note:
-            self._say(deal.id, actor, SYSTEM, "message", out.note, item_id=item.id)
-        target_by_id = {l.id: l for l in self._target_lines(deal)}
-        flagged_ids = {lid for f in out.flags if f.kind == "mapping" for lid in f.line_ids}
-        try:  # check the whole result before writing any of it, so a refused result leaves nothing behind
-            self._check_mapping(deal, out, target_by_id)
-        except Invalid as error:
-            self._deny(error, deal.id, actor, "propose:map_lines", item.id)
+        mapping is stored ("mapping") and once before the questions open ("question"); the job runner uses it to
+        pace a demo run, so the live view fills line by line. It is never called during the checks.
+
+        The result is written in steps, each its own write under the gateway lock: the checks, then each mapping,
+        then the tags, the posting, and the questions. `progress` runs between the steps, outside the lock, so a
+        paced run never holds the lock while it waits and an answer or a read is never kept waiting by the stream.
+        The whole result is checked before the first mapping is written, so a refused result leaves nothing behind,
+        and the item is marked as being stored, so a second result for it is refused while the first is written."""
+        with self._writing():
+            item = self._item(item_id)
+            self._require(actor, "propose:map_lines", item.deal_id, item.id)
+            if item.type != "map_lines" or item.state != State.NEW or item.payload.get("storing"):
+                state = "being stored" if item.payload.get("storing") else item.state.value
+                self._deny(IllegalTransition(f"cannot store a mapping on {item.type} in state {state}"),
+                           item.deal_id, actor, "propose:map_lines", item.id)
+            deal = self._deal(item.deal_id)
+            if deal.brief_status != "approved":
+                self._deny(IllegalTransition(f"mapping waits for the approved Brief (the Brief is {deal.brief_status})"),
+                           deal.id, actor, "propose:map_lines", item.id)
+            out = MapperOutput.model_validate(out.model_dump())  # the gateway re-validates the typed result
+            self._say(deal.id, actor, SYSTEM, "message",
+                      f"Proposing {_count(len(out.mappings), 'mapping')} and {_count(len(out.tags), 'covenant tag')}, "
+                      f"{_count(len(out.flags), 'question')} for the controller", item_id=item.id)
+            if out.note:
+                self._say(deal.id, actor, SYSTEM, "message", out.note, item_id=item.id)
+            target_by_id = {l.id: l for l in self._target_lines(deal)}
+            flagged_ids = {lid for f in out.flags if f.kind == "mapping" for lid in f.line_ids}
+            try:  # check the whole result before writing any of it, so a refused result leaves nothing behind
+                self._check_mapping(deal, out, target_by_id)
+            except Invalid as error:
+                self._deny(error, deal.id, actor, "propose:map_lines", item.id)
+            self._discard_unfinished_mappings(deal, item)
+            item.payload = {**item.payload, "storing": True}
         stored: list[Mapping] = []
         for p in out.mappings:
-            t = target_by_id[p.target_line_id]
-            pl = self._platform_line(deal, t.section, p.platform_line)
-            m = Mapping(id=self.store.next_id("m"), deal_id=deal.id, target_line_id=t.id,
-                        platform_line_id=pl.id if pl else None, target_line=t.line,
-                        platform_line=pl.line if pl else p.platform_line, confidence=p.confidence,
-                        reason=p.reason, flagged=t.id in flagged_ids)
-            m.policy_id = self._cited_policy(p.policy_id, "mapping", m.platform_line, t)
-            self.store.mappings[m.id] = m
-            stored.append(m)
+            with self._writing():
+                t = target_by_id[p.target_line_id]
+                pl = self._platform_line(deal, t.section, p.platform_line)
+                m = Mapping(id=self.store.next_id("m"), deal_id=deal.id, target_line_id=t.id,
+                            platform_line_id=pl.id if pl else None, target_line=t.line,
+                            platform_line=pl.line if pl else p.platform_line, confidence=p.confidence,
+                            reason=p.reason, flagged=t.id in flagged_ids)
+                m.policy_id = self._cited_policy(p.policy_id, "mapping", m.platform_line, t)
+                self.store.mappings[m.id] = m
+                stored.append(m)
             if progress:
                 progress("mapping")
-        for tag in out.tags:
-            line = self.store.source_lines[tag.line_id]
-            line.covenant_tag = tag.tag
-            line.covenant_note = tag.note or None
-            line.covenant_policy_id = self._cited_policy(tag.policy_id, "covenant_tag", tag.tag, line)
-            if line.covenant_policy_id:
-                self.note_policy_applied(line.covenant_policy_id, deal.id, line.line)
-        for m in stored:
-            if m.policy_id:
-                self.note_policy_applied(m.policy_id, deal.id, m.target_line)
-        item.state = State.PROPOSED
-        item.payload = {"mappings": len(out.mappings), "tags": len(out.tags), "flags": len(out.flags),
-                        "note": out.note}
-        self._log(deal.id, actor, "propose:map_lines", "ALLOWED", item.id,
-                  reason=f"{_count(len(out.mappings), 'mapping')}, {_count(len(out.flags), 'flag')}")
-        by_policy = sum(1 for m in stored if m.policy_id) + sum(
-            1 for tag in out.tags if self.store.source_lines[tag.line_id].covenant_policy_id)
-        self._say(deal.id, SYSTEM, actor, "check",
-                  f"Checked and accepted {_count(len(stored), 'mapping')} and {_count(len(out.tags), 'covenant tag')}"
-                  + (f"; {by_policy} decided by a learned policy" if by_policy else ""), item_id=item.id)
-        for flag in out.flags:
-            if progress:
-                progress("question")
-            self._open_flag(deal, item, flag)
-        self._post(item)
-        deal.stage = "awaiting_flag" if self.open_flags(deal.id) else "mapped"
+        if progress and out.flags:
+            progress("question")
+        with self._writing():
+            for tag in out.tags:
+                line = self.store.source_lines[tag.line_id]
+                line.covenant_tag = tag.tag
+                line.covenant_note = tag.note or None
+                line.covenant_policy_id = self._cited_policy(tag.policy_id, "covenant_tag", tag.tag, line)
+                if line.covenant_policy_id:
+                    self.note_policy_applied(line.covenant_policy_id, deal.id, line.line)
+            for m in stored:
+                if m.policy_id:
+                    self.note_policy_applied(m.policy_id, deal.id, m.target_line)
+            item.state = State.PROPOSED
+            item.payload = {"mappings": len(out.mappings), "tags": len(out.tags), "flags": len(out.flags),
+                            "note": out.note}
+            self._log(deal.id, actor, "propose:map_lines", "ALLOWED", item.id,
+                      reason=f"{_count(len(out.mappings), 'mapping')}, {_count(len(out.flags), 'flag')}")
+            by_policy = sum(1 for m in stored if m.policy_id) + sum(
+                1 for tag in out.tags if self.store.source_lines[tag.line_id].covenant_policy_id)
+            self._say(deal.id, SYSTEM, actor, "check",
+                      f"Checked and accepted {_count(len(stored), 'mapping')} and {_count(len(out.tags), 'covenant tag')}"
+                      + (f"; {by_policy} decided by a learned policy" if by_policy else ""), item_id=item.id)
+            opened = [self._open_flag(deal, item, flag) for flag in out.flags]
+            for n, flag_item in enumerate(opened, 1):
+                self._say_question(deal, flag_item, n, len(opened))
+            self._post(item)
+            deal.stage = "awaiting_flag" if self.open_flags(deal.id) else "mapped"
         return item
+
+    def _discard_unfinished_mappings(self, deal: Deal, item: WorkItem) -> None:
+        """A Mapper run cut off mid-write (the app restarted while a paced run stored its mappings) left some mappings
+        behind on an item that never posted. The new result replaces them, or consolidate would count those target
+        lines twice; the cut-off item is closed as REJECTED, and both are logged."""
+        stale = self.store.deal_mappings(deal.id)
+        for old in self.store.deal_items(deal.id, "map_lines"):
+            if old.id != item.id and old.state == State.NEW:
+                old.state = State.REJECTED
+                old.reject_reason = f"cut off before it posted; replaced by {item.id}"
+                self._log(deal.id, SYSTEM, "reject", "ALLOWED", old.id, reason=old.reject_reason)
+        if stale:
+            for m in stale:
+                del self.store.mappings[m.id]
+            self._log(deal.id, SYSTEM, "mapping:discard", "ALLOWED", item.id,
+                      reason=f"{_count(len(stale), 'mapping')} of an earlier Mapper run replaced by this one")
 
     def _check_mapping(self, deal: Deal, out: MapperOutput, target_by_id: dict[str, SourceLine]) -> None:
         for p in out.mappings:
@@ -670,7 +742,7 @@ class Gateway:
             lev = self.store.tool_runs.get(test.inputs.get("leverage_run_id", "")) if test else None
             if test and lev:
                 figures = dict(leverage=lev.outputs["debt"] / lev.outputs["ebitda"], ok=bool(test.outputs["ok"]),
-                               basis="as_filed" if self._whole_line(flag, opt.tags) else "covenant")
+                               basis="as_filed" if self._as_filed(flag, opt.id, opt.tags) else "covenant")
             options.append(Option(id=opt.id, label=opt.label, effect=effect, run_id=run_id,
                                   added_by=SYSTEM if opt is flag.options[-1] and baseline_added else None, **figures))
         item = WorkItem(id=self.store.next_id("wi"), deal_id=deal.id, type="flag", state=State.NEEDS_INFO,
@@ -680,11 +752,50 @@ class Gateway:
                                  "option_actions": {o.id: o.model_dump() for o in flag.options}})
         self.store.items[item.id] = item
         self._log(deal.id, MAPPER, "ask:flag", "ALLOWED", item.id, reason=flag.question, evidence=flag.evidence)
-        self._say(deal.id, MAPPER, CONTROLLER, "question", flag.question, item_id=item.id,
-                  line_id=flag.line_ids[0] if len(flag.line_ids) == 1 else None)
         if self.forks:
             self.forks.flag_opened(item)
         return item
+
+    def _option_effects(self, deal: Deal, item: WorkItem) -> list[str]:
+        """Each option of a flag with its concrete effect, from the figures the gateway's what-if runs gave it.
+        The first covenant option says it in full ("leverage 2.84x as filed, over the 2.50x limit"), the others in
+        short ("0.76x, under")."""
+        limit = deal.brief.limit if deal.brief else None
+        out = []
+        for o in item.options:
+            if o.leverage is not None and o.ok is not None and limit is not None:
+                basis = " as filed" if o.basis == "as_filed" else ""
+                side = "under" if o.ok else "over"
+                if not out:
+                    out.append(f"{o.id}) {o.label}: leverage {o.leverage:.2f}x{basis}, {side} the {limit:.2f}x limit")
+                else:
+                    out.append(f"{o.id}) {o.label}: {o.leverage:.2f}x{basis}, {side}")
+            elif item.payload.get("kind") == "mapping":
+                action = item.payload.get("option_actions", {}).get(o.id, {})
+                where = action.get("platform_line") or (", ".join(sorted(set((action.get("mappings") or {}).values())))
+                                                        if action.get("mappings") else None)
+                out.append(f"{o.id}) {where}" if where else f"{o.id}) {o.label}")
+            else:
+                out.append(f"{o.id}) {o.label}: {o.effect.rstrip('.')}")
+        return out
+
+    def _say_question(self, deal: Deal, item: WorkItem, n: int, of: int) -> None:
+        """The Mapper's question to the controller, stated exactly: what is decided, each option with its effect from
+        its run, and what happens next. The figures are the options' own (leverage from each option's run chain);
+        the only other figures are the flagged lines' filed amounts and the Brief's limit."""
+        kind = item.payload.get("kind")
+        head = f"Decision {n} of {of}: " if of > 1 else "Decision needed: "
+        text = f"{head}{item.question} " + "; ".join(self._option_effects(deal, item)) + "."
+        if kind == "covenant_tag" and item.default:
+            text += f" Default {item.default}, the agreement's reading."
+        if kind == "mapping":
+            text += " Debt, EBITDA, and leverage do not change with this answer."
+        after = ("The Preparer waits for your answer." if of == 1 else
+                 "The Preparer waits for both answers." if of == 2 else f"The Preparer waits for all {of} answers.")
+        self._say(deal.id, item.proposed_by, CONTROLLER, "question", f"{text} {after}", item_id=item.id,
+                  line_id=item.payload["line_ids"][0] if len(item.payload.get("line_ids", [])) == 1 else None,
+                  limit=QUESTION_TEXT_LIMIT)
+        item.payload = {**item.payload, "next_step": after}
 
     @_writes
     def note_fork(self, item_id: str, fork: dict, action: str, reason: str) -> None:
@@ -715,6 +826,13 @@ class Gateway:
         line_ids = flag.line_ids if isinstance(flag, FlagProposal) else flag.payload.get("line_ids", [])
         return bool(line_ids) and all(tags.get(lid) == "debt" for lid in line_ids)
 
+    @classmethod
+    def _as_filed(cls, flag: FlagProposal | WorkItem, option_id: str, tags: dict[str, str]) -> bool:
+        """The whole-line option is computed as filed (reported EBITDA, no add-backs), the reading of someone who has
+        not read the agreement, unless it is the flag's default: when the agreement itself counts every flagged line
+        (Mama's finance leases), that reading is the agreement's, and its EBITDA is the agreement's too."""
+        return cls._whole_line(flag, tags) and option_id != flag.default
+
     def _flag_effect(self, deal: Deal, flag: FlagProposal, opt) -> tuple[str, str | None]:
         """What-if for one option, run by the system through the same tools. Tags are restored afterwards.
 
@@ -729,7 +847,7 @@ class Gateway:
                     if lid in lines:
                         lines[lid].covenant_tag = tag
                 # Any other unclear line is counted as debt for the what-if, so the figure is a ceiling.
-                as_filed = self._whole_line(flag, opt.tags)
+                as_filed = self._as_filed(flag, opt.id, opt.tags)
                 debt = self.run_tool(SYSTEM, deal.id, "covenant_debt", {"naive": True, "what_if": opt.id})
                 eb = self.run_tool(SYSTEM, deal.id, "ebitda", {"what_if": opt.id, "as_filed": as_filed})
                 lev = self.run_tool(SYSTEM, deal.id, "leverage", {"debt_run_id": debt.run_id, "ebitda_run_id": eb.run_id})
@@ -758,7 +876,9 @@ class Gateway:
                         parts.append(f"{l.line} ({_fmt(amt)}K) to '{ref}', which is not a platform line")
                     else:
                         parts.append(f"{l.line} ({_fmt(amt)}K) left unmapped and listed")
-                return "; ".join(parts) + ".", None
+                # Debt and EBITDA are read from each company's own lines and tags, never from the mapping, so a
+                # mapping answer moves a line between rows of the combined books and nothing else.
+                return "; ".join(parts) + ". No change to debt, EBITDA, or leverage.", None
             return "No effect computed.", None
         except GatewayError as error:
             return f"Effect not computed: {error.message}", None
@@ -805,14 +925,46 @@ class Gateway:
                   item_id=item.id)
 
     def _say_learned(self, item: WorkItem) -> None:
-        """One message for the policies an answer taught (one per flagged line), so the agent hears it once."""
+        """Right after an answer, the agent that asked tells the controller what it learned, with the policy id, and
+        what happens next. One message per answer, so the controller hears it once: a covenant answer lists each
+        decision with its lines; a mapping answer names the line and where it now goes."""
         learned = [p for p in self.store.policies.values() if p.learned_from == item.id and not p.retired_by]
-        if learned:
-            ids = ", ".join(p.id for p in learned)
-            word = "policy" if len(learned) == 1 else "policies"
-            self._say(item.deal_id, SYSTEM, learned[0].role, "message",
-                      f"Learned {len(learned)} {word} from the answer on {item.id} ({ids}): applied next time without "
-                      f"asking", item_id=item.id)
+        if not learned:
+            return
+        deal = self._deal(item.deal_id)
+        ids = _id_list([p.id for p in learned])
+        companies = _and(list(dict.fromkeys(p.company or "this company" for p in learned)))
+        names = {lid: self.store.source_lines[lid].line for lid in item.payload.get("line_ids", [])
+                 if lid in self.store.source_lines}
+        if item.payload.get("kind") == "covenant_tag":
+            groups: dict[str, list[str]] = {}
+            for p in learned:
+                line = next((n for n in names.values() if n.strip().lower() == p.pattern), p.pattern)
+                if f"'{line}'" not in groups.setdefault(p.decision, []):
+                    groups[p.decision].append(f"'{line}'")
+            term = deal.brief.debt_term if deal.brief else "covenant debt"
+            said = []
+            for tag in sorted(groups, key=lambda t: t != "debt"):
+                lines = groups[tag]
+                many = len(lines) > 1
+                verb = ("count" if many else "counts") if tag == "debt" else ("do not count" if many else "does not count")
+                said.append(f"{_and(lines)} {verb}")
+            text = f"Learned {ids} ({companies}, {term}): {'; '.join(said)}."
+            these = "these lines" if len(learned) > 1 else "this line"
+        else:
+            p = learned[0]
+            line = next(iter(names.values()), p.pattern)
+            where = f"goes to '{p.decision}'" if p.decision else "stays unmapped and listed"
+            text = f"Learned {ids}: {companies}'s '{line}' {where}."
+            these = "this line"
+        open_now = [f.id for f in self.open_flags(item.deal_id) if f.id != item.id]
+        if open_now:
+            nxt = (f" Applying it now; {_count(len(open_now), 'question')} still open ({', '.join(open_now)}), and the "
+                   f"Preparer starts once {'it is' if len(open_now) == 1 else 'they are'} answered.")
+        else:
+            nxt = f" Applying it now, and to {these} on later deals without asking. The Preparer is next."
+        self._say(item.deal_id, item.proposed_by, CONTROLLER, "message", text + nxt, item_id=item.id,
+                  policy_id=learned[0].id, limit=QUESTION_TEXT_LIMIT)
 
     def _apply_flag_answer(self, actor: str, item: WorkItem, option_id: str) -> None:
         action = item.payload.get("option_actions", {}).get(option_id, {})
@@ -820,7 +972,7 @@ class Gateway:
         label = next((o.label for o in item.options if o.id == option_id), option_id)
         if kind == "covenant_tag":
             deal = self._deal(item.deal_id)
-            basis = "as_filed" if self._whole_line(item, action.get("tags", {})) else "covenant"
+            basis = "as_filed" if self._as_filed(item, option_id, action.get("tags", {})) else "covenant"
             if basis != deal.ebitda_basis:
                 deal.ebitda_basis = basis
                 self._log(item.deal_id, SYSTEM, "basis", "ALLOWED", deal.id,
@@ -1049,7 +1201,7 @@ class Gateway:
                            "propose:prepare_result", item.id)
         if abs(out.limit - deal.brief.limit) > 1e-9:
             self._deny(Invalid("limit must come from the brief"), deal.id, actor, "propose:prepare_result", item.id)
-        test = finance.limit_test(out.leverage, deal.brief.limit)
+        test = finance.limit_test(out.leverage, deal.brief.limit, wording=finance.wording_of(deal.brief.limit_wording))
         by_tool = {k: v for k, v in (("consolidate", out.consolidate_run_id), ("ebitda", out.ebitda_run_id),
                                       ("covenant_debt", out.debt_run_id), ("leverage", out.leverage_run_id)) if v}
         for tool, rid in list(by_tool.items()):
@@ -1304,9 +1456,9 @@ class Gateway:
         for item in reversed(self.store.deal_items(deal_id, "flag")):
             if item.payload.get("kind") != "covenant_tag":
                 continue
-            for action in item.payload.get("option_actions", {}).values():
+            for oid, action in item.payload.get("option_actions", {}).items():
                 tags = action.get("tags") or {}
-                if tags and all(t == "debt" for t in tags.values()):
+                if tags and all(t == "debt" for t in tags.values()) and oid != item.default:
                     return tags
         return None
 

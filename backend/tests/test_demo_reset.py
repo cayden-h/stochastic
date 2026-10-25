@@ -57,7 +57,7 @@ def test_a_reset_that_clears_memory_brings_the_flag_back():
     full_run(c)
     assert c.post("/dev/reset").json()["policies"] > 0  # the default keeps memory: the second-run moment
     assert c.post("/dev/reset?keep_memory=false").json() == {"ok": True, "keep_memory": False, "policies": 0,
-                                                             "sessions": 0}
+                                                             "sessions": 0, "kept_deals": []}
     c.post(f"/deals/{DEAL_ID}/run")
     assert c.get(f"/deals/{DEAL_ID}/case").json()["open_flags"]
 

@@ -4,8 +4,9 @@ It reads the deal's state from the store, opens the next work item through the g
 and hands the typed result back to the gateway. It holds no state of its own: it can run again at any time and
 will find the next thing to do.
 
-With DEMO_PACE set, it waits a little between steps on the scripted and replay backends (app/agents/pace.py), so a
-demo run plays at a speed people can follow. The gateway's checks never wait.
+With DEMO_PACE set, or a run's own pace ("demo", "human", "off"), it waits a little between steps on the scripted and
+replay backends (app/agents/pace.py), so a demo run plays at a speed people can follow. The gateway's checks never
+wait, and no wait holds the gateway's lock.
 """
 from __future__ import annotations
 
@@ -106,13 +107,16 @@ def _remember(gw: Gateway, role: Role, run, item_id: str, summary: str) -> None:
     gw.update_session(role.name, run.backend, item_id, summary, ok.get("session_id"), ok.get("session_key"))
 
 
-def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: int = 6) -> list[str]:
+def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: int = 6,
+            pace_name: str | None = None) -> list[str]:
     """Do every step that needs no human until the deal waits on a human or is posted. Returns what happened.
 
+    `pace_name` ("demo", "human", "off") paces this run whatever DEMO_PACE says; None follows DEMO_PACE.
     A run that stops on an error marks the deal `run_failed` with a `run:failed` row before the error goes up, so
     the console offers Run again on the sync route too, not only after a background run."""
     try:
-        return _advance(gw, deal_id, backend, max_steps)
+        with pace.using(pace_name):
+            return _advance(gw, deal_id, backend, max_steps)
     except Exception as error:
         if deal_id in gw.store.deals:  # the deal may have been reset meanwhile
             gw.note_run_failed(deal_id, f"{type(error).__name__}: {error}")
@@ -157,9 +161,12 @@ def _advance(gw: Gateway, deal_id: str, backend: str | None, max_steps: int) -> 
                               policies=gw.policies_for(MAPPER_ROLE.actor, deal_id),
                               session=store.sessions.get(MAPPER_ROLE.name))
             asked = _chosen(backend)
-            run, _ = _store_or_fall_back(gw, MAPPER_ROLE, inp, deal_id, item.id, backend,
-                                         lambda r: gw.store_mapping(MAPPER_ROLE.actor, item.id, r.output,
-                                                                    progress=lambda step: pace.pause(step, asked)),
+
+            def store_mapping(r):
+                n = len(r.output.mappings)
+                return gw.store_mapping(MAPPER_ROLE.actor, item.id, r.output,
+                                        progress=lambda step: pace.pause(step, asked, count=n))
+            run, _ = _store_or_fall_back(gw, MAPPER_ROLE, inp, deal_id, item.id, backend, store_mapping,
                                          log, retry_with_reason=True)
             _remember(gw, MAPPER_ROLE, run, item.id,
                       f"mapped {len(run.output.mappings)} lines, {len(run.output.flags)} flags")

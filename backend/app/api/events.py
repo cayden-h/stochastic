@@ -21,6 +21,26 @@ def mapping_event(store, m) -> dict:
             "at": m.model_dump(mode="json", include={"at"})["at"]}  # the same ISO form as every other event
 
 
+ROLE_NAMES = {"agent:mapper": "Mapper", "agent:preparer": "Preparer", "agent:reviewer": "Reviewer",
+              "agent:brief_reader": "Brief Reader", "system:gateway": "Gateway"}
+
+
+def notify_event(store, msg) -> dict | None:
+    """The `notify` event's body for a question to the controller, or None when the message is not one or its item
+    is no longer waiting (answered while the page was away), so a reconnecting page never re-notifies an old
+    question. `body` is the one-line question of the work item; the conversation message has the options."""
+    if msg.kind != "question" or msg.to != "human:controller":
+        return None
+    item = store.items.get(msg.item_id) if msg.item_id else None
+    if item is None or item.state != State.NEEDS_INFO:
+        return None
+    who = ROLE_NAMES.get(msg.sender, msg.sender)
+    body = " ".join((item.question or msg.text).split())
+    return {"id": msg.id, "deal_id": msg.deal_id, "at": msg.model_dump(mode="json", include={"at"})["at"],
+            "kind": "decision", "item_id": item.id, "from": msg.sender, "title": f"The {who} needs your decision",
+            "body": body}
+
+
 def _key(msg) -> tuple[str, str]:
     return msg.id, msg.at.isoformat()
 
@@ -36,6 +56,9 @@ def _live_events(store, deal_id: str, live_seen: dict) -> list[str]:
         sent = 0  # the record was reset: replay the new conversation from the start
     for msg in messages[sent:]:
         out.append(_sse("conversation", msg.model_dump(mode="json")))
+        note = notify_event(store, msg)
+        if note:
+            out.append(_sse("notify", note))
     live_seen["messages"] = len(messages)
     live_seen["last_message"] = _key(messages[-1]) if messages else None
     seen: dict = live_seen.setdefault("mappings", {})
