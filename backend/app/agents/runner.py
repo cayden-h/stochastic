@@ -5,9 +5,13 @@ falls back along AGENT_FALLBACK (default "scripted") and says which backend prod
 pitch can be honest about it. Successful model runs are recorded to recordings/latest/ when RECORD_RUNS=1 (the default),
 so a live run never replaces the pinned replay; `scripts/record_run.py` (RECORD_RUNS=force) writes the pinned one.
 Agents are stateful: the runner loads the role's session from the gateway, passes it in, and updates it after.
+`only(backend)` pins every run in the block to one backend with no fallback chain: the 15-second demo
+(pace "demo") runs the scripted backend whatever AGENT_BACKEND says (app/agents/jobs.py).
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import os
 import time
 from dataclasses import dataclass, field
@@ -22,6 +26,25 @@ from app.core.models import BriefReaderInput, MapperInput, PreparerInput, Review
 # The Anthropic backend has run on a teammate's key (recordings/anthropic-haiku-5-5), but the demo laptop has no
 # key, so the default fallback is the deterministic rules. Add `anthropic` to AGENT_FALLBACK when a key is in .env.
 DEFAULT_FALLBACK = "scripted"
+
+# The one backend every run in an `only` block uses, with no fallback chain; None follows AGENT_BACKEND and the chain.
+_only: contextvars.ContextVar[str | None] = contextvars.ContextVar("only_backend", default=None)
+
+
+@contextlib.contextmanager
+def only(backend: str | None):
+    """Run the block on this backend alone, with no fallback (None: no pin)."""
+    token = _only.set(backend)
+    try:
+        yield
+    finally:
+        _only.reset(token)
+
+
+def pinned() -> str | None:
+    """The backend an `only` block pins, or None."""
+    return _only.get()
+
 
 LAST_RUNS: list[dict] = []  # what the console shows as "backend status"
 TOTALS: dict[str, float] = {"runs": 0, "factory_credits": 0.0, "input_tokens": 0, "output_tokens": 0}  # this process
@@ -78,8 +101,10 @@ def run_agent(role: Role, inp: BaseModel, call_tool, session=None, backend: str 
               rewind_to: str | None = None) -> AgentRun:
     """Run one role on one work item. Returns the typed output and the backend that produced it.
     `rewind_to` asks the Droid backend to drop a turn from the resumed session first; other backends ignore it."""
-    chosen = backend or os.getenv("AGENT_BACKEND", "scripted")
-    chain = [chosen] + [b for b in os.getenv("AGENT_FALLBACK", DEFAULT_FALLBACK).split(",") if b and b != chosen]
+    pin = _only.get()
+    chosen = pin or backend or os.getenv("AGENT_BACKEND", "scripted")
+    chain = [chosen] if pin else [chosen] + [b for b in os.getenv("AGENT_FALLBACK", DEFAULT_FALLBACK).split(",")
+                                            if b and b != chosen]
     attempts: list[dict] = []
     start = time.time()
     for b in chain:
@@ -95,7 +120,7 @@ def run_agent(role: Role, inp: BaseModel, call_tool, session=None, backend: str 
                 except OSError:
                     pass
             run = AgentRun(output=out, backend=b, attempts=attempts, seconds=round(time.time() - start, 2))
-            LAST_RUNS.append({"role": role.name, "backend": b, "attempts": attempts, "meta": meta,
+            LAST_RUNS.append({"role": role.name, "backend": b, "asked": chosen, "attempts": attempts, "meta": meta,
                               "at": time.strftime("%H:%M:%S")})
             TOTALS["runs"] += 1
             usage = meta.get("usage", meta) if isinstance(meta, dict) else {}

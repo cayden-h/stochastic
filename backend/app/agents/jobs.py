@@ -7,6 +7,9 @@ will find the next thing to do.
 With DEMO_PACE set, or a run's own pace ("demo", "human", "off"), it waits a little between steps on the scripted and
 replay backends (app/agents/pace.py), so a demo run plays at a speed people can follow. The gateway's checks never
 wait, and no wait holds the gateway's lock.
+
+Pace "demo" (the 15-second "Run the demo") always runs the scripted backend for every role, with no fallback chain
+and no live call, whatever AGENT_BACKEND says, unless the run names its own backend.
 """
 from __future__ import annotations
 
@@ -14,6 +17,7 @@ import os
 
 from app.agents import pace
 from app.agents.roles import BRIEF_READER_ROLE, MAPPER_ROLE, PREPARER_ROLE, REVIEWER_ROLE, Role
+from app.agents import runner
 from app.agents.runner import run_agent
 from app.core.models import MapperInput, PreparerInput, ReviewerInput, State
 from app.gateway.gateway import Gateway, Invalid
@@ -112,11 +116,14 @@ def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: in
     """Do every step that needs no human until the deal waits on a human or is posted. Returns what happened.
 
     `pace_name` ("demo", "human", "off") paces this run whatever DEMO_PACE says; None follows DEMO_PACE.
+    Pace "demo" with no `backend` runs every role on the scripted backend alone, so the 15-second demo never makes a
+    live model call (a .env with AGENT_BACKEND=droid would otherwise take about 45 s and Factory credits).
     A run that stops on an error marks the deal `run_failed` with a `run:failed` row before the error goes up, so
     the console offers Run again on the sync route too, not only after a background run."""
     try:
-        with pace.using(pace_name):
-            return _advance(gw, deal_id, backend, max_steps)
+        pin = "scripted" if pace_name == "demo" and backend is None else None
+        with pace.using(pace_name), runner.only(pin):
+            return _advance(gw, deal_id, pin or backend, max_steps)
     except Exception as error:
         if deal_id in gw.store.deals:  # the deal may have been reset meanwhile
             gw.note_run_failed(deal_id, f"{type(error).__name__}: {error}")

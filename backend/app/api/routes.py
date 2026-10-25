@@ -25,6 +25,7 @@ from app.api.events import next_events
 from app.api.schemas import (BriefAmountsBody, BriefAmountsResponse, CaseResponse, DealCreated, EditBody,
                              EditReasonBody, EditResponse, HealthResponse)
 from app.core.models import CONTROLLER, SYSTEM, Brief, Deal, Edit, State
+from app.db.fixtures.kewaunee import DEAL_ID
 from app.db.loader import MAX_BYTES, LoaderError, parse_statement_csv
 from app.gateway.gateway import Denied, Gateway, GatewayError, Invalid
 
@@ -147,6 +148,10 @@ def first_non_finite(brief: Brief) -> str | None:
 def build_router(gw: Gateway) -> APIRouter:
     r = APIRouter()
     store = gw.store
+    # Uploads already in the record when this process started (a Postgres ledger keeps them) are hidden from the
+    # Dashboard list, not deleted: GET /deals?include_uploads=true lists them, and their own routes still answer.
+    # A deal uploaded in this process stays listed, across /dev/reset too.
+    earlier_uploads = {d.id for d in store.deals.values() if d.data_source == "upload"}
 
     def guard(fn):
         try:
@@ -227,10 +232,14 @@ def build_router(gw: Gateway) -> APIRouter:
                 "updated_at": last.isoformat() if last else None}
 
     @r.get("/deals")
-    def deals():
-        """Every deal for the Dashboard, the live demo deal first: the deal's own fields (id, name, platform,
-        target, stage, brief, data_source, note, ...) plus deal_id, verdict, and updated_at."""
-        return [deal_card(d) for d in list(store.deals.values())]
+    def deals(include_uploads: bool = False):
+        """The Dashboard's deals, the live demo deal first: the deal's own fields (id, name, platform, target,
+        stage, brief, data_source, note, ...) plus deal_id, verdict, and updated_at. By default the demo deal, the
+        seeded cases, and the deals uploaded since this process started; include_uploads=true adds the uploads from
+        before it started, which are kept in the record but hidden."""
+        rows = [d for d in list(store.deals.values()) if include_uploads or d.id not in earlier_uploads]
+        rows.sort(key=lambda d: d.id != DEAL_ID)  # stable: the rest keep their order
+        return [deal_card(d) for d in rows]
 
     @r.get("/deals/{deal_id}")
     def deal(deal_id: str):

@@ -97,6 +97,20 @@ export interface LoadError { kind: "unreachable" | "no_deal"; message: string }
 const emptyAudit: AuditResponse = { chain_valid: true, rows: [] };
 const Ctx = createContext<DealData | null>(null);
 
+/** POST /dev/reset, waiting out a run that is finishing. The job runner finishes about a second after the Reviewer's
+ * hand-off (the paced wait after a stored result), and the gateway refuses a reset until then (409). A reset clicked
+ * in that second waits for it instead of failing. */
+async function resetWhenIdle(keepMemory: boolean): Promise<Awaited<ReturnType<typeof api.reset>>> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await api.reset(keepMemory);
+    } catch (e) {
+      if (attempt >= 8 || !(e instanceof Error) || !/run is in progress/i.test(e.message)) throw e;
+      await new Promise((r) => setTimeout(r, 700));
+    }
+  }
+}
+
 /** Reads the case in one call and refreshes on every stream event. The console never computes a number. */
 export function DealProvider({ children }: { children: React.ReactNode }) {
   const [deals, setDeals] = useState<DealSummary[]>([]);
@@ -274,18 +288,7 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
   }, [starting]);
 
   const resetOnce = useCallback(async (keepMemory: boolean) => {
-    // The job runner finishes about a second after the Reviewer's hand-off (the paced wait after a stored result), and
-    // the gateway refuses a reset until then (409). A reset clicked in that second waits for it instead of failing.
-    let res: Awaited<ReturnType<typeof api.reset>>;
-    for (let attempt = 0; ; attempt++) {
-      try {
-        res = await api.reset(keepMemory);
-        break;
-      } catch (e) {
-        if (attempt >= 8 || !(e instanceof Error) || !/run is in progress/i.test(e.message)) throw e;
-        await new Promise((r) => setTimeout(r, 700));
-      }
-    }
+    const res = await resetWhenIdle(keepMemory);
     dispatchConversation({ type: "reset" });
     dispatchMapping({ type: "reset" });
     setNotices([]); setLearned([]); setDeciding(null);

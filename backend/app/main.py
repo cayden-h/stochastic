@@ -97,12 +97,16 @@ def create_app(demo_cases: bool | None = None, demo_cases_background: bool = Tru
     if demo_cases if demo_cases is not None else demo_cases_wanted():
         app.state.cases_thread = start_demo_cases(gateway, background=demo_cases_background)
 
+    FRESH_DEMO_REASON = "fresh demo: clear memory for the demo deal"
+
     @app.post("/dev/reset")
     def reset(keep_memory: bool = True):
         """Demo helper: reseed the live demo deal. Agent memory (policies, sessions) is kept unless keep_memory=false,
         so a second run shows the Mapper applying what the controller taught it. Between judges, use
         keep_memory=false so the next judge sees the flag. Every other deal (the Dashboard's seeded cases, uploads)
-        keeps its whole record, its audit rows, and the memory learned on it, in both modes. Refused while a run of
+        keeps its whole record, its audit rows, and the memory learned on it, in both modes, except that
+        keep_memory=false retires (D18) every live policy that covers the demo deal's companies or platform, whatever
+        deal it was learned on, so the next demo run asks both questions again. Refused while a run of
         the demo deal is in flight, because the run would keep writing into the new deal; the fork slot is freed."""
         # The running check and the reset hold the lock a run's claim takes (routes.claim), so a Run clicked at the
         # same moment either claims first and the reset is refused, or waits and starts on the new deal.
@@ -114,6 +118,8 @@ def create_app(demo_cases: bool | None = None, demo_cases_background: bool = Tru
                 store.reset_deals(keep_memory=keep_memory, keep_deals=keep, rechain=gateway.rechain)
                 gateway.run_pace.pop(DEAL_ID, None)
                 seed(store, gateway)
+                if not keep_memory:  # memory learned on other deals that covers the demo deal's companies, too
+                    gateway.retire_policies_covering(DEAL_ID, FRESH_DEMO_REASON)
                 if gateway.forks:
                     gateway.forks.reset()
         demo = store.deals[DEAL_ID]

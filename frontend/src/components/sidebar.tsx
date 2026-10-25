@@ -36,15 +36,17 @@ const BACKEND_WORDS: Record<string, { title: string; sub: string }> = {
 };
 
 /** Which backend produced the agent output, from GET /health. When the Mapper and the Preparer ran on different
- * backends (a fallback), the card names the one that fell back, not the better one. */
-function producedBy(health: Health | null, kase: Case | null): { produced: string; configured: string } | null {
+ * backends (a fallback), the card names the one that fell back, not the better one. A fallback is measured against
+ * the backend the last run asked for, so the 15-second demo (always scripted) is not shown as a fallback. */
+function producedBy(health: Health | null, kase: Case | null): { produced: string; configured: string; env: string } | null {
   const status = health?.backend ?? kase?.backend;
   if (!status) return null;
   const roles = status.last_runs.filter((r) => r.role !== "runner");
   const last = roles[roles.length - 1];
   const recent = roles.slice(-3).map((r) => r.backend);
   const weakest = ["scripted", "replay"].find((b) => recent.includes(b));
-  return { produced: weakest ?? kase?.verdict?.backend ?? last?.backend ?? status.configured, configured: status.configured };
+  const asked = last?.asked ?? status.configured;
+  return { produced: weakest ?? kase?.verdict?.backend ?? last?.backend ?? asked, configured: asked, env: status.configured };
 }
 
 /** The model card: what produced the agent text, and where the record lives (Tiger Cloud or memory). */
@@ -59,7 +61,7 @@ function ModelCard() {
   const storeWord = !store ? null : store.fallback_reason ? "Tiger unreachable" : tiger ? (store.last_error ? "Tiger Cloud, retrying" : "Tiger Cloud") : "in memory";
   const healthy = !fellBack && !store?.fallback_reason && !store?.last_error;
   const title = [
-    `Configured: ${by.configured}. Fallback: ${health?.backend.fallback ?? kase?.backend.fallback}.`,
+    `Configured: ${by.env}${by.configured !== by.env ? `; this run asked for ${by.configured}` : ""}. Fallback: ${health?.backend.fallback ?? kase?.backend.fallback}.`,
     tiger
       ? `Postgres on Tiger Cloud, schema ${store?.schema}, ledger ${store?.ledger}. ${store?.pending ? `${store.pending} writes queued.` : "Every write is saved."}${store?.last_error ? ` Last error: ${store.last_error}` : ""}`
       : store?.fallback_reason ? `Tiger Cloud was not reachable at start: ${store.fallback_reason}` : "The record is kept in memory and resets when the API restarts.",
