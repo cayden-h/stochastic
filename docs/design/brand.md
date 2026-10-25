@@ -70,13 +70,12 @@ The desktop splash switches ink with the macOS appearance (section 4).
 
 ## 3. The name
 
-The name in the lockup is "stochastic", in lowercase.
+The name in the lockup is "Stochastic", with a capital S (changed from lowercase by Cayden on 2026-10-25).
 It is set in Instrument Serif Regular, the console's display serif (`--font-serif`, loaded in `frontend/src/app/layout.tsx`), at 48 px in the splash, with 0.01em letter spacing and a line height of 1.
 It sits centered under the mark, 14 px below it.
 The fallbacks are Iowan Old Style, New York, and Georgia.
 
-The sidebar brand row keeps "Stochastic" with a capital S next to the small mark.
-That row is a page title, not the lockup.
+The sidebar brand row uses the same "Stochastic" next to the small mark.
 
 ## 4. The launch splash
 

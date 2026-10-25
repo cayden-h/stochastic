@@ -75,7 +75,7 @@ test("the Mac app: splash, then the console, the demo path with saveFiles, and a
     // The first window is the splash: only the mark and the name, on a transparent page.
     const first = await app.firstWindow();
     expect(first.url()).toContain("splash.html");
-    await expect(first.locator("body")).toContainText("stochastic");
+    await expect(first.locator("body")).toContainText("Stochastic");
     await expect(first.locator("svg").first()).toBeVisible();
     const backgrounds = await first.evaluate(() => [getComputedStyle(document.documentElement).backgroundColor, getComputedStyle(document.body).backgroundColor]);
     expect(backgrounds).toEqual(["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"]);

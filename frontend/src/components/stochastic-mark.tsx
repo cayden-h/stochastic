@@ -75,7 +75,7 @@ const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
 const clamp = (t: number) => Math.max(0, Math.min(1, t));
 const span = (ms: number, [a, b]: readonly [number, number]) => clamp((ms - a) / (b - a));
 
-/** The launch lockup: the mark drawing itself, then "stochastic" below it, with the exact prototype timings.
+/** The launch lockup: the mark drawing itself, then "Stochastic" below it, with the exact prototype timings.
  * The ring draws clockwise from the top, the start dot pops with a slight overshoot, the walk draws and each
  * arrowhead appears as the line passes it, and the name fades up at 1450 ms. With reduced motion it shows
  * finished at once. Painted by direct DOM writes per frame, so React does not re-render 60 times a second. */
@@ -129,7 +129,7 @@ export function AnimatedStochasticLockup({ size, className }: { size: number; cl
         ))}
         <circle ref={dot} cx={WALK[0][0]} cy={WALK[0][1]} r={0} fill="currentColor" />
       </svg>
-      <span ref={word} className="launch-word font-serif text-[48px] leading-none tracking-[0.01em]">stochastic</span>
+      <span ref={word} className="launch-word font-serif text-[48px] leading-none tracking-[0.01em]">Stochastic</span>
     </div>
   );
 }

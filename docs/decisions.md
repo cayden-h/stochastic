@@ -597,7 +597,8 @@ Decided by Cayden, from an approved prototype of the launch animation.
 
 Decision:
 1. The logo is a circle with a random walk inside it: a filled start dot and barbed arrowheads along the walk, in one ink that follows the theme.
-   The name under it is "stochastic", lowercase, in the console's display serif (Instrument Serif).
+   The name under it is "Stochastic", in the console's display serif (Instrument Serif).
+   Changed on 2026-10-25 by Cayden: the name takes a capital S (it was lowercase).
 2. On launch, the desktop app shows a splash before the main window: a frameless, transparent window centered on the screen with only the circle and the name.
    No card, no panel, no progress bar.
 3. The splash plays the approved draw once (circle, start dot, walk with arrowheads, then the name), with the prototype's exact timings, and holds the finished mark until the whole app has loaded: the backend answers, the console has loaded in the hidden main window, and it has read the deal.

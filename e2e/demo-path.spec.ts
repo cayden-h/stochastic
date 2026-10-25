@@ -36,7 +36,7 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
   const lockup = splash.locator(":scope > *");
   await expect(lockup).toHaveCount(1);
   await expect(lockup.locator("svg").first()).toBeVisible();
-  await expect(splash).toContainText("stochastic");
+  await expect(splash).toContainText("Stochastic");
   const box = (await lockup.boundingBox())!;
   expect(Math.abs(box.x + box.width / 2 - 720)).toBeLessThan(3);
   expect(Math.abs(box.y + box.height / 2 - 450)).toBeLessThan(3);
