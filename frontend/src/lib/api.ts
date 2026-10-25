@@ -1,5 +1,7 @@
 import type { ConversationMessage } from "./conversation";
-import type { AuditResponse, Brief, Case, Deal, DealCreated, Edit, EditBody, EditResponse, Health, ToolRun, WorkItem } from "./types";
+import type {
+  AuditResponse, Brief, Case, Deal, DealCreated, DealSummary, Edit, EditBody, EditResponse, Health, Stage, ToolRun, WorkItem,
+} from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 /** The human seat. The gateway's default controller actor; every write carries it. */
@@ -38,9 +40,33 @@ async function createDeal(form: FormData): Promise<DealCreated> {
   return res.json();
 }
 
+/** One GET /deals row as the gateway sends it: the summary shape (`deal_id`, `verdict`, `updated_at`, `data_source`,
+ * `note`), or the older full Deal (`id`, `name`). Both read as a DealSummary. */
+type DealRow = Partial<Deal> & Partial<Omit<DealSummary, "verdict">> & {
+  deal_id?: string; verdict?: DealSummary["verdict"]; updated_at?: string | null;
+};
+
+export function toSummary(d: DealRow): DealSummary {
+  const id = d.deal_id ?? d.id ?? "";
+  const platform = d.platform ?? "";
+  const target = d.target ?? "";
+  const v = d.verdict;
+  return {
+    id, platform, target, stage: (d.stage ?? "new") as Stage,
+    name: d.name ?? `${platform} acquires ${target}`,
+    verdict: v && typeof v.leverage === "number" ? { leverage: v.leverage, limit: v.limit, verdict: v.verdict } : null,
+    updated_at: d.updated_at ?? null,
+    data_source: d.data_source === "sample" || d.data_source === "filings" ? d.data_source : null,
+    note: d.note ?? null,
+  };
+}
+
+/** How fast a run plays. "demo" is the 15-second demo (about 6 s to the question, about 7 s after the last answer). */
+export type Pace = "demo";
+
 /** The reads for the screen and the writes. Everything else is a link to the record. */
 export const api = {
-  deals: () => get<Deal[]>("/deals"),
+  deals: async () => (await get<DealRow[]>("/deals")).map(toSummary).filter((d) => d.id),
   case: (id: string) => get<Case>(`/deals/${id}/case`),
   health: () => get<Health>("/health"),
   audit: (id: string) => get<AuditResponse>(`/deals/${id}/audit`),
@@ -49,8 +75,9 @@ export const api = {
   runs: (id: string) => get<ToolRun[]>(`/deals/${id}/runs`),
   conversation: (id: string) => get<ConversationMessage[]>(`/deals/${id}/conversation`),
   // The run goes in the background ({"sync": false}): a paced run takes about 23 s, and the console follows it on the
-  // stream instead of waiting on the request.
-  start: (id: string) => post<{ ok: boolean; log: string[]; stage: string }>(`/deals/${id}/run`, { sync: false }),
+  // stream instead of waiting on the request. `pace: "demo"` plays it in about 15 s of agent time.
+  start: (id: string, pace?: Pace) =>
+    post<{ ok: boolean; log: string[]; stage: string }>(`/deals/${id}/run`, pace ? { sync: false, pace } : { sync: false }),
   answer: (itemId: string, optionId: string) => post<WorkItem>(`/work-items/${itemId}/answer`, { option_id: optionId }),
   hold: (itemId: string) => post<WorkItem>(`/work-items/${itemId}/hold`),
   approve: (itemId: string) => post<WorkItem>(`/work-items/${itemId}/approve`),

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState } from "react";
+import { useDeal } from "@/lib/deal-context";
 import type { Evidence, SourceLine } from "@/lib/types";
 import { Button, Label, Mono } from "./ui";
 
@@ -36,7 +37,9 @@ export function SourceChip({ evidence, line, label }: { evidence: Evidence; line
 /** The exact quote and the document it comes from. The filing's note on a line is shown when there is one. */
 export function SourcePanel() {
   const { source, close } = useSource();
+  const { kase, deals } = useDeal();
   if (!source) return null;
+  const sample = deals.find((d) => d.id === kase?.deal.id)?.data_source === "sample";
   const { evidence, line } = source;
   return (
     <div className="fixed inset-0 z-10 flex justify-end" role="dialog" aria-label="Source">
@@ -63,7 +66,9 @@ export function SourcePanel() {
           </div>
         ) : null}
         <p className="rounded-chip bg-paper px-4 py-3 text-muted">
-          Quoted from the public filing. Figures from public SEC filings. The reading of the agreement is ours, and no lender has checked it.
+          {sample
+            ? "A sample case: its figures are made up, not from a filing. The quote is the agreement the sample uses. The reading of the agreement is ours, and no lender has checked it."
+            : "Quoted from the public filing. Figures from public SEC filings. The reading of the agreement is ours, and no lender has checked it."}
         </p>
       </aside>
     </div>
