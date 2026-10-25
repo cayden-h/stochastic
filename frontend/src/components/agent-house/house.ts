@@ -661,7 +661,18 @@ export function createHouse(container: HTMLElement, options: HouseOptions = {}):
     const lineGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(48));
     const line = new THREE.Line(lineGeo, new THREE.LineDashedMaterial({ color: ink, dashSize: 0.18, gapSize: 0.14, transparent: true, opacity: 0, depthTest: false }));
     line.computeLineDistances(); line.renderOrder = 8; notes.add(line);
-    return new Promise((resolve) => { flights.push({ sprite, trail, line, curve, start: clock.getElapsedTime(), seconds, resolve }); });
+    return new Promise((resolve) => {
+      flights.push({ sprite, trail, line, curve, start: clock.getElapsedTime(), seconds, resolve });
+      countNotes(1);
+    });
+  }
+  // The notes sent and in the air, on the overlay as data attributes, so a test can see a note fly without reading
+  // WebGL pixels (e2e/agents-3d.spec.ts). Nothing reads them in the console.
+  let notesSent = 0;
+  function countNotes(sent: number) {
+    notesSent += sent;
+    overlay.dataset.notesSent = String(notesSent);
+    overlay.dataset.notesInFlight = String(flights.length);
   }
   function endFlight(f: Flight) {
     for (const s of [f.sprite, ...f.trail]) { notes.remove(s); s.material.dispose(); }
@@ -672,7 +683,7 @@ export function createHouse(container: HTMLElement, options: HouseOptions = {}):
   function stepFlights(t: number) {
     for (let i = flights.length - 1; i >= 0; i--) {
       const f = flights[i], u = (t - f.start) / f.seconds;
-      if (u >= 1.35) { endFlight(f); flights.splice(i, 1); continue; }
+      if (u >= 1.35) { endFlight(f); flights.splice(i, 1); countNotes(0); continue; }
       const e = u < 1 ? 1 - Math.pow(1 - u, 2.2) : 1;
       f.sprite.position.copy(f.curve.getPoint(Math.min(1, e)));
       const fade = u < 1 ? 1 : Math.max(0, 1 - (u - 1) / 0.35);
