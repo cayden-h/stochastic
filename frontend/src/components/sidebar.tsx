@@ -36,18 +36,20 @@ const BACKEND_WORDS: Record<string, { title: string; sub: string }> = {
   scripted: { title: "Scripted rules", sub: "no model" },
 };
 
-/** Which backend produced the agent output, from GET /health. When the Mapper and the Preparer ran on different
- * backends (a fallback), the card names the one that fell back, not the better one. A fallback is measured against
- * the backend the last run asked for, so the 15-second demo (always scripted) is not shown as a fallback. */
+/** Which backend produced the agent output, from GET /health. A run that fell back says so on its own entry: its
+ * `backend` is not the `asked` one. When one of the last three roles fell back, the card names that run (the weaker
+ * one), not the better one. Otherwise it names the newest run. Runs are compared with the backend each one asked
+ * for, so the demo paces (replay or scripted, whatever is configured) and the seeded cases' scripted runs are not
+ * shown as a fallback. */
 function producedBy(health: Health | null, kase: Case | null): { produced: string; configured: string; env: string } | null {
   const status = health?.backend ?? kase?.backend;
   if (!status) return null;
   const roles = status.last_runs.filter((r) => r.role !== "runner");
   const last = roles[roles.length - 1];
-  const recent = roles.slice(-3).map((r) => r.backend);
-  const weakest = ["scripted", "replay"].find((b) => recent.includes(b));
-  const asked = last?.asked ?? status.configured;
-  return { produced: weakest ?? kase?.verdict?.backend ?? last?.backend ?? asked, configured: asked, env: status.configured };
+  const fell = roles.slice(-3).findLast((r) => r.asked && r.backend !== r.asked);
+  const shown = fell ?? last;
+  const asked = shown?.asked ?? status.configured;
+  return { produced: shown?.backend ?? kase?.verdict?.backend ?? asked, configured: asked, env: status.configured };
 }
 
 /** The model a replayed run recorded, named for the card ("Claude Haiku 5.5"), from the newest replay run on /health or
@@ -107,10 +109,11 @@ function dealCounts(kase: Case | null): { human_answers: number; policies: numbe
   };
 }
 
-/** What the agents learn from, counted across every deal (GET /health `counts`), else the selected deal's counts. */
+/** What the agents learn from, counted across every deal (GET /health `memory_counts`, the same as GET /memory/counts),
+ * else the selected deal's counts. /health is read again after every answer, edit, and reason, so the counters move. */
 function Learning() {
   const { kase, health, learnedAt } = useDeal();
-  const counts = health?.counts ?? dealCounts(kase);
+  const counts = health?.memory_counts ?? dealCounts(kase);
   const rows: [string, number][] = [["Human answers", counts.human_answers], ["Policies", counts.policies], ["Edits", counts.edits]];
   return (
     <div className="flex w-full flex-col gap-[4px]">
