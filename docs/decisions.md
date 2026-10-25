@@ -562,3 +562,42 @@ Rejected:
 - An edit on Mama's and Crown I: the gateway refuses amount edits on subtotals and balance sheet detail lines, and no Crown I line has a sourced change that fits.
 
 Design: `architecture/gateway-and-api.md` ("Demo pace", "Seeded cases"), `agents.md` section 7a, `demo-script.md`.
+
+## D23. Demo starts from the agreement; a code verifier checks the Brief; two human touchpoints
+
+Date: 2026-10-25.
+Decided by Cayden.
+
+Context: Cayden asked for a verification layer after the Brief Reader finishes reading the agreement, inside the demo, with the human asked as little as possible and everything else autonomous.
+He then set the touchpoints at exactly two: a one-click approval of the verified Brief, and one escalation in the agents' conversation.
+
+Decision:
+1. The live demo deal starts from the credit agreement text: `data/brief/kewaunee_ex101_extract.txt`, verbatim extracts of Ex 10.1 (the opening, Section 4.8, and three definitions from Addendum I, 3,434 characters), committed so the demo runs on any machine with the repo.
+   The full exhibit stays out of git.
+   `DEMO_FROM_AGREEMENT` (default on; off under pytest unless a test asks) picks it; the fixture `seed()` with the Brief as JSON stays for the tests.
+2. A verifier (`system:verifier`, code, not a model, `backend/app/core/verifier.py`) runs right after the reader's draft passes the nine draft checks.
+   For every field it checks that the quote is verbatim in the agreement, that the named section exists and contains it, that the limit and each cap equal the number in the quote, and that the debt term and EBITDA are defined and each exclusion and adjustment is quoted from its own definition.
+   Each check is a `check` message and a `verify:brief_field` audit row; the report is `brief_verification` on `/case`.
+   A failed check opens a question for the controller.
+3. Adjustment amounts come from the deal's books with their sources (`deal.book_amounts`): pension 4,019 and stock compensation 1,018 from the 10-K, rent 1,970 (inferred, 10-K), transaction and integration costs 0 (not applied).
+   The verifier fills them (`brief:amend` rows by `system:verifier`), so the controller types nothing.
+4. The controller approves the Brief (normal maker-checker; the verifier never approves).
+   Touchpoint 1 is one click on the Case: the verification card shows "22 of 22 checks passed", and Approve the Brief and map continues the run.
+   What the Brief cannot hold (the Fixed Charge Coverage covenant in 4.8(b)) is noted on the report, not asked, when every check passed.
+5. Touchpoint 2 is the Mapper's one escalation: the recorded Claude Haiku 5.5 run asks two questions at once (the covenant reading, and six Nu Aire lines led by the certificates of deposit).
+   They are answered together on one screen, after one notification ("The Mapper needs 2 decisions").
+   One escalation, two decisions: the recorded model's output is not changed to remove a question.
+6. The Brief Reader runs on the scripted rules in the demo paces.
+   The pinned Sonnet 5.5 read (`backend/recordings/brief_reader.json`) passes all 25 of its verifier checks on the extract, but asks five questions of its own (two substantive), which would add human steps.
+7. Timings (agent time): pace `demo` reads in 2.4 s, verifies in 1.6 s, then after the approval reaches the questions in about 3.8 s and the approval about 6.6 s after the last answer, about 15 s in all; `factory` doubles every wait.
+
+Why:
+- A model points and code decides: checking every quote and number in code is the claim we can defend, and showing each check makes it visible. [inferred]
+- The amounts already have filed sources, so asking for them again is busywork; the controller still approves the Brief that every later figure depends on. [inferred]
+
+Rejected:
+- Auto-approving the Brief on the demo deal (built, then dropped on Cayden's correction): the controller approves.
+- Settling the Mapper's second question by code: it would misrepresent the recorded model run.
+- Committing the full Ex 10.1.
+
+Design: `architecture/brief-reader.md` section 6a, `architecture/gateway-and-api.md`, `demo-script.md`.

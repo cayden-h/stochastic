@@ -96,12 +96,10 @@ The report, `BriefVerification`, is stored on the draft item and returned on `/c
 
 What happens next:
 - The draft's questions open only after the verifier ran, so the controller is asked only what is left: amounts the books do not give, low-confidence fields, the reader's own questions, and every failed check.
-- What the Brief cannot hold (the second covenant in Section 4.8(b), stage 2) is asked on an ordinary deal.
-  On a deal with `brief_auto_approve` and no failed check, it is noted on the report and in a `verify:scope_note` row instead, and not tested.
-- On a deal with `brief_auto_approve` (the demo deal only), a Brief with every check passed and no question open is approved by the verifier.
-  The `approve_brief` row names `system:verifier` and starts "auto-approved: all N checks passed".
-  The verifier is not the reader, so maker-checker holds.
-  On every other deal the controller approves the Brief, as in section 5.
+- What the Brief cannot hold (the second covenant in Section 4.8(b), stage 2) is noted on the report and in a `verify:scope_note` row when every check passed, and not tested; with a failed check it is asked like the rest.
+- The verifier never approves. With every check passed and nothing left to ask, the stage is `brief_ready`, the verifier hands the Brief to the controller ("Brief checked; ready for your approval"), and the stream sends one `notify` event of kind `brief_approval`.
+  The controller approves in one click, with nothing to type, as in section 5 (maker-checker: the reader drafted it, the controller approves it).
+  `POST /deals/{id}/brief/approve` then continues the run in the background at the run's pace, as an answer does.
 
 On the demo deal the verifier writes 22 checks: 17 quoted fields and 5 amounts.
 It fills pension 4,019, stock compensation 1,018, and rent 1,970 (inferred) from the books with their 10-K sources, and keeps transaction and integration costs at 0 (not applied).

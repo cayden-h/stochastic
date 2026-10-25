@@ -76,6 +76,7 @@ In Electron a question also fires a native macOS notification through `window.st
   A row opens its case: it becomes the current deal (kept for a reload of the window), and every page reads it.
   A case with `data_source: "sample"` shows a Sample data tag (a deal from the filings or an upload shows none), with the note as its tooltip; its Case and Source panel say the figures are not from a filing.
   The stat cards count across every case; Policies learned is the store's own count.
+- The demo deal starts from its agreement (D23): the Case shows the Brief card with the verification card ("22 of 22 checks passed", Show the checks lists each field with its quote, section, and pass mark), and Approve the Brief and map is one click; the approval continues the run. The pipeline shows Brief Reader, Verifier (a lock chip, no avatar), Mapper, Preparer, Reviewer, You. A `notify` of kind `brief_approval` shows "Needs your approval" off the Case.
 - Run the demo resets with memory cleared (`POST /dev/reset?keep_memory=false`, which reseeds only the demo deal and returns `kept_deals`), makes the deal it reseeded current, runs it with `"pace": "demo"`, and opens the Case.
   This is the Hyphenate demo.
 - The Upload modal's Begin is the Factory demo: after the files are chosen it resets with memory cleared (`POST /dev/reset?keep_memory=false`, retried while a run finishes, so the uploaded deal's questions are asked), creates the deal (`POST /deals`), runs it with `{"sync": false, "pace": "factory"}` (about 30 s of agent time, twice the demo), and opens its Case.
