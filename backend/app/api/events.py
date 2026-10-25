@@ -34,11 +34,22 @@ def notify_event(store, msg) -> dict | None:
     item = store.items.get(msg.item_id) if msg.item_id else None
     if item is None or item.state != State.NEEDS_INFO:
         return None
+    # One escalation, however many decisions (D23): the questions an agent opens together (one parent work item)
+    # come as one notification, on the first of them that is still open; the Case shows them all at once.
+    parent = item.payload.get("parent")
+    together = [i for i in store.deal_items(item.deal_id, "flag")
+                if parent and i.payload.get("parent") == parent and i.state == State.NEEDS_INFO] or [item]
+    if together[0].id != item.id:
+        return None
     who = ROLE_NAMES.get(msg.sender, msg.sender)
     body = " ".join((item.question or msg.text).split())
+    n = len(together)
+    title = f"The {who} needs your decision" if n == 1 else f"The {who} needs {n} decisions"
+    if n > 1:
+        body = f"{body} (and {n - 1} more question{'s' if n > 2 else ''}, answered together)"
     return {"id": msg.id, "deal_id": msg.deal_id, "at": msg.model_dump(mode="json", include={"at"})["at"],
-            "kind": "decision", "item_id": item.id, "from": msg.sender, "title": f"The {who} needs your decision",
-            "body": body}
+            "kind": "decision", "item_id": item.id, "item_ids": [i.id for i in together], "from": msg.sender,
+            "title": title, "body": body}
 
 
 def _key(msg) -> tuple[str, str]:

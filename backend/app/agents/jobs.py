@@ -173,6 +173,7 @@ def _advance(gw: Gateway, deal_id: str, backend: str | None, max_steps: int) -> 
                 # No Haiku recording exists for the Brief Reader: a replayed demo run reads the Brief with the rules.
                 replayed = runner.pinned() == "replay"
                 reader = "scripted" if replayed else backend
+                pace.pause("read", reader or _chosen(backend))  # reading the agreement (D23)
                 with runner.only("scripted") if replayed else contextlib.nullcontext():
                     run, _ = _store_or_fall_back(gw, BRIEF_READER_ROLE, inp, deal_id, item.id, reader,
                                                  lambda r: gw.store_brief(BRIEF_READER_ROLE.actor, item.id, r.output),

@@ -13,7 +13,7 @@ os.environ["AGENT_FALLBACK"] = "scripted"
 import pytest  # noqa: E402
 
 from app.core.models import MAPPER, MapperOutput  # noqa: E402
-from app.db.fixtures.kewaunee import DEAL_ID, seed  # noqa: E402
+from app.db.fixtures.kewaunee import BRIEF, DEAL_ID, seed, seed_demo  # noqa: E402
 from app.db.memory import MemoryStore  # noqa: E402
 from app.gateway.gateway import Gateway  # noqa: E402
 
@@ -96,13 +96,23 @@ def run_beat(gw, clock, pace_name, deal_id=DEAL_ID):
     return t_q, t_ready - t_answer
 
 
-def test_the_demo_pace_replays_the_recorded_haiku_run_and_keeps_its_timings(world, paced):
-    store, gw = world
+@pytest.fixture
+def demo_world():
+    """The live demo deal, which starts from the agreement (D23)."""
+    store = MemoryStore()
+    gw = Gateway(store)
+    seed_demo(store, gw)
+    return store, gw
+
+
+def test_the_demo_pace_replays_the_recorded_haiku_run_and_keeps_its_timings(demo_world, paced):
+    store, gw = demo_world
     to_q, after = run_beat(gw, paced, "demo")
-    assert 5.5 <= to_q <= 6.5 and 6.0 <= after <= 7.5, (to_q, after)
+    assert 7.7 <= to_q <= 8.7 and 6.0 <= after <= 7.2, (to_q, after)  # read 2.8, verify 1.6, Mapper 3.8; then 6.6
     runs = [r for r in runner.LAST_RUNS if r["role"] != "runner"]
-    assert [r["role"] for r in runs] == ["mapper", "preparer", "reviewer"]
-    for r in runs:
+    assert [r["role"] for r in runs] == ["brief_reader", "mapper", "preparer", "reviewer"]
+    assert (runs[0]["backend"], runs[0]["model"], runs[0]["recorded"]) == ("scripted", None, False)  # no recording
+    for r in runs[1:]:
         assert (r["backend"], r["asked"], r["model"], r["recorded"], r["recording"]) == (
             "replay", "replay", "claude-haiku-5-5", True, "haiku-5-5-run2")
         assert r["recorded_backend"] == "droid" and r["recorded_at"].startswith("2026-10-24")
@@ -135,19 +145,20 @@ def test_the_replayed_mapper_raises_the_covenant_and_the_certificates_of_deposit
     assert taught and {p.learned_from for p in taught} == {cov.id, cds.id}  # the answers teach the policies
 
 
-def test_the_factory_pace_is_twice_the_demo_with_a_longer_mapping_stream(world, paced):
-    store, gw = world
+def test_the_factory_pace_is_twice_the_demo(demo_world, paced):
+    store, gw = demo_world
     to_q, after = run_beat(gw, paced, "factory")
-    assert 13.5 <= to_q <= 14.5, to_q  # 2.4 + 10 + 1.6
+    assert 15.5 <= to_q <= 17.5, to_q  # twice the demo's 8.2 s
     demo_store = MemoryStore()
     demo_gw = Gateway(demo_store)
-    seed(demo_store, demo_gw)
+    seed_demo(demo_store, demo_gw)
     demo_clock = FakeClock()
     pace._sleep = demo_clock.sleep
     d_q, d_after = run_beat(demo_gw, demo_clock, "demo")
-    assert after == pytest.approx(2 * d_after, abs=0.01) and 12.5 <= after <= 14.5, (after, d_after)
-    assert 26.0 <= to_q + after <= 30.0  # the 30-second Factory beat, agent time only
-    assert all(r["backend"] == "replay" for r in runner.LAST_RUNS)
+    assert to_q == pytest.approx(2 * d_q, abs=0.01) and after == pytest.approx(2 * d_after, abs=0.01)
+    assert 12.5 <= after <= 14.0, (after, d_after)
+    assert 28.5 <= to_q + after <= 31.5  # the 30-second Factory beat, agent time only
+    assert all(r["backend"] == "replay" for r in runner.LAST_RUNS if r["role"] != "brief_reader")
 
 
 def test_health_and_case_say_replay_with_the_recorded_model(paced):
@@ -200,7 +211,7 @@ def test_a_second_run_with_memory_kept_is_scripted_and_says_why(paced):
 
 
 def upload(c, name, plat, targ, platform=PLATFORM, target=TARGET):
-    brief = c.app.state.gateway.store.deals[DEAL_ID].brief.model_dump_json()
+    brief = (c.app.state.gateway.store.deals[DEAL_ID].brief or BRIEF).model_dump_json()  # read on the first run (D23)
     r = c.post("/deals", files={"platform_csv": ("Kewaunee_10Q.csv", plat, "text/csv"),
                                 "target_csv": ("NuAire_FY2024.csv", targ, "text/csv")},
                data={"name": name, "platform": platform, "target": target, "brief": brief})
@@ -216,13 +227,13 @@ def test_an_upload_of_the_demo_statements_replays_the_recording_at_the_factory_p
     assert r.status_code == 200
     body = c.get(f"/deals/{did}/case").json()
     assert body["stage"] == "awaiting_flag" and len(body["open_flags"]) == 2
-    assert 13.5 <= paced.now <= 15.5, paced.now  # the questions at 14.0 s, then the Mapper's 1.2 s hand-off wait
+    assert 6.0 <= paced.now <= 8.5, paced.now  # a Brief sent as JSON: no read; the Mapper 2.4 + 2.8 + 1.2, then 1.2
     asked = paced.now
     from tests.test_demo_fresh import answer_all
     answer_all(c, did)  # the last answer continues in the background at the factory pace
     body = c.get(f"/deals/{did}/case").json()
     assert body["stage"] == "awaiting_approval" and body["verdict"]["backend"] == "replay"
-    assert 12.0 <= paced.now - asked <= 14.5
+    assert 13.0 <= paced.now - asked <= 15.0
     assert {(r["backend"], r["model"]) for r in runner.LAST_RUNS} == {("replay", "claude-haiku-5-5")}
 
 

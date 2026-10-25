@@ -81,7 +81,11 @@ def test_the_demo_conversation_in_order_through_the_api():
     msgs = c.get(f"/deals/{DEAL_ID}/conversation").json()
 
     n_target = len([sl for sl in case["source_lines"] if sl["company"] == TARGET])
-    i = find(msgs, 0, **{"from": SYSTEM, "to": MAPPER, "kind": "handoff"})
+    # The demo deal reads its Brief first; the verifier approves it and the reader hands the Brief to the Mapper (D23).
+    i = find(msgs, 0, **{"from": BRIEF_READER, "to": VERIFIER, "kind": "handoff"})
+    i = find(msgs, i, **{"from": VERIFIER, "to": CONTROLLER, "kind": "check", "text": "Brief verified: 22 of 22"})
+    i = find(msgs, i, **{"from": BRIEF_READER, "to": MAPPER, "kind": "handoff", "text": "Brief approved"})
+    assert not [m for m in msgs[:i] if m["kind"] == "question"]  # the Brief stage asks the controller nothing
     i = find(msgs, i, **{"from": MAPPER, "to": SYSTEM, "kind": "message", "text": f"Proposing {n_target} mappings"})
     assert "2 questions" in msgs[i]["text"]
     i = find(msgs, i, **{"from": SYSTEM, "to": MAPPER, "kind": "check", "text": f"accepted {n_target} mappings"})
