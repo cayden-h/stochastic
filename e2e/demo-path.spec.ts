@@ -8,6 +8,21 @@ import {
 } from "./support/flows";
 import { readWorkbook } from "./support/xlsx";
 
+/** The demo deal's target lines that the Mapper places: 53 lines less the 16 totals. */
+const MAPPED_LINES = 37;
+
+interface CaseLines {
+  open_flags: string[]; flags: { id: string; payload: { line_ids?: string[] } }[];
+  mappings: { target_line_id: string }[]; source_lines: { id: string; is_total: boolean }[];
+}
+
+/** How many mapped (non-total) lines are in an open question: the console's "unsure". */
+function openQuestionMappings(c: CaseLines): number {
+  const lines = new Set(c.flags.filter((f) => c.open_flags.includes(f.id)).flatMap((f) => f.payload.line_ids ?? []));
+  const totals = new Set(c.source_lines.filter((l) => l.is_total).map((l) => l.id));
+  return c.mappings.filter((m) => lines.has(m.target_line_id) && !totals.has(m.target_line_id)).length;
+}
+
 test("the demo path: run, answer, review, edit with a reason, approve, download", async ({ page, backend, shot }, testInfo) => {
   test.setTimeout(180_000);
 
@@ -50,9 +65,10 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
   const first = await lines();
   await expect.poll(lines, { timeout: 20_000 }).toBeGreaterThan(first);
   const second = await lines();
-  expect(second).toBeLessThan(53);
+  expect(second).toBeLessThan(MAPPED_LINES);
   await shot("mapping-filling");
-  await expect.poll(lines, { timeout: 30_000 }).toBe(53);
+  // 53 target lines, of which 16 are totals: those are not placed (no platform line by design) and not counted.
+  await expect.poll(lines, { timeout: 30_000 }).toBe(MAPPED_LINES);
 
   // Agents: the 3D house, notes flying, and the Mapper asking.
   await nav(page, "Agents").click();
@@ -60,7 +76,13 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
   await expect(house.locator("canvas")).toBeVisible();
   const mapper = house.locator(".agent-house-label").filter({ has: page.locator(".agent-house-pill > b", { hasText: /^Mapper$/ }) });
   await expect(mapper).toHaveAttribute("data-state", "asking", { timeout: 30_000 });
-  await expect(mapper).toContainText("MAPPER · ASKING");
+  // The asking agent's bubble is up, in the layer under every name pill; the others show just their pill.
+  const mapperBubble = house.locator('.agent-house-bubble[data-agent="mapper"]');
+  await expect(mapperBubble).toContainText("MAPPER · ASKING");
+  await expect(mapperBubble).toBeVisible();
+  const bubbleBox = await mapperBubble.boundingBox();
+  expect(bubbleBox!.width).toBeLessThanOrEqual(190);
+  await expect(house.locator('.agent-house-bubble[data-agent="reviewer"]')).toBeHidden();
   // (Notes flying between rooms is checked in agents-3d.spec.ts, from a page opened before the agents talk.)
   await shot("agents-asking");
 
@@ -68,12 +90,22 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
   await nav(page, "Case").click();
   await expect(page.getByText("The Mapper is asking you")).toBeVisible();
   await expect(page.getByText("2 questions hold the agents.")).toBeVisible();
+  // Unsure is the lines in an open question, nothing else: not the totals, not a low-confidence line the Mapper
+  // placed without asking. The count is the 2 open questions' mapped lines, read from the gateway.
+  const asking = await readCase(backend);
+  expect(asking.open_flags).toHaveLength(2);
+  const unsureNow = openQuestionMappings(asking);
+  expect(unsureNow).toBeGreaterThan(0);
+  const mappingTile = page.getByRole("link", { name: /^Mapping \d+ placed/ });
+  await expect(mappingTile).toContainText(`${MAPPED_LINES - unsureNow} sure · ${unsureNow} unsure`);
   await shot("case-asking");
   await answerSuggested(page);
   await expect(page.getByText("Answer it and the run goes on.")).toBeVisible();
   await shot("case-one-answered");
   await answerSuggested(page);
   await expect(page.getByText("The Mapper is asking you")).toHaveCount(0);
+  await expect(mappingTile).toContainText(`${MAPPED_LINES} sure · 0 unsure`);
+  expect(openQuestionMappings(await readCase(backend))).toBe(0);
 
   // The agents resume: the Preparer, then the Reviewer, then the hand-off.
   await expect(pipeline.getByRole("listitem").filter({ hasText: "Preparer" })).toContainText(/Working|Done|Drafting/i, { timeout: 30_000 });

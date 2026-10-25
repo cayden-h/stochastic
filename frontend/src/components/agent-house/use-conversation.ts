@@ -122,13 +122,25 @@ export function useConversationPlayer(opts: {
     return () => clearTimeout(t);
   }, [stage, loaded, dealId, settleTo]);
 
+  // Leaving the page stops the player: a new generation ends a playing loop at its next step, and a replay that was
+  // about to start does not. (The house itself is disposed by AgentHouse.)
+  const replayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const r = run.current;
+    return () => {
+      r.gen++;
+      if (replayTimer.current) clearTimeout(replayTimer.current);
+    };
+  }, []);
+
   /** Play this deal's whole conversation again from the start, for the pitch. */
   const replay = useCallback(() => {
     const r = run.current;
     r.gen++; r.played = new Set(); r.applied.clear();
     setShown(new Set());
     for (const k of AGENT_KEYS) put(k, "idle", "");
-    setTimeout(() => void pump(), 400);
+    if (replayTimer.current) clearTimeout(replayTimer.current);
+    replayTimer.current = setTimeout(() => { replayTimer.current = null; void pump(); }, 400);
   }, [pump, put]);
 
   /** The scene was made again (a new canvas): send it every agent's state afresh. */
