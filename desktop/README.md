@@ -8,7 +8,7 @@ On quit it stops both, so nothing stays on ports 8000 or 3000.
 ## Launch sequence
 
 The splash is specified in `docs/design/brand.md` section 4.
-1. A frameless, transparent window (360 by 420, centered on the screen) shows `splash.html`: only the circle mark and the name "stochastic".
+1. A frameless, transparent window (360 by 420, centered on the screen) shows `splash.html`: only the circle mark and the name "Stochastic".
    It draws once, then holds the finished mark.
 2. The backend and the console start.
    In dev mode the app waits for the running `next dev` instead.
