@@ -10,7 +10,14 @@ import { useDeal } from "@/lib/deal-context";
 import { ago, canStart, fmtX, stageWords } from "@/lib/format";
 import type { Deal } from "@/lib/types";
 
-const STAGE_TONE = { you: "text-escalation", work: "text-forest", done: "text-clear", bad: "text-denied", idle: "text-slate" } as const;
+// As in V3-1: a stage that waits on the controller sits in a pale teal chip; the others are plain words.
+const STAGE_TONE = {
+  you: "rounded-[6px] bg-mint px-[8px] py-[4px] text-forest",
+  work: "text-forest",
+  done: "text-clear",
+  bad: "text-denied",
+  idle: "text-forest",
+} as const;
 
 /** The case column names the platform: "Kewaunee Scientific acquires Nu Aire" is the Kewaunee Scientific case. */
 function caseName(d: Deal): string {
@@ -55,10 +62,11 @@ export default function Dashboard() {
     router.push("/case");
   }
 
-  const stats: [number, string][] = [
-    [open, open === 1 ? "Open case" : "Open cases"],
-    [needsYou, "Needs you"],
-    [policies, policies === 1 ? "Policy learned" : "Policies learned"],
+  // The frame writes "Needs you" in ink, apart from the teal figures beside it.
+  const stats: [number, string, string][] = [
+    [open, open === 1 ? "Open case" : "Open cases", "text-forest"],
+    [needsYou, "Needs you", "text-ink"],
+    [policies, policies === 1 ? "Policy learned" : "Policies learned", "text-forest"],
   ];
 
   return (
@@ -71,10 +79,10 @@ export default function Dashboard() {
       {note ? <p role="alert" className="rounded-[8px] bg-denied-tint px-[12px] py-[8px] font-semibold text-denied">{note}</p> : null}
 
       <div className="flex w-full gap-[16px]">
-        {stats.map(([n, label]) => (
-          <Card key={label} className="flex min-w-0 flex-1 flex-col gap-[4px] p-[18px]">
-            <span className="text-[28px] font-semibold text-forest">{n}</span>
-            <span className="text-[13px] text-slate">{label}</span>
+        {stats.map(([n, label, ink]) => (
+          <Card key={label} className={`flex min-w-0 flex-1 flex-col gap-[4px] p-[18px] ${ink}`}>
+            <span className="text-[28px] font-semibold">{n}</span>
+            <span className="text-[13px]">{label}</span>
           </Card>
         ))}
       </div>

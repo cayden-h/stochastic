@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { Gate } from "./gate";
 import { Sidebar, themeOf } from "./sidebar";
 
-const WASH = { green: "wash-green", pink: "wash-pink", purple: "wash-purple" } as const;
+const WASH = { teal: "wash-teal", blue: "wash-blue", violet: "wash-violet" } as const;
 
 /** The v3 window: the sidebar on the left and the page on the right, over the page's tint. Only the page scrolls. */
 export function Shell({ children }: { children: ReactNode }) {

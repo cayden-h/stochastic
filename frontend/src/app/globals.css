@@ -1,25 +1,29 @@
 @import "tailwindcss";
 
-/* Tokens from Figma Hi-fi v3 (docs/design/README.md). The older Paper and ink roles stay for the state colors. */
+/* Tokens from Figma Hi-fi v3 (docs/design/README.md), after Josie's teal pass: one teal for brand, text, and figures,
+   a pale teal for surfaces, and each agent's own tint. The older Paper and ink roles stay for the state colors. */
 @theme {
   /* v3 surface and text */
-  --color-forest: #1A5140;      /* brand, headings, primary button, figures */
-  --color-body: #23302D;        /* body text */
-  --color-slate: #62736D;       /* labels and secondary text */
-  --color-faint: #9AA8A1;       /* unavailable rows */
-  --color-line: #DEE8E3;        /* card borders and row dividers */
+  --color-forest: #0F6674;      /* brand, headings, primary button, figures */
+  --color-forest-deep: #0B4F5A; /* primary button hover */
+  --color-body: #0F6674;        /* body text */
+  --color-slate: #0F6674;       /* labels and secondary text */
+  --color-faint: #7A8A8C;       /* unavailable rows, empty values */
+  --color-line: #DCEFF1;        /* card borders and row dividers */
   --color-fog: #F2F5F3;         /* waiting verdict */
-  --color-mint: #E1F0EA;        /* model card, Mapper chip */
-  --color-mint-select: #EEF7F2; /* suggested option */
-  --color-mint-file: #C9E3D4;   /* chosen file */
-  --color-mint-file-ink: #3F5F52;
-  --color-mint-edge: #A8CFBA;   /* upload button border */
+  --color-mint: #DCEFF1;        /* model card, stage chip, chosen option, Mapper chip */
+  --color-mint-select: #EDF7F8; /* row hover */
+  --color-mint-file: #DCEFF1;   /* chosen file */
+  --color-mint-file-ink: #0F6674;
+  --color-mint-edge: #A9D4DA;   /* hover border */
   --color-amber-line: #E8C98A;  /* flag card border */
   --color-amber-tint: #FDF6E7;  /* unsure mapping row */
-  --color-preparer: #B3266F;
-  --color-preparer-tint: #FDE4EE;
-  --color-reviewer: #5B3FA6;
-  --color-reviewer-tint: #ECE6FB;
+  --color-preparer: #2E55A3;
+  --color-preparer-tint: #E2E9F7;
+  --color-reviewer: #6A4C9C;
+  --color-reviewer-tint: #ECE5F6;
+  --color-brief: #8B3A68;
+  --color-brief-tint: #F6E6EF;
 
   /* Paper and ink roles still in use */
   --color-paper: #F7F4EC;
@@ -36,8 +40,8 @@
   --color-escalation-bar: #C77700;
   --color-denied: #B3261E;
   --color-denied-tint: #FBE4E1;
-  --color-clear: #1E6B52;
-  --color-clear-tint: #E1F0EA;
+  --color-clear: #0F6674;
+  --color-clear-tint: #DCEFF1;
 
   /* The logo's ink on a light surface (docs/design/brand.md); #ECE9E2 on dark. */
   --color-mark: #16191D;
@@ -64,10 +68,11 @@ body {
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* The page wash behind each screen, as in the v3 frames: a tint at the top that is white by 20% of the height. */
-.wash-green  { background-image: linear-gradient(180deg, #D8EEE3 0%, #EDF7F2 10%, #FFFFFF 20%, #FFFFFF 100%); }
-.wash-pink   { background-image: linear-gradient(180deg, #FBDDEA 0%, #FEF1F6 10%, #FFFFFF 20%, #FFFFFF 100%); }
-.wash-purple { background-image: linear-gradient(180deg, #E5DDF9 0%, #F4F1FC 10%, #FFFFFF 20%, #FFFFFF 100%); }
+/* The page wash behind each screen, as in the v3 frames: the page's tint for the top 10%, white by 20%.
+   Teal for the Mapper's pages, blue for the Preparer's Case, violet for the Reviewer's Log. */
+.wash-teal   { background-image: linear-gradient(180deg, #DCEFF1 0%, #DCEFF1 10%, #FFFFFF 20%, #FFFFFF 100%); }
+.wash-blue   { background-image: linear-gradient(180deg, #E2E9F7 0%, #E2E9F7 10%, #FFFFFF 20%, #FFFFFF 100%); }
+.wash-violet { background-image: linear-gradient(180deg, #ECE5F6 0%, #ECE5F6 10%, #FFFFFF 20%, #FFFFFF 100%); }
 
 /* Electron window (titleBarStyle hiddenInset): the top strip drags the window, the controls inside it do not. */
 .drag { -webkit-app-region: drag; app-region: drag; }
