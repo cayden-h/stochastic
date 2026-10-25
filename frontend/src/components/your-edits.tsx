@@ -76,13 +76,6 @@ export function YourEdits({ locked }: { locked: boolean }) {
   );
 }
 
-declare global {
-  interface Window {
-    /** Eric's Electron preload (E1): writes the files through the macOS save dialog. */
-    stochastic?: { saveFiles?: (files: { url: string; name: string }[]) => Promise<unknown> };
-  }
-}
-
 /** Fetch each file and hand it to the browser under its own name. A cross-origin link would ignore `download`. */
 async function browserDownload(files: { url: string; name: string }[]): Promise<string[]> {
   const missing: string[] = [];

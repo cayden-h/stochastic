@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="215 215 870 870">
+  <!-- The favicon (docs/design/brand.md): the small mark, no arrowheads, ink by the browser theme. -->
+  <style>.s{fill:none;stroke:#16191D}.f{fill:#16191D}@media (prefers-color-scheme:dark){.s{stroke:#ECE9E2}.f{fill:#ECE9E2}}</style>
+  <circle class="s" cx="650" cy="650" r="392" stroke-width="52"/>
+  <polyline class="s" points="437,397 550,588 752,385 345,637 812,925 812,628 402,763 515,898 958,793 622,632 782,498 896,566" stroke-width="52" stroke-linejoin="round"/>
+  <circle class="f" cx="437" cy="397" r="58"/>
+</svg>

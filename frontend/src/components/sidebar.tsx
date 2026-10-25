@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDeal } from "@/lib/deal-context";
 import type { Case, Health } from "@/lib/types";
 import { NavIcon, type NavIconName } from "./icons";
+import { StochasticMark } from "./stochastic-mark";
 import { Label } from "./ui";
 
 const PAGES: { href: string; label: string; icon: NavIconName }[] = [
@@ -24,12 +24,6 @@ export function themeOf(path: string): Theme {
   if (path.startsWith("/log")) return "purple";
   return "green";
 }
-
-const BRAND: Record<Theme, string> = {
-  green: "/v3/brand.png",
-  pink: "/v3/agent-preparer.png",
-  purple: "/v3/agent-reviewer.png",
-};
 
 /** Plain words for the model card, so a judge reads what produced the agent text without a tooltip. */
 const BACKEND_WORDS: Record<string, { title: string; sub: string }> = {
@@ -110,12 +104,11 @@ function Learning() {
 export function Sidebar() {
   const path = usePathname();
   const { kase } = useDeal();
-  const theme = themeOf(path);
   const deal = kase?.deal;
   return (
     <aside className="flex h-full w-[240px] shrink-0 flex-col gap-[24px] overflow-y-auto border-r border-line bg-white/72 px-[20px] pb-[24px]">
       <div className="drag flex shrink-0 items-center gap-[8px] pt-[24px] [html[data-electron]_&]:pt-[52px]">
-        <Image src={BRAND[theme]} alt="" width={24} height={24} className="size-[24px] object-cover" priority />
+        <StochasticMark size={24} className="shrink-0 text-forest" />
         <span className="font-serif text-[26px] whitespace-nowrap text-forest">Stochastic</span>
       </div>
 
