@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from app.core.models import (AgentSession, AgreementText, ApprovedBrief, AuditRow, Deal, Edit, LearnedAdjustment, Mapping, Policy,
+from app.core.models import (AgentSession, AgreementText, ApprovedBrief, AuditRow, ConversationMessage, Deal, Edit, LearnedAdjustment, Mapping, Policy,
                              Result, SourceLine, ToolRun, WorkItem)
 
 
@@ -44,6 +44,7 @@ class MemoryStore:
         self.adjustments: dict[str, LearnedAdjustment] = {}  # agent memory, ids "a_001": survives a deal reset
         self.sessions: dict[str, AgentSession] = {}  # keyed by role
         self.approved_briefs: dict[str, ApprovedBrief] = {}  # by agreement hash: agent memory, survives a deal reset
+        self.messages: dict[str, ConversationMessage] = {}  # the deal's conversation, ids "msg_001", in order
         self.audit: list[AuditRow] = []  # append only, in order
         self._seq: dict[str, int] = {}
 
@@ -80,7 +81,12 @@ class MemoryStore:
         return out
 
     def deal_mappings(self, deal_id: str) -> list[Mapping]:
-        return [m for m in self.mappings.values() if m.deal_id == deal_id]
+        # list() copies the values first: a paced Mapper run adds mappings while the stream and /case read them
+        return [m for m in list(self.mappings.values()) if m.deal_id == deal_id]
+
+    def deal_messages(self, deal_id: str) -> list[ConversationMessage]:
+        """The deal's conversation, in the order the gateway wrote it."""
+        return [m for m in list(self.messages.values()) if m.deal_id == deal_id]
 
     def deal_items(self, deal_id: str, type_: str | None = None) -> list[WorkItem]:
         out = [i for i in self.items.values() if i.deal_id == deal_id]

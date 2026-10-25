@@ -28,7 +28,7 @@ import psycopg
 from psycopg.rows import dict_row
 from pydantic import BaseModel
 
-from app.core.models import (AgentSession, AgreementText, ApprovedBrief, AuditRow, Deal, Edit, LearnedAdjustment, Mapping, Policy,
+from app.core.models import (AgentSession, AgreementText, ApprovedBrief, AuditRow, ConversationMessage, Deal, Edit, LearnedAdjustment, Mapping, Policy,
                              Result, SourceLine, ToolRun, WorkItem, now)
 from app.db.memory import MemoryStore
 
@@ -52,6 +52,7 @@ KINDS: dict[str, tuple[str, type[BaseModel], bool]] = {
     "adjustment": ("adjustments", LearnedAdjustment, True),
     "agreement": ("agreements", AgreementText, False),
     "approved_brief": ("approved_briefs", ApprovedBrief, True),
+    "conversation": ("messages", ConversationMessage, False),
 }
 
 SCHEMA_SQL = """

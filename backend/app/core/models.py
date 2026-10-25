@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 def now() -> datetime:
@@ -170,6 +170,7 @@ class Mapping(BaseModel):
     flagged: bool = False
     approved_by: str | None = None
     policy_id: str | None = None  # set by the gateway when a learned policy decided it; the console's Learned chip
+    at: datetime = Field(default_factory=now)  # when the gateway accepted it; the live mapping view orders by it
 
 
 class ResultRow(BaseModel):
@@ -450,6 +451,32 @@ class AuditRow(BaseModel):
     evidence: list[Evidence] = Field(default_factory=list)
     prev_hash: str
     hash: str
+
+
+# The roles that speak in the deal's conversation, and the kinds of message (gateway-and-api.md, "Live events").
+ROLES = (BRIEF_READER, MAPPER, PREPARER, REVIEWER, SYSTEM, CONTROLLER)
+MessageKind = Literal["message", "handoff", "question", "answer", "refusal", "check"]
+
+
+class ConversationMessage(BaseModel):
+    """One line of the deal's conversation: who told whom what, written by the gateway when the thing happened.
+
+    Every message states something the gateway did or saw at that moment (a proposal, a refusal, a question, a run's
+    figure), so the conversation is a readable view of the audit log, never a script. `from` is a Python keyword,
+    so the field is `sender` in code and `from` on the wire and in the database."""
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    id: str
+    deal_id: str
+    at: datetime = Field(default_factory=now)
+    sender: str = Field(alias="from")
+    to: str
+    kind: MessageKind
+    text: str
+    item_id: str | None = None
+    run_id: str | None = None
+    line_id: str | None = None
 
 
 # ---------------------------------------------------------------------------

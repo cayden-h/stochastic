@@ -5,7 +5,6 @@ Owner: Tri (backend/app/api/). Cayden wrote the first version so the console had
 from __future__ import annotations
 
 import asyncio
-import json
 import math
 import os
 import threading
@@ -61,6 +60,7 @@ def _debt_capacity(store, result) -> tuple[float | None, str | None]:
     return None, None
 
 
+STREAM_TICK_S = 0.25  # how often the stream looks for new events
 SENSITIVITY_KEYS = ("naive_debt", "naive_ebitda", "naive_leverage", "naive_flip_addback")
 
 
@@ -605,6 +605,13 @@ def build_router(gw: Gateway) -> APIRouter:
         return dump(guard(lambda: gw.run_tool(x_actor, body.deal_id, name, body.inputs)))
 
     # ------------------------------------------------------------------ live updates
+    @r.get("/deals/{deal_id}/conversation")
+    def conversation(deal_id: str):
+        """The deal's whole conversation in order: what each agent, the gateway, and the controller told each other.
+        The same messages the stream sends as `conversation` events, for a page opened late or after a restart."""
+        need_deal(deal_id)
+        return [dump(m) for m in guard(lambda: gw.conversation(deal_id))]
+
     @r.get("/deals/{deal_id}/stream")
     async def stream(deal_id: str, request: Request):
         need_deal(deal_id)
@@ -612,16 +619,18 @@ def build_router(gw: Gateway) -> APIRouter:
         async def gen():
             seen, last, tick = 0, None, 0
             edits_seen: dict = {}  # the edit event's cursor, updated in place by next_events
+            live_seen: dict = {}  # the conversation and mapping events' cursor, likewise
             while not await request.is_disconnected():
                 if deal_id not in store.deals:
                     return
-                events, seen, last = next_events(store, deal_id, seen, last, edits_seen=edits_seen)
+                events, seen, last = next_events(store, deal_id, seen, last, edits_seen=edits_seen,
+                                                 live_seen=live_seen)
                 for e in events:
                     yield e
                 tick += 1
-                if tick % 15 == 0:
+                if tick % 60 == 0:
                     yield ": keepalive\n\n"
-                await asyncio.sleep(1)
+                await asyncio.sleep(STREAM_TICK_S)  # a quarter second, so a paced mapping run streams line by line
 
         return StreamingResponse(gen(), media_type="text/event-stream")
 

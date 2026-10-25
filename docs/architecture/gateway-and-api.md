@@ -105,7 +105,8 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /deals/{id}/runs` | any | Every tool run for the deal |
 | `GET /runs/{run_id}` | any | One tool run: tool, inputs, outputs |
 | `GET /agents/memory` | any | Policies and sessions |
-| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, `stage` events, and `edit` events (shapes below) |
+| `GET /deals/{id}/conversation` | any | The deal's whole conversation in order: what the agents, the gateway, and the controller told each other (shape in "Live events" below). The same messages the stream sends as `conversation` events, for a page opened late or after a restart. 404 for an unknown deal. |
+| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, `stage`, `edit`, `conversation`, and `mapping` events (shapes below) |
 | `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, files `platform_csv` and `target_csv`, and exactly one of `brief` (a JSON string of the Brief; the reader is skipped) or `agreement_txt` (the credit agreement as a UTF-8 `.txt` file, same 2 MB limit; the deal starts with `brief_status` `none` and the run starts with the Brief Reader, unless an approved Brief for the same agreement hash is reused). Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}, "brief_status"}`. 422 when neither or both of `brief` and `agreement_txt` are sent, for an empty or non-UTF-8 agreement or a name not ending in `.txt`, and naming the file, row, and column for a bad CSV. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
 | `POST /deals/{id}/brief/amounts` | `human:controller` only | Set fields of the draft Brief (D20), most often an adjustment amount from the books with its source. Any draft field can be set by its path (the limit, the lender, the definitions, `debt_excludes[k]`, an adjustment's name, amount, or cap); only an amount needs a `source_ref`. Body `{"amounts": [{"field": "ebitda_addbacks[2].amount", "value": 698.0, "source_ref": "...", "inferred": false, "note": ""}]}` (a new adjustment is added by its `.name` at the next index). Every entry is checked first (path, index, type, source); a bad entry refuses the whole list with 422 naming `amounts[i]`, nothing applied, and a DENIED row. The entries are then applied in order through `gateway.amend_brief` under the gateway lock. The gateway cannot roll back: if it still refuses entry i, the 422 names `amounts[i]` and lists the earlier entries, which stay applied. Returns `{"brief", "brief_draft", "brief_status", "stage"}` (response model `BriefAmountsResponse`). 404 unknown deal; 422 for an empty list, a field path that is not `name[i].attr`, or a `value` that is a boolean, non-finite, too big for a float, 1e12 or more in size, or a number sent as text for an amount, a cap, or the limit (loc `amounts[i].value`, the message names the field path); 403 with a DENIED row for any actor but `human:controller` (an agent, `human:intern`), before any write; 409 when there is no draft or the Brief is approved. |
 | `POST /deals/{id}/brief/approve` | `human:controller` only | Approve the draft Brief through `gateway.approve_brief`; it is locked and the deal is back at stage `new`. The run does not continue by itself: the console calls `POST /deals/{id}/run` next. Returns the deal (response model `Deal`, `brief_status` `approved`, `stage` `new`). 404 unknown deal; 403 with a DENIED row for any actor but `human:controller`, or while a `brief_field` flag is open; 409 when there is no draft (a second approve, or a deal whose Brief came as JSON). |
@@ -436,7 +437,9 @@ The scripted reader returns the fixture Brief with the verbatim quotes in `data/
 
 ## The stream
 
-`GET /deals/{id}/stream` sends three kinds of event.
+`GET /deals/{id}/stream` sends five kinds of event: `audit`, `stage`, `edit`, `conversation`, and `mapping`.
+It looks for new events every quarter second.
+On connect it sends everything the deal has so far (every audit row, the whole conversation, every stored mapping), then only what is new.
 Audit events are unchanged.
 A `stage` event is sent once on connect and again whenever the stage changes:
 
@@ -456,6 +459,77 @@ data: {"deal_id": "d_kequ_nuaire", "edits": [{"id": "e_001", "status": "needs_re
 ```
 
 A `: keepalive` comment is sent every 15 seconds.
+
+### Live events: the conversation
+
+A `conversation` event is one message between the roles, sent as soon as the gateway writes it:
+
+```
+event: conversation
+data: {"id": "msg_002", "deal_id": "d_kequ_nuaire", "at": "<iso timestamp>", "from": "agent:mapper", "to": "system:gateway", "kind": "message", "text": "Proposing 53 mappings and 78 covenant tags, 2 questions for the controller", "item_id": "wi_001", "run_id": null, "line_id": null}
+```
+
+`from` and `to` are one of `agent:brief_reader`, `agent:mapper`, `agent:preparer`, `agent:reviewer`, `system:gateway`, and `human:controller`.
+`kind` is one of these:
+
+| kind | Meaning | Example |
+| --- | --- | --- |
+| `message` | A statement: a proposal, a tool run's figure, a learned policy, the agent's own reason | Gateway to Preparer: "leverage: 0.76x" (with `run_id`) |
+| `handoff` | Work passes to the next role | Mapper to Preparer: "Mappings posted: 53 lines ready to combine; the controller answered 2 questions" |
+| `question` | An escalation to the controller, always `to` `human:controller`, with the flag or approval item as `item_id` | Mapper to Controller: the flag's own question |
+| `answer` | The controller's answer, always `from` `human:controller`, back to the agent that asked, with the same `item_id` | Controller to Mapper: "Option b: Only the PNC term loan and revolver count" |
+| `refusal` | The gateway refused a write, with its reason | Gateway to Mapper: "Refused: tag not_debt on ... is the controller's call: ..." |
+| `check` | A check that passed or found a problem | Reviewer to Preparer: "Tie-out passes (run_017), limit test passes (run_018): leverage 0.76x against 2.50x" |
+
+`item_id`, `run_id`, and `line_id` are null when they do not apply.
+`run_id` names the tool run a message's figures come from.
+Every figure in a message is formatted from the run it cites (or from runs that run is built on), and the only figure without a run is the Brief's limit (verified by `test_every_figure_in_a_message_equals_the_run_it_cites`).
+Leverage is written from the unrounded quotient of the run's debt and EBITDA, like the flag effects, so the conversation and the cards agree in the second decimal.
+Texts are one line, plain hyphens only, at most 300 characters; a model's reason is cut to fit.
+
+Where the messages come from.
+The gateway writes each one in the same write as the thing it describes, so a message is never ahead of the record and never says what did not happen:
+
+| When | Message |
+| --- | --- |
+| The runner opens a work item (`create_item`) | The hand-off: Gateway to Brief Reader, Gateway or Brief Reader to Mapper (Brief Reader when it drafted the approved Brief), Mapper to Preparer, Preparer to Reviewer |
+| An agent hands in a result (`store_mapping`, `store_result`, `store_brief`) | The agent to the Gateway with the counts or figures, then the agent's own `note` when it gave one (the scripted backend's notes are fixed, the Droid and Anthropic notes are the model's) |
+| The gateway accepts it | A `check` back to the agent: mappings and tags accepted, and how many a learned policy decided; every figure traced to its runs; citations checked |
+| The gateway refuses anything (`_deny`) | A `refusal` to the actor, with the refusal reason |
+| An agent's tool run (`run_tool`, `read_agreement`) | Gateway to the agent with the run's figure and `run_id`; the system's what-ifs and recomputes are summed up by the message that uses them instead |
+| A flag opens (Mapper, Brief Reader or Gateway, Preparer) or the Reviewer finds a problem | A `question` to the controller with the item id |
+| The controller answers, amends a Brief field, holds, rejects, or reverses | The `answer` (or a message) to the agent that asked; one message for the policies the answer taught |
+| The Reviewer's review is stored | Reviewer to Preparer `check`, then Reviewer to Controller: `handoff` "Ready for your approval" (pass) or a `question` (needs attention) |
+| The controller approves, edits, gives a reason, or undoes an edit | Controller to Gateway, then the Gateway's reply: posted, or "Recomputed after edit ..." |
+| The job runner retries a refused model result or falls back to scripted | Gateway to the agent, through `Gateway.note` |
+| A run stops on an error | Gateway to Controller: "The run stopped: ..." |
+
+The agents still do not call each other: the job runner moves work items and the gateway is the only writer.
+The conversation is a readable view of that record, written as the record is written.
+It is stored as a record of kind `conversation` (collection `messages`, ids `msg_001`, ...), in memory and in Postgres, so a page opened late or after a restart replays it whole from `GET /deals/{id}/conversation` or the stream.
+`/dev/reset` clears it with the rest of the deal's record.
+
+### Live events: mapping
+
+A `mapping` event is one target line's mapping, sent when the gateway accepts it, in the order the gateway stores them:
+
+```
+event: mapping
+data: {"mapping_id": "m_001", "line_id": "sl_055", "company": "Nu Aire", "section": "balance_sheet", "line": "Cash and Cash Equivalents", "platform_line": "Cash and cash equivalents", "platform_line_id": "sl_001", "confidence": 1.0, "reason": "Same line", "flagged": false, "approved_by": null, "policy_id": null, "at": "<iso timestamp>"}
+```
+
+The gateway checks the Mapper's whole result first, so a refused result sends no mapping event.
+It then stores the mappings one by one, and `/case` shows the mappings stored so far while the Mapper's result is being written.
+A mapping is sent again when it changes (a mapping flag's answer sets `platform_line` and `approved_by`).
+A live model returns all its mappings at once, so they are sent in the order the gateway stores them, a few milliseconds apart; with `DEMO_PACE` on a scripted or replay run, about 0.3 s apart.
+
+### Demo pace
+
+`DEMO_PACE` (default off) makes the job runner wait a little on the scripted and replay backends, so the demo plays at a speed people can follow (`backend/app/agents/pace.py`).
+`DEMO_PACE=1` is human speed; 0.5 halves each wait and 2 doubles it (capped at 5).
+The waits at `DEMO_PACE=1`: 2.5 s when an agent picks up its work item, 1.0 s before each tool call it makes, 0.3 s after each mapping is stored, 1.5 s before each question opens, and 1.0 s after a result is stored.
+On the demo deal that is about 22 s from Run to the two questions (53 mappings) and about 13 s from the last answer to "Ready for your approval" (Preparer 7.5 s, Reviewer 5.5 s), measured on uvicorn on 2026-10-24 as 23 s and 12 s.
+The waits are never inside the gateway's checks, a live model backend (`droid`, `anthropic`) gets none, and under pytest the pace is off unless a test turns it on.
 
 ## Stages
 

@@ -39,7 +39,7 @@ def open_store(schema):
 def snapshot(store):
     return {attr: {k: v.model_dump(mode="json") for k, v in getattr(store, attr).items()}
             for attr in ("deals", "source_lines", "mappings", "items", "results", "tool_runs", "policies", "sessions",
-                         "edits", "adjustments", "agreements", "approved_briefs")}
+                         "edits", "adjustments", "agreements", "approved_briefs", "messages")}
 
 
 def run_to_posted(gw):
@@ -67,6 +67,7 @@ def test_a_posted_deal_survives_a_restart(schema):
     assert again._seq == seq
     assert Gateway(again).verify_chain()  # the hash chain checks out on the rows read back from Postgres
     assert list(again.results) == list(before["results"])  # insertion order kept, so latest_result is the same
+    assert again.messages and list(again.messages) == list(before["messages"])  # the conversation replays in order
     again.close()
 
 

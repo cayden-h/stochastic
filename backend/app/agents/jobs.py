@@ -3,9 +3,15 @@
 It reads the deal's state from the store, opens the next work item through the gateway, runs the agent for it,
 and hands the typed result back to the gateway. It holds no state of its own: it can run again at any time and
 will find the next thing to do.
+
+With DEMO_PACE set, it waits a little between steps on the scripted and replay backends (app/agents/pace.py), so a
+demo run plays at a speed people can follow. The gateway's checks never wait.
 """
 from __future__ import annotations
 
+import os
+
+from app.agents import pace
 from app.agents.roles import BRIEF_READER_ROLE, MAPPER_ROLE, PREPARER_ROLE, REVIEWER_ROLE, Role
 from app.agents.runner import run_agent
 from app.core.models import MapperInput, PreparerInput, ReviewerInput, State
@@ -15,19 +21,27 @@ from app.gateway.gateway import Gateway, Invalid
 READ_TOOLS = ("get_section", "get_definition")  # the Brief Reader's read-only agreement tools
 
 
-def _call_tool(gw: Gateway, actor: str, deal_id: str):
+def _call_tool(gw: Gateway, actor: str, deal_id: str, pace_as: str | None = None):
     def call(name: str, inputs: dict):
+        pace.pause("tool", pace_as)
         if name in READ_TOOLS:
             return gw.read_agreement(actor, deal_id, name, inputs)
         return gw.run_tool(actor, deal_id, name, inputs)
     return call
 
 
+def _chosen(backend: str | None) -> str:
+    return backend or os.getenv("AGENT_BACKEND", "scripted")
+
+
 def _run(gw: Gateway, role: Role, inp, deal_id: str, item_id: str, backend: str | None,
-         rewind_to: str | None = None):
-    """Run a role with its saved session, so a backend that can resume (Droid) continues the same conversation."""
+         rewind_to: str | None = None, pace_as: str | None = None):
+    """Run a role with its saved session, so a backend that can resume (Droid) continues the same conversation.
+    `pace_as` is the backend the run was asked for: a scripted fallback after a live model's refusal is not paced."""
+    pace_as = pace_as or _chosen(backend)
+    pace.pause("turn", pace_as)
     extra = {"rewind_to": rewind_to} if rewind_to else {}  # only a retry after a refusal asks for a rewind
-    return run_agent(role, inp, _call_tool(gw, role.actor, deal_id), session=gw.store.sessions.get(role.name),
+    return run_agent(role, inp, _call_tool(gw, role.actor, deal_id, pace_as), session=gw.store.sessions.get(role.name),
                      backend=backend, **extra)
 
 
@@ -48,15 +62,17 @@ def _store_or_fall_back(gw: Gateway, role: Role, inp, deal_id: str, item_id: str
     audit log; the Mapper first retries once with the reason, then the scripted backend makes the result, so a
     refused model result costs one more run instead of failing the deal on stage. The scripted result goes
     through the same checks."""
+    asked = _chosen(backend)
     run = _run(gw, role, inp, deal_id, item_id, backend)
     try:
-        return run, store_fn(run)
+        return run, _stored(store_fn, run, asked)
     except Invalid as error:
         log.append(f"{role.name} result refused on {run.backend}: {error.message}")
         if retry_with_reason and run.backend != "scripted":
             # The agent forgets its refused answer (rewind) but still learns why it was refused (previous_refusal).
             rewind_to = _refused_turn(gw, role, run)
             inp = inp.model_copy(update={"previous_refusal": error.message})
+            gw.note(deal_id, role.actor, f"Try once more on {run.backend}, with the gateway's reason", item_id=item_id)
             run = _run(gw, role, inp, deal_id, item_id, backend, rewind_to=rewind_to)
             ok = next((a for a in reversed(run.attempts) if a.get("ok")), {})
             if ok.get("rewound"):
@@ -65,14 +81,23 @@ def _store_or_fall_back(gw: Gateway, role: Role, inp, deal_id: str, item_id: str
             elif rewind_to:
                 log.append(f"{role.name} session not rewound: {ok.get('rewind_error') or 'the retry ran on ' + run.backend}")
             try:
-                return run, store_fn(run)
+                return run, _stored(store_fn, run, asked)
             except Invalid as again:
                 log.append(f"{role.name} result refused again on {run.backend}: {again.message}")
         if run.backend == "scripted":
             raise
-    run = _run(gw, role, inp, deal_id, item_id, "scripted")
+    gw.note(deal_id, role.actor, f"The {run.backend} result was refused; the scripted backend makes it under the same "
+                                 f"checks", item_id=item_id)
+    run = _run(gw, role, inp, deal_id, item_id, "scripted", pace_as=asked)
     log.append(f"{role.name} fell back to scripted after the refusal")
-    return run, store_fn(run)
+    return run, _stored(store_fn, run, asked)
+
+
+def _stored(store_fn, run, asked: str):
+    """Hand the result to the gateway, then wait the step's pace (off unless DEMO_PACE is set)."""
+    out = store_fn(run)
+    pace.pause("after", asked)
+    return out
 
 
 def _remember(gw: Gateway, role: Role, run, item_id: str, summary: str) -> None:
@@ -131,9 +156,11 @@ def _advance(gw: Gateway, deal_id: str, backend: str | None, max_steps: int) -> 
                               platform_lines=store.lines(deal_id, deal.platform), brief=deal.brief,
                               policies=gw.policies_for(MAPPER_ROLE.actor, deal_id),
                               session=store.sessions.get(MAPPER_ROLE.name))
+            asked = _chosen(backend)
             run, _ = _store_or_fall_back(gw, MAPPER_ROLE, inp, deal_id, item.id, backend,
-                                         lambda r: gw.store_mapping(MAPPER_ROLE.actor, item.id, r.output), log,
-                                         retry_with_reason=True)
+                                         lambda r: gw.store_mapping(MAPPER_ROLE.actor, item.id, r.output,
+                                                                    progress=lambda step: pace.pause(step, asked)),
+                                         log, retry_with_reason=True)
             _remember(gw, MAPPER_ROLE, run, item.id,
                       f"mapped {len(run.output.mappings)} lines, {len(run.output.flags)} flags")
             log.append(f"mapper ran on {run.backend}")

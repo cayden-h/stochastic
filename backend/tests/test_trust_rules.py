@@ -357,7 +357,6 @@ def test_flag_effect_text_matches_the_verdict_rounding(world):
     effects = {o.id: o.effect for o in fin.options}
     assert "Leverage 2.84x" in effects["a"] and effects["a"].startswith("As filed")
     assert "Leverage 1.56x" in effects["c"]  # 44,173 / 28,378.8 = 1.5566
-    from app.core.models import FlagOption, FlagProposal
     for o in fin.options:
         assert "unclear" not in gw.store.items[fin.id].payload["option_actions"][o.id]["tags"].values()
 
