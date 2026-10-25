@@ -285,6 +285,7 @@ def build_router(gw: Gateway) -> APIRouter:
             "edits": [dump(e) for e in store.deal_edits(deal_id)],
             "adjustments": [dump(a) for a in store.adjustments.values()],
             "brief_draft": dump(draft) if (draft := gw.brief_draft(deal_id)) else None,
+            "brief_verification": dump(report) if (report := gw.brief_verification(deal_id)) else None,
             "reason_chips": {kind: [dump(c) for c in gw.reason_chips(deal_id, kind)] for kind in ("amount", "remap")},
         }
 

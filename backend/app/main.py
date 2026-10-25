@@ -15,7 +15,7 @@ from app.api.body_limit import MAX_BODY_BYTES, BodyLimitMiddleware  # noqa: E402
 from app.api.errors import install_error_handlers  # noqa: E402
 from app.api.routes import build_router  # noqa: E402
 from app.core.config import settings  # noqa: E402
-from app.db.fixtures.kewaunee import DEAL_ID, seed  # noqa: E402
+from app.db.fixtures.kewaunee import DEAL_ID, seed_demo  # noqa: E402
 from app.db.memory import MemoryStore  # noqa: E402
 from app.gateway.gateway import Gateway  # noqa: E402
 
@@ -80,7 +80,7 @@ def create_app(demo_cases: bool | None = None, demo_cases_background: bool = Tru
                                     schema=settings.db_schema)
         gateway.forks.clean_leftovers()
     if not store.deals:  # a Postgres store that loaded a ledger keeps it
-        seed(store, gateway)
+        seed_demo(store, gateway)
     stuck = gateway.recover_interrupted_runs()  # no job survives a restart; a deal left mid-run gets Run again
     if stuck:
         log.warning("deals left mid-run by the last process, now run_failed: %s", ", ".join(stuck))
@@ -117,7 +117,7 @@ def create_app(demo_cases: bool | None = None, demo_cases_background: bool = Tru
                 keep = {d for d in store.deals if d != DEAL_ID}
                 store.reset_deals(keep_memory=keep_memory, keep_deals=keep, rechain=gateway.rechain)
                 gateway.run_pace.pop(DEAL_ID, None)
-                seed(store, gateway)
+                seed_demo(store, gateway)
                 if not keep_memory:  # memory learned on other deals that covers the demo deal's companies, too
                     gateway.retire_policies_covering(DEAL_ID, FRESH_DEMO_REASON)
                 if gateway.forks:

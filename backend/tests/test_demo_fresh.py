@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import app.main as app_main  # noqa: E402
 from app.agents import pace  # noqa: E402
 from app.agents.backends import droid_backend  # noqa: E402
-from app.db.fixtures.kewaunee import DEAL_ID, PLATFORM, TARGET  # noqa: E402
+from app.db.fixtures.kewaunee import BRIEF, DEAL_ID, PLATFORM, TARGET  # noqa: E402
 from app.main import create_app  # noqa: E402
 from tests.test_demo_pace import FakeClock  # noqa: E402
 
@@ -103,7 +103,7 @@ def upload_demo_companies(c) -> str:
     files = {"platform_csv": ("platform.csv", _csv(store, PLATFORM), "text/csv"),
              "target_csv": ("target.csv", _csv(store, TARGET), "text/csv")}
     data = {"name": "Kewaunee again", "platform": PLATFORM.lower(), "target": TARGET.lower(),
-            "brief": demo.brief.model_dump_json()}
+            "brief": (demo.brief or BRIEF).model_dump_json()}  # the demo deal reads its Brief on its first run (D23)
     r = c.post("/deals", files=files, data=data)
     assert r.status_code == 201, r.text
     return r.json()["deal_id"]
