@@ -75,6 +75,11 @@ Measured on live Droid on 2026-10-24 08:30 (Mapper Sonnet 5.5, Preparer and Revi
 - Between judges, reset with memory cleared: the console's "Fresh deal (clear memory)" on the Case page, or `curl -X POST 'localhost:8000/dev/reset?keep_memory=false'`. The plain reset keeps memory, and the next judge would see no flag. The reset is refused while a run is going (409) and frees the fork slot.
 - The console shows a progress row while the agents work: which agent, and for how many seconds.
 
+The 15-second demo (2026-10-25): on the Dashboard, "Run the demo" resets the demo deal with memory cleared and runs it with `"pace": "demo"` on the scripted or replay backend.
+About 6 s after the click, the Mapper's question arrives as a notification at the top right (a native macOS one too, in the Mac app); Decide opens its flag card.
+After each answer the Mapper says what it learned ("The Mapper learned p_007: ..."), and about 7 s after the last answer the Reviewer hands off: "Ready for your approval".
+Begin still runs the current case at its normal pace, and the four sample cases on the Dashboard open on every page for a judge who wants to click around; each says Sample data.
+
 The beats below are the original plan; Cayden times the real version with a stopwatch (`tasks/cayden.md` task 5).
 
 | Beat | Time | On-screen state | Presenter says | Hardcoded or real |
@@ -85,7 +90,7 @@ The beats below are the original plan; Cayden times the real version with a stop
 | 4. Answer | 1:50 - 1:55 | The controller clicks Approve on one option, or Change. | "The controller decides. Not the model." | The answer call is real. The gateway logs it. |
 | 5. Combine and test | 1:55 - 2:00 | The verdict line shows 0.76x against 2.50x with OK and Reviewer pass, and under it "read as filed, counting the whole financing line: 2.84x, over the limit". | "Code adds the books and tests the lender's limit. That is the verdict." | The Preparer's tool calls, the math, the tie-out, and the limit test run for real. The gateway checks that every figure is the Preparer's own run and reads the Reviewer's pass from its checks. |
 | 6. Review | after the hand-off | The Reviewer hands off. On the Case, "Review the books" opens the Review page: the combined books as a workbook, the Reviewer avatar trailing the cursor. Click Nu Aire's General and Administrative (6,163), type 5663, Enter. The verdict reads 0.75x, the Reviewer glides to the cell and asks why. Press 1, then Enter: "Learned: allowed add-back, for the next add-on." Approve, then Download final files. | "The controller can change the books. Code recomputes every total, and the Reviewer asks why once. The reason becomes a policy for the next add-on." | Real. The edit, the recompute, the reason, the approval, and the workbook (amber cell with its note) all go through the gateway. The reason chips are hardcoded for the demo deal. |
-| 7. Close | after 2:00 if asked | The presenter clicks Log in the Review ribbon (or the Log tile on the Case). | "Every step is here, and each row is chained to the one before." | Real. The chain check is real. |
+| 7. Close | after 2:00 if asked | The presenter clicks Log in the sidebar (or the Log tile on the Case). | "Every step is here, and each row is chained to the one before." | Real. The chain check is real. |
 
 What runs for real: the gateway (state changes, maker-checker, permissions), the math tools (consolidation, EBITDA, leverage, limit test), the tie-out check, and the audit log with its hash chain. [verified: `STOCHASTIC.md`, section 2]
 What the model writes: the mappings, the flag question, and the option labels, on the backend the model card names.

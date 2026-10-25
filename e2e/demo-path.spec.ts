@@ -137,7 +137,18 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
     await expect(covenant.getByText(label)).toBeInViewport({ ratio: 1 });
   }
   expect(await page.locator("[data-sheet]").evaluate((el) => el.scrollTop)).toBe(0);
+  // Review keeps the sidebar, Review last in it, and its own tabs are Review and Mapping only.
+  await expect(page.getByRole("navigation", { name: "Pages" }).getByRole("link")).toHaveText(["Dashboard", "Case", "Mapping", "Agents", "Log", "Review"]);
+  await expect(page.getByRole("tablist", { name: "Review tabs" }).getByRole("tab")).toHaveText(["Review", "Mapping"]);
+  // The sheet fits beside the sidebar: no sideways scroll.
+  expect(await page.locator("[data-sheet]").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await shot("review-open");
+  // Back to case, and back again.
+  await page.getByRole("link", { name: "Back to case" }).click();
+  await expect(page).toHaveURL(/\/case$/);
+  await nav(page, "Review").click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(reviewVerdict(page)).toHaveText("0.76× of 2.50×");
 
   // Edit Nu Aire's General and Administrative, 6,163 -> 5,663: the verdict reads 0.75x.
   await editAmount(page, NUAIRE_GA, "5663");

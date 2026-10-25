@@ -6,7 +6,7 @@
 // Packaged as Stochastic.app (`npm run package`), it still runs the backend and console from this repo,
 // whose path is written into the app's package.json at package time.
 
-const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, shell } = require("electron");
 const { execFileSync, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
@@ -335,6 +335,22 @@ function buildMenu() {
     { role: "windowMenu" },
   ]));
 }
+
+// ---- window.stochastic.notify ----
+
+// A question for the controller, as a native notification. Only the console may send one; a click shows the window.
+ipcMain.on("stochastic:notify", (event, { title, body } = {}) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents || !Notification.isSupported()) return;
+  if (typeof title !== "string" || !title.trim()) return;
+  const note = new Notification({ title: title.slice(0, 120), body: typeof body === "string" ? body.slice(0, 300) : "" });
+  note.on("click", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+  note.show();
+});
 
 // ---- window.stochastic.saveFiles ----
 

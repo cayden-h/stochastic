@@ -24,6 +24,22 @@ export interface Brief {
   ebitda_addbacks?: BriefAdjustment[]; ebitda_deductions?: BriefAdjustment[]; test_period_note?: string;
 }
 
+/** One row of GET /deals: every case the Dashboard lists, with its stage, verdict, and where its figures come from.
+ * `data_source` is "filings" for a deal read from public filings, "sample" for a made-up one, and "upload" for one sent
+ * through POST /deals; `note` says which. Only a sample is tagged on the Dashboard. */
+export interface DealSummary {
+  id: string; name: string; platform: string; target: string; stage: Stage;
+  verdict: { leverage: number; limit: number; verdict: "ok" | "over_limit" } | null;
+  updated_at: string | null; data_source: "filings" | "sample" | "upload" | null; note: string | null;
+}
+
+/** An SSE `notify` event: a question to the controller just opened, so every page says so (a toast, and in the Mac
+ * app a native notification). `from` is the agent that asks. */
+export interface Notice {
+  id: string; deal_id: string; at: string; kind: "decision" | string; item_id: string | null; from: string;
+  title: string; body: string;
+}
+
 export interface Deal {
   id: string; name: string; platform: string; target: string; stage: Stage;
   /** Null only while a deal created from agreement text has no draft yet (D20). */

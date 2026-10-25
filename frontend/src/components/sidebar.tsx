@@ -11,10 +11,11 @@ import { Label } from "./ui";
 const PAGES: { href: string; label: string; icon: NavIconName }[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/case", label: "Case", icon: "case" },
-  { href: "/review", label: "Review", icon: "review" },
   { href: "/mapping", label: "Mapping", icon: "mapping" },
   { href: "/agents", label: "Agents", icon: "agents" },
   { href: "/log", label: "Log", icon: "log" },
+  // Review is the last step: the books are edited and approved there once the agents are done.
+  { href: "/review", label: "Review", icon: "review" },
 ];
 
 type Theme = "teal" | "blue" | "violet";
@@ -78,7 +79,7 @@ function ModelCard() {
 
 /** What the agents learn from. Human answers: the flags answered here, plus the earlier answers behind each policy. */
 function Learning() {
-  const { kase } = useDeal();
+  const { kase, learnedAt } = useDeal();
   const answers = new Set([
     ...(kase?.flags.filter((f) => f.answer).map((f) => f.id) ?? []),
     ...(kase?.policies.map((p) => p.learned_from) ?? []),
@@ -91,7 +92,12 @@ function Learning() {
     <div className="flex w-full flex-col gap-[4px]">
       <Label>Always learning from</Label>
       {rows.map(([name, n]) => (
-        <div key={name} className="flex w-full items-center gap-[8px] rounded-[8px] border border-line bg-white px-[10px] py-[7px]">
+        // The Policies row pulses when an answer just taught one; the key restarts the pulse for the next.
+        <div
+          key={name === "Policies" && learnedAt ? `${name}-${learnedAt}` : name}
+          data-counter={name}
+          className={`flex w-full items-center gap-[8px] rounded-[8px] border border-line bg-white px-[10px] py-[7px] ${name === "Policies" && learnedAt ? "counter-pulse" : ""}`}
+        >
           <span className="flex-1 text-[13px] text-forest">{name}</span>
           <span className="font-mono text-[12px] text-forest">{n}</span>
         </div>
@@ -106,6 +112,8 @@ export function Sidebar() {
   const path = usePathname();
   const { kase } = useDeal();
   const deal = kase?.deal;
+  // The questions that hold the agents or wait on the controller now: the Case item's badge.
+  const asks = kase?.open_flags.length ?? 0;
   return (
     <aside className="flex h-full w-[240px] shrink-0 flex-col gap-[24px] overflow-y-auto border-r border-line bg-white/72 px-[20px] pb-[24px]">
       <div className="drag flex shrink-0 items-center gap-[8px] pt-[24px] [html[data-electron]_&]:pt-[52px]">
@@ -120,17 +128,28 @@ export function Sidebar() {
         <nav className="flex w-full flex-col gap-[4px]" aria-label="Pages">
           {PAGES.map((p) => {
             const on = p.href === "/" ? path === "/" : path.startsWith(p.href);
+            const badge = p.href === "/case" ? asks : 0;
             return (
               <Link
                 key={p.href}
                 href={p.href}
                 aria-current={on ? "page" : undefined}
+                title={badge ? `${badge} ${badge === 1 ? "question needs" : "questions need"} you` : undefined}
                 className={`flex w-full items-center gap-[10px] rounded-[8px] px-[10px] py-[9px] text-[14px] transition-colors duration-150 ${
                   on ? "bg-forest font-semibold text-white" : "font-medium text-body hover:bg-mint/60 [&_svg]:text-forest"
                 }`}
               >
                 <NavIcon name={p.icon} />
-                {p.label}
+                <span className="flex-1">{p.label}</span>
+                {badge ? (
+                  <span
+                    data-badge=""
+                    aria-hidden="true"
+                    className="flex h-[20px] min-w-[20px] items-center justify-center rounded-full bg-escalation-bar px-[6px] font-mono text-[11px] font-semibold text-white"
+                  >
+                    {badge}
+                  </span>
+                ) : null}
               </Link>
             );
           })}

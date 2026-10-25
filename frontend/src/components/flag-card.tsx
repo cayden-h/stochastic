@@ -31,14 +31,28 @@ function splitQuestion(q: string): [string, string] {
   return m ? [m[1], m[2]] : [q, ""];
 }
 
+/** What the controller's pick sets going, in one line under the options, so no answer is a leap. */
+function nextStep(kind: "covenant" | "adjustment" | "mapping", asker: string, more: number): string {
+  if (kind === "adjustment") return "Apply puts the adjustment in the books and the Reviewer runs the checks again. Skip leaves the books as they are. Approval stays yours.";
+  const back = `Your pick goes back to the ${asker} and becomes a policy, so it is not asked again.`;
+  return more > 0
+    ? `${back} ${more === 1 ? "One more question holds" : `${more} more questions hold`} the agents; after the last answer, the Preparer combines the books and the Reviewer tests the limit.`
+    : `${back} Then the Preparer combines the books and the Reviewer tests the limit. Approval stays yours.`;
+}
+
 /**
- * One flag: the question and the options with their readings, then the evidence, collapsed: each option's effect
- * sentence and run id, the flagged lines, and the filing quotes. The readings sit right under the question on a projector.
+ * One flag: the decision, the options with what each one does (its reading, the effect sentence with its figures,
+ * and the tool run), and what happens next. The evidence is folded under it: the flagged lines and the filing quotes.
  * The ratio, verdict, effect text and run id come from the gateway's tool runs. Nothing here is computed.
  */
 export function FlagCard({
-  item, lines, busy, onAnswer, onHold, position, approvalReady = true, banner,
+  item, lines, busy, onAnswer, onHold, position, approvalReady = true, banner, asker = "Mapper", more = 0, cardRef,
 }: {
+  /** The agent that asked, by name, for "what happens next". */
+  asker?: string;
+  /** The other open questions that hold the agents. */
+  more?: number;
+  cardRef?: React.Ref<HTMLElement>;
   item: WorkItem; lines: SourceLine[]; busy: boolean; onAnswer: (optionId: string) => void; onHold: () => void;
   /** An adjustment's Apply edits the books, which needs the result's approval item to be PROPOSED. */
   approvalReady?: boolean;
@@ -56,7 +70,13 @@ export function FlagCard({
   const [heading, detail] = splitQuestion(item.question ?? "");
   const letter = (i: number) => String.fromCharCode(97 + i);
   return (
-    <section className="flex w-full flex-col gap-[14px] rounded-card border border-amber-line bg-white p-[20px]">
+    <section
+      ref={cardRef}
+      tabIndex={-1}
+      data-flag={item.id}
+      aria-label={`${kind}: ${heading}`}
+      className="flex w-full scroll-mt-[20px] flex-col gap-[14px] rounded-card border border-amber-line bg-white p-[20px] outline-none focus-visible:shadow-[0_0_0_3px_var(--color-amber-line)]"
+    >
       {banner}
       <div className="flex w-full items-center gap-[10px] whitespace-nowrap">
         <ActorChip actor={item.proposed_by} />
@@ -96,38 +116,34 @@ export function FlagCard({
                 {suggested ? <Tag>Suggested</Tag> : null}
                 {o.added_by ? <ActorChip actor={o.added_by} /> : null}
               </span>
-              {adjustment ? <span className="text-[13px] leading-[18px] text-slate">{o.effect}</span> : null}
               {o.leverage != null ? (
-                <>
+                <span className="flex items-baseline gap-[8px]">
                   <span className={`text-[30px] font-semibold ${ok ? "text-clear" : "text-denied"}`}>{fmtX(o.leverage)}</span>
-                  <span className={`text-[13px] font-medium ${ok ? "text-clear" : "text-denied"}`}>{ok ? "OK" : "Over the limit"}</span>
-                </>
+                  <span className={`inline-flex items-center gap-[4px] text-[13px] font-semibold ${ok ? "text-clear" : "text-denied"}`}>
+                    <Shape kind={ok ? "check" : "cross"} size={10} />{ok ? "OK" : "Over the limit"}
+                  </span>
+                </span>
               ) : null}
+              {o.effect ? <span className="text-[13px] leading-[18px] text-body" data-effect="">{o.effect}</span> : null}
+              {o.run_id ? <Mono className="text-[11px]">{o.run_id}</Mono> : null}
             </button>
           );
         })}
       </div>
 
-      {adjustment && !approvalReady ? (
-        <p className="-mt-[4px] text-[13px] text-slate">Apply opens once the Reviewer has checked the result and it waits for your approval.</p>
-      ) : null}
+      <p className="-mt-[2px] flex items-start gap-[8px] text-[13px] leading-[18px] text-slate" data-next="">
+        <span className="shrink-0 font-semibold text-forest">What happens next</span>
+        <span>{adjustment && !approvalReady ? "Apply opens once the Reviewer has checked the result and it waits for your approval." : nextStep(covenant ? "covenant" : adjustment ? "adjustment" : "mapping", asker, more)}</span>
+      </p>
 
       <details className="rounded-[12px] border border-line bg-fog px-[14px] py-[10px]">
         <summary className="cursor-pointer text-[13px] font-semibold text-forest">
-          Evidence: {plural(item.options.length, "effect")}
-          {flagged.length ? `, ${plural(flagged.length, "line")}` : ""}
-          {item.evidence.length ? `, ${plural(item.evidence.length, "quote")} from the filings` : ""}
+          Evidence: {[
+            flagged.length ? plural(flagged.length, "line") : null,
+            item.evidence.length ? `${plural(item.evidence.length, "quote")} from the documents` : null,
+          ].filter(Boolean).join(", ") || "none attached"}
         </summary>
         <div className="mt-[10px] flex flex-col gap-[12px]">
-          <div className="flex flex-col gap-[6px] rounded-[8px] border border-line bg-white px-[12px] py-[10px]">
-            {item.options.map((o, i) => (
-              <div key={o.id} className="flex items-baseline gap-[8px] text-[13px]">
-                <span className="font-mono text-[12px] text-forest">{letter(i)}.</span>
-                <span className="min-w-0 flex-1 text-body">{o.effect}</span>
-                {o.run_id ? <Mono>{o.run_id}</Mono> : null}
-              </div>
-            ))}
-          </div>
           {flagged.length ? (
             <div className="flex flex-col gap-[4px] rounded-[8px] border border-line bg-white px-[12px] py-[10px]">
               {flagged.map((l) => (

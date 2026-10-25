@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Companion } from "@/components/companion";
+import { MAPPING_COLS, MappingSheet, mappingLayout } from "@/components/review-mapping";
 import { Shape } from "@/components/ui";
 import {
   type Active, type SheetHandlers, ColumnLetters, CovenantSheetRow, HeaderRow, LineSheetRow, SectionTitleRow, SubSheetRow,
@@ -12,7 +14,7 @@ import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
 import { canEdit, editAnchor, num } from "@/lib/edits";
-import { fmtX, plural } from "@/lib/format";
+import { fmtX, mappingCounts, openQuestionLines, plural } from "@/lib/format";
 import type { Case, Edit, ToolRun } from "@/lib/types";
 import {
   type AmountCell, type CovenantRow, type LineRow, type SheetRow, SECTION_TITLES, SHEET_ORDER, agentsLeverageRun,
@@ -77,13 +79,32 @@ const BTN = "inline-flex shrink-0 items-center justify-center rounded-chip px-[1
 const PRIMARY = `${BTN} bg-forest text-white hover:bg-forest-deep disabled:opacity-40 disabled:hover:bg-forest`;
 const SECONDARY = `${BTN} border border-rule bg-white text-ink hover:bg-sheet-band disabled:opacity-45 disabled:hover:bg-white`;
 
+type Tab = "review" | "mapping";
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "review", label: "Review" },
+  { key: "mapping", label: "Mapping" },
+];
+
 /**
  * V3-7, Review (D19, Figma 670:44): the combined books as a workbook the controller edits, with the Reviewer asking
- * why. One full window, no sidebar: a title bar, a ribbon (Review, Combined, Mapping, Log), the formula bar, the sheet,
- * the verdict and Your edits, and the sheet tabs. Approve and Download final files live here.
+ * why. It sits in the sidebar shell like every page, with "Back to case" in its header. Two tabs: Review, the
+ * workbook, where an amount is changed; and Mapping, the target lines with the platform line each goes to, where a
+ * line is remapped. Then the formula bar, the sheet, the verdict and Your edits, and the sheet tabs. Approve and
+ * Download final files live here, and gate on every edit of either tab.
  */
-export default function ReviewScreen() {
-  const { kase, refresh } = useDeal();
+export default function ReviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <ReviewScreen />
+    </Suspense>
+  );
+}
+
+function ReviewScreen() {
+  const { kase, refresh, mappings } = useDeal();
+  const router = useRouter();
+  const tab: Tab = useSearchParams().get("tab") === "mapping" ? "mapping" : "review";
   const ctx = useEdits();
   const [selected, setSelected] = useState<Active | null>(null);
   const [typed, setTyped] = useState("");
@@ -118,6 +139,8 @@ export default function ReviewScreen() {
   }, [verdict, edits, runs]);
 
   const laid = useMemo(() => (kase ? layout(kase, edits, collapsed, covenant) : { rows: [] as Laid[], meta: new Map<string, CellMeta>() }), [kase, edits, collapsed, covenant]);
+  const asking = useMemo(() => openQuestionLines(kase?.flags ?? [], kase?.open_flags ?? []), [kase]);
+  const mapped = useMemo(() => (kase ? mappingLayout(kase, mappings, edits, asking) : null), [kase, mappings, edits, asking]);
 
   if (!kase) return null;
   const { deal, result } = kase;
@@ -131,13 +154,15 @@ export default function ReviewScreen() {
   const canApprove = Boolean(verdict) && proposed && review === "pass" && !over && !unreasoned && !kase.open_flags.length;
 
   // The cell being worked in: typing, the large-change question, the reason bubble, or the line menu.
+  const meta: Map<string, CellMeta> = tab === "mapping" && mapped ? mapped.meta : laid.meta;
   const workingKey = ctx.editing ?? ctx.confirm?.anchor ?? (ctx.asking ? editAnchor(ctx.asking) : null) ?? menu;
-  const workingMeta = workingKey ? laid.meta.get(workingKey) : undefined;
+  const workingMeta = workingKey ? meta.get(workingKey) : undefined;
   const active: Active | null = workingKey && workingMeta ? { key: workingKey, row: workingMeta.row, col: workingMeta.col } : null;
   const focusKey = workingKey ?? selected?.key ?? null;
-  const focus = focusKey ? laid.meta.get(focusKey) : undefined;
+  const focus = focusKey ? meta.get(focusKey) : undefined;
   const formulaValue = focus ? (ctx.editing === focusKey ? typed.replace(/,/g, "") : focus.value) : "";
   const formulaNote = focus ? focus.note
+    : editable && tab === "mapping" ? `Click a platform line to map the ${deal.target} line to another ${deal.platform} line. Code recomputes every total.`
     : editable ? "Click a platform or target amount to change it. Code recomputes every total."
     : posted ? "Approved and posted. The books are read-only."
     : result ? "The books open for edits once the Reviewer passes them." : "Code combines the books after the agents run.";
@@ -168,25 +193,41 @@ export default function ReviewScreen() {
 
   return (
     <>
-      {/* Title bar: the window's drag region. In the Mac app the traffic lights sit at its left. */}
-      <header className="drag relative flex h-[44px] w-full shrink-0 items-center justify-center border-b border-titlebar-line bg-titlebar [html[data-electron]_&]:h-[52px]">
-        <p className="truncate px-[96px] text-[13px] font-medium text-titlebar-ink">
-          {deal.platform} + {deal.target} combined books.xlsx - Stochastic review
-        </p>
+      {/* The page header: the way back to the case, the page, and the workbook it holds. It drags the Mac window. */}
+      <header className="drag flex h-[56px] w-full shrink-0 items-center gap-[16px] border-b border-sheet-line bg-white px-[20px]">
+        <Link
+          href="/case"
+          className="inline-flex shrink-0 items-center gap-[6px] rounded-chip py-[6px] pr-[8px] text-[14px] font-semibold text-forest underline-offset-4 hover:underline"
+        >
+          <span aria-hidden="true" className="font-sans">&larr;</span>
+          Back to case
+        </Link>
+        <span className="h-[22px] w-px shrink-0 bg-sheet-line" aria-hidden="true" />
+        <h1 className="shrink-0 font-serif text-[26px] leading-none text-forest">Review</h1>
+        <span className="min-w-0 truncate text-[13px] text-sheet-muted" title={`${deal.platform} + ${deal.target} combined books`}>
+          {deal.platform} + {deal.target} combined books
+        </span>
       </header>
 
       {/* Ribbon */}
       <nav className="flex h-[44px] w-full shrink-0 items-center border-b border-sheet-line bg-white px-[16px]" aria-label="Review ribbon">
-        <div className="flex h-full items-start gap-[4px]">
-          <span aria-current="page" className="relative flex h-full items-center px-[12px] text-[13px] font-semibold text-forest">
-            Review
-            <span className="absolute bottom-0 left-[8px] h-[2px] w-[calc(100%-16px)] bg-forest" aria-hidden="true" />
-          </span>
-          {[["Combined", "/case"], ["Mapping", "/mapping"], ["Log", "/log"]].map(([label, href]) => (
-            <Link key={href} href={href} className="flex h-full items-center px-[12px] text-[13px] font-medium text-sheet-muted transition-colors duration-150 hover:text-forest">
-              {label}
-            </Link>
-          ))}
+        <div className="flex h-full items-start gap-[4px]" role="tablist" aria-label="Review tabs">
+          {TABS.map((t) => {
+            const on = t.key === tab;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => { setMenu(null); setSelected(null); router.replace(t.key === "review" ? "/review" : `/review?tab=${t.key}`, { scroll: false }); }}
+                className={`relative flex h-full items-center px-[12px] text-[13px] transition-colors duration-150 ${on ? "font-semibold text-forest" : "font-medium text-sheet-muted hover:text-forest"}`}
+              >
+                {t.label}
+                {on ? <span className="absolute bottom-0 left-[8px] h-[2px] w-[calc(100%-16px)] bg-forest" aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
         </div>
         <span className="flex-1" />
         <div className="flex items-center gap-[8px]">
@@ -262,11 +303,15 @@ export default function ReviewScreen() {
         <span className="truncate text-[12px] text-sheet-muted">{formulaNote}</span>
       </div>
 
-      <ColumnLetters active={sheet === "combined" ? active : null} />
+      {tab === "mapping"
+        ? <ColumnLetters active={active} cols={MAPPING_COLS} rest="E" />
+        : <ColumnLetters active={sheet === "combined" ? active : null} />}
 
       {/* The sheet. It scrolls; the title bar, ribbon, formula bar, and the strips below stay put. */}
       <div className="relative min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto" data-sheet="">
-        {sheet === "edits" ? (
+        {tab === "mapping" && mapped ? (
+          <MappingSheet kase={kase} rows={mapped.rows} editable={editable} active={active} menu={menu} setMenu={setMenu} onSelect={setSelected} />
+        ) : sheet === "edits" ? (
           <EditsSheet />
         ) : (
           <div className="flex w-full flex-col">
@@ -323,6 +368,13 @@ export default function ReviewScreen() {
       {/* Sheet tabs and status */}
       <footer className="flex h-[40px] w-full shrink-0 items-stretch border-t border-titlebar-line bg-sheet-head">
         <div className="-mt-px ml-[44px] flex items-stretch" role="tablist" aria-label="Sheets">
+          {tab === "mapping" ? (
+            <span role="tab" aria-selected="true" className="relative flex items-center bg-white px-[16px] text-[12px] font-semibold text-forest">
+              <span className="absolute top-0 right-0 left-0 h-[2px] bg-forest" aria-hidden="true" />
+              Mapping
+            </span>
+          ) : null}
+          {tab === "mapping" ? null : <>
           <button
             type="button" role="tab" aria-selected={sheet === "combined"} onClick={() => setSheet("combined")}
             className={`relative flex items-center px-[16px] text-[12px] ${sheet === "combined" ? "bg-white font-semibold text-forest" : "font-medium text-sheet-muted hover:text-forest"}`}
@@ -338,10 +390,15 @@ export default function ReviewScreen() {
             {sheet === "edits" ? <span className="absolute top-0 right-0 left-0 h-[2px] bg-forest" aria-hidden="true" /> : null}
             Edits <span className="font-mono text-[11px] font-normal">{reasoned}</span>
           </button>
+          </>}
           <Link href="/log" className="flex items-center px-[16px] text-[12px] font-medium text-sheet-muted hover:text-forest">Audit</Link>
         </div>
         <span className="flex-1" />
-        {verdict ? (
+        {tab === "mapping" && mapped ? (
+          <span className="self-center truncate pr-[16px] pl-[12px] text-[12px] text-sheet-muted">
+            {mappingStatus(kase, mappings, asking, edits)}
+          </span>
+        ) : verdict ? (
           <span className="self-center truncate pr-[16px] pl-[12px] text-[12px] text-sheet-muted">
             Covenant leverage {fmtX(verdict.leverage)} against {fmtX(verdict.limit)} &middot; every figure is a tool run &middot; USD thousands
           </span>
@@ -351,6 +408,13 @@ export default function ReviewScreen() {
       <Companion />
     </>
   );
+}
+
+/** The Mapping sheet's status: how many target lines are placed, sure, and remapped. */
+function mappingStatus(kase: Case, mappings: Case["mappings"], asking: Set<string>, edits: Edit[]): string {
+  const { placed, sure, unsure } = mappingCounts(mappings, kase.source_lines, asking);
+  const remaps = edits.filter((e) => e.kind === "remap").length;
+  return `${plural(placed, `${kase.deal.target} line`)} placed · ${sure} sure · ${unsure} unsure${remaps ? ` · ${plural(remaps, "remap")}` : ""} · totals are not mapped`;
 }
 
 /** The Edits sheet: every live edit as a row of the workbook, with its reason and what it taught. */
@@ -363,19 +427,19 @@ function EditsSheet() {
     <div className="flex w-full flex-col">
       <div className="flex w-full border-b border-sheet-line">
         <div className={gutter}>1</div>
-        <div className={`${cell} w-[420px] ${head}`}>Line</div>
-        <div className={`${cell} w-[180px] justify-end ${head}`}>Was</div>
-        <div className={`${cell} w-[180px] justify-end ${head}`}>Now</div>
-        <div className={`${cell} w-[320px] ${head}`}>Reason</div>
+        <div className={`${cell} w-[380px] ${head}`}>Line</div>
+        <div className={`${cell} w-[150px] justify-end ${head}`}>Was</div>
+        <div className={`${cell} w-[150px] justify-end ${head}`}>Now</div>
+        <div className={`${cell} w-[300px] ${head}`}>Reason</div>
         <div className={`${cell} min-w-0 flex-1 border-r-0 ${head}`}>Learned</div>
       </div>
       {ctx.edits.map((e, i) => (
         <div key={e.id} className="flex w-full border-b border-sheet-line text-[14px] text-ink">
           <div className={gutter}>{i + 2}</div>
-          <button type="button" onClick={() => ctx.show(e.id)} className={`${cell} w-[420px] truncate text-left hover:underline`}>{e.line} &middot; {e.company}</button>
-          <div className={`${cell} w-[180px] justify-end font-mono text-[13px]`}>{e.kind === "amount" ? num(e.old_value ?? 0) : e.old_platform_line ?? "Unmapped"}</div>
-          <div className={`${cell} w-[180px] justify-end font-mono text-[13px]`}>{e.kind === "amount" ? num(e.new_value ?? 0) : e.new_platform_line}</div>
-          <div className={`${cell} w-[320px] ${e.status === "needs_reason" ? "font-medium text-escalation" : "text-sheet-muted"}`}>
+          <button type="button" onClick={() => ctx.show(e.id)} className={`${cell} w-[380px] truncate text-left hover:underline`}>{e.line} &middot; {e.company}</button>
+          <div className={`${cell} w-[150px] justify-end font-mono text-[13px]`}>{e.kind === "amount" ? num(e.old_value ?? 0) : e.old_platform_line ?? "Unmapped"}</div>
+          <div className={`${cell} w-[150px] justify-end font-mono text-[13px]`}>{e.kind === "amount" ? num(e.new_value ?? 0) : e.new_platform_line}</div>
+          <div className={`${cell} w-[300px] ${e.status === "needs_reason" ? "font-medium text-escalation" : "text-sheet-muted"}`}>
             <span className="truncate" title={e.reason_text ?? change(e)}>{e.reason_text ?? "Needs a reason"}</span>
           </div>
           <div className={`${cell} min-w-0 flex-1 border-r-0 font-mono text-[12px] text-sheet-muted`}>{e.policy_id ?? e.adjustment_id ?? ""}</div>

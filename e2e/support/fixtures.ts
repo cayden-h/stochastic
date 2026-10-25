@@ -8,6 +8,9 @@ import { ARTIFACTS, SCREENSHOTS, ensureDir, ports } from "./env";
 export interface Options {
   /** DEMO_PACE for this test's backend: 1 plays the run at reading speed, 0 runs it as fast as it goes. */
   pace: number;
+  /** DEMO_CASES for this test's backend: the Dashboard's seeded cases beside the demo deal. Off by default, so a test
+   * sees only the demo deal and the policies it teaches; demo-run.spec.ts turns it on. */
+  cases: boolean;
 }
 
 interface Fixtures {
@@ -22,12 +25,13 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(
 
 export const test = base.extend<Fixtures & Options>({
   pace: [0, { option: true }],
+  cases: [false, { option: true }],
 
-  backend: [async ({ pace }, use, testInfo) => {
+  backend: [async ({ pace, cases }, use, testInfo) => {
     const logDir = ensureDir(path.join(ARTIFACTS, "logs"));
     const logFile = path.join(logDir, `${slug(path.basename(testInfo.file, ".spec.ts"))}-${slug(testInfo.title)}-r${testInfo.retry}.log`);
     fs.writeFileSync(logFile, "");
-    const backend = await startBackend({ port: ports().backend, consolePort: ports().console, pace, logFile });
+    const backend = await startBackend({ port: ports().backend, consolePort: ports().console, pace, cases, logFile });
     await use(backend);
     await backend.stop({ dumpThreads: testInfo.status !== testInfo.expectedStatus });
     if (testInfo.status !== testInfo.expectedStatus) await testInfo.attach("backend.log", { path: logFile, contentType: "text/plain" });

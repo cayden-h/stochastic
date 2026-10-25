@@ -42,8 +42,9 @@ If it is not in `~/Library/Caches/ms-playwright`, run `npx playwright install ch
 
 | Spec | Project | What it covers |
 | --- | --- | --- |
-| `demo-path.spec.ts` | paced | The splash (mark and name, centered, until the deal is read), the Dashboard, Begin, the live pipeline and conversation, Mapping filling line by line, the 3D house with the Mapper asking, both flags answered, the agents resuming, the Reviewer's hand-off, the Log (audit rows and the Conversation view), Review: Nu Aire General and Administrative 6,163 to 5,663, the verdict 0.76x to 0.75x, the Reviewer gliding to the cell, 1 and Enter, the learned note, Edits 1, Approve, Download final files. It opens the workbook (one amber cell with its note, an Edits row) and the certificate. One screenshot per step. |
-| `review-branches.spec.ts` | fast | Later and the companion's waiting dot that reopens the bubble; a remap (Nu Aire Research and Development to Cost of products sold: target Gross profit 23,150, combined Gross profit down 532, Operating profit and leverage unchanged, the mapping rule learned); a large change that asks first ("Change it", then "Yes, save it"); Undo. |
+| `demo-path.spec.ts` | paced | The splash (mark and name, centered, until the deal is read), the Dashboard, Begin, the live pipeline and conversation, Mapping filling line by line, the 3D house with the Mapper asking, both flags answered, the agents resuming, the Reviewer's hand-off, the Log (audit rows and the Conversation view), Review (the sidebar in its order, the two tabs, no sideways scroll, Back to case and back): Nu Aire General and Administrative 6,163 to 5,663, the verdict 0.76x to 0.75x, the Reviewer gliding to the cell, 1 and Enter, the learned note, Edits 1, Approve, Download final files. It opens the workbook (one amber cell with its note, an Edits row) and the certificate. One screenshot per step. |
+| `review-branches.spec.ts` | fast | Later and the companion's waiting dot that reopens the bubble; a remap (Nu Aire Research and Development to Cost of products sold: target Gross profit 23,150, combined Gross profit down 532, Operating profit and leverage unchanged, the mapping rule learned); the same remap from the Mapping tab (the two tabs, the Reviewer at the row, Your edits, approval waiting, Back to case); a large change that asks first ("Change it", then "Yes, save it"); Undo. |
+| `demo-run.spec.ts` | fast | The Dashboard's five cases (stage, Sample data and its note, the stat cards), each opened on Case, Mapping, Log, Review, and the Review Mapping tab; then Run the demo from another case: the notification within 12 s, the Case badge, Decide focusing the flag card, each option's effect and "What happens next", the Learned note and the Policies pulse, Ready within 12 s of the last answer, Review with Back to case, an amount edit and a Mapping-tab remap with their reasons, approval, and the two files. It asks for `"pace": "demo"` and skips on a backend without the demo contract (`GET /deals` with five rows and `data_source`). |
 | `second-run.spec.ts` | fast | After an approval, "Run it again with what was learned": no questions, the Learned chips, the lines placed by policy. Then "Fresh deal (clear memory)": no policies, and the next run asks again. |
 | `agreement.spec.ts` | fast | Upload of the two demo CSVs (written from the backend fixture) and `backend/tests/fixtures/kewaunee_ex101_excerpt.txt`; the Brief card; the reader's question answered; three add-back amounts entered with their source and two kept at 0; the Brief approved; then map, flags, hand-off at 0.76x, review, approval. |
 | `reload-replay.spec.ts` | paced | A reload in the middle of the run brings back every line of the conversation in order, and the page keeps following the run to the Mapper's questions. |
@@ -53,11 +54,13 @@ If it is not in `~/Library/Caches/ms-playwright`, run `npx playwright install ch
 ## Timings
 
 Measured on 2026-10-24 on an Apple Silicon Mac, the last three of six green runs in a row: 3.0, 2.9 and 2.8 minutes for the whole suite, including the console build (about 10 seconds).
+On 2026-10-25, with the demo run and the Mapping tab added, two green runs in a row took 3.8 and 3.9 minutes.
 
 | Spec | Time per run |
 | --- | --- |
 | `agreement.spec.ts` | 4.5 s |
-| `review-branches.spec.ts` | 4 to 6 s per test, 4 tests |
+| `review-branches.spec.ts` | 4 to 6 s per test, 5 tests |
+| `demo-run.spec.ts` | 7 s (the five cases) and 21 s (the demo, at pace demo) |
 | `second-run.spec.ts` | 4.6 s |
 | `agents-3d.spec.ts` | 54 s (paced) |
 | `demo-path.spec.ts` | 51 s (paced) |

@@ -13,6 +13,11 @@ Mapping (V3-4) is read-only too; a remap is made from the line cell's menu on Re
 The companion is the Reviewer (`frontend/public/agents/reviewer-avatar.png`, 26 px) and lives on the Review page only.
 Where the sections below say V3-3, V3-4, or the agent-blue dot, the Review page and the Reviewer now stand in their place.
 
+Update, 2026-10-25: the Review page keeps the sidebar, like every other page, and Review is last in it.
+Its header has "Back to case", and its tabs are Review (the workbook) and Mapping (the target lines in review mode); the title bar, Combined, and Log are gone.
+A remap is made on the Mapping tab, from the platform line cell's menu, as well as from the line cell on the Review tab; the Reviewer asks why at the row either way, Your edits lists it, and approval waits for its reason.
+The sheet's columns narrow (A 380, B to D 170, E 130) so it fits beside the sidebar at 1440 by 900, with the covenant block still pinned.
+
 ## 1. What changes
 
 Stochastic ships as a Mac desktop app.

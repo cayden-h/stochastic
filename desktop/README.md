@@ -105,6 +105,8 @@ The page has no Node access: `contextIsolation` is on, `nodeIntegration` is off,
 - `saveFiles([{ url, name }])`: asks for a folder, downloads each file from the API (an absolute URL, or a path relative to `NEXT_PUBLIC_API_URL`), writes it there, and shows it in Finder.
   It resolves to `{ canceled, folder, files }` and rejects if a download fails.
   It only downloads from the API's origin, and it keeps only the base name of each `name`.
+- `notify({ title, body })`: shows a native macOS notification for a question that needs the controller; a click brings the window forward.
+  Only the console's own window may send one.
 
 Links to other sites open in the default browser, not in the app window.
 

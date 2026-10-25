@@ -6,6 +6,7 @@ import { EditProvider } from "@/lib/edit-context";
 import { SourcePanel, SourceProvider } from "@/components/source";
 import { Shell } from "@/components/shell";
 import { LaunchSplash } from "@/components/launch-splash";
+import { Toasts } from "@/components/toasts";
 
 // The v3 type: DM Sans for the UI (optical size fixed at 14, as in the frames), Instrument Serif for page titles,
 // IBM Plex Mono for ids and counts, Public Sans for button labels.
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <SourceProvider>
               <Shell>{children}</Shell>
               <SourcePanel />
+              <Toasts />
             </SourceProvider>
           </EditProvider>
           <LaunchSplash />

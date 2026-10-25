@@ -1,8 +1,8 @@
 // The Review page's other branches (docs/design/review-companion.md sections 4 to 7): an edit left for Later and the
-// waiting dot that reopens it, a remap with its roll-up through the subtotals, a large change that asks first, and
-// Undo. Each test starts from a fresh backend and runs the deal to the Reviewer's hand-off (no pacing).
+// waiting dot that reopens it, a remap with its roll-up through the subtotals, a remap from the Mapping tab, a large
+// change that asks first, and Undo. Each test starts from a fresh backend and runs the deal to the Reviewer's hand-off (no pacing).
 import { expect, open, readCase, test } from "./support/fixtures";
-import { NUAIRE_GA, bubble, companion, editAmount, reviewVerdict, sheetRow, toReview } from "./support/flows";
+import { NUAIRE_GA, bubble, centre, companion, editAmount, reviewVerdict, sheetRow, toReview } from "./support/flows";
 
 test.beforeEach(async ({ page }) => {
   await open(page, "/");
@@ -75,6 +75,52 @@ test("remap a target line: the subtotals roll, leverage holds, the rule is learn
   expect(remap.policy_id).toBeTruthy();
   const gp = kase.result.rows.find((r: { line: string }) => r.line === "Gross profit");
   expect(gp.target).toBeCloseTo(23149.519, 3);
+});
+
+test("the Mapping tab remaps a line in review mode: the Reviewer asks why, Your edits shows it, approval waits", async ({ page, backend, shot }) => {
+  // Two tabs only, and the page keeps the sidebar.
+  const tabs = page.getByRole("tablist", { name: "Review tabs" }).getByRole("tab");
+  await expect(tabs).toHaveText(["Review", "Mapping"]);
+  await expect(page.getByRole("navigation", { name: "Pages" })).toBeVisible();
+  await tabs.filter({ hasText: "Mapping" }).click();
+  await expect(page).toHaveURL(/\/review\?tab=mapping$/);
+  await expect(page.locator("[data-mapping-sheet]")).toBeVisible();
+  await shot("mapping-tab");
+
+  // The platform line cell is the menu; pick Cost of products sold for Nu Aire's Research and Development.
+  await page.getByRole("button", { name: /^Research and Development goes to Operating expenses\. Map it to another Kewaunee line$/ }).click();
+  const menu = page.getByRole("listbox", { name: "Map to a Kewaunee line" });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("option", { name: "Cost of products sold" }).click();
+
+  // The Reviewer asks at the row; until the reason, approval waits.
+  await expect(bubble(page)).toBeVisible();
+  await expect(bubble(page).getByText("Apply to every add-on on this platform")).toBeVisible();
+  const cell = page.getByRole("button", { name: "Research and Development: remapped from Operating expenses to Cost of products sold" });
+  await expect(cell).toBeVisible();
+  await expect.poll(async () => {
+    const c = await centre(cell), m = await centre(companion(page));
+    return Math.abs(c.y - m.y);
+  }).toBeLessThan(40);
+  await expect(page.getByRole("button", { name: "Approve", exact: true })).toBeDisabled();
+  await expect(page.getByRole("region", { name: "Your edits" })).toContainText("Operating expenses → Cost of products sold");
+  await shot("mapping-tab-asking");
+  await page.keyboard.press("1");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("status").filter({ hasText: "Learned: mapping rule, for this platform." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Approve", exact: true })).toBeEnabled();
+  await expect(reviewVerdict(page)).toHaveText("0.76× of 2.50×");
+  await shot("mapping-tab-learned");
+
+  // The record: the same remap edit as from the Review tab, reasoned, with its policy.
+  const kase = await readCase(backend);
+  const remap = kase.edits.find((e: { kind: string }) => e.kind === "remap");
+  expect(remap).toMatchObject({ line: "Research and Development", new_platform_line: "Cost of products sold", status: "reasoned" });
+  expect(remap.policy_id).toBeTruthy();
+
+  // Back to case leaves the Review page; the sidebar brings it back on the same tab's default.
+  await page.getByRole("link", { name: "Back to case" }).click();
+  await expect(page).toHaveURL(/\/case$/);
 });
 
 test("a large change asks first; Change it goes back to the cell, Yes saves it", async ({ page, shot }) => {
