@@ -1,13 +1,14 @@
 """The Dashboard's four seeded cases, besides the live demo deal (Kewaunee and Nu Aire, kewaunee.py).
 
 Three are real public deals, each built from its filings like the Kewaunee fixture (sources in each module's header):
-- DLH Holdings acquires GRSi (dlh_grsi.py): posted, after one covenant answer and one reasoned remap edit.
+- DLH Holdings acquires GRSi (dlh_grsi.py): posted, after one covenant answer and two reasoned remap edits.
 - Mama's Creations acquires Crown I (mamas_crown.py): awaiting the controller's approval.
 - Shutterstock acquires Envato (sstk_envato.py): waiting on the controller, with the IFRS 16 lease question open.
 The fourth is a sample, not a real deal: DLH's next add-on, the QuickBooks Online sample company (Craig's Design and
 Landscaping Services, scripts/samples/qbo/). Its platform lines are the posted combined DLH and GRSi books of the
 first case, read from that case's consolidate run, and the Mapper reuses the controller's answer on DLH's prior term
-loan from that case (policy:apply), so it asks only about the sample company's own credit card. It is posted.
+loan from that case (policy:apply), so it asks only about the sample company's own credit card. It is posted, after two reasoned remap edits.
+Four reasoned edits in all, each citing its source line in the reason.
 
 Every case runs through the real pipeline on the scripted backend with no pace: the scripted Mapper reads the deal's
 reference mapping (`DealPlan`), the Preparer and the Reviewer call the tools through the gateway, and the controller's
@@ -48,6 +49,28 @@ CHIPS = {
                   ReasonChip(id=2, label="Auditor's reclassification")],
     },
 }
+
+# The controller's reasoned edits on the seeded cases (D19), each sourced in the filing or the sample's own export and
+# made through the same gateway calls as the console's edit bubble (apply_edit, then reason_edit). With the DLH remap
+# above (remembered, a platform policy) there are four across the cases, two on DLH and GRSi and two on the sample:
+# GET /memory/counts reads 4 after seeding. These three are not remembered, so none becomes memory a later deal is
+# offered. Mama's and Crown I has none: the gateway refuses amount edits on subtotals and on balance sheet detail
+# lines, and no Crown I line has a filing-sourced correction or remap that fits those rules.
+DLH_CONTRACT_LIABILITIES_REASON = (
+    "Ex 99.2 Note 1: GRSi's other current liabilities ($209) are its contract liabilities, which DLH reports as "
+    "Deferred revenue")
+SAMPLE_UNDEPOSITED_FUNDS_REASON = (
+    "QuickBooks account list (scripts/samples/qbo/account_list.xlsx): Undeposited Funds is an Other Current Assets "
+    "account, not a Bank account: customer payments received but not yet in the bank")
+SAMPLE_EQUIPMENT_RENTAL_REASON = (
+    "QuickBooks account list (scripts/samples/qbo/account_list.xlsx): Equipment Rental is its own Expenses account, "
+    "not the Job Expenses:Equipment Rental job cost, so it is overhead")
+
+
+def _reasoned_edit(gw: Gateway, deal_id: str, kind: str, company: str, line: str, reason: str, **change) -> None:
+    out = gw.apply_edit(CONTROLLER, deal_id, kind, company, line, **change)
+    gw.reason_edit(CONTROLLER, out["edit"].id, text=reason, remember=False)
+
 
 for _m in FILED:
     register_plan(_m.DEAL_ID, DealPlan(mapping=_m.MAPPING, tags=_m.TAGS, covenant_flag=_m.COVENANT_FLAG,
@@ -179,7 +202,7 @@ def _stage(gw: Gateway, deal_id: str, want: str) -> None:
 
 
 def scenario_dlh(gw: Gateway) -> None:
-    """Posted: the covenant answer (the prior loans were repaid at close), one reasoned remap edit, approval."""
+    """Posted: the covenant answer (the prior loans were repaid at close), two reasoned remap edits, approval."""
     m = dlh_grsi
     _run(gw, m.DEAL_ID)
     _answer(gw, m.DEAL_ID)
@@ -187,6 +210,8 @@ def scenario_dlh(gw: Gateway) -> None:
     _stage(gw, m.DEAL_ID, "awaiting_approval")
     out = gw.apply_edit(CONTROLLER, m.DEAL_ID, "remap", m.TARGET, "Indirect costs", platform_line="Contract costs")
     gw.reason_edit(CONTROLLER, out["edit"].id, chip=0, remember=True)
+    _reasoned_edit(gw, m.DEAL_ID, "remap", m.TARGET, "Other current liabilities", DLH_CONTRACT_LIABILITIES_REASON,
+                   platform_line="Deferred revenue")
     gw.approve(CONTROLLER, _approval(gw, m.DEAL_ID).id)
     _stage(gw, m.DEAL_ID, "posted")
 
@@ -249,7 +274,8 @@ def _sample_brief() -> Brief:
 
 
 def scenario_sample(gw: Gateway) -> None:
-    """Posted: the Mapper reuses the DLH policy, the controller answers the one new question, and approves."""
+    """Posted: the Mapper reuses the DLH policy, the controller answers the one new question, makes two reasoned remap
+    edits from the QuickBooks account list, and approves."""
     lines = _sample_lines(gw)
     if lines is None:
         log.warning("sample case skipped: %s is not posted", dlh_grsi.DEAL_ID)
@@ -261,6 +287,10 @@ def scenario_sample(gw: Gateway) -> None:
     _answer(gw, SAMPLE_ID)
     _run(gw, SAMPLE_ID)
     _stage(gw, SAMPLE_ID, "awaiting_approval")
+    _reasoned_edit(gw, SAMPLE_ID, "remap", SAMPLE_TARGET, "Equipment Rental", SAMPLE_EQUIPMENT_RENTAL_REASON,
+                   platform_line="General and administrative costs")
+    _reasoned_edit(gw, SAMPLE_ID, "remap", SAMPLE_TARGET, "Undeposited Funds", SAMPLE_UNDEPOSITED_FUNDS_REASON,
+                   platform_line="Other current assets")
     gw.approve(CONTROLLER, _approval(gw, SAMPLE_ID).id)
     _stage(gw, SAMPLE_ID, "posted")
 

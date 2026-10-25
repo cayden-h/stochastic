@@ -66,11 +66,13 @@ def test_every_seeded_case_is_fully_viewable_with_a_valid_audit_chain(seeded):
         assert c.get(f"/deals/{deal_id}/export.xlsx").status_code == 200
 
 
-def test_the_dlh_case_has_one_reasoned_remap_and_the_sample_reuses_its_learned_policy(seeded):
+def test_the_dlh_case_has_its_remembered_remap_and_the_sample_reuses_its_learned_policy(seeded):
     app, c = seeded
     store = app.state.gateway.store
     dlh = c.get(f"/deals/{dlh_grsi.DEAL_ID}/case").json()
-    (edit,) = dlh["edits"]
+    edit, contract = dlh["edits"]
+    assert (contract["line"], contract["new_platform_line"], contract["remember"]) == (
+        "Other current liabilities", "Deferred revenue", False)
     assert (edit["kind"], edit["line"], edit["new_platform_line"], edit["status"]) == (
         "remap", "Indirect costs", "Contract costs", "reasoned")
     assert store.policies[edit["policy_id"]].scope == "platform" and store.policies[edit["policy_id"]].platform == "DLH"
@@ -171,3 +173,60 @@ def test_each_filed_fixture_balances_and_names_its_sources(module):
         assert assets == pytest.approx(le, abs=0.5)
     names = {line for section, _, _, _, rows in module.TARGET_BLOCKS for line, _, _ in rows}
     assert names <= set(module.MAPPING)  # the scripted Mapper has an answer for every target line
+
+
+def test_the_seeded_cases_hold_four_reasoned_edits_each_citing_its_source(seeded):
+    """The sidebar's Edits counter reads 4 after seeding: real gateway edits (apply_edit, then reason_edit), each
+    reason citing the filing note or the sample export that supports it, none remembered as memory."""
+    app, c = seeded
+    edits = [e for d in cases.CASE_IDS for e in c.get(f"/deals/{d}/case").json()["edits"]]
+    assert len(edits) == 4 and all(e["status"] == "reasoned" for e in edits)
+    got = {(e["deal_id"], e["line"], e["new_platform_line"]) for e in edits}
+    assert got == {(dlh_grsi.DEAL_ID, "Indirect costs", "Contract costs"),
+                   (dlh_grsi.DEAL_ID, "Other current liabilities", "Deferred revenue"),
+                   (cases.SAMPLE_ID, "Equipment Rental", "General and administrative costs"),
+                   (cases.SAMPLE_ID, "Undeposited Funds", "Other current assets")}
+    sources = {e["line"]: e["reason_text"] for e in edits}
+    assert "Ex 99.3 note 3b" in sources["Indirect costs"]
+    assert "Ex 99.2 Note 1" in sources["Other current liabilities"]
+    assert "account_list.xlsx" in sources["Equipment Rental"] and "account_list.xlsx" in sources["Undeposited Funds"]
+    # Each source says what the reason says (the filing note on the line, or the QuickBooks export).
+    assert "contract liabilities" in dlh_grsi.LINE_NOTES["Other current liabilities"]
+    accounts = cases.QBO / "account_list.xlsx"
+    import openpyxl
+    rows = {r[0]: r for r in openpyxl.load_workbook(accounts).active.iter_rows(values_only=True) if r and r[0]}
+    assert rows["Equipment Rental"][1] == "Expenses" and rows["Job Expenses:Equipment Rental"][1] == "Expenses"
+    assert rows["Undeposited Funds"][1] == "Other Current Assets" and rows["Checking"][1] == "Bank"
+    assert [e["remember"] for e in edits].count(True) == 1  # only the DLH remap was remembered (a platform policy)
+    for d in cases.CASE_IDS:  # every edited case still ties out and passes review on the edited books
+        body = c.get(f"/deals/{d}/case").json()
+        if body["edits"]:
+            assert body["verdict"]["tie_out_ok"] and body["verdict"]["review"]["verdict"] == "pass"
+
+
+def test_the_counters_are_totals_across_every_deal_and_the_demo_adds_to_them(seeded):
+    app, c = seeded
+    store = app.state.gateway.store
+    counts = c.get("/memory/counts").json()
+    assert counts["edits"] == 4
+    assert counts["policies"] == len([p for p in store.policies.values() if not p.retired_by])
+    answered = [i for i in store.items.values() if i.type == "flag" and i.answer]
+    assert counts["human_answers"] == len(answered) > 0
+    assert set(counts["by_deal"]) <= set(cases.CASE_IDS) and sum(v["edits"] for v in counts["by_deal"].values()) == 4
+    assert c.get("/health").json()["memory_counts"] == counts
+    # The live demo deal adds to them as it runs: two answers, the policies they teach, then one edit.
+    c.post(f"/deals/{DEAL_ID}/run", json={"sync": True, "backend": "scripted"})
+    for fid in c.get(f"/deals/{DEAL_ID}/case").json()["open_flags"]:
+        f = next(x for x in c.get(f"/deals/{DEAL_ID}/case").json()["flags"] if x["id"] == fid)
+        c.post(f"/work-items/{fid}/answer?auto_advance=false", json={"option_id": f["default"]})
+    c.post(f"/deals/{DEAL_ID}/run", json={"sync": True, "backend": "scripted"})
+    mid = c.get("/memory/counts").json()
+    assert mid["human_answers"] == counts["human_answers"] + 2 and mid["policies"] > counts["policies"]
+    r = c.post(f"/deals/{DEAL_ID}/edits", json={"kind": "remap", "company": "Nu Aire",
+                                                "line": "Certificates of Deposit", "platform_line": "Other assets"})
+    assert r.status_code == 200, r.text
+    c.post(f"/edits/{r.json()['edit']['id']}/reason", json={"chip": 0, "remember": False})
+    assert c.get("/memory/counts").json()["edits"] == 5
+    # A fresh reset clears the demo deal's answers, its edit, and the policies covering it; the cases keep theirs.
+    c.post("/dev/reset?keep_memory=false")
+    assert c.get("/memory/counts").json() == counts
