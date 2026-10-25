@@ -18,10 +18,6 @@ const HEAD_PATH = "M12 0 L-12 -11 L-5 0 L-12 11 Z";
 const STROKE = 7;
 const DOT_R = 27;
 const POINTS = WALK.map((p) => p.join(",")).join(" ");
-/** The in-app small mark's walk: five segments that never cross, so it stays readable at sidebar size.
- * The favicon, the app icon, and the splash keep the full walk. */
-const SMALL_WALK: [number, number][] = [[420, 420], [560, 620], [760, 440], [880, 640], [640, 840], [470, 760]];
-const SMALL_POINTS = SMALL_WALK.map((p) => p.join(",")).join(" ");
 const RING_LEN = 2 * Math.PI * RING.r;
 
 /** Each arrowhead's position, angle, and the walk length at which it appears while the walk draws. */
@@ -53,15 +49,15 @@ interface MarkProps {
 }
 
 /** The static mark. Ink is currentColor, so it follows the surrounding text color and theme.
- * Below 64 px it switches to the small mark (a shorter walk that never crosses, heavier strokes, no arrowheads). */
+ * Below 64 px it switches to the small mark (heavier strokes, no arrowheads), which stays legible at 16 to 32 px. */
 export function StochasticMark({ size, className, title }: MarkProps) {
   const a11y = title ? { role: "img", "aria-label": title } : { "aria-hidden": true };
   if (size < 64) {
     return (
       <svg width={size} height={size} viewBox="230 230 840 840" className={className} {...a11y}>
         <circle {...RING} fill="none" stroke="currentColor" strokeWidth={40} />
-        <polyline points={SMALL_POINTS} fill="none" stroke="currentColor" strokeWidth={44} strokeLinejoin="round" strokeLinecap="round" />
-        <circle cx={SMALL_WALK[0][0]} cy={SMALL_WALK[0][1]} r={60} fill="currentColor" />
+        <polyline points={POINTS} fill="none" stroke="currentColor" strokeWidth={40} strokeLinejoin="round" />
+        <circle cx={WALK[0][0]} cy={WALK[0][1]} r={45} fill="currentColor" />
       </svg>
     );
   }

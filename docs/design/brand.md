@@ -35,20 +35,16 @@ There are no gradients, no second color, and no fill inside the circle.
 ### Weights
 
 The mark has three weights for three sizes.
-The circle stays the same in each.
-The walk is the same in each except the in-app small mark, which uses a shorter walk.
+The geometry (the circle and the walk) stays the same in each.
 
 | Weight | Used at | Strokes | Dot | Arrowheads |
 | --- | --- | --- | --- | --- |
 | Full | 64 px and larger: the splash (232 px) | 7 | r 27 | scale 1 |
-| Small (in app) | below 64 px in the console: the sidebar (24 px) | 44, round joins | r 60 | none |
-| Small (favicon) | the browser tab icon | 52, round joins | r 58 | none |
+| Small | below 64 px: the sidebar (24 px), the favicon | 40 to 52, round joins | r 45 to 58 | none |
 | Icon | the macOS app icon | 22 | r 48 | scale 2.6 |
 
 The full weight's 7-unit strokes are under 0.25 px at 24 px and disappear, so small sizes use the small weight.
 The arrowheads are left out below 64 px because they turn into noise on the line.
-At sidebar size the full walk's eleven segments cross five or six times and merge into a knot, so the in-app small mark draws a five-segment walk that never crosses: 420,420 560,620 760,440 880,640 640,840 470,760, starting at its own dot.
-The favicon, the macOS app icon, and the splash keep the full walk.
 `StochasticMark` in the console picks the weight from its `size` prop.
 
 ### Minimum size and clear space
