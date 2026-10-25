@@ -66,6 +66,13 @@ export function canStart(stage: Stage): boolean {
   return stage === "new" || stage === "run_failed";
 }
 
+/** A run is in flight: this page just asked for one, or the gateway says a job is running for the deal now.
+ * Read from the gateway's `running`, never from the stage: after a restart a deal can be loaded at a working stage
+ * with no job behind it, and inferring from the stage then kept Run and Reset disabled for good. */
+export function runInFlight(starting: boolean, kase: { running?: boolean } | null): boolean {
+  return starting || Boolean(kase?.running);
+}
+
 /** The stage in the controller's words, and whether it waits on them. */
 export function stageWords(stage: Stage): { text: string; tone: "you" | "work" | "done" | "bad" | "idle" } {
   switch (stage) {

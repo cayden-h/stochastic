@@ -69,6 +69,9 @@ class CaseResponse(BaseModel):
 
     deal: Deal
     stage: str
+    # A job is running for this deal in this process now. The console reads this, not the stage: after a restart a
+    # deal can sit at a working stage with nothing running (it is moved to run_failed on start).
+    running: bool = False
     source_lines: list[SourceLine]
     mappings: list[Mapping]
     flags: list[WorkItem]
@@ -198,6 +201,7 @@ class HealthResponse(BaseModel):
     chain_valid: bool
     backend: BackendStatus
     store: StoreStatus
+    running: bool = False  # a job is running for some deal in this process now
 
 
 class DealCreated(BaseModel):

@@ -5,13 +5,14 @@ Owner: Tri (backend/app/api/). Cayden wrote the first version so the console had
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 import os
-import threading
 
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Query, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
@@ -172,9 +173,9 @@ def build_router(gw: Gateway) -> APIRouter:
 
     # One job per deal at a time. Answering the last flag starts the job runner, so a Run click at the same moment
     # would start a second Preparer; the gateway would deny its result, but the click should get a clear 409 instead.
-    running: set[str] = set()
-    running_lock = threading.Lock()
-    gw.running = running  # /dev/reset refuses while a run is in flight
+    # The set and its lock live on the gateway: /dev/reset holds the same lock across its check and the reset, and
+    # /case and /health say from the set whether a job is really running (the stage alone cannot tell after a restart).
+    running, running_lock = gw.running, gw.running_lock
 
     def claim(deal_id: str) -> bool:
         with running_lock:
@@ -210,7 +211,7 @@ def build_router(gw: Gateway) -> APIRouter:
     def health():
         forks = gw.forks.status() if gw.forks else {"enabled": False}
         return {"ok": True, "chain_valid": gw.verify_chain(), "backend": backend_status(),
-                "store": {**store.status(), "forks": forks}}
+                "store": {**store.status(), "forks": forks}, "running": bool(running)}
 
     @r.get("/deals")
     def deals():
@@ -244,6 +245,7 @@ def build_router(gw: Gateway) -> APIRouter:
         return {
             "deal": dump(d),
             "stage": d.stage,
+            "running": gw.is_running(deal_id),
             "source_lines": [dump(l) for l in store.lines(deal_id)],
             "mappings": [dump(m) for m in store.deal_mappings(deal_id)],
             "flags": [dump(f) for f in flags],
@@ -377,7 +379,17 @@ def build_router(gw: Gateway) -> APIRouter:
         The console calls POST /deals/{id}/run next. /dev/reset reseeds only the demo deal, so uploaded deals
         are lost on reset, which is fine for the demo.
         """
-        guard(lambda: gw._require(x_actor, "create_deal", deal_id="-"))  # a denial is audited, before any file is parsed
+        def require():  # a denial is audited, before any file is parsed; a write, so under the lock and committed
+            with gw.lock:
+                try:
+                    gw._require(x_actor, "create_deal", deal_id="-")
+                except GatewayError as error:
+                    raise HTTPException(status_code=error.status, detail=error.message)
+                finally:
+                    store.commit()
+        # Every gateway call below may wait on the gateway lock, which a paced run holds for seconds at a time. They
+        # run in a worker thread, so an upload during a run never stops the event loop (and every stream with it).
+        await run_in_threadpool(require)
         name, platform, target = name.strip(), platform.strip(), target.strip()
         if not name or not platform or not target or platform.lower() == target.lower():
             raise HTTPException(status_code=422, detail="name, platform and target are required, and platform and target must differ")
@@ -403,22 +415,33 @@ def build_router(gw: Gateway) -> APIRouter:
                 raise HTTPException(status_code=422, detail=f"brief: {bad_path} must be finite")
             if not math.isfinite(parsed_brief.limit) or parsed_brief.limit <= 0:
                 raise HTTPException(status_code=422, detail="brief: limit must be a finite number greater than 0")
-        deal_id = store.next_id("d")
-        loaded = {}
-        for field, company, text in (("platform_csv", platform, platform_text), ("target_csv", target, target_text)):
-            try:
-                loaded[field] = parse_statement_csv(text, company, deal_id, store.next_id)
-            except (LoaderError, ValueError, ValidationError) as error:
-                raise HTTPException(status_code=422, detail=f"{field}: {error}")
-        lines = loaded["platform_csv"] + loaded["target_csv"]
-        if has_agreement:
-            deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=None, brief_status="none")
-            source = (agreement_txt.filename or "agreement.txt").strip()[:200]
-            created = guard(lambda: gw.create_deal_from_agreement(x_actor, deal, lines, agreement_text, source=source))
-        else:
-            deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=parsed_brief)
-            guard(lambda: gw.create_deal(x_actor, deal, lines))
-            created = store.deals[deal_id]
+        return await run_in_threadpool(load_deal, name, platform, target, platform_text, target_text, parsed_brief,
+                                       agreement_text, (agreement_txt.filename if agreement_txt else None), x_actor)
+
+    def load_deal(name: str, platform: str, target: str, platform_text: str, target_text: str,
+                  parsed_brief: Brief | None, agreement_text: str | None, agreement_name: str | None,
+                  x_actor: str) -> dict:
+        """The blocking half of POST /deals: parse the CSVs and write the deal through the gateway. Under the gateway
+        lock, so the new id and the deal are one step and two uploads cannot take the same id."""
+        with gw.lock:
+            deal_id = store.next_id("d")
+            loaded = {}
+            for field, company, text in (("platform_csv", platform, platform_text),
+                                         ("target_csv", target, target_text)):
+                try:
+                    loaded[field] = parse_statement_csv(text, company, deal_id, store.next_id)
+                except (LoaderError, ValueError, ValidationError) as error:
+                    raise HTTPException(status_code=422, detail=f"{field}: {error}")
+            lines = loaded["platform_csv"] + loaded["target_csv"]
+            if agreement_text is not None:
+                deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=None, brief_status="none")
+                source = (agreement_name or "agreement.txt").strip()[:200]
+                created = guard(lambda: gw.create_deal_from_agreement(x_actor, deal, lines, agreement_text,
+                                                                      source=source))
+            else:
+                deal = Deal(id=deal_id, name=name, platform=platform, target=target, brief=parsed_brief)
+                guard(lambda: gw.create_deal(x_actor, deal, lines))
+                created = store.deals[deal_id]
         return {"deal_id": deal_id, "stage": created.stage, "brief_status": created.brief_status,
                 "lines": {"platform": len(loaded["platform_csv"]), "target": len(loaded["target_csv"])}}
 
@@ -620,6 +643,7 @@ def build_router(gw: Gateway) -> APIRouter:
             seen, last, tick = 0, None, 0
             edits_seen: dict = {}  # the edit event's cursor, updated in place by next_events
             live_seen: dict = {}  # the conversation and mapping events' cursor, likewise
+            was_running = None
             while not await request.is_disconnected():
                 if deal_id not in store.deals:
                     return
@@ -627,6 +651,13 @@ def build_router(gw: Gateway) -> APIRouter:
                                                  live_seen=live_seen)
                 for e in events:
                     yield e
+                # A `run` event when a job for this deal starts or stops. The stage does not always change then (the
+                # runner ends about a second after the Reviewer's hand-off), and the console enables Run and Reset
+                # only once no job runs.
+                now_running = gw.is_running(deal_id)
+                if now_running != was_running:
+                    yield f"event: run\ndata: {json.dumps({'running': now_running})}\n\n"
+                    was_running = now_running
                 tick += 1
                 if tick % 60 == 0:
                     yield ": keepalive\n\n"
