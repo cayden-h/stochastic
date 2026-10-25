@@ -377,7 +377,7 @@ How to show the "answer key" on stage:
   Click one to see expected versus simulated. [inferred]
 - A frozen golden scenario: a tiny fictional company with 3 quarters, hand-computed in a spreadsheet by a teammate (not by the code or an LLM).
   The code must reproduce every cell. [inferred]
-- This links to Hyphenate's request for an answer key with a score (see `../hyphenate-workshop.md`, item 5 of the gaps list: "No answer key").
+- This links to Hyphenate's request for an answer key with a score (see `../../hyphenate-workshop.md`, item 5 of the gaps list: "No answer key").
   The simulation answer key is separate from the covenant-trap catch-rate score, so keep both. [verified (hyphenate-workshop.md)]
 
 ### 4.4 Never let the LLM invent a number

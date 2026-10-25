@@ -223,7 +223,7 @@ This is a labeling and fairness rule, not a legal conclusion (inferred).
    Keep the Articles, Section numbering, defined terms, amendment sequence, and instrument types.
    Rewrite only names, amounts, and dates.
 6. Use an LLM only to rewrite text during the build, then freeze the output as files.
-   All deal math at demo time is deterministic code, per `../README.md`.
+   All deal math at demo time is deterministic code, per `CalHacks/ideation/Stochastic/README.md`.
 7. Produce a document pack: a synthetic 10-K style financial table set, the credit agreement with amendments, a term sheet for the new money, and a few emails or 8-K style notices that arrive during the demo (for the time dimension).
 
 ### Traps to plant (7 to 8, pick 5 to 7 for the demo)
@@ -272,14 +272,14 @@ Suggested fields:
 ```
 
 Score = traps found, correct action taken, evidence cited, no forbidden action.
-This matches the Hyphenate request for an answer key (see `../hyphenate-workshop.md`).
+This matches the Hyphenate request for an answer key (see `../../hyphenate-workshop.md`).
 
 ## 4. Bright Data and Apify
 
 Recommendation: no for the core, and optional only for one narrow, real input.
 
 - Bright Data disqualifies mocked or hardcoded demo data.
-  verified (`../../tracks.md` line 36, which quotes the email)
+  verified (`CalHacks/ideation/tracks.md` line 36, which quotes the email)
 - The Stochastic core is a seeded fictional company, which is by design not "public web data", so it cannot qualify for that prize.
   inferred
 - A real, live input that does not need scraping exists: the NY Fed SOFR API returned 200 with `percentRate` 3.90 for 2026-10-22.
@@ -288,7 +288,7 @@ Recommendation: no for the core, and optional only for one narrow, real input.
 - If the team still wants a sponsor, the only honest use is a live feed that really drives a decision, for example pulling a day's deal press releases and showing the agent react to a new lender-term event.
   That requires the demo to truly depend on it, which adds failure risk in 36 hours, and the Hyphenate judges want the seeded company (inferred).
 - Apify: a Store Actor could fetch rate or news pages, but the same logic applies, and the free plan hard-blocks when the $5 monthly usage is used up.
-  verified (`../../sponsors/apify.md`, citing https://apify.com/pricing)
+  verified (`CalHacks/ideation/sponsors/apify.md`, citing https://apify.com/pricing)
 - Verdict: no Bright Data or Apify for the core.
   If a spare person has time, add the SOFR feed (free) and decide later whether to route it through a sponsor tool.
 

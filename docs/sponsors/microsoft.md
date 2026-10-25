@@ -39,7 +39,7 @@ The name "Delta" was not found in any source; it may be an internal team name [n
 
 ### Official prompt
 The exact Devpost text for the Microsoft prizes was not retrievable: the Devpost page returned HTTP 403 and web search found nothing for "Built for the Real World" or "Customer Impact Award" [not found].
-Prize names and rewards come from `../tracks.md`: 1st "Built for the Real World" ($3,800, Surface laptop, FDE tech talk and mentorship), 2nd "Customer Impact Award" (tech talk and mentorship, no cash) [verified: tracks.md, from Devpost 2026-10-15].
+Prize names and rewards come from `CalHacks/ideation/tracks.md`: 1st "Built for the Real World" ($3,800, Surface laptop, FDE tech talk and mentorship), 2nd "Customer Impact Award" (tech talk and mentorship, no cash) [verified: tracks.md, from Devpost 2026-10-15].
 The organizers' email names the Delta / Frontier Co. FDE team as involved in the Customer Impact Award, and says Microsoft brings 12 engineers and 4 early-career recruiters plus a workshop on system design for deployed agents [verified: pre-event email, see tracks.md].
 No judging criteria are published.
 Full criteria arrive on the Live Site at kickoff [verified: tracks.md].

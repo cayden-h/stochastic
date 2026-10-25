@@ -55,7 +55,7 @@ That is a custom stack, and Mana's no-setup model works against it.
 The honest cheap use is brainstorming, research, and a throwaway prototype of the reviewer console, with the real build on our own stack.
 That may not count as "built with Mana".
 Claim the credits, and do not change the architecture for the prize.
-No project code before Friday Oct 23, about 6pm, so check that Mana prototyping does not break that rule (the rule is in `../../logistics.md`).
+No project code before Friday Oct 23, about 6pm, so check that Mana prototyping does not break that rule (the rule is in `CalHacks/logistics.md`).
 
 
 ## Research 2026-10-23: alongside-stack fit

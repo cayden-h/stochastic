@@ -19,11 +19,11 @@ This file holds what Stochastic needs.
 The fit is real, because the Figma MCP is already in our loop.
 We built the design system and four screens in Figma through `use_figma`.
 The current UI is the `Hi-fi - v3` page of the team file, https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-2, with its `Components` page.
-The pitch material is on the `Technologies Used` page. [verified: `design/README.md`]
-The first design system was built in https://www.figma.com/design/KDbPUruO6f5oPLyzyLgUZh. [verified: `design/README.md`]
+The pitch material is on the `Technologies Used` page. [verified: `../design/README.md`]
+The first design system was built in https://www.figma.com/design/KDbPUruO6f5oPLyzyLgUZh. [verified: `../design/README.md`]
 It holds one variable collection (`Tokens`), seven text styles, and five components: Actor Chip, Button, Source Chip, Verdict, and Log Row.
 
-Hi-fi v3 has six screens (Dashboard, upload, Case, Mapping, Log, Agents), and the console is built from it.
+Hi-fi v3 has seven screens (Dashboard, upload, Case, Mapping, Log, Agents, and the Review flow), and the console is built from it. [verified: `../design/README.md`]
 Show a v3 frame on screen in the pitch.
 
 ## What the track needs from us

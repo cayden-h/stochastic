@@ -101,7 +101,7 @@ Use this phrase in the pitch and in searches, because it is the industry's curre
 - No startup, product launch, or Devpost project doing AI capital-structure advising with simulation and covenant checking turned up in standard searches.
   The finance hackathon found was AdvisoryAI Hackathon 2026 (January, consumer financial advice access), which is a different problem. [verified absence of results, not proof none exists]
 - Absence in search is weak evidence.
-  Still to do: search EDGAR-adjacent vendors, Hypercore and Ellis (see `../private-credit-market.md`), and ask the Hyphenate booth.
+  Still to do: search EDGAR-adjacent vendors, Hypercore and Ellis (see `CalHacks/ideation/private-credit-market.md`), and ask the Hyphenate booth.
 
 ### Still open
 
@@ -116,4 +116,4 @@ Use this phrase in the pitch and in searches, because it is the industry's curre
 - Read the Hyphenate track brief PDF link in `../sponsors/hyphenate.md` sources, and ask the booth if capital structuring counts.
 - Find real Monte Carlo practice for covenant headroom, such as EBITDA volatility and rate path assumptions, so inputs are defensible.
 - Find the General Atlantic press release text for terms (dividend rate, PIK toggle, redemption), if public.
-- Confirm no one has built this already (Devpost search "capital structure", "covenant", "mezzanine", plus startups such as Hypercore and Ellis, noted in `../private-credit-market.md`).
+- Confirm no one has built this already (Devpost search "capital structure", "covenant", "mezzanine", plus startups such as Hypercore and Ellis, noted in `CalHacks/ideation/private-credit-market.md`).

@@ -62,9 +62,9 @@ The site also lists human approval checkpoints and multiple model providers. [ve
 The Cal Hacks 13.0 prompt text is not published anywhere we could reach.
 The Devpost page returned HTTP 403 to fetch, and no search result quoted a Factory challenge.
 The only official wording is the prize name, "Best Use of the Factory Droid SDK".
-[verified: Devpost fetch blocked 2026-10-15; prize name from `../tracks.md`]
+[verified: Devpost fetch blocked 2026-10-15; prize name from `CalHacks/ideation/tracks.md`]
 Full criteria are due on the Live Site when hacking starts, so ask the Factory booth on day one for the rubric and the credit amount.
-[verified: Hacker Guide note in `../tracks.md`]
+[verified: Hacker Guide note in `CalHacks/ideation/tracks.md`]
 
 ### How Factory frames and judges at other events
 No Factory hackathon prompt, rubric, or winner list turned up in search (Devpost, Factory blog, general web).

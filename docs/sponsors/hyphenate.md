@@ -32,8 +32,8 @@ Questions to ask at the Friday 7pm workshop:
 
 - Prize: "The Hyphenated Enterprise: Autonomous Systems for Finance" - $8,000 / $5,000 / $3,000 for 1st to 3rd, plus an expedited, shortened interview for every member of the top 5 teams.
 - Status: **main track** (team decision 2026-10-15, reconfirmed 2026-10-23).
-  The idea is now Stochastic, special-situations financing, see `../Stochastic/README.md`.
-  Securitization (`../domains/securitization/`) is shelved.
+  The idea is now Stochastic, special-situations financing, see `CalHacks/ideation/Stochastic/README.md`.
+  Securitization (`CalHacks/ideation/domains/securitization/`) is shelved.
 - Brief read: 2026-10-15, full text pasted by the team from the organizers' document (Cal_Hacks_Hyphenate_Track).
 
 ## What they do
@@ -133,9 +133,9 @@ A scenario that only works on the rehearsed input.
 
 ## How our existing work maps
 
-Our git-for-AI-coding direction (see `../tracks.md`) does not fit this track as a coding tool, but its core ideas are exactly what the brief asks for: per-action attribution, an append-only history, approvals before risky actions, and replay.
+Our git-for-AI-coding direction (see `CalHacks/ideation/tracks.md`) does not fit this track as a coding tool, but its core ideas are exactly what the brief asks for: per-action attribution, an append-only history, approvals before risky actions, and replay.
 The honest move is to carry those ideas into finance, with the ledger and the decision trail as the differentiator, and to drop the coding framing.
-The git idea stays recorded in `../ideas.md` as a fallback, not the plan.
+The git idea stays recorded in `CalHacks/ideation/ideas.md` as a fallback, not the plan.
 
 ## Idea seeds (all unvetted, written against the brief)
 
@@ -170,7 +170,7 @@ Confirm the workshop times (online Oct 21, in person Oct 23 at 7pm) and attend a
 
 ## Workshop and Slack update (2026-10-23)
 
-The Oct 21 online workshop and its slide deck are analyzed in `../Stochastic/hyphenate-workshop.md`.
+The Oct 21 online workshop and its slide deck are analyzed in `../hyphenate-workshop.md`.
 The main new facts: the system-of-work blueprint (gateway, state machine, append-only diff log, learned policies), the "would you hire it" emphasis, precision over recall, and a list of strong and weak submissions.
 In `#cohost-hyphenate` a Hyphenate rep said you do not sign up separately: you participate normally and select the Hyphenate track on Devpost at submission.
 Abdul, a Hyphenate founding engineer, said they will judge as part of the Hyphenate team.
