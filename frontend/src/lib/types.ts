@@ -107,9 +107,21 @@ export interface Policy {
 }
 
 export interface Attempt { backend: Backend; ok: boolean; seconds: number; error?: string }
-/** `asked`: the backend the run was asked for (pace "demo" asks for scripted whatever is configured). */
-export interface LastRun { role: string; backend: Backend; asked?: Backend; attempts: Attempt[]; meta: Record<string, unknown>; at: string }
-export interface BackendStatus { configured: Backend; fallback: string; anthropic_key: boolean; factory_key: boolean; last_runs: LastRun[] }
+/** `asked`: the backend the run was asked for (pace "demo" asks for scripted whatever is configured).
+ * `model` and `recorded`: on the replay backend, the model whose recorded run is replayed (for example
+ * "claude-haiku-5-5") and true when the replay plays a real recorded run. */
+export interface LastRun {
+  role: string; backend: Backend; asked?: Backend; model?: string | null; recorded?: boolean;
+  attempts: Attempt[]; meta: Record<string, unknown>; at: string;
+}
+export interface BackendStatus {
+  configured: Backend; fallback: string; anthropic_key: boolean; factory_key: boolean; last_runs: LastRun[];
+  /** The case's own backend info may name the replayed model directly. */
+  model?: string | null; recorded?: boolean;
+}
+
+/** What the agents learned from, counted across every deal (GET /health `counts`). */
+export interface LearningCounts { human_answers: number; policies: number; edits: number }
 
 export interface Case {
   /** A job is running for this deal in the gateway's process now (not inferred from the stage). */
@@ -161,7 +173,11 @@ export interface StoreStatus {
   kind: "memory" | "postgres"; fallback_reason: string | null;
   host?: string; schema?: string; ledger?: number; pending?: number; last_error?: string | null; last_write_at?: string | null;
 }
-export interface Health { ok: boolean; chain_valid: boolean; backend: BackendStatus; store: StoreStatus; running?: boolean }
+export interface Health {
+  ok: boolean; chain_valid: boolean; backend: BackendStatus; store: StoreStatus; running?: boolean;
+  /** Cross-deal learning counters. Absent on a gateway from before they were added; the sidebar then counts the deal. */
+  counts?: LearningCounts;
+}
 
 export interface AuditRow {
   id: number; at: string; deal_id: string; actor: string; action: string; target: string | null;

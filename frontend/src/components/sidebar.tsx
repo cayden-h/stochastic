@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDeal } from "@/lib/deal-context";
-import type { Case, Health } from "@/lib/types";
+import { recordedModelName } from "@/lib/format";
+import type { BackendStatus, Case, Health } from "@/lib/types";
 import { NavIcon, type NavIconName } from "./icons";
 import { StochasticMark } from "./stochastic-mark";
 import { Label } from "./ui";
@@ -49,13 +50,27 @@ function producedBy(health: Health | null, kase: Case | null): { produced: strin
   return { produced: weakest ?? kase?.verdict?.backend ?? last?.backend ?? asked, configured: asked, env: status.configured };
 }
 
+/** The model a replayed run recorded, named for the card ("Claude Haiku 5.5"), from the newest replay run on /health or
+ * the case, or from the backend info itself. Null unless the replay plays a recorded Haiku run. */
+function recordedModel(...statuses: (BackendStatus | undefined)[]): string | null {
+  for (const status of statuses) {
+    if (!status) continue;
+    const run = status.last_runs.findLast((r) => r.role !== "runner" && r.backend === "replay");
+    const name = recordedModelName(run) ?? recordedModelName({ backend: "replay", model: status.model, recorded: status.recorded });
+    if (name) return name;
+  }
+  return null;
+}
+
 /** The model card: what produced the agent text, and where the record lives (Tiger Cloud or memory). */
 function ModelCard() {
   const { health, kase } = useDeal();
   const by = producedBy(health, kase);
   const store = health?.store;
   if (!by) return null;
-  const words = BACKEND_WORDS[by.produced] ?? { title: by.produced, sub: "" };
+  // A replay of a recorded Claude Haiku run names the model; a scripted run always reads "Scripted rules".
+  const model = by.produced === "replay" ? recordedModel(health?.backend, kase?.backend) : null;
+  const words = model ? { title: model, sub: "recorded run" } : BACKEND_WORDS[by.produced] ?? { title: by.produced, sub: "" };
   const fellBack = by.produced !== by.configured;
   const tiger = store?.kind === "postgres";
   const storeWord = !store ? null : store.fallback_reason ? "Tiger unreachable" : tiger ? (store.last_error ? "Tiger Cloud, retrying" : "Tiger Cloud") : "in memory";
@@ -79,17 +94,24 @@ function ModelCard() {
   );
 }
 
-/** What the agents learn from. Human answers: the flags answered here, plus the earlier answers behind each policy. */
+/** The selected deal's own counts, for a gateway without the cross-deal counters. Human answers: the flags answered
+ * here, plus the earlier answers behind each policy. Edits: the ones saved with a reason (D19). */
+function dealCounts(kase: Case | null): { human_answers: number; policies: number; edits: number } {
+  return {
+    human_answers: new Set([
+      ...(kase?.flags.filter((f) => f.answer).map((f) => f.id) ?? []),
+      ...(kase?.policies.map((p) => p.learned_from) ?? []),
+    ]).size,
+    policies: kase?.policies.length ?? 0,
+    edits: kase?.edits?.filter((e) => e.status === "reasoned").length ?? 0,
+  };
+}
+
+/** What the agents learn from, counted across every deal (GET /health `counts`), else the selected deal's counts. */
 function Learning() {
-  const { kase, learnedAt } = useDeal();
-  const answers = new Set([
-    ...(kase?.flags.filter((f) => f.answer).map((f) => f.id) ?? []),
-    ...(kase?.policies.map((p) => p.learned_from) ?? []),
-  ]).size;
-  const policies = kase?.policies.length ?? 0;
-  // Edits saved with a reason (D19). Until Tri's T2 adds `edits` to /case the count is 0.
-  const edits = kase?.edits?.filter((e) => e.status === "reasoned").length ?? 0;
-  const rows: [string, number][] = [["Human answers", answers], ["Policies", policies], ["Edits", edits]];
+  const { kase, health, learnedAt } = useDeal();
+  const counts = health?.counts ?? dealCounts(kase);
+  const rows: [string, number][] = [["Human answers", counts.human_answers], ["Policies", counts.policies], ["Edits", counts.edits]];
   return (
     <div className="flex w-full flex-col gap-[4px]">
       <Label>Always learning from</Label>
