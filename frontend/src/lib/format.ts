@@ -105,6 +105,28 @@ export function isLearnedTag(l: SourceLine): boolean {
   return Boolean(l.covenant_policy_id);
 }
 
+/** The lines an open question is about (an open flag item's `line_ids`). Answered flags are not open. */
+export function openQuestionLines(flags: Pick<WorkItem, "id" | "state" | "payload">[], openIds?: string[]): Set<string> {
+  const open = flags.filter((f) => (openIds ? openIds.includes(f.id) : f.state === "NEEDS_INFO"));
+  return new Set(open.flatMap((f) => (Array.isArray(f.payload.line_ids) ? (f.payload.line_ids as string[]) : [])));
+}
+
+/** Unsure: the line is in an open question, so it waits on the controller. A line the Mapper accepted without a
+ * question, one the controller approved, and one a policy placed are not unsure, whatever the confidence. */
+export function isUnsure(m: Pick<Mapping, "target_line_id">, asking: Set<string>): boolean {
+  return asking.has(m.target_line_id);
+}
+
+/** The Mapping counts the Case tile and the Mapping page show. Totals are left out everywhere: they have no platform
+ * line by design ("Total, not mapped"), so they are neither placed, sure, nor unsure. */
+export function mappingCounts(mappings: Pick<Mapping, "target_line_id">[], lines: Pick<SourceLine, "id" | "is_total">[],
+  asking: Set<string>): { placed: number; sure: number; unsure: number; totals: number } {
+  const total = new Set(lines.filter((l) => l.is_total).map((l) => l.id));
+  const rows = mappings.filter((m) => !total.has(m.target_line_id));
+  const unsure = rows.filter((m) => isUnsure(m, asking)).length;
+  return { placed: rows.length, sure: rows.length - unsure, unsure, totals: mappings.length - rows.length };
+}
+
 /** The distinct policies applied to this deal's lines: one controller answer can settle several lines. */
 export function learnedPolicies(mappings: Mapping[], lines: SourceLine[]): Set<string> {
   const ids = [...mappings.map((m) => m.policy_id), ...lines.map((l) => l.covenant_policy_id)];

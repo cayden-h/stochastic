@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { type MappingFilter, Mappings, editOf, isUnsure } from "@/components/mappings";
+import { type MappingFilter, Mappings, editOf } from "@/components/mappings";
 import { Page } from "@/components/shell";
 import { PageHeader } from "@/components/ui";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
-import { plural } from "@/lib/format";
+import { mappingCounts, openQuestionLines, plural } from "@/lib/format";
 
 const FILTERS: { key: MappingFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -22,9 +22,10 @@ export default function MappingScreen() {
   const { edits } = useEdits();
   const [filter, setFilter] = useState<MappingFilter>("all");
   if (!kase) return null;
-  const { source_lines, stage } = kase;
+  const { source_lines, stage, flags, open_flags } = kase;
   const live = starting || stage === "mapping";
-  const unsure = mappings.filter(isUnsure).length;
+  const asking = openQuestionLines(flags, open_flags);
+  const { placed, sure, unsure, totals } = mappingCounts(mappings, source_lines, asking);
   const byId = new Map(source_lines.map((l) => [l.id, l]));
   const edited = mappings.filter((m) => editOf(byId.get(m.target_line_id), edits)).length;
   return (
@@ -35,7 +36,7 @@ export default function MappingScreen() {
         <PageHeader title="Mapping">
           <span className="font-mono text-[12px] whitespace-nowrap text-slate">
             {live ? <span className="mr-[8px] font-ui font-semibold text-forest">Mapper is placing lines</span> : null}
-            {plural(mappings.length, "line")} &middot; {mappings.length - unsure} sure &middot; {unsure} unsure{edited ? ` · ${edited} edited` : ""}
+            {plural(placed, "line")} &middot; {sure} sure &middot; {unsure} unsure{totals ? ` · ${plural(totals, "total")}` : ""}{edited ? ` · ${edited} edited` : ""}
           </span>
         </PageHeader>
 
@@ -59,7 +60,7 @@ export default function MappingScreen() {
         </div>
       </div>
 
-      <Mappings key={filter} mappings={mappings} lines={source_lines} filter={filter} received={liveMappings.received} live={live} />
+      <Mappings key={filter} mappings={mappings} lines={source_lines} filter={filter} asking={asking} received={liveMappings.received} live={live} />
     </Page>
   );
 }
