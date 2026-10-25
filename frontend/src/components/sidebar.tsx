@@ -11,18 +11,19 @@ import { Label } from "./ui";
 const PAGES: { href: string; label: string; icon: NavIconName }[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/case", label: "Case", icon: "case" },
+  { href: "/review", label: "Review", icon: "review" },
   { href: "/mapping", label: "Mapping", icon: "mapping" },
   { href: "/agents", label: "Agents", icon: "agents" },
   { href: "/log", label: "Log", icon: "log" },
 ];
 
-type Theme = "green" | "pink" | "purple";
+type Theme = "teal" | "blue" | "violet";
 
-/** Each page's tint in v3: the Case is the Preparer's pink, the Log the Reviewer's purple, the rest the Mapper's green. */
+/** Each page's tint in v3: the Case is the Preparer's blue, the Log the Reviewer's violet, the rest the Mapper's teal. */
 export function themeOf(path: string): Theme {
-  if (path.startsWith("/case")) return "pink";
-  if (path.startsWith("/log")) return "purple";
-  return "green";
+  if (path.startsWith("/case")) return "blue";
+  if (path.startsWith("/log")) return "violet";
+  return "teal";
 }
 
 /** Plain words for the model card, so a judge reads what produced the agent text without a tooltip. */
@@ -91,7 +92,7 @@ function Learning() {
       <Label>Always learning from</Label>
       {rows.map(([name, n]) => (
         <div key={name} className="flex w-full items-center gap-[8px] rounded-[8px] border border-line bg-white px-[10px] py-[7px]">
-          <span className="flex-1 text-[13px] text-body">{name}</span>
+          <span className="flex-1 text-[13px] text-forest">{name}</span>
           <span className="font-mono text-[12px] text-forest">{n}</span>
         </div>
       ))}
@@ -99,7 +100,7 @@ function Learning() {
   );
 }
 
-/** The v3 sidebar: the deal, the five pages, the model, and the learning counters. 240 px wide.
+/** The v3 sidebar: the deal, the six pages, the model, and the learning counters. 240 px wide.
  * In the Electron window the brand row moves down to clear the traffic lights (x 20, y 20). */
 export function Sidebar() {
   const path = usePathname();

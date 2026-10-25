@@ -2,7 +2,7 @@
 
 const STROKE = { strokeWidth: 1.35, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, stroke: "currentColor", fill: "none" };
 
-export type NavIconName = "dashboard" | "case" | "mapping" | "agents" | "log";
+export type NavIconName = "dashboard" | "case" | "review" | "mapping" | "agents" | "log";
 
 const NAV: Record<NavIconName, React.ReactNode> = {
   dashboard: <path d="M3 3H8.25V8.25H3V3ZM9.75 3H15V6H9.75V3ZM9.75 8.25H15V15H9.75V8.25ZM3 10.5H8.25V15H3V10.5Z" {...STROKE} />,
@@ -10,6 +10,12 @@ const NAV: Record<NavIconName, React.ReactNode> = {
     <>
       <path d="M3.75 3H11.25L14.25 6V15H3.75V3Z" {...STROKE} />
       <path d="M11.25 3V6H14.25" {...STROKE} />
+    </>
+  ),
+  review: (
+    <>
+      <path d="M4.5 3.75H13.5C14.3284 3.75 15 4.42157 15 5.25V12.75C15 13.5784 14.3284 14.25 13.5 14.25H4.5C3.67157 14.25 3 13.5784 3 12.75V5.25C3 4.42157 3.67157 3.75 4.5 3.75Z" {...STROKE} />
+      <path d="M3 7.5H15M7.5 7.5V14.25" {...STROKE} />
     </>
   ),
   mapping: (
@@ -60,7 +66,7 @@ export function LockIcon({ size = 20 }: { size?: number }) {
 export function UploadIcon() {
   return (
     <svg width={16} height={16} viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
-      <path d="M8 10.6667V3.33333M11.3333 6.66667L8 3.33333L4.66667 6.66667M2.66667 12.6667H13.3333" stroke="#1E6B52" strokeWidth={1.46667} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 10.6667V3.33333M11.3333 6.66667L8 3.33333L4.66667 6.66667M2.66667 12.6667H13.3333" stroke="#0F6674" strokeWidth={1.46667} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -68,9 +74,9 @@ export function UploadIcon() {
 export function FileIcon() {
   return (
     <svg width={22} height={27} viewBox="0 0 22 27" fill="none" aria-hidden="true" className="shrink-0">
-      <path d="M2.35714 2.5H13.3571L19.6429 8.78571V24.5H2.35714V2.5Z" fill="white" stroke="#1E6B52" strokeWidth={1.25714} strokeLinejoin="round" />
-      <path d="M13.3571 2.5V8.78571H19.6429" stroke="#1E6B52" strokeWidth={1.25714} strokeLinejoin="round" />
-      <path d="M5.5 14.2857H16.5M5.5 18.2143H16.5M5.5 22.1429H12.5714" stroke="#1E6B52" strokeWidth={1.25714} strokeLinecap="round" />
+      <path d="M2.35714 2.5H13.3571L19.6429 8.78571V24.5H2.35714V2.5Z" fill="white" stroke="#0F6674" strokeWidth={1.25714} strokeLinejoin="round" />
+      <path d="M13.3571 2.5V8.78571H19.6429" stroke="#0F6674" strokeWidth={1.25714} strokeLinejoin="round" />
+      <path d="M5.5 14.2857H16.5M5.5 18.2143H16.5M5.5 22.1429H12.5714" stroke="#0F6674" strokeWidth={1.25714} strokeLinecap="round" />
     </svg>
   );
 }

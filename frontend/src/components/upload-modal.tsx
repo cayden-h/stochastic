@@ -162,10 +162,10 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="no-drag fixed inset-0 z-20 flex items-center justify-center bg-[rgba(15,41,33,0.45)] p-4 pt-[34px]">
+    <div className="no-drag fixed inset-0 z-20 flex items-center justify-center bg-[rgba(15,102,116,0.45)] p-4 pt-[34px]">
       {/* The backdrop closes on click but is not a tab stop; Close and Esc do the same from the keyboard. */}
       <div aria-hidden="true" className="absolute inset-0" onClick={close} />
-      <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="new-deal-title" className="relative flex outline-none w-full max-w-[880px] flex-col gap-[18px] rounded-[20px] bg-white p-[28px] shadow-[0px_24px_60px_0px_rgba(15,41,33,0.3)]">
+      <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="new-deal-title" className="relative flex outline-none w-full max-w-[880px] flex-col gap-[18px] rounded-[20px] bg-white p-[28px] shadow-[0px_24px_60px_0px_rgba(15,102,116,0.3)]">
         <div className="flex w-full items-center gap-[12px]">
           <h2 id="new-deal-title" className="font-serif text-[30px] text-forest">New deal</h2>
           <span className="flex-1" />
@@ -174,7 +174,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
 
         <div className="flex w-full justify-center">
           <button
-            className="inline-flex items-center gap-[8px] rounded-chip border border-mint-edge bg-white px-[12px] py-[8px] text-[13px] font-semibold text-clear hover:bg-mint-select"
+            className="inline-flex items-center gap-[8px] rounded-chip border border-line bg-white px-[12px] py-[8px] text-[13px] font-semibold text-forest hover:border-mint-edge hover:bg-mint-select"
             onClick={() => many.current?.click()}
             disabled={busy}
           >
@@ -229,7 +229,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         <div className="relative flex w-full flex-col items-center gap-[10px] pt-[24px] pb-[8px]">
           <Image src="/v3/glow.svg" alt="" width={420} height={150} className="pointer-events-none absolute top-[-23px] left-1/2 h-[150px] w-[420px] max-w-none -translate-x-1/2" />
           <button
-            className="relative inline-flex min-h-11 items-center justify-center rounded-full bg-forest px-[44px] py-[14px] font-ui text-[18px] leading-[28px] font-semibold text-paper drop-shadow-[0px_8px_12px_rgba(30,107,82,0.35)] transition-colors duration-150 hover:bg-clear disabled:opacity-40"
+            className="relative inline-flex min-h-11 items-center justify-center rounded-full bg-forest px-[44px] py-[14px] font-ui text-[18px] leading-[28px] font-semibold text-paper drop-shadow-[0px_8px_12px_rgba(15,102,116,0.35)] transition-colors duration-150 hover:bg-forest-deep disabled:opacity-40"
             onClick={begin}
             disabled={busy}
           >
