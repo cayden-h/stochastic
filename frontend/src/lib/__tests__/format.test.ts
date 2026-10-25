@@ -42,3 +42,15 @@ test("unsure means in an open question; totals, accepted, approved and policy li
   // After the answers, nothing waits: the second run asks nothing.
   assert.deepEqual(mappingCounts(mappings, lines, openQuestionLines([])), { placed: 4, sure: 4, unsure: 0, totals: 1 });
 });
+
+test("the model card names a recorded Haiku run on the replay backend, and nothing else", async () => {
+  const { recordedModelName } = await import("../format.ts");
+  assert.equal(recordedModelName({ backend: "replay", model: "claude-haiku-5-5", recorded: true }), "Claude Haiku 5.5");
+  assert.equal(recordedModelName({ backend: "replay", model: "claude-haiku-5.5", recorded: true }), "Claude Haiku 5.5");
+  assert.equal(recordedModelName({ backend: "replay", model: "claude-haiku-5-5", recorded: false }), null, "not a recorded run");
+  assert.equal(recordedModelName({ backend: "replay", model: "claude-haiku-5-5" }), null, "recorded not said");
+  assert.equal(recordedModelName({ backend: "scripted", model: "claude-haiku-5-5", recorded: true }), null, "a scripted run");
+  assert.equal(recordedModelName({ backend: "replay", model: "claude-opus-5-5", recorded: true }), null, "not Haiku");
+  assert.equal(recordedModelName({ backend: "replay", model: null, recorded: true }), null);
+  assert.equal(recordedModelName(null), null);
+});

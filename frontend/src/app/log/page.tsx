@@ -87,7 +87,7 @@ function Log() {
       </div>
 
       {view === "conversation" ? (
-        <Conversation messages={messages} received={received} live={running} full />
+        <Conversation messages={messages} received={received} live={running} />
       ) : (
         <Card className="flex w-full flex-col">
           <div className="flex w-full gap-[12px] border-b border-line px-[20px] py-[12px]">

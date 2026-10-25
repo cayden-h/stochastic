@@ -1,18 +1,23 @@
 // A page reloaded in the middle of a paced run (DEMO_PACE=1) reads the conversation again and follows the live run:
-// nothing said before the reload is lost, and the run goes on to the Mapper's questions.
+// nothing said before the reload is lost, and the run goes on to the Mapper's questions. The conversation is on the Log
+// page's Conversation view (the Case shows only the pipeline).
 import { expect, open, test } from "./support/fixtures";
-import { begin } from "./support/flows";
+import { begin, nav } from "./support/flows";
 
 test("a reload mid-run replays the conversation and keeps following the run", async ({ page, shot }) => {
   await open(page, "/");
   await begin(page);
-  const process = page.getByRole("region", { name: "The process" });
+  await nav(page, "Log").click();
+  await page.getByRole("group", { name: "What the log shows" }).getByRole("button", { name: /Conversation/ }).click();
+  await expect(page).toHaveURL(/\/log\?view=conversation$/);
+  const process = page.getByRole("region", { name: "Conversation" });
   const counter = process.getByText(/^\d+ messages?$/);
   const count = async () => Number(/\d+/.exec((await counter.textContent()) ?? "0")![0]);
 
+  const asked = process.getByText(/Where does Nu Aire's 'Certificates of Deposit' \(991K\) go on Kewaunee's chart of accounts/);
   // Mid-run: the Mapper has proposed and is placing lines, and has not asked yet.
   await expect.poll(count, { timeout: 20_000 }).toBeGreaterThanOrEqual(3);
-  await expect(page.getByText("The Mapper is asking you")).toHaveCount(0);
+  await expect(asked).toHaveCount(0);
   const before = await process.getByRole("list").last().getByRole("listitem").allInnerTexts();
   expect(before.length).toBeGreaterThanOrEqual(3);
   await shot("before-reload");
@@ -26,8 +31,7 @@ test("a reload mid-run replays the conversation and keeps following the run", as
   await shot("after-reload");
 
   // And the page keeps following the live run.
-  await expect(page.getByText("The Mapper is asking you")).toBeVisible({ timeout: 40_000 });
+  await expect(asked).toBeVisible({ timeout: 40_000 });
   expect(await count()).toBeGreaterThan(before.length);
-  await expect(process.getByText(/Where does Nu Aire's 'Certificates of Deposit' \(991K\) go on Kewaunee's chart of accounts/)).toBeVisible();
   await shot("asking-after-reload");
 });

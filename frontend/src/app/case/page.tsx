@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { CombinedPending, CombinedTable } from "@/components/combined-table";
+import { CombinedCollapsed, CombinedPending, CombinedTable } from "@/components/combined-table";
 import { FlagCard, MoreFlags, WaitingVerdict } from "@/components/flag-card";
 import { Page } from "@/components/shell";
 import { Avatar, Button, Card, Label, Mono, PageHeader, Shape, Tag } from "@/components/ui";
-import { VerdictLine } from "@/components/verdict-line";
+import { VerdictFigures } from "@/components/verdict-figures";
 import { BriefCard } from "@/components/brief-card";
-import { AskingBanner, Conversation, Pipeline, agentName } from "@/components/process-flow";
+import { AskingBanner, Pipeline, agentName } from "@/components/process-flow";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
@@ -29,14 +29,17 @@ function CaseTile({ href, label, value, sub, children }: { href: string; label: 
 
 /**
  * V3-3, the case: one screen from one read, GET /deals/{id}/case.
- * Run, answer the flags, read the verdict. The books are read-only here: editing, the reasons, approval, and the final
- * files are on the Review page (V3-7), which the Reviewer's hand-off opens. Mapping, Review and Log are tiles.
+ * Run, answer the flags, watch the pipeline, read the limit check's figures. The combined books start hidden behind
+ * Show combined books. The books are read-only here: editing, the reasons, the leverage against the limit, approval,
+ * and the final files are on the Review page (V3-7), which the Reviewer's hand-off opens. The agents' conversation is
+ * on the Agents and Log pages. Mapping, Review and Log are tiles.
  */
 export default function CaseScreen() {
-  const { kase, deals, refresh, messages, received, agentStates, startRun, starting, reset, running, mappings: liveRows, focus } = useDeal();
+  const { kase, deals, refresh, messages, agentStates, startRun, starting, reset, running, mappings: liveRows, focus } = useDeal();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
+  const [showBooks, setShowBooks] = useState(false);
   const editsCtx = useEdits();
   const flagRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLElement>(null);
@@ -93,14 +96,6 @@ export default function CaseScreen() {
   const applied = learnedPolicies(mappings, source_lines);
   const learned = applied.size;
   const learnedLines = mappings.filter((m) => m.policy_id).length + source_lines.filter((l) => l.covenant_policy_id).length;
-  const earlierAnswers = new Set(policies.filter((p) => applied.has(p.id)).map((p) => p.learned_from)).size;
-  // "No flag this time" counts the questions that hold the agents; an adjustment flag is not one of them.
-  const noFlagThisTime = Boolean(verdict) && answered.filter((f) => !isAdjustmentFlag(f)).length === 0 && learned > 0 && blocking.length === 0;
-  // The whole-line reading as filed, from the answered covenant flag: the comparison stays on screen after the answer.
-  const covenantFlag = answered.find((f) => f.payload.kind === "covenant_tag");
-  const asFiledOpt = covenantFlag?.options.find((o) => o.basis === "as_filed" && o.leverage != null);
-  const asFiled = asFiledOpt && deal.ebitda_basis !== "as_filed"
-    ? { leverage: asFiledOpt.leverage!, ok: Boolean(asFiledOpt.ok), run_id: asFiledOpt.run_id } : null;
   const failed = stage === "run_failed";
   // Where the figures come from: the filings for the demo deal, made-up figures for a sample case.
   const sample = deals.find((d) => d.id === deal.id)?.data_source === "sample";
@@ -110,9 +105,6 @@ export default function CaseScreen() {
   const handoff = messages.findLast(isReadyForApproval) ?? null;
   const review = verdict?.review?.verdict ?? null;
   const over = verdict?.verdict === "over_limit";
-  // The controller's edits (D19), made on the Review page. Approval there is refused while one has no reason (check 5e).
-  const edits = editsCtx.edits;
-  const unreasoned = edits.filter((e) => e.status === "needs_reason").length;
   const reviewReady = verdict?.approval_state === "PROPOSED" && review === "pass" && !over && !openAdjustments.length;
 
   // The lines an open flag is about, by name, so the combined books can show them in amber.
@@ -129,19 +121,6 @@ export default function CaseScreen() {
     try { await fn(); await refresh(); return true; } catch (e) { setNote(e instanceof Error ? e.message : "Action failed"); await refresh(); return false; }
     finally { setBusy(false); }
   }
-
-  const editWord = plural(edits.length, "edit");
-  const headline = verdict && edits.length
-    ? `${over ? "Over" : "Under"} the limit at ${fmtX(verdict.leverage)}. ${editWord.charAt(0).toUpperCase()}${editWord.slice(1)}.`
-    : null;
-  const sub =
-    verdict?.posted && edits.length ? "Approved with your edits. The reasons are now policies for the next add-on."
-    : verdict?.posted ? "Posted to the record. The answer you gave is now a policy the Mapper applies next time."
-    : edits.length && unreasoned ? `${plural(unreasoned, "edit")} ${unreasoned === 1 ? "needs" : "need"} a reason on the Review page before you can approve.`
-    : edits.length ? `Code recomputed the books with your ${edits.length === 1 ? "edit" : "edits"}. The Reviewer re-ran the checks. Approve on the Review page.`
-    : noFlagThisTime ? `No flag this time. The Mapper applied ${earlierAnswers === 1 ? "your earlier answer" : `your ${earlierAnswers} earlier answers`} to ${plural(learnedLines, "line")} and asked nothing. Code combined the books and tested the limit again.`
-    : verdict ? "Code combined the books and tested the limit. The Reviewer re-ran the checks. Review the books, then approve."
-    : null;
 
   return (
     <Page>
@@ -220,37 +199,26 @@ export default function CaseScreen() {
             </Card>
           ) : null}
 
-          {/* The process as it happens: who is working, who waits on whom, and what they told each other. */}
+          {/* The process as it happens: who is working and who waits on whom. What they told each other is on the
+              Agents and Log pages. */}
           {showProcess ? (
             <section className="flex w-full flex-col gap-[12px]" aria-label="The process">
               <Card className="p-[8px]">
                 <Pipeline agents={agentStates} readerUsed={fromAgreement} posted={Boolean(verdict?.posted)} approvalWaiting={approvalWaiting} />
               </Card>
-              <Conversation messages={messages} received={received} live={running} />
             </section>
           ) : null}
 
           {verdict ? (
-            <VerdictLine
-              verdict={verdict}
-              runIds={runIds}
-              asFiled={asFiled}
-              note={sub ? (
-                <>
-                  {headline ? <strong className="block text-[16px] font-semibold text-forest">{headline}</strong> : null}
-                  {noFlagThisTime ? <><Tag tone="agent">Learned</Tag>{" "}</> : null}{sub}
-                </>
-              ) : null}
-              action={verdict.posted ? (
-                <Link href="/review" className="text-[14px] font-semibold text-forest underline-offset-4 hover:underline">Download final files on Review</Link>
-              ) : null}
-            />
+            <VerdictFigures verdict={verdict} runIds={runIds} />
           ) : open.length ? (
             <WaitingVerdict text={open.length === 1 ? "Verdict waits on the flag." : `Verdict waits on ${open.length} flags.`} limit={deal.brief?.limit} />
           ) : null}
 
-          {result ? (
-            <CombinedTable result={result} flagged={flaggedNames} kase={kase} />
+          {result && showBooks ? (
+            <CombinedTable result={result} flagged={flaggedNames} kase={kase} onHide={() => setShowBooks(false)} />
+          ) : result ? (
+            <CombinedCollapsed result={result} onShow={() => setShowBooks(true)} />
           ) : !idle && !briefing ? (
             <CombinedPending text={open.length ? "Code combines the books after you answer." : stage === "mapping" || starting ? "Code combines the books after the Mapper." : "Code is combining the books."} />
           ) : null}

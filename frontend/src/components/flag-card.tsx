@@ -110,10 +110,13 @@ export function FlagCard({
                 suggested ? "border-2 border-forest bg-mint p-[15px] hover:border-forest-deep" : "border border-line bg-white hover:bg-mint-select"
               }`}
             >
-              <span className="flex w-full items-start gap-[6px] text-forest">
+              {/* The Suggested tag sits on its own row above the label (order-first), so a long model-written label keeps
+                  the card's width instead of wrapping beside the tag; in the DOM it stays after the label, so the
+                  option's name still starts with its letter. */}
+              <span className="flex w-full flex-wrap items-start gap-x-[6px] gap-y-[8px] text-forest">
                 <span className="pt-[2px] font-mono text-[12px]">{letter(i)}.</span>
                 <span className="min-w-0 flex-1 text-[14px] font-semibold">{o.label}</span>
-                {suggested ? <Tag>Suggested</Tag> : null}
+                {suggested ? <span className="order-first flex basis-full"><Tag>Suggested</Tag></span> : null}
                 {o.added_by ? <ActorChip actor={o.added_by} /> : null}
               </span>
               {o.leverage != null ? (

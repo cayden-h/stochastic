@@ -4,9 +4,10 @@
 import { expect, open, test } from "./support/fixtures";
 import { writeDemoCsvs } from "./support/demo-files";
 import { AGREEMENT } from "./support/env";
-import { handoff, reviewVerdict, runToHandoff } from "./support/flows";
+import { expectCleanCase, handoff, reviewVerdict, runToHandoff, watchRunBody } from "./support/flows";
 
 test("a deal from the agreement text: Brief card, answer and correct, approve the Brief, map, review", async ({ page, backend, shot }, testInfo) => {
+  test.setTimeout(180_000);  // Begin runs at pace "factory", about 30 s of agent time
   const csv = writeDemoCsvs(testInfo.outputDir);
   await open(page, "/");
   await page.getByRole("button", { name: "Upload", exact: true }).click();
@@ -16,8 +17,11 @@ test("a deal from the agreement text: Brief card, answer and correct, approve th
   await expect(dialog.getByRole("button", { name: /^Nu-Aire\.csv \d+ rows · as Nu Aire$/ })).toBeVisible();
   await expect(dialog.getByRole("button", { name: /kewaunee_ex101_excerpt\.txt Agreement text/ })).toBeVisible();
   await shot("upload");
+  // Begin is the Factory demo: it creates the deal and runs it at pace "factory".
+  const run = await watchRunBody(page);
   await dialog.getByRole("button", { name: "Begin", exact: true }).click();
   await expect(page).toHaveURL(/\/case$/);
+  expect(run.body()).toEqual({ sync: false, pace: "factory" });
 
   // The Brief card: every field quoted, six questions before approval.
   const brief = page.getByRole("region", { name: "Brief" });
@@ -59,7 +63,7 @@ test("a deal from the agreement text: Brief card, answer and correct, approve th
   await expect(brief).toHaveCount(0);
   await runToHandoff(page);
   await expect(handoff(page)).toBeVisible();
-  await expect(page.getByText(/0\.76× against 2\.50×/).first()).toBeVisible();
+  await expectCleanCase(page);
   await shot("handoff");
 
   // The rest of the path: review and approve.

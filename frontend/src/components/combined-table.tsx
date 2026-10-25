@@ -100,7 +100,11 @@ function Chevron({ open }: { open: boolean }) {
  * `flagged` names the lines a flag is about; they show in amber. Read-only: the controller edits the books on the
  * Review page (D19, V3-7), and the edits show here with their states. A row that gathers several target lines opens
  * to show them. */
-export function CombinedTable({ result, flagged, kase }: { result: Result; flagged: Set<string>; kase: Case }) {
+export function CombinedTable({ result, flagged, kase, onHide }: {
+  result: Result; flagged: Set<string>; kase: Case;
+  /** On the Case the books start hidden; this hides them again. */
+  onHide?: () => void;
+}) {
   const { edits } = useEdits();
   const amountEdit = (l: SourceLine) => edits.find((e) => e.kind === "amount" && e.company === l.company && e.line === l.line && e.section === l.section);
 
@@ -113,17 +117,9 @@ export function CombinedTable({ result, flagged, kase }: { result: Result; flagg
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (k: string) => setExpanded((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
 
-  const consolidateRun = result.run_ids_by_tool.consolidate;
   return (
     <Card className="flex w-full flex-col">
-      <div className="flex w-full items-center gap-[12px] px-[20px] pt-[14px]">
-        <h2 className="flex-1 text-[16px] font-semibold text-forest">Combined books</h2>
-        <span className={`inline-flex items-center gap-[6px] text-[13px] font-semibold ${result.tie_out_ok ? "text-clear" : "text-denied"}`}>
-          <Shape kind={result.tie_out_ok ? "check" : "cross"} size={10} />
-          {result.tie_out_ok ? "Ties out" : "Does not tie out"}
-        </span>
-        <Mono>USD thousands &middot; {consolidateRun}</Mono>
-      </div>
+      <BooksHeader result={result} open={onHide ? true : undefined} onToggle={onHide} />
       <div className="flex w-full gap-[12px] border-b border-line px-[20px] py-[12px]">
         <Label className="flex-1">Line</Label>
         <Label className={COL}>Platform</Label>
@@ -195,6 +191,34 @@ export function CombinedTable({ result, flagged, kase }: { result: Result; flagg
           </div>
         );
       })}
+    </Card>
+  );
+}
+
+/** The books card's title row: the tie-out state, the run, and on the Case the Show or Hide toggle. */
+function BooksHeader({ result, open, onToggle }: { result: Result; open?: boolean; onToggle?: () => void }) {
+  return (
+    <div className={`flex w-full items-center gap-[12px] px-[20px] ${open === false ? "py-[14px]" : "pt-[14px]"}`}>
+      <h2 className="flex-1 text-[16px] font-semibold text-forest">Combined books</h2>
+      <span className={`inline-flex items-center gap-[6px] text-[13px] font-semibold ${result.tie_out_ok ? "text-clear" : "text-denied"}`}>
+        <Shape kind={result.tie_out_ok ? "check" : "cross"} size={10} />
+        {result.tie_out_ok ? "Ties out" : "Does not tie out"}
+      </span>
+      <Mono>USD thousands &middot; {result.run_ids_by_tool.consolidate}</Mono>
+      {onToggle ? (
+        <Button kind="link" className="text-[13px]" aria-expanded={open} onClick={onToggle}>
+          {open ? "Hide combined books" : "Show combined books"}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+/** The Case's books, hidden until asked for: the title row with the tie-out state and Show combined books. */
+export function CombinedCollapsed({ result, onShow }: { result: Result; onShow: () => void }) {
+  return (
+    <Card className="flex w-full flex-col">
+      <BooksHeader result={result} open={false} onToggle={onShow} />
     </Card>
   );
 }

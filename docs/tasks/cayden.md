@@ -253,3 +253,16 @@ Open for the console (other agents): render the conversation as a chat between t
 Built in `cayden/launch-mark`: the mark in the sidebar, the favicon, the app icon, the browser splash, and the desktop splash in `desktop/splash.html` (Eric's folder; he has a note in `eric.md`).
 Spec: `design/brand.md`.
 Open: license the Alamy reference image the walk was traced from, or replace the walk with our own seeded walk, before any public brand use.
+
+## Demo 2 console (2026-10-25, `cayden/demo2-console`)
+
+Built, from Cayden's asks, against the backend contract of `cayden/demo2-backend`:
+- The Case: no agent conversation (the pipeline row and the flag card stay), no verdict sentence (the leverage against the limit, the badges, the edits headline, the as-filed reading, and "Download final files on Review"), only the four figure tiles.
+- The Case's combined books start hidden, with a Show combined books toggle.
+- One source for the agent characters: `Avatar` and `ROLES` in `frontend/src/components/ui.tsx`, served as files rather than through `/_next/image`.
+  The old green Mapper on the Agents rows, the timeline, and the Log came from the browser's 4-hour cache of the optimizer's small sizes; the Review companion's separate `reviewer-avatar.png` is gone.
+- The Dashboard has no Begin; Run the demo is the Hyphenate demo (pace "demo", 15 s); the Upload modal's Begin is the Factory demo (pace "factory", about 30 s).
+- The model card shows "Claude Haiku 5.5, recorded run" for a recorded Haiku replay, never for a scripted run.
+- The "Always learning from" counters read `GET /health` `memory_counts` across deals, with the selected deal's counts as the fallback.
+- The Upload modal's Begin resets with memory cleared before it creates the deal, so the Factory beat always asks its questions.
+Built against the backend of PR #32 (merged): the `"factory"` pace, the recorded run's `model` and `recorded` on `last_runs`, and `memory_counts`.

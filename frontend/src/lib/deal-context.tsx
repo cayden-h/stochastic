@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { API_URL, api } from "./api";
+import { API_URL, type Pace, api } from "./api";
 import {
   type AgentInfo, type AgentKey, type ConversationMessage, type MappingEvent, type MappingState,
   agentStates as readAgentStates, conversationReducer, emptyConversation, emptyMappings, mappingReducer, mergeMappings,
@@ -63,7 +63,8 @@ interface DealData {
   /** The clock the agent states were read at, in ms. It ticks only while an agent is talking. */
   now: number;
   /** Start the deal's run in the background. True from the click until the stream shows the run started. */
-  startRun: (id?: string) => Promise<void>;
+  /** Start a run of the deal in the background, at the gateway's pace or at the pace given. */
+  startRun: (id?: string, pace?: Pace) => Promise<void>;
   starting: boolean;
   /** POST /dev/reset, then clear the live conversation and mappings and read the case again. */
   reset: (keepMemory: boolean) => Promise<void>;
@@ -266,12 +267,12 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [conversation, now]);
 
-  const startRun = useCallback(async (runId?: string) => {
+  const startRun = useCallback(async (runId?: string, pace?: Pace) => {
     const target = runId ?? dealId.current;
     if (!target) return;
     setStarting(true);
     try {
-      await api.start(target);
+      await api.start(target, pace);
     } catch (e) {
       setStarting(false);
       throw e;
