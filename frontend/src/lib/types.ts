@@ -107,7 +107,8 @@ export interface Policy {
 }
 
 export interface Attempt { backend: Backend; ok: boolean; seconds: number; error?: string }
-export interface LastRun { role: string; backend: Backend; attempts: Attempt[]; meta: Record<string, unknown>; at: string }
+/** `asked`: the backend the run was asked for (pace "demo" asks for scripted whatever is configured). */
+export interface LastRun { role: string; backend: Backend; asked?: Backend; attempts: Attempt[]; meta: Record<string, unknown>; at: string }
 export interface BackendStatus { configured: Backend; fallback: string; anthropic_key: boolean; factory_key: boolean; last_runs: LastRun[] }
 
 export interface Case {

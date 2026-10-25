@@ -6,7 +6,8 @@ Two ways to turn it on:
   deal and about 13 s from the last answer to the approval. 0.5 halves every wait and 2 doubles it (capped at 5).
 - `POST /deals/{id}/run` with `"pace"` sets it for that run only, and for the run that the controller's answer
   continues: `"demo"` (the 15-second demo, about 6 s to the question and 7 s from the answer to the approval),
-  `"human"` (the DEMO_PACE=1 timings), or `"off"`. It overrides DEMO_PACE (`using`).
+  `"human"` (the DEMO_PACE=1 timings), or `"off"`. It overrides DEMO_PACE (`using`). A `"demo"` run with no backend
+  of its own is always scripted, whatever AGENT_BACKEND says (app/agents/jobs.py, `advance`).
 
 The waits sit in the job runner only: before an agent's turn, before each tool call an agent makes, while the
 mappings are stored (a fixed time for the whole list in the `demo` profile, a fixed time per line in `human`), once
