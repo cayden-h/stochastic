@@ -72,10 +72,13 @@ Measured on live Droid on 2026-10-24 08:30 (Mapper Sonnet 5.5, Preparer and Revi
 - Last answer to a live Approve button: 36 to 38 s (Preparer about 28 s, Reviewer about 9 s). Answer the flag early and talk over this wait: the gateway, the tools, the run ids.
 - Second run after a reset with memory kept: 58 s to approval, no flag. Show it at the table only if a judge has the time, or point to the Learned chips.
 - If the timing does not fit, use `AGENT_BACKEND=replay` for the pitch and say so: the recorded Sonnet 5.5 Droid run's text, with every tool run live. The pinned replay is a first run, so it raises the covenant flag. [verified: `test_demo_reset.py`]
-- Between judges, reset with memory cleared: the console's "Fresh deal (clear memory)" on the Case page, or `curl -X POST 'localhost:8000/dev/reset?keep_memory=false'`. The plain reset keeps memory, and the next judge would see no flag. The reset is refused while a run is going (409) and frees the fork slot.
+- Between judges, reset with memory cleared: the console's "Fresh deal (clear memory)" on the Case page, or `curl -X POST 'localhost:8000/dev/reset?keep_memory=false'`. It also retires the policies earlier uploads of the same companies learned. The plain reset keeps memory, and the next judge would see no flag. The reset is refused while a run is going (409) and frees the fork slot.
 - The console shows a progress row while the agents work: which agent, and for how many seconds.
 
-The 15-second demo (2026-10-25): on the Dashboard, "Run the demo" resets the demo deal with memory cleared and runs it with `"pace": "demo"` on the scripted or replay backend.
+The 15-second demo (2026-10-25): on the Dashboard, "Run the demo" resets the demo deal with memory cleared and runs it with `"pace": "demo"`.
+That run is always scripted, whatever `.env` says: with `AGENT_BACKEND=droid` it does not call Droid (about 45 s to the questions, on Factory credits), and the model card says "Scripted rules, no model". [verified: `test_demo_fresh.py`]
+The reset with memory cleared also retires every policy that covers Kewaunee or Nu Aire, even one learned on an earlier upload of the same companies, so the run always asks both questions. [verified: `test_demo_fresh.py`]
+Uploads from an earlier session are hidden from the Dashboard, not deleted; a deal uploaded during the demo still shows.
 About 6 s after the click, the Mapper's question arrives as a notification at the top right (a native macOS one too, in the Mac app); Decide opens its flag card.
 After each answer the Mapper says what it learned ("The Mapper learned p_007: ..."), and about 7 s after the last answer the Reviewer hands off: "Ready for your approval".
 Begin still runs the current case at its normal pace, and the four sample cases on the Dashboard open on every page for a judge who wants to click around; each says Sample data.
