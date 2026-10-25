@@ -299,3 +299,34 @@ def test_the_seeded_cases_survive_a_restart_and_a_reset_of_the_demo_deal(schema)
         kept = conn.execute("SELECT count(*) FROM audit_log WHERE ledger = 2").fetchone()[0]
     assert kept == len(third.audit)
     third.close()
+
+
+def test_a_fresh_reset_retires_a_covering_policy_and_the_retirement_survives_a_restart(schema):
+    """`/dev/reset?keep_memory=false` retires a policy learned on another deal that covers the demo deal's companies
+    (found on the demo laptop, 2026-10-24); the retirement and its audit row are in Postgres after a restart."""
+    from app.core.models import Policy
+    from app.db.fixtures import cases
+    from app.db.fixtures.kewaunee import PLATFORM
+    store = open_store(schema)
+    gw = Gateway(store)
+    seed(store, gw)
+    cases.seed_cases(gw)
+    kept = cases.CASE_IDS[0]
+    with gw.lock:
+        p = Policy(id=store.next_id("p"), role="agent:mapper", kind="covenant_tag", pattern="customer deposits",
+                   decision="not_debt", reason="test", approved_by=CONTROLLER, learned_from="wi_x", deal_id=kept,
+                   company=PLATFORM.lower())
+        store.policies[p.id] = p
+        store.reset_deals(keep_memory=False, keep_deals=set(cases.CASE_IDS), rechain=gw.rechain)
+        seed(store, gw)
+    reason = "fresh demo: clear memory for the demo deal"
+    assert gw.retire_policies_covering(DEAL_ID, reason) == [p.id]
+    assert store.flush()
+    store.close()
+
+    again = open_store(schema)
+    gw2 = Gateway(again)
+    assert again.policies[p.id].retired_by and gw2.verify_chain()
+    assert p.id not in [q.id for q in gw2.policies_for("agent:mapper", DEAL_ID)]
+    assert [a.target for a in again.audit if a.action == "policy:retire" and a.reason == reason] == [p.id]
+    again.close()
