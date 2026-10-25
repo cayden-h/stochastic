@@ -80,6 +80,9 @@ interface DealData {
   /** A notification's Decide: open the Case on this item's flag card. */
   focus: FocusRequest | null;
   requestFocus: (itemId: string) => void;
+  /** The deal whose questions the controller is answering now (they pressed Decide): on its Case, a question that
+   * opens next is already on screen ("1 more question"), so it gets no toast there. A reset clears it. */
+  deciding: string | null;
 }
 
 /** The gateway answered but holds no deal: a different screen from the gateway being down. */
@@ -152,11 +155,15 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [learned, setLearned] = useState<LearnedNotice[]>([]);
   const [focus, setFocus] = useState<FocusRequest | null>(null);
+  const [deciding, setDeciding] = useState<string | null>(null);
   const dismiss = useCallback((nid: string) => {
     setNotices((n) => n.filter((x) => x.id !== nid));
     setLearned((n) => n.filter((x) => x.id !== nid));
   }, []);
-  const requestFocus = useCallback((itemId: string) => setFocus({ item_id: itemId, at: Date.now() }), []);
+  const requestFocus = useCallback((itemId: string) => {
+    setFocus({ item_id: itemId, at: Date.now() });
+    setDeciding(dealId.current);
+  }, []);
 
   // The first read, from a timer callback so the effect body itself sets no state (react-hooks/set-state-in-effect).
   useEffect(() => {
@@ -274,7 +281,7 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     }
     dispatchConversation({ type: "reset" });
     dispatchMapping({ type: "reset" });
-    setNotices([]); setLearned([]);
+    setNotices([]); setLearned([]); setDeciding(null);
     await refresh();
   }, [refresh]);
 
@@ -313,7 +320,7 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
       messages, received: conversation.received, agentStates: agents,
       conversationLoaded: conversation.deal === id && conversation.loaded,
       conversationSupported: conversation.deal === id && conversation.supported, liveMappings, mappings, now, startRun, starting, reset, running,
-      runDemo, notices, learned, dismiss, learnedAt: learned.length ? Date.parse(learned[learned.length - 1].at) || 1 : 0, focus, requestFocus,
+      runDemo, notices, learned, dismiss, learnedAt: learned.length ? Date.parse(learned[learned.length - 1].at) || 1 : 0, focus, requestFocus, deciding,
     }}>
       {children}
     </Ctx.Provider>

@@ -13,7 +13,7 @@ test("run it again with what was learned, then a fresh deal", async ({ page, bac
   expect(learned).toBeGreaterThan(0);
 
   // Back on the Case: run it again with what was learned.
-  await page.getByRole("navigation", { name: "Review ribbon" }).getByRole("link", { name: "Combined" }).click();
+  await page.getByRole("link", { name: "Back to case" }).click();
   await expect(page.getByText("Approved and posted").first()).toBeVisible();
   await page.getByRole("button", { name: "Run it again with what was learned" }).click();
   await expect(page.getByRole("heading", { name: "Run again. The Mapper now applies what you decided." })).toBeVisible();

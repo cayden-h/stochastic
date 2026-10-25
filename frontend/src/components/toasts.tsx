@@ -85,7 +85,7 @@ function LearnedToast({ note, more, onClose }: { note: LearnedNotice; more: numb
  * put it off, and each policy an answer taught, for a few seconds. A question already answered drops out on its own.
  */
 export function Toasts() {
-  const { notices, learned, dismiss, kase, select, requestFocus } = useDeal();
+  const { notices, learned, dismiss, kase, select, requestFocus, deciding } = useDeal();
   const router = useRouter();
   const path = usePathname();
   // One learned note at a time: the newest, closed a few seconds after it came, with the ones before it.
@@ -98,7 +98,9 @@ export function Toasts() {
   }, [lastLearned, learnedIds, dismiss]);
   // A question is open until the case shows it answered. One the case does not hold yet (the read is a moment behind
   // the event) still shows.
+  const onCase = path.startsWith("/case");
   const open = notices.filter((n) => {
+    if (onCase && n.deal_id === deciding && n.deal_id === kase?.deal.id) return false;
     if (!kase || n.deal_id !== kase.deal.id || !n.item_id) return true;
     const item = kase.flags.find((f) => f.id === n.item_id) ?? kase.work_items.find((w) => w.id === n.item_id);
     return !item || item.state === "NEEDS_INFO";
@@ -110,7 +112,7 @@ export function Toasts() {
     for (const x of notices) if (x.deal_id === n.deal_id) dismiss(x.id);
     if (kase && n.deal_id !== kase.deal.id) await select(n.deal_id);
     if (n.item_id) requestFocus(n.item_id);
-    if (!path.startsWith("/case")) router.push("/case");
+    if (!onCase) router.push("/case");
   }
 
   return (
