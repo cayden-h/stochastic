@@ -43,6 +43,18 @@
   --color-clear: #0F6674;
   --color-clear-tint: #DCEFF1;
 
+  /* The Review workbook (V3-7, Figma 670:44): Excel-like neutrals around the teal. */
+  --color-sheet-line: #ECECEA;   /* grid lines */
+  --color-sheet-head: #F3F3F1;   /* column letters, row numbers, status strip */
+  --color-sheet-band: #FAFAF8;   /* section rows, cell hover */
+  --color-sheet-muted: #5E6166;  /* letters, numbers, secondary text */
+  --color-titlebar: #EFEFED;
+  --color-titlebar-line: #E2E2DF;
+  --color-titlebar-ink: #3A3D42;
+  --color-edit-bar: #D9822B;     /* an edit that still needs its reason */
+  --color-bubble-ink: #343A37;   /* the reason popover's text */
+  --color-bubble-muted: #62736D;
+
   /* The logo's ink on a light surface (docs/design/brand.md); #ECE9E2 on dark. */
   --color-mark: #16191D;
 
@@ -93,16 +105,25 @@ html[data-electron] .launch-splash { display: none; }
   box-shadow: 0 8px 28px rgba(27, 31, 36, 0.14), 0 1px 3px rgba(27, 31, 36, 0.06), inset 0 1px 3px rgba(255, 255, 255, 0.8);
 }
 
-/* The companion asking: a slow pulse ring in agent-tint. */
+/* The Reviewer companion asking: a light violet ring (reviewer-tint) that breathes around the avatar. */
 @keyframes companion-pulse {
-  0% { transform: scale(1); opacity: 0.9; }
-  100% { transform: scale(2.4); opacity: 0; }
+  0% { transform: scale(0.94); opacity: 1; }
+  100% { transform: scale(1.08); opacity: 0.7; }
 }
-.companion-pulse { animation: companion-pulse 1.6s ease-out infinite; }
+.companion-pulse { animation: companion-pulse 1.6s ease-out infinite alternate; }
+
+/* The reason popover (Josie's Reason popover, Figma 545:408, as drawn on the Review frames). */
+.popover-glass {
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: rgba(246, 246, 245, 0.94);
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+  box-shadow: 0 8px 14px rgba(27, 31, 36, 0.18);
+}
 
 /* An edited cell after its Your edits row is clicked. */
 @keyframes cell-flash {
-  0%, 30% { box-shadow: inset 0 0 0 2px var(--color-agent); background-color: var(--color-agent-tint); }
+  0%, 30% { box-shadow: inset 0 0 0 2px var(--color-forest); background-color: var(--color-mint); }
   100% { box-shadow: inset 0 0 0 2px transparent; }
 }
 .cell-flash { animation: cell-flash 1.2s ease-out 1; }
@@ -121,5 +142,5 @@ html[data-electron] .launch-splash { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
-  .cell-flash { box-shadow: inset 0 0 0 2px var(--color-agent); }
+  .cell-flash { box-shadow: inset 0 0 0 2px var(--color-forest); }
 }
