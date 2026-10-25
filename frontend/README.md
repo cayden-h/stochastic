@@ -10,16 +10,16 @@ The design notes are in `docs/design/README.md`.
 | --- | --- | --- |
 | `/` | Dashboard (V3-1) | See every case with its stage, verdict, and last update; Begin runs the deal |
 | (modal) | New deal (V3-2) | Load two statement CSVs and a Brief JSON or the credit agreement as text (`POST /deals`), then run |
-| `/case` | Case (V3-3) | Run the deal, answer the flags, read the verdict, edit the books, approve, download |
-| `/mapping` | Mapping (V3-4) | Where each target line went and how sure the Mapper was: All, Unsure, By policy, Edited; remap a line |
-| `/agents` | Agents (V3-6) | The agents' conversation and timeline, from the audit log |
-| `/log` | Log (V3-5) | Prove what happened |
+| `/case` | Case (V3-3) | Watch the run live, answer the flags, read the verdict, edit the books, approve, download |
+| `/mapping` | Mapping (V3-4) | Where each target line went and how sure the Mapper was, line by line as it happens: All, Unsure, By policy, Edited; remap a line |
+| `/agents` | Agents (V3-6) | The Agent House plays the conversation live, with the timeline beside it |
+| `/log` | Log (V3-5) | Prove what happened: the audit rows, or the conversation |
 | (slide-over) | Source | Show the exact quote and the document behind a flag |
 
 ## Routes the console uses
 
-Reads: `GET /deals` (the Dashboard rows and the current deal), `GET /deals/{id}/case`, `GET /health` (the backend badge), `GET /deals/{id}/audit`, and `GET /deals/{id}/stream` for `stage` and `audit` events.
-Writes: `POST /deals` (the upload), `POST /deals/{id}/run`, `POST /work-items/{id}/answer`, `POST /work-items/{id}/hold`, `POST /work-items/{id}/approve`, `POST /work-items/{id}/reject`, and `POST /dev/reset` for the second-run moment.
+Reads: `GET /deals` (the Dashboard rows and the current deal), `GET /deals/{id}/case`, `GET /health` (the backend badge), `GET /deals/{id}/audit`, `GET /deals/{id}/conversation` (the history, on load), and `GET /deals/{id}/stream` for `stage`, `audit`, `conversation`, and `mapping` events.
+Writes: `POST /deals` (the upload), `POST /deals/{id}/run` (always `{"sync": false}`: the console follows the run on the stream), `POST /work-items/{id}/answer`, `POST /work-items/{id}/hold`, `POST /work-items/{id}/approve`, `POST /work-items/{id}/reject`, and `POST /dev/reset` for the second-run moment.
 Review edits (D19, Tri's T2): `POST /deals/{id}/edits`, `POST /edits/{id}/reason`, and `DELETE /edits/{id}`; `/case` carries `edits` and `adjustments`.
 The Brief Reader (D20, Tri's T4): `POST /deals` with `agreement_txt`, `POST /deals/{id}/brief/amounts` (`field`, `value`, `source_ref`), and `POST /deals/{id}/brief/approve`; `/case` carries `brief_draft`.
 After approval, Download final files reads `GET /deals/{id}/export.xlsx` (Tri's T3) and `GET /deals/{id}/certificate`.
@@ -53,9 +53,26 @@ In the Electron window (`titleBarStyle: hiddenInset`), the layout detects Electr
 - On a deal made from agreement text, the Case opens on the Brief card before mapping: every field with the quote it came from, the open questions on the Brief, the EBITDA adjustment amounts to enter from the books with their source, and "Approve the Brief and map". `deal.brief` is null until the reader has drafted it.
 - A "Learned" chip marks a mapping or a tag the gateway tied to a live policy (`policy_id`). After "Run it again with what was learned", Run again shows no flag. "Fresh deal (clear memory)" resets for the next judge.
 
+## The live run
+
+One stream per page, opened by `src/lib/deal-context.tsx`, feeds every page; the Agents page reads it too and opens none of its own.
+The reducers are pure and live in `src/lib/conversation.ts` with their tests (`npm run test:lib`, plain `node --test`):
+the message list (ordered by id, the stream's replay deduplicated, a reset detected when an id comes back with another time), each agent's state, the mappings (upserted by `mapping_id`), and the Agent House's reading (`settle`, `fromAudit` for a backend without conversation events, `verbOfEvent`).
+The agent state rules: a `handoff` to an agent sets it working and the sender done; a `question` to the controller sets the sender asking until the `answer` with the same `item_id`; a `message`, `check`, or `refusal` shows the speaker talking for 1.8 s, then working.
+
+- Begin and Run start the run with `{"sync": false}` and open the Case at once.
+- The Case shows the pipeline (Brief Reader, Mapper, Preparer, Reviewer, You) with each agent's state, and the conversation under it, newest at the bottom.
+  A question opens its flag card with "The Mapper is asking you" and the pipeline shows the Mapper waiting on You.
+  After the Reviewer's hand-off a card offers "Review the books" (`/review`) and "See the log".
+- The Mapping page adds each row as its `mapping` event arrives, highlights the newest for about a second, and keeps the counts and filters on screen.
+- The Log highlights rows that arrive while it is open and has a Conversation view (`/log?view=conversation`).
+- With `DEMO_PACE=1` the paced Mapper holds the gateway lock for about 16 s. Run, Upload, and the reset links stay disabled while an agent works, so no write waits on the lock.
+  A reset in the second after the Reviewer's hand-off (the run is still finishing) is retried until the gateway takes it.
+
 ## The companion
 
 `src/components/companion.tsx` is a 14 px agent-blue mark that trails the cursor about 48 px below and to the right, on the spring from Squeek's `halo.js` (credited in the file).
+It shows only where editing happens: on the Case, and on the Mapping page while a remap asks for its reason.
 It fades to 40% and parks at the edge when the cursor leaves the window.
 When an edit is saved, it glides to the cell (250 ms) and opens the reason bubble: chips (keys 1 to 3), a typed reason, the remember box, Later (Esc) and Save reason (Enter).
 After Save the bubble shrinks into it and a one-line "Learned" note shows for 4 s.

@@ -27,6 +27,10 @@ interface DealData {
   messages: ConversationMessage[];
   /** When this page received each message from the stream, in ms (absent for history read on load). */
   received: Record<string, number>;
+  /** The history read has answered or failed; until then a page cannot tell history from new lines. */
+  conversationLoaded: boolean;
+  /** The gateway speaks the conversation; when false, the Agents page derives it from the audit log. */
+  conversationSupported: boolean;
   /** Each agent's live state, read from the conversation. */
   agentStates: Record<AgentKey, AgentInfo>;
   /** The mappings as the `mapping` events delivered them, with when each arrived (to highlight the newest). */
@@ -129,9 +133,10 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     // The whole conversation once, for a page opened late; the stream's replay brings the same messages.
     const load = () => api.conversation(id)
       .then((messages) => { if (!closed) dispatchConversation({ type: "load", deal: id, messages }); })
-      .catch(() => { /* the stream replays the conversation as well */ });
+      .catch(() => { if (!closed) dispatchConversation({ type: "loadFailed", deal: id }); });
     load();
     const es = new EventSource(`${API_URL}/deals/${id}/stream`);
+    let firstStage = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const bump = () => {
       if (timer) clearTimeout(timer);
@@ -145,7 +150,9 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
       if (body && !canStart(body.stage)) setStarting(false);
       // Back at `new` (a reset, from this page or another): the deal holds no mappings, and the conversation is
       // read again, as a reset sends no event of its own.
-      if (body?.stage === "new") { dispatchMapping({ type: "reset", deal: id }); load(); }
+      // The first stage event is the stream's own opening line, already covered by the read above.
+      if (body?.stage === "new" && !firstStage) { dispatchMapping({ type: "reset", deal: id }); load(); }
+      firstStage = false;
       bump();
     });
     es.addEventListener("audit", bump);
@@ -221,7 +228,9 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{
       deals, kase, health, audit, error, loading, refresh, select, stageSince: stageSeen?.at ?? 0,
-      messages, received: conversation.received, agentStates: agents, liveMappings, mappings, now, startRun, starting, reset, running,
+      messages, received: conversation.received, agentStates: agents,
+      conversationLoaded: conversation.deal === id && conversation.loaded,
+      conversationSupported: conversation.deal === id && conversation.supported, liveMappings, mappings, now, startRun, starting, reset, running,
     }}>
       {children}
     </Ctx.Provider>

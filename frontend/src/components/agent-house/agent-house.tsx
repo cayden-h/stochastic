@@ -2,7 +2,7 @@
 
 import { IBM_Plex_Mono, Public_Sans } from "next/font/google";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
-import type { AgentKey, AgentState } from "./conversation";
+import type { AgentKey, AgentState } from "@/lib/conversation";
 import type { House } from "./house";
 import "./agent-house.css";
 

@@ -1,46 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import { API_URL } from "@/lib/api";
-import type { AgentHouseHandle } from "./agent-house";
 import {
-  AGENT_KEYS, CONTROLLER, GATEWAY, type AgentKey, type AgentState, type ConversationEvent, parseConversation, sceneKey, settle,
-} from "./conversation";
+  AGENT_KEYS, CONTROLLER, GATEWAY, type AgentKey, type AgentState, type ConversationEvent, sceneKey, settle,
+} from "@/lib/conversation";
+import type { AgentHouseHandle } from "./agent-house";
 
-/**
- * The gateway's own conversation for this deal: the history from GET /deals/{id}/conversation, then every
- * `conversation` event on GET /deals/{id}/stream (which also replays history on connect; ids dedupe it).
- * `ready` turns true once the history read has answered, or failed on a backend that has no conversation yet; the
- * page then falls back to the lines derived from the audit log.
- */
-export function useLiveConversation(dealId: string | undefined): { events: ConversationEvent[]; ready: boolean; supported: boolean } {
-  const [live, setLive] = useState<{ deal: string; events: ConversationEvent[]; ready: boolean; supported: boolean }>({ deal: "", events: [], ready: false, supported: false });
-  useEffect(() => {
-    if (!dealId) return;
-    let alive = true;
-    const addAll = (list: ConversationEvent[], done?: { supported: boolean }) => setLive((prev) => {
-      const base = prev.deal === dealId ? prev : { deal: dealId, events: [], ready: false, supported: false };
-      const ids = new Set(base.events.map((x) => x.id));
-      const fresh = list.filter((e) => !ids.has(e.id));
-      if (!fresh.length && !done && prev.deal === dealId) return prev;
-      const events = fresh.length ? [...base.events, ...fresh].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)) : base.events;
-      // an event on the stream proves the gateway speaks the conversation, even if the history read failed
-      return { deal: dealId, events, ready: done ? true : base.ready, supported: done ? done.supported || base.supported : base.supported || fresh.length > 0 };
-    });
-    fetch(`${API_URL}/deals/${dealId}/conversation`, { cache: "no-store" })
-      .then(async (r) => {
-        const rows: unknown = r.ok ? await r.json() : [];
-        const list = (Array.isArray(rows) ? rows : []).map((x) => parseConversation(JSON.stringify(x))).filter((e): e is ConversationEvent => Boolean(e));
-        if (alive) addAll(list, { supported: r.ok });
-      })
-      .catch(() => { if (alive) addAll([], { supported: false }); });
-    const es = new EventSource(`${API_URL}/deals/${dealId}/stream`);
-    const on = (m: MessageEvent) => { const e = parseConversation(m.data); if (e) addAll([e]); };
-    es.addEventListener("conversation", on);
-    return () => { alive = false; es.close(); };
-  }, [dealId]);
-  return live.deal === dealId ? { events: live.events, ready: live.ready, supported: live.supported } : { events: [], ready: false, supported: false };
-}
+// The conversation itself comes from deal-context (one stream per page, GET /conversation on load); this file only
+// plays it in the house.
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

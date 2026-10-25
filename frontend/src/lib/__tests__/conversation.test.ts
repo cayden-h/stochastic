@@ -2,9 +2,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  type ConversationMessage, type ConversationState, type MappingEvent,
-  TALK_MS, agentStates, conversationReducer, emptyConversation, emptyMappings, liveList, mappingReducer,
-  mergeMappings, nextTalkEnd, openQuestions, readyForApproval,
+  type ConversationEvent, type ConversationMessage, type ConversationState, type MappingEvent,
+  TALK_MS, agentStates, conversationReducer, emptyConversation, emptyMappings, fromAudit, liveList, mappingReducer,
+  mergeConversation, mergeMappings, nextTalkEnd, openQuestions, parseConversation, readyForApproval, settle, verbOfEvent,
 } from "../conversation.ts";
 
 const D = "d_kequ_nuaire";
@@ -155,4 +155,67 @@ test("merged mappings: live ones first, then case-only ones", () => {
   assert.deepEqual(merged.map((m) => m.id), ["m_002", "m_001"]);
   assert.equal(merged[0].platform_line, "Cash");
   assert.equal(mergeMappings(caseRows, emptyMappings), caseRows);
+});
+
+test("the history read marks the conversation loaded and supported; a failed read only loaded", () => {
+  const run = demoRun();
+  const ok = conversationReducer(emptyConversation, { type: "load", deal: D, messages: run.slice(0, 2) });
+  assert.equal(ok.loaded, true);
+  assert.equal(ok.supported, true);
+  const failed = conversationReducer(emptyConversation, { type: "loadFailed", deal: D });
+  assert.equal(failed.loaded, true);
+  assert.equal(failed.supported, false);
+  // A stream message proves the gateway speaks the conversation even after a failed read.
+  assert.equal(conversationReducer(failed, { type: "message", message: run[0], receivedAt: 0 }).supported, true);
+});
+
+// The Agent House's reading, moved here from components/agent-house/conversation.ts.
+const ev = (id: string, from: string, to: string, kind: ConversationEvent["kind"], text: string, item_id: string | null = null, at = "2026-10-24T10:00:00Z"): ConversationEvent =>
+  ({ id, at, from, to, kind, text, item_id, run_id: null });
+
+test("settle: handoffs, questions, and answers put each agent where it rests", () => {
+  const events = [
+    ev("1", "system:gateway", "agent:mapper", "handoff", "Map the lines"),
+    ev("2", "agent:mapper", "human:controller", "question", "Which parts?", "wi_002"),
+    ev("3", "agent:mapper", "human:controller", "question", "Where?", "wi_003"),
+  ];
+  assert.equal(settle(events).mapper.state, "asking");
+  const one = [...events, ev("4", "human:controller", "agent:mapper", "answer", "Option b", "wi_002")];
+  assert.equal(settle(one).mapper.state, "asking");
+  const both = [...one, ev("5", "human:controller", "agent:mapper", "answer", "Option a", "wi_003")];
+  assert.equal(settle(both).mapper.state, "working");
+  assert.equal(settle(both).mapper.text, "Got it: Option a");
+  const handed = [...both, ev("6", "agent:mapper", "agent:preparer", "handoff", "Mappings posted")];
+  assert.equal(settle(handed).mapper.state, "done");
+  assert.equal(settle(handed).preparer.state, "working");
+  // The stage settles what the lines alone cannot.
+  assert.equal(settle(handed, "awaiting_approval").preparer.state, "done");
+  assert.equal(settle(handed, "run_failed").preparer.state, "idle");
+  assert.equal(settle([], "awaiting_brief")["brief-reader"].state, "asking");
+  // A backend's note on how it worked stays off the bubble.
+  assert.equal(settle([...handed, ev("7", "agent:preparer", "system:gateway", "message", "scripted backend: consolidate")]).preparer.text, "Mappings posted");
+});
+
+test("verbOfEvent and parseConversation", () => {
+  assert.equal(verbOfEvent(ev("1", "agent:mapper", "human:controller", "question", "Which?")), "ASKED");
+  assert.equal(verbOfEvent(ev("2", "agent:reviewer", "agent:preparer", "check", "Tie-out passes")), "PASS");
+  assert.equal(verbOfEvent(ev("3", "system:gateway", "agent:mapper", "message", "Learned 5 policies")), "POLICY");
+  assert.equal(verbOfEvent(ev("4", "system:gateway", "agent:preparer", "message", "ebitda: 28,379K")), "RAN");
+  assert.equal(parseConversation("not json"), null);
+  assert.equal(parseConversation(JSON.stringify({ id: "msg_1", from: "a", to: "b", text: "t", kind: "shout" })), null);
+  assert.equal(parseConversation(JSON.stringify({ id: "msg_1", at: "x", from: "a", to: "b", text: "t", kind: "check" }))?.kind, "check");
+});
+
+test("fromAudit derives lines when the gateway sends no conversation, and mergeConversation prefers the gateway's", () => {
+  const row = (id: number, actor: string, action: string, target: string | null = null, reason: string | null = null, at = `2026-10-24T10:00:0${id}Z`) =>
+    ({ id, at, deal_id: D, actor, action, target, result: "ALLOWED" as const, reason, evidence: [], prev_hash: "", hash: "" });
+  const items = [{ id: "wi_001", deal_id: D, type: "map_lines", state: "PROPOSED" as const, proposed_by: "system:gateway", question: null, evidence: [], options: [], default: null, answer: null, reject_reason: null, payload: {}, created_at: "" }];
+  const derived = fromAudit([row(1, "system:gateway", "create:map_lines", "wi_001"), row(2, "agent:mapper", "tool:consolidate", "run_001"), row(3, "agent:mapper", "tool:ebitda", "run_002")], items);
+  assert.deepEqual(derived.map((e) => e.kind), ["handoff", "check"]);
+  assert.equal(derived[1].text, "consolidate · ebitda ran.");
+  assert.equal(derived[1].run_id, "run_002");
+  const live = [ev("msg_001", "system:gateway", "agent:mapper", "handoff", "Map", null, "2026-10-24T10:00:02Z")];
+  assert.deepEqual(mergeConversation(derived, live, true).map((e) => e.id), ["msg_001"]);
+  assert.deepEqual(mergeConversation(derived, live, false).map((e) => e.id), ["a1", "msg_001"]);
+  assert.equal(mergeConversation(derived, [], false), derived);
 });

@@ -18,7 +18,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import type { AgentKey, AgentState } from "./conversation";
+import type { AgentKey, AgentState } from "@/lib/conversation";
 
 export interface HouseOptions {
   /** Run the prototype's canned STEPS loop (the pitch preview). */
