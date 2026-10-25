@@ -123,7 +123,7 @@ flowchart LR
 
 The human steps are two.
 First, the controller approves the Brief in one click, once the verifier shows 22 of 22 checks passed.
-Second, the Mapper's one escalation asks two questions together: which parts of the financing liability count as debt, and where Nu Aire's certificates of deposit and five other lines go.
+Second, the Mapper's one escalation asks three questions together: which parts of the financing liability count as debt, where Nu Aire's certificates of deposit and five other lines with no Kewaunee home go, and which home three lines with two honest homes take.
 
 Behind the console there are four parts:
 
@@ -240,7 +240,7 @@ result = session.stream(prompt, output=role.output_type, timeout=timeout)
 `AGENT_BACKEND=droid` is the first choice on the demo laptop.
 `AGENT_FALLBACK` lists what runs if Droid fails: the `scripted` rules by default, and `anthropic` (the Anthropic API) when a key is in `.env`.
 We rehearsed it with the `droid` CLI missing from PATH: the run came back as "mapper ran on scripted", and `GET /health` listed each attempt and why it failed.
-The two on-stage demo beats replay a recorded live Droid run (`backend/recordings/haiku-5-5-run2/`, Mapper 33 of 33 against the answer key), so the demo never depends on conference WiFi.
+The two on-stage demo beats replay a recorded live Droid run (`backend/recordings/haiku-5-5-run3/`, every role served Claude Haiku 5.5), so the demo never depends on conference WiFi.
 Every result, and the sidebar's model card, says which backend produced it.
 
 ---

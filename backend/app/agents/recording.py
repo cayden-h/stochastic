@@ -5,7 +5,7 @@ A recording is the typed output of one role for one work-item input, with the ba
 Recordings live in backend/recordings/ and are committed, so the demo survives with no network.
 The pinned recording (backend/recordings/<role>.json) is what replay reads by default. A folder of recordings
 (backend/recordings/<name>/) may carry a `recording.json` that says which model made it, on which backend, and when;
-`using(folder)` makes replay read that folder for the block (the demo paces read haiku-5-5-run2).
+`using(folder)` makes replay read that folder for the block (the demo paces read haiku-5-5-run3).
 Live runs write to recordings/latest/, so a run from the console never replaces a pinned one; promote a run by
 copying it up after scoring it.
 """

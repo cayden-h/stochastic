@@ -59,6 +59,18 @@ to detail lines. Read each line's `note` field: it is what the filing says about
 If a target line has no honest platform home, give confidence below 0.6 and add a mapping flag. A mapping flag may
 cover several target lines: then each option fills `mappings` with target line id -> platform line name for every
 line id in the flag. Use platform line names, never ids, in `platform_line` and in `mappings` values.
+Confidence is calibrated, and the bar is 0.90:
+- Every detail line you do not flag must have confidence 0.90 or more. If you would give a line less than 0.90, it
+  needs the controller: put it in a mapping flag (with your best platform line as the default option) instead.
+- A target line that is one part of a platform line which rolls up the same kind of item is a sure mapping, 0.95 or
+  more: Selling, G&A, and R&D into the platform's single Operating expenses line; Machinery, Vehicles, Leasehold
+  improvements, and Construction in process into gross PP&E at cost; Accrued compensation into employee compensation.
+- A line that is the same item under another name (Net revenues and Net sales) is 0.95 or more.
+- A line whose kind the platform has no line for (an income tax receivable, an intangible, interest income, a tax
+  reserve, short-term investments), or where two homes are both honest (software: PP&E or intangibles; commissions:
+  compensation or accruals; D&A against depreciation only), is below 0.90 and goes in a flag.
+Group the flagged lines into at most two mapping flags by kind (for example: lines with no platform home, and lines
+with two honest homes), so the controller answers each kind once.
 Keep the sign of a line: an income line never maps to an expense line (Interest Income - Net is not Interest
 expense). If the platform has no income line of that kind, map it to "Other income, net" or flag it.
 A flag's `question` is read aloud to the controller: name the lines by their statement names ("the Statesville
@@ -77,6 +89,8 @@ Then give every BALANCE SHEET line of both companies a covenant tag for the brie
 "debt" for borrowed money and finance leases, "na" if the line is not a liability for borrowed money (payables,
 accruals, operating leases, equity), and "unclear" in two cases that you must never decide yourself:
 (1) a line, or a family of lines sharing a name, that holds more than one instrument, and
+   (a family is every line whose name starts the same way, such as every "Financing liability" line: when one line
+   of a family is unclear, put every line of that family in the flag, even the ones that look plainly like debt);
 (2) any line that one of the brief's exclusions may apply to (for example a capitalized lease on the named property,
 or subordinated notes). Exclusions are the controller's call, not yours. Do not use "not_debt" on your own.
 Put every "unclear" line into ONE covenant_tag flag (not one flag per line) that explains the readings, cites the
@@ -84,7 +98,7 @@ agreement wording and exclusions from the brief as evidence, and offers two or t
 tag for every unclear line id under that reading, and the default is the agreement's own reading.
 Every option must settle every flagged line as "debt" or "not_debt". An option may not leave a line "unclear":
 the gateway rejects the whole proposal, because the controller's answer would not let the Preparer run.
-The gateway computes the leverage effect of each option. Aim for one covenant flag and at most two mapping flags.
+The gateway computes the leverage effect of each option. Give one covenant flag and at most two mapping flags.
 {SHARED_RULES}""",
     input_type=MapperInput,
     output_type=MapperOutput,

@@ -1,6 +1,6 @@
 import { anchorKey, num, rowParts } from "./edits.ts";
 import { toK } from "./format.ts";
-import type { Case, Edit, Result, ResultRow, Section, SourceLine, ToolRun } from "./types";
+import type { Case, Edit, GlAccount, GlResponse, Mapping, Result, ResultRow, Section, SourceLine, ToolRun } from "./types";
 
 /** The Review workbook (V3-7): the combined books as rows of a sheet. Every figure comes from the case: the result's
  * rows, the source lines, the verdict. The only arithmetic here is the change column, from the edits' own old and new
@@ -45,7 +45,27 @@ export interface SubRow {
 
 export interface SectionRow { kind: "section"; key: string; title: string }
 export interface CovenantRow { kind: "covenant"; key: string; label: string; value: string; was: string | null; bold: boolean }
-export type SheetRow = LineRow | SubRow | SectionRow | CovenantRow;
+/** The detail block under an opened combined row: for each company (platform, then target) the statement lines that
+ * feed it, each with its filing facts and its GL accounts. Statement lines are real; GL accounts are simulated. */
+export type Side = "platform" | "target";
+export interface DetailHead { kind: "dhead"; key: string; parent: string; gl: boolean }
+export interface DetailCompany { kind: "dcompany"; key: string; parent: string; side: Side; company: string; count: number; value: number; ties: boolean | null }
+export interface DetailLine {
+  kind: "dline"; key: string; parent: string; side: Side; line: SourceLine;
+  /** The line's figure in USD thousands: its amount edit's new value, else the filing's. */
+  value: number; edit?: Edit;
+  /** The target line's mapping, for its confidence, reason, and who settled it. */
+  mapping: Mapping | null;
+  /** The editable sub row, when the combined row gathers several target lines: the line is edited here. */
+  sub: SubRow | null;
+}
+export interface DetailFacts { kind: "dfacts"; key: string; parent: string; side: Side; line: SourceLine; mapping: Mapping | null }
+export interface DetailGl { kind: "dgl"; key: string; parent: string; side: Side; gl: GlAccount; value: number; prior: number }
+export interface DetailGlTotal { kind: "dgltotal"; key: string; parent: string; side: Side; line: SourceLine; value: number; ties: boolean }
+export interface DetailNote { kind: "dnote"; key: string; parent: string; text: string }
+export type DetailRow = DetailHead | DetailCompany | DetailLine | DetailFacts | DetailGl | DetailGlTotal | DetailNote;
+
+export type SheetRow = LineRow | SubRow | SectionRow | CovenantRow | DetailRow;
 
 const lower = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 
@@ -160,4 +180,53 @@ export function lineNote(line: SourceLine, remap: Edit | undefined, platform: st
   if (remap.status === "needs_reason") return `Remapped by controller. The agents mapped it to ${from}.`;
   const learned = remap.policy_id ?? remap.adjustment_id;
   return `Remapped by controller. Was ${from}. Reason: ${(remap.reason_text ?? "").replace(/[.\s]+$/, "")}.${learned ? ` ${learned}` : ""}`;
+}
+
+/** The detail block of one combined row (see DetailRow). GL rows show only when `gl` is given; a subtotal row has no GL
+ * and says so. The only arithmetic is the GL tie-out check, a sum of the simulated accounts against the filed line. */
+export function detailRows(row: LineRow, kase: Case, gl: GlResponse | null, edits: Edit[]): DetailRow[] {
+  const { deal, source_lines, mappings } = kase;
+  const parent = row.key;
+  const byLine = new Map(mappings.map((m) => [m.target_line_id, m]));
+  const subs = new Map(row.subs.map((s) => [s.line.id, s]));
+  const platform = source_lines.filter((l) => l.company === deal.platform && l.section === row.section && lower(l.line) === lower(row.line));
+  // A target subtotal the Mapper sent to a detail line (Total Operating Expense to Operating expenses) is not added
+  // again in consolidation, so it is not listed as a source of a detail row either.
+  const target = source_lines.filter((l) => {
+    if (l.company !== deal.target || l.section !== row.section || (l.is_total && !row.bold)) return false;
+    const m = byLine.get(l.id);
+    return Boolean(m) && lower(m!.platform_line) === lower(row.line);
+  });
+  const out: DetailRow[] = [{ kind: "dhead", key: `${parent}|dhead`, parent, gl: Boolean(gl) && !row.bold }];
+  const group = (side: Side, company: string, lines: SourceLine[], total: number) => {
+    const accounts = lines.map((l) => gl?.lines[l.id] ?? []);
+    const allTie = gl && !row.bold ? lines.every((l, i) => !accounts[i].length || glTies(accounts[i], l.amount)) : null;
+    out.push({ kind: "dcompany", key: `${parent}|${side}`, parent, side, company, count: lines.length, value: total, ties: allTie });
+    if (!lines.length) {
+      out.push({ kind: "dnote", key: `${parent}|${side}|none`, parent, text: `No ${company} line feeds this row.` });
+      return;
+    }
+    lines.forEach((l, i) => {
+      const e = amountEdit(edits, l);
+      out.push({ kind: "dline", key: `${parent}|${l.id}`, parent, side, line: l, value: e?.new_value ?? toK(l.amount, l.unit), edit: e, mapping: byLine.get(l.id) ?? null, sub: subs.get(l.id) ?? null });
+      out.push({ kind: "dfacts", key: `${parent}|${l.id}|facts`, parent, side, line: l, mapping: byLine.get(l.id) ?? null });
+      if (!gl || l.is_total) return;
+      for (const g of accounts[i]) {
+        out.push({ kind: "dgl", key: `${parent}|${l.id}|${g.account}`, parent, side, gl: g, value: toK(g.amount, l.unit), prior: toK(g.prior, l.unit) });
+      }
+      if (accounts[i].length) {
+        const sum = accounts[i].reduce((a, g) => a + g.amount, 0);
+        out.push({ kind: "dgltotal", key: `${parent}|${l.id}|total`, parent, side, line: l, value: toK(sum, l.unit), ties: glTies(accounts[i], l.amount) });
+      }
+    });
+  };
+  group("platform", deal.platform, platform, row.platform.value);
+  group("target", deal.target, target, row.target.value);
+  if (row.bold) out.push({ kind: "dnote", key: `${parent}|subtotal`, parent, text: "A subtotal: code adds the lines above it, so it has no GL accounts of its own." });
+  return out;
+}
+
+/** The simulated GL accounts add up to the filed line, to half a unit of the filing. */
+export function glTies(accounts: GlAccount[], amount: number): boolean {
+  return Math.abs(accounts.reduce((a, g) => a + g.amount, 0) - amount) <= 0.5;
 }

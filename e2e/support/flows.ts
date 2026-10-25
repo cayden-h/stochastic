@@ -97,13 +97,18 @@ export async function answerSuggested(page: Page): Promise<string> {
   return asked;
 }
 
-/** Waits for the Mapper's questions, then answers both with the suggested option. */
+/** Waits for the Mapper's questions, then answers each with the suggested option: the scripted rules ask 2, the
+ * recorded Haiku 5.5 run (the demo paces, an upload of the demo deal) asks 3. */
 export async function answerBothFlags(page: Page): Promise<void> {
   await expect(page.getByText("The Mapper is asking you")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText("2 questions hold the agents.")).toBeVisible();
-  await answerSuggested(page);
-  await expect(page.getByText("Answer it and the run goes on.")).toBeVisible();
-  await answerSuggested(page);
+  const held = page.getByText(/\d+ questions hold the agents\./);
+  await expect(held).toBeVisible();
+  const n = Number(((await held.textContent()) ?? "").split(" ")[0]);
+  expect([2, 3]).toContain(n);
+  for (let i = 0; i < n; i++) {
+    if (i === n - 1) await expect(page.getByText("Answer it and the run goes on.")).toBeVisible();
+    await answerSuggested(page);
+  }
   await expect(page.getByText("The Mapper is asking you")).toHaveCount(0);
 }
 

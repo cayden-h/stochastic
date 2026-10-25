@@ -129,7 +129,7 @@ export interface Attempt { backend: Backend; ok: boolean; seconds: number; error
 /** `asked`: the backend the run was asked for (the paces "demo" and "factory" ask for replay or scripted whatever is
  * configured). `model` and `recorded`: on the replay backend, the model whose recorded run is replayed (for example
  * "claude-haiku-5-5") and true when the replay plays a real recorded run; a scripted run has model null and recorded
- * false. `recording`, `recorded_at`, and `recorded_backend` name the recording ("haiku-5-5-run2", when, "droid"). */
+ * false. `recording`, `recorded_at`, and `recorded_backend` name the recording ("haiku-5-5-run3", when, "droid"). */
 export interface LastRun {
   role: string; backend: Backend; asked?: Backend; model?: string | null; recorded?: boolean;
   recording?: string | null; recorded_at?: string | null; recorded_backend?: string | null;
@@ -212,3 +212,9 @@ export interface ToolRun { run_id: string; deal_id: string; tool: string; actor:
 
 /** POST /deals: the new deal's id, its stage, and the lines loaded per company. */
 export interface DealCreated { deal_id: string; stage: Stage; lines: { platform: number; target: number } }
+
+/** One GL account under a source line, from GET /deals/{id}/gl. Amounts in the source line's own unit. */
+export interface GlAccount { account: string; name: string; amount: number; prior: number; entries: number; last_posted: string }
+/** GET /deals/{id}/gl: the GL accounts behind each detail source line, keyed by source line id. The accounts are
+ * simulated from the real statement lines (`note` says how); subtotal lines have no entry. */
+export interface GlResponse { simulated: boolean; note: string; lines: Record<string, GlAccount[]> }

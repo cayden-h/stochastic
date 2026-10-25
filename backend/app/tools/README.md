@@ -8,3 +8,5 @@ Tools have no write access and never see a model.
 The EBITDA and debt definitions come from the deal's `Brief`, never from the code.
 Owner: Tri.
 Cayden wrote the first version so the agents had something to call.
+`gl_detail.py` makes simulated account-level detail under each statement line for the Review page (`GET /deals/{id}/gl`).
+It is display data, labeled simulated, seeded from the line names, and sums exactly to each filed line; it is not a gateway tool and no deal math reads it.

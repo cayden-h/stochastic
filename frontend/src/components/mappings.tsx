@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useEdits } from "@/lib/edit-context";
 import { anchorKey, effectivePlatformLine } from "@/lib/edits";
-import { isLearned, isLearnedTag, isUnsure, pct } from "@/lib/format";
+import { isLearned, isLearnedTag, isUnsure, shownConfidence } from "@/lib/format";
 import type { Edit, Mapping, SourceLine } from "@/lib/types";
 import { Card, Label, Mono, Shape, Tag } from "./ui";
 
@@ -107,6 +107,8 @@ export function Mappings({
           const remap = editOf(line, edits, "remap");
           const amount = editOf(line, edits, "amount");
           const now = effectivePlatformLine(m, line, edits);
+          // A line you answered or a policy placed is settled: 100%, with the Mapper's own figure in the tooltip.
+          const shown = shownConfidence(m, asking);
           return (
             <div
               key={m.id}
@@ -124,11 +126,14 @@ export function Mappings({
                 {remap ? <Remapped edit={remap} />
                   : <span className="truncate">{now ?? (unsure ? "?" : "Total, not mapped")}</span>}
                 {isLearned(m) && !remap ? <Tag tone="agent">Learned</Tag> : null}
-                {m.approved_by && !remap ? <Mono>by you</Mono> : null}
+                {m.approved_by && !remap && !unsure ? <Mono>by you</Mono> : null}
                 {unsure && !remap ? <Tag tone="escalation">Needs you</Tag> : null}
               </span>
-              <span className={`w-[130px] shrink-0 font-ui font-semibold ${remap || total ? "text-slate" : unsure ? "text-escalation" : m.confidence < 0.8 ? "text-slate" : "text-clear"}`}>
-                {remap ? "Your edit" : total ? "Total" : pct(m.confidence)}
+              <span
+                className={`w-[130px] shrink-0 font-ui font-semibold ${remap || total ? "text-slate" : unsure ? "text-escalation" : shown.sure ? "text-clear" : "text-slate"}`}
+                title={!remap && !total ? shown.title ?? undefined : undefined}
+              >
+                {remap ? "Your edit" : total ? "Total" : shown.text}
               </span>
             </div>
           );

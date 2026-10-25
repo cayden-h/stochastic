@@ -1,7 +1,7 @@
 // Run with `npm run test:lib` (node --test; Node strips the types).
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canStart, isUnsure, mappingCounts, openQuestionLines, runInFlight } from "../format.ts";
+import { canStart, isUnsure, mappingCounts, openQuestionLines, runInFlight, shownConfidence } from "../format.ts";
 
 test("a run is in flight only when the gateway says a job runs, not because of the stage", () => {
   // After a restart with STORE=postgres the deal was loaded at `mapping` with no job; the stage alone kept Run off.
@@ -53,4 +53,19 @@ test("the model card names a recorded Haiku run on the replay backend, and nothi
   assert.equal(recordedModelName({ backend: "replay", model: "claude-opus-5-5", recorded: true }), null, "not Haiku");
   assert.equal(recordedModelName({ backend: "replay", model: null, recorded: true }), null);
   assert.equal(recordedModelName(null), null);
+});
+
+test("a line you answered or a policy placed shows 100%, with the Mapper's own figure in the tooltip", () => {
+  const none = new Set<string>();
+  const answered = { target_line_id: "sl_507", confidence: 0.3, approved_by: "human:controller", policy_id: null };
+  assert.deepEqual(shownConfidence(answered, none), { text: "100%", sure: true, by: "you", title: "Mapper's confidence before your answer: 30%" });
+  const policy = { target_line_id: "sl_511", confidence: 0.5, approved_by: null, policy_id: "p_006" };
+  assert.equal(shownConfidence(policy, none).text, "100%");
+  assert.equal(shownConfidence(policy, none).by, "policy");
+  assert.match(shownConfidence(policy, none).title ?? "", /p_006.*50%/);
+  // Still in an open question: the model's own figure, not settled.
+  assert.deepEqual(shownConfidence(answered, new Set(["sl_507"])), { text: "30%", sure: false, by: null, title: null });
+  // The Mapper placed it alone: its own figure; sure from 80%.
+  assert.deepEqual(shownConfidence({ target_line_id: "x", confidence: 0.85, approved_by: null }, none), { text: "85%", sure: true, by: null, title: null });
+  assert.equal(shownConfidence({ target_line_id: "x", confidence: 0.7, approved_by: null }, none).sure, false);
 });

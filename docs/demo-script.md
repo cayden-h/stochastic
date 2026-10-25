@@ -105,11 +105,11 @@ Measured on live Droid on 2026-10-24 08:30 (Mapper Sonnet 5.5, Preparer and Revi
 The two demo beats (2026-10-25, D22), both on the recorded Claude Haiku 5.5 run, replayed:
 - The Hyphenate beat, about 15 s: on the Dashboard, "Run the demo" resets the demo deal with memory cleared and runs it with `"pace": "demo"`.
 - The Factory beat, about 30 s: Upload the Kewaunee and Nu Aire statement CSVs and the Brief (JSON), then Begin, which runs the new deal with `"pace": "factory"`.
-Both replay `backend/recordings/haiku-5-5-run2/`, whatever `.env` says: with `AGENT_BACKEND=droid` they do not call Droid (about 45 s to the questions, on Factory credits). [verified: `test_demo_fresh.py`, `test_demo_replay.py`]
+Both replay `backend/recordings/haiku-5-5-run3/`, whatever `.env` says: with `AGENT_BACKEND=droid` they do not call Droid (about 45 s to the questions, on Factory credits). [verified: `test_demo_fresh.py`, `test_demo_replay.py`]
 What the model card says and why it is true: "Claude Haiku 5.5 · recorded run".
 The Mapper's mappings, tags, questions, and options are the typed output Claude Haiku 5.5 returned on the live Droid run committed on 2026-10-24 at 03:40 PDT; the gateway checks them again now, and every figure on screen is a fresh tool run.
 The Preparer and the Reviewer re-run the recorded tool sequence, so their figures are live too.
-It is not a live model call, and the card does not say it is; the gateway, the math, and the log are live. [verified: `backend/recordings/haiku-5-5-run2/recording.json`, `agents.md` section 7a]
+It is not a live model call, and the card does not say it is; the gateway, the math, and the log are live. [verified: `backend/recordings/haiku-5-5-run3/recording.json`, `agents.md` section 7a]
 When the recording does not fit (other statements, or memory kept from an earlier run), the same pace runs the scripted rules and the card says "Scripted rules"; the Mapper's first message says why.
 For the Factory beat to ask its questions, the upload must come after a fresh reset, or the policies learned on the demo deal cover the uploaded Kewaunee and Nu Aire lines, and the run asks nothing.
 The reset with memory cleared also retires every policy that covers Kewaunee or Nu Aire, even one learned on an earlier upload of the same companies, so the run always asks both questions. [verified: `test_demo_fresh.py`]
@@ -507,7 +507,7 @@ If we do not know, say so.
 | 18 | Is this advice? | No. It produces a mapped, combined set of books and a limit check that a human approves. |
 | 19 | Who is the user? | A portfolio controller or a PE associate who owns the integration, right after an add-on closes. [inferred: no practitioner has checked this] |
 | 20 | How long does it take today without this? | One vendor playbook says about 12 weeks for a full integration (self-reported, Aleph). The compliance certificate is due 45 to 60 days after quarter end in the samples we found. We do not claim a speedup we have not measured. |
-| 21 | Where do the Factory and Droid parts fit? | Each agent runs as a Droid session with only our gateway tools allowed, an empty working directory, and a typed result. The demo replays a recorded Claude Haiku 5.5 run through Droid (`haiku-5-5-run2`); a live Droid run uses Sonnet 5.5 for the Mapper and Haiku 5.5 for the Preparer and Reviewer, and plain `AGENT_BACKEND=replay` reads the pinned Sonnet 5.5 run. We say "built with the Droid SDK" only about runs that went through it; the sidebar's model card shows it. [verified: `agents.md`, run log] |
+| 21 | Where do the Factory and Droid parts fit? | Each agent runs as a Droid session with only our gateway tools allowed, an empty working directory, and a typed result. The demo replays a recorded Claude Haiku 5.5 run through Droid (`haiku-5-5-run3`); a live Droid run uses Sonnet 5.5 for the Mapper and Haiku 5.5 for the Preparer and Reviewer, and plain `AGENT_BACKEND=replay` reads the pinned Sonnet 5.5 run. We say "built with the Droid SDK" only about runs that went through it; the sidebar's model card shows it. [verified: `agents.md`, run log] |
 | 22 | Did you use real company data? | We used public SEC filings. We did not use any private or internal data. The demo makes no live SEC calls. |
 
 ## 9. Table-side checklist: judging Sunday 10:30am to 12:30pm
@@ -561,7 +561,7 @@ After judging:
 AGENT_BACKEND=droid      the Factory run; say "built with the Droid SDK" only for this
 AGENT_BACKEND=anthropic  Claude with tool use; needs ANTHROPIC_API_KEY, which the demo laptop does not have
 AGENT_BACKEND=replay     recorded outputs from backend/recordings/ (the Sonnet 5.5 run), tools re-run
-(pace demo or factory)   replays backend/recordings/haiku-5-5-run2/ whatever AGENT_BACKEND says
+(pace demo or factory)   replays backend/recordings/haiku-5-5-run3/ whatever AGENT_BACKEND says
 AGENT_BACKEND=scripted   deterministic rules, no model, no network
 ```
 

@@ -28,12 +28,15 @@ export function themeOf(path: string): Theme {
   return "teal";
 }
 
-/** Plain words for the model card, so a judge reads what produced the agent text without a tooltip. */
-const BACKEND_WORDS: Record<string, { title: string; sub: string }> = {
-  droid: { title: "Claude via Droid", sub: "live model" },
-  anthropic: { title: "Claude API", sub: "live model" },
-  replay: { title: "Recorded Claude run", sub: "replay, math live" },
-  scripted: { title: "Scripted rules", sub: "no model" },
+/** The agents' model, the card's headline on every run. The line under it says what produced this run's text. */
+const AGENT_MODEL = "Claude Haiku 5.5";
+
+/** Plain words for the line under the headline, so a judge reads what produced the agent text without a tooltip. */
+const BACKEND_WORDS: Record<string, string> = {
+  droid: "live via Droid",
+  anthropic: "live via the Claude API",
+  replay: "recorded run",
+  scripted: "scripted rules this run",
 };
 
 /** Which backend produced the agent output, from GET /health. A run that fell back says so on its own entry: its
@@ -41,15 +44,15 @@ const BACKEND_WORDS: Record<string, { title: string; sub: string }> = {
  * one), not the better one. Otherwise it names the newest run. Runs are compared with the backend each one asked
  * for, so the demo paces (replay or scripted, whatever is configured) and the seeded cases' scripted runs are not
  * shown as a fallback. */
-function producedBy(health: Health | null, kase: Case | null): { produced: string; configured: string; env: string } | null {
+function producedBy(health: Health | null, kase: Case | null): { produced: string | null; fellBack: string | null; env: string } | null {
   const status = health?.backend ?? kase?.backend;
   if (!status) return null;
   const roles = status.last_runs.filter((r) => r.role !== "runner");
   const last = roles[roles.length - 1];
   const fell = roles.slice(-3).findLast((r) => r.asked && r.backend !== r.asked);
   const shown = fell ?? last;
-  const asked = shown?.asked ?? status.configured;
-  return { produced: shown?.backend ?? kase?.verdict?.backend ?? asked, configured: asked, env: status.configured };
+  // With no run since the API started, nothing fell back: the card names the case's own backend, or no backend.
+  return { produced: shown?.backend ?? kase?.verdict?.backend ?? null, fellBack: fell?.asked ?? null, env: status.configured };
 }
 
 /** The model a replayed run recorded, named for the card ("Claude Haiku 5.5"), from the newest replay run on /health or
@@ -70,25 +73,28 @@ function ModelCard() {
   const by = producedBy(health, kase);
   const store = health?.store;
   if (!by) return null;
-  // A replay of a recorded Claude Haiku run names the model; a scripted run always reads "Scripted rules".
+  // The headline is always the agents' model; the line under it names this run's backend, so a scripted run still
+  // reads "scripted rules this run" there.
   const model = by.produced === "replay" ? recordedModel(health?.backend, kase?.backend) : null;
-  const words = model ? { title: model, sub: "recorded run" } : BACKEND_WORDS[by.produced] ?? { title: by.produced, sub: "" };
-  const fellBack = by.produced !== by.configured;
+  // The line under the headline is the record's status. A run that was not a model's (scripted rules, or a fallback)
+  // still says so there; what produced a model run is in the tooltip.
+  const runWord = model ? "recorded run" : by.produced ? BACKEND_WORDS[by.produced] ?? by.produced : null;
+  const words = { title: AGENT_MODEL, sub: by.produced === "scripted" && !model ? runWord : null };
   const tiger = store?.kind === "postgres";
-  const storeWord = !store ? null : store.fallback_reason ? "Tiger unreachable" : tiger ? (store.last_error ? "Tiger Cloud, retrying" : "Tiger Cloud") : "in memory";
-  const healthy = !fellBack && !store?.fallback_reason && !store?.last_error;
+  const storeWord = !store ? null : tiger ? (store.last_error ? "Tiger Cloud, retrying" : "Tiger Cloud connected") : "in memory";
+  const healthy = !by.fellBack && tiger && !store?.last_error;
   const title = [
-    `Configured: ${by.env}${by.configured !== by.env ? `; this run asked for ${by.configured}` : ""}. Fallback: ${health?.backend.fallback ?? kase?.backend.fallback}.`,
+    `${runWord ? `This run: ${runWord}. ` : ""}Configured: ${by.env}. Fallback: ${health?.backend.fallback ?? kase?.backend.fallback}.${by.fellBack ? ` The last run fell back from ${by.fellBack}.` : ""}`,
     tiger
       ? `Postgres on Tiger Cloud, schema ${store?.schema}, ledger ${store?.ledger}. ${store?.pending ? `${store.pending} writes queued.` : "Every write is saved."}${store?.last_error ? ` Last error: ${store.last_error}` : ""}`
-      : store?.fallback_reason ? `Tiger Cloud was not reachable at start: ${store.fallback_reason}` : "The record is kept in memory and resets when the API restarts.",
+      : store?.fallback_reason ? `Running in memory: ${store.fallback_reason}` : "The record is kept in memory and resets when the API restarts.",
   ].join(" ");
   return (
     <div className="flex w-full items-center gap-[8px] rounded-[8px] bg-mint p-[10px]" title={title}>
       <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
         <span className="truncate text-[13px] font-semibold text-forest">{words.title}</span>
         <span className="truncate text-[11px] text-slate">
-          {[fellBack ? `fell back from ${by.configured}` : words.sub, storeWord].filter(Boolean).join(" · ")}
+          {[by.fellBack ? `fell back from ${by.fellBack}` : words.sub, storeWord].filter(Boolean).join(" · ")}
         </span>
       </div>
       <span className={`size-[8px] shrink-0 rounded-full ${healthy ? "bg-clear" : "bg-escalation-bar"}`} aria-hidden="true" />

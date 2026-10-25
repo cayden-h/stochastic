@@ -138,7 +138,7 @@ test("run the demo: the notification, Decide, Learned, Ready, then Review and Ma
   const toast = page.getByRole("alert").filter({ hasText: "Needs your decision" });
   await expect(toast).toBeVisible({ timeout: 20_000 });
   expect((Date.now() - approvedBrief) / 1000).toBeLessThan(8);
-  await expect(toast).toContainText("The Mapper needs 2 decisions");
+  await expect(toast).toContainText("The Mapper needs 3 decisions");
   await expect(toast.getByRole("button", { name: "Decide" })).toBeVisible();
   await expect(page.locator("[data-badge]")).toBeVisible();
   // The demo replays the recorded Claude Haiku 5.5 run, and the model card says so.
