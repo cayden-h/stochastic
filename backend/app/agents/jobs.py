@@ -19,7 +19,7 @@ from app.agents import pace
 from app.agents.roles import BRIEF_READER_ROLE, MAPPER_ROLE, PREPARER_ROLE, REVIEWER_ROLE, Role
 from app.agents import runner
 from app.agents.runner import run_agent
-from app.core.models import MapperInput, PreparerInput, ReviewerInput, State
+from app.core.models import VERIFIER, MapperInput, PreparerInput, ReviewerInput, State
 from app.gateway.gateway import Gateway, Invalid
 
 
@@ -111,7 +111,7 @@ def _remember(gw: Gateway, role: Role, run, item_id: str, summary: str) -> None:
     gw.update_session(role.name, run.backend, item_id, summary, ok.get("session_id"), ok.get("session_key"))
 
 
-def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: int = 6,
+def advance(gw: Gateway, deal_id: str, backend: str | None = None, max_steps: int = 8,
             pace_name: str | None = None) -> list[str]:
     """Do every step that needs no human until the deal waits on a human or is posted. Returns what happened.
 
@@ -135,6 +135,16 @@ def _advance(gw: Gateway, deal_id: str, backend: str | None, max_steps: int) -> 
     store = gw.store
     for _ in range(max_steps):
         deal = store.deals[deal_id]
+        if gw.needs_verification(deal_id):
+            # The verifier checks the reader's draft before anyone is asked anything (D23): code, not a model, so it
+            # runs the same on every backend. Its checks are paced like the mappings, outside the gateway lock.
+            asked = _chosen(backend)
+            n = gw.verification_size(deal_id)
+            report = gw.verify_brief(VERIFIER, deal_id, progress=lambda step: pace.pause(step, asked, count=n))
+            pace.pause("after", asked)
+            log.append(f"verifier: {report.passed} of {len(report.checks)} checks passed"
+                       + (", Brief auto-approved" if report.auto_approved else ""))
+            continue
         if gw.open_flags(deal_id):
             log.append("waiting on a flag")
             break

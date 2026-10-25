@@ -34,6 +34,7 @@ PROFILES: dict[str, dict[str, float]] = {
         "turn": 2.5,  # an agent picks up its work item
         "tool": 1.0,  # before each tool call an agent makes
         "mapping": 0.3,  # after each mapping the gateway accepts
+        "verify": 0.3,  # after each Brief field the verifier checks (D23)
         "question": 1.5,  # before the questions to the controller open
         "after": 1.0,  # after an agent's result is stored, before the next hand-off
     },
@@ -44,6 +45,7 @@ PROFILES: dict[str, dict[str, float]] = {
         "turn": 1.2,
         "tool": 0.6,
         "mapping_total": 4.0,  # the whole list of mappings, spread evenly over the lines
+        "verify_total": 2.0,  # the verifier's whole list of Brief checks, spread evenly over the checks (D23)
         "question": 0.8,
         "after": 0.6,
     },
@@ -118,8 +120,8 @@ def seconds(step: str, count: int = 1) -> float:
     list being stored, for the `demo` profile's fixed total."""
     name, f = _profile()
     steps = PROFILES[name]
-    if step == "mapping" and "mapping_total" in steps:
-        return f * steps["mapping_total"] / max(count, 1)
+    if f"{step}_total" in steps:  # a list streamed in a fixed total time: the mappings, the Brief checks
+        return f * steps[f"{step}_total"] / max(count, 1)
     return f * steps[step]
 
 

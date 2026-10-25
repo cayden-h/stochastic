@@ -43,6 +43,10 @@ PREPARER = "agent:preparer"
 REVIEWER = "agent:reviewer"
 BRIEF_READER = "agent:brief_reader"
 SYSTEM = "system:gateway"
+# The Brief verifier (D23): code, not a model. It checks every Brief field against the agreement after the reader's
+# draft is stored, fills the amounts the deal's books give with their sources, and on a deal that allows it approves a
+# Brief whose every check passed. It speaks in the conversation as itself, so its checks read apart from the gateway's.
+VERIFIER = "system:verifier"
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +145,14 @@ class Deal(BaseModel):
     # company's books, not a real deal), or "upload" (sent through POST /deals). `note` is one line for the Dashboard.
     data_source: Literal["filings", "sample", "upload"] = "upload"
     note: str = ""
+    # Adjustment amounts that come from the books, each with its source outside the agreement (D23). After the reader
+    # drafts the Brief, the verifier fills an adjustment of the same name from here, with this source, so the
+    # controller is not asked for a figure the deal already holds. Empty for an upload unless the controller sends it.
+    book_amounts: list[Adjustment] = Field(default_factory=list)
+    # True on the demo deal only (D23): a Brief whose every verification check passed, with no question left open, is
+    # approved by the verifier, and the audit row says "auto-approved: all N checks passed". False everywhere else,
+    # where the controller approves the Brief.
+    brief_auto_approve: bool = False
 
 
 class SourceLine(BaseModel):
@@ -407,6 +419,33 @@ class ApprovedBrief(BaseModel):
     at: datetime = Field(default_factory=now)
 
 
+class BriefCheck(BaseModel):
+    """One Brief field checked against the agreement by the verifier (D23), or one amount checked against its source."""
+
+    field: str  # path in the Brief, such as "limit" or "ebitda_addbacks[1].cap"
+    value: str  # the field's value as the Brief holds it, shortened
+    section: str  # the agreement's section the quote is from, or the source of an amount from the books
+    quote: str  # the quote that backs the field, or the source line of an amount
+    ok: bool
+    reason: str  # what was checked, in a few words, or why it failed
+    checks: list[str] = Field(default_factory=list)  # the checks run: verbatim, in_section, number, defined, source
+
+
+class BriefVerification(BaseModel):
+    """The verifier's report on a draft Brief: every field with its quote, section, and result (D23)."""
+
+    item_id: str  # the draft_brief work item
+    sha256: str  # the agreement's hash
+    checks: list[BriefCheck] = Field(default_factory=list)
+    passed: int = 0
+    failed: int = 0
+    filled: list[str] = Field(default_factory=list)  # the amount fields filled from the deal's books
+    scope_notes: list[str] = Field(default_factory=list)  # what the Brief cannot hold, said, not tested
+    escalated: list[str] = Field(default_factory=list)  # the flag ids the controller must answer
+    auto_approved: bool = False
+    at: datetime = Field(default_factory=now)
+
+
 class BriefDraft(BaseModel):
     """The draft Brief with its citations and flags, as /case shows it while the controller reviews it."""
 
@@ -459,7 +498,7 @@ class AuditRow(BaseModel):
 
 
 # The roles that speak in the deal's conversation, and the kinds of message (gateway-and-api.md, "Live events").
-ROLES = (BRIEF_READER, MAPPER, PREPARER, REVIEWER, SYSTEM, CONTROLLER)
+ROLES = (BRIEF_READER, MAPPER, PREPARER, REVIEWER, SYSTEM, VERIFIER, CONTROLLER)
 MessageKind = Literal["message", "handoff", "question", "answer", "refusal", "check"]
 
 

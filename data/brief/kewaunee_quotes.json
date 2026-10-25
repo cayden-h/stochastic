@@ -4,7 +4,8 @@
   "url": "https://www.sec.gov/Archives/edgar/data/55529/000119312524249232/d886750dex101.htm",
   "sha256": {
     "ex101_full_text": "a7158ee3455edd4a0834a73fd12780c154c68c593aeb49bfd9d467973207f6ff",
-    "test_excerpt": "800d838d7e81bae76772487377ab54a19de2b11960aa56de24ee358c348fc473"
+    "test_excerpt": "800d838d7e81bae76772487377ab54a19de2b11960aa56de24ee358c348fc473",
+    "demo_extract": "f76ea1e20a6b6dcb2b04a51532e7c955d2eedb89034f47e19338682704b9fea3"
   },
   "citations": [
     {
