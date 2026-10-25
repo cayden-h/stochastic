@@ -84,7 +84,7 @@ export function FlagCard({
               onClick={() => onAnswer(o.id)}
               title={adjustment && o.id === "apply" && !approvalReady ? "Apply opens once the result is ready for your approval" : o.effect}
               className={`flex min-w-0 flex-1 flex-col items-start gap-[6px] self-stretch rounded-[12px] p-[16px] text-left transition-colors duration-150 disabled:opacity-50 ${
-                suggested ? "border-2 border-clear bg-mint-select p-[15px] hover:bg-mint" : "border border-line bg-white hover:bg-mint-select"
+                suggested ? "border-2 border-forest bg-mint p-[15px] hover:border-forest-deep" : "border border-line bg-white hover:bg-mint-select"
               }`}
             >
               <span className="flex w-full items-start gap-[6px] text-forest">

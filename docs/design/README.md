@@ -4,7 +4,7 @@
 
 The latest UI is the `Hi-fi - v3` page of the team file, Schocastic: https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=141-2 [verified: Cayden, 2026-10-24 evening]
 Use it whenever you need to look back at the UI.
-Every screen is 1440 by 900, with a 240 px sidebar (deal, Dashboard, Case, Mapping, Agents, Log, the model, and the "Always learning from" counters for human answers and policies).
+Every screen is 1440 by 900, with a 240 px sidebar (deal, Dashboard, Case, Review, Mapping, Agents, Log, the model, and the "Always learning from" counters for human answers, policies, and edits).
 
 | Frame | Shows | Link |
 | --- | --- | --- |
@@ -14,6 +14,13 @@ Every screen is 1440 by 900, with a 240 px sidebar (deal, Dashboard, Case, Mappi
 | V3-4 Mapping | Target line, platform line, and confidence, filtered by All, Unsure, or By policy | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-195 |
 | V3-5 Log | The audit log | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=144-379 |
 | V3-6 Agents | The three agents | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=146-149 |
+| V3-7.N Review | The Review workbook flow (section "Review flow (D19)") | https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=670-44 |
+
+Josie's teal pass (2026-10-24 evening) changed the whole look, and the console follows it:
+- One teal, #0F6674, for the brand, headings, body text, labels, figures, and the primary button. Surfaces and borders are pale teal, #DCEFF1. Empty values are #7A8A8C.
+- Each agent has its own character and tint: the Mapper a teal star (#DCEFF1, #0F6674), the Preparer a blue flower (#E2E9F7, #2E55A3), the Reviewer a violet character (#ECE5F6, #6A4C9C), and the Brief Reader a plum character.
+- The page wash is the page's agent tint: teal for Dashboard, Mapping, Agents, and Review, blue for the Case, violet for the Log.
+- The frames put the page's character in the brand row. The console keeps the Stochastic mark there (`brand.md`) and puts the page's character 24 px to the right of the page title instead.
 
 Other pages in the same file:
 - `Components` (https://www.figma.com/design/biVEkpW4u8S1TiaC9grcqi?node-id=487-1681): the components behind v3.
