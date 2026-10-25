@@ -1061,6 +1061,21 @@ class Gateway:
                 if any(self._policy_applies(p, deal.id, c) for c in (deal.platform, deal.target))]
 
     @_writes
+    def retire_policies_covering(self, deal_id: str, reason: str) -> list[str]:
+        """Retire (D18) every live policy that covers this deal's companies or platform, whatever deal it was learned
+        on, with a `policy:retire` row on the deal it was learned on. A retired policy stays in the record and is
+        never applied again. `/dev/reset?keep_memory=false` calls it for the demo deal. Returns the retired ids."""
+        deal = self._deal(deal_id)
+        retired = []
+        for p in list(self.store.policies.values()):
+            if p.retired_by or not any(self._policy_applies(p, deal.id, c) for c in (deal.platform, deal.target)):
+                continue
+            p.retired_by = "reset"
+            self._log(p.deal_id, SYSTEM, "policy:retire", "ALLOWED", p.id, reason=reason)
+            retired.append(p.id)
+        return retired
+
+    @_writes
     def note_policy_applied(self, policy_id: str, deal_id: str, line: str) -> None:
         p = self.store.policies.get(policy_id)
         if p:

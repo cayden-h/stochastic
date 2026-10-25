@@ -234,7 +234,8 @@ class Policy(BaseModel):
     # "platform" for remap edits (D19): it applies to every add-on of the platform named in `platform`.
     scope: Literal["company", "platform"] = "company"
     platform: str | None = None  # the platform company name, for scope "platform"
-    retired_by: str | None = None  # the reversal item that withdrew it; a retired policy is never applied
+    # The reversal item or edit that withdrew it, or "reset" for a fresh demo reset; a retired policy is never applied
+    retired_by: str | None = None
     at: datetime = Field(default_factory=now)
     times_applied: int = 0
 
