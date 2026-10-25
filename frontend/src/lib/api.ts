@@ -61,8 +61,9 @@ export function toSummary(d: DealRow): DealSummary {
   };
 }
 
-/** How fast a run plays. "demo" is the 15-second demo (about 6 s to the question, about 7 s after the last answer). */
-export type Pace = "demo";
+/** How fast a run plays. "demo" is the 15-second Hyphenate demo (about 6 s to the question, about 7 s after the last
+ * answer); "factory" is the Factory demo the Upload modal's Begin starts, about 30 s of agent time, twice the demo. */
+export type Pace = "demo" | "factory";
 
 /** The reads for the screen and the writes. Everything else is a link to the record. */
 export const api = {
@@ -75,7 +76,8 @@ export const api = {
   runs: (id: string) => get<ToolRun[]>(`/deals/${id}/runs`),
   conversation: (id: string) => get<ConversationMessage[]>(`/deals/${id}/conversation`),
   // The run goes in the background ({"sync": false}): a paced run takes about 23 s, and the console follows it on the
-  // stream instead of waiting on the request. `pace: "demo"` plays it in about 15 s of agent time.
+  // stream instead of waiting on the request. `pace: "demo"` plays it in about 15 s of agent time, `pace: "factory"` in
+  // about 30 s.
   start: (id: string, pace?: Pace) =>
     post<{ ok: boolean; log: string[]; stage: string }>(`/deals/${id}/run`, pace ? { sync: false, pace } : { sync: false }),
   answer: (itemId: string, optionId: string) => post<WorkItem>(`/work-items/${itemId}/answer`, { option_id: optionId }),

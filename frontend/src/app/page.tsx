@@ -6,7 +6,7 @@ import { Page } from "@/components/shell";
 import { Button, Card, Label, PageHeader, Shape } from "@/components/ui";
 import { UploadModal } from "@/components/upload-modal";
 import { useDeal } from "@/lib/deal-context";
-import { ago, canStart, clock, fmtX, stageWords } from "@/lib/format";
+import { ago, clock, fmtX, stageWords } from "@/lib/format";
 import type { DealSummary } from "@/lib/types";
 
 // As in V3-1, every stage sits in a chip; state is color, a word, and a shape. A stage that waits on the controller is
@@ -24,13 +24,14 @@ function caseName(d: DealSummary): string {
   return d.name.replace(/\s+acquires\s+.*$/i, "") || d.platform;
 }
 
-/** V3-1: every case with its stage, verdict, and last update. A row opens its case. Run the demo resets the demo deal
- * and plays it in about 15 seconds; Begin runs the current deal at its normal pace; Upload loads a new one. */
+/** V3-1: every case with its stage, verdict, and last update. A row opens its case. Run the demo (the Hyphenate demo)
+ * resets the demo deal and plays it in about 15 seconds; Upload loads a new deal, and its Begin runs it as the Factory
+ * demo, about 30 seconds. */
 export default function Dashboard() {
   const router = useRouter();
-  const { deals, kase, audit, select, startRun, runDemo, running, reloadDeals } = useDeal();
+  const { deals, kase, audit, select, runDemo, running, reloadDeals } = useDeal();
   const [upload, setUpload] = useState(false);
-  const [busy, setBusy] = useState<"begin" | "demo" | null>(null);
+  const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -55,17 +56,16 @@ export default function Dashboard() {
   const needsYou = deals.filter((d) => stageWords(stageOf(d)).tone === "you").length;
   const policies = kase.policies.length;
 
-  async function go(kind: "begin" | "demo") {
-    setBusy(kind); setNote(null);
+  async function demo() {
+    setBusy(true); setNote(null);
     try {
       // The run goes in the background, so the Case opens at once and the judge watches it happen.
-      if (kind === "demo") await runDemo();
-      else if (canStart(kase!.stage)) await startRun(current);
+      await runDemo();
       router.push("/case");
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Could not start the run");
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }
 
@@ -86,14 +86,13 @@ export default function Dashboard() {
     <Page>
       <PageHeader title="Dashboard">
         <Button disabled={running} title={wait} onClick={() => setUpload(true)}>Upload</Button>
-        <Button disabled={busy !== null || running} title={wait ?? "Run the current case at its normal pace"} onClick={() => void go("begin")}>Begin</Button>
         <Button
           kind="primary"
-          disabled={busy !== null || running}
+          disabled={busy || running}
           title={wait ?? "Reset the demo deal with memory cleared and run it in about 15 seconds"}
-          onClick={() => void go("demo")}
+          onClick={() => void demo()}
         >
-          {busy === "demo" ? "Starting the demo" : "Run the demo"}
+          {busy ? "Starting the demo" : "Run the demo"}
         </Button>
       </PageHeader>
 

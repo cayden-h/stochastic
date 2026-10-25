@@ -3,13 +3,16 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { api, type Pace } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
 import { canStart, fmtX, plural } from "@/lib/format";
 import { FileIcon, UploadIcon } from "./icons";
 import { Label } from "./ui";
 
 type Slot = "platform" | "target" | "brief";
+
+/** Begin's pace: the Factory demo, about 30 s of agent time. */
+const FACTORY_PACE = "factory" satisfies Pace;
 interface Picked { file: File; sub: string }
 
 const SLOTS: { key: Slot; label: string; accept: string }[] = [
@@ -47,8 +50,10 @@ async function summarize(slot: Slot, file: File): Promise<string> {
 
 /**
  * V3-2: a new deal from two statement CSVs and a Brief (JSON) or the credit agreement (text), then the run.
+ * Begin is the Factory demo: it creates the deal and runs it at pace "factory" (about 30 s of agent time, twice the
+ * 15-second demo), hard-coded as Run the demo is, and opens its Case.
  * With agreement text the run starts with the Brief Reader, and the Case shows its draft to check.
- * With no files chosen, the slots show the current deal's inputs and Begin runs it.
+ * With no files chosen, the slots show the current deal's inputs and Begin runs it at the same pace.
  */
 export function UploadModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
@@ -148,9 +153,9 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         await select(created.current);  // the new deal is current even if the start below fails
       }
       if (created.current) {
-        await startRun(created.current);
+        await startRun(created.current, FACTORY_PACE);
       } else if (canStart(kase!.stage)) {
-        await startRun(deal.id);
+        await startRun(deal.id, FACTORY_PACE);
       }
       onClose();
       router.push("/case");
