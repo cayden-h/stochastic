@@ -5,6 +5,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("stochastic", {
   isDesktop: true,
+  // The console calls this once its first read of the deal has finished, so main can show the window
+  // and close the launch splash (design/brand.md).
+  appReady: () => ipcRenderer.send("stochastic:app-ready"),
   // files: [{ url, name }], url absolute or relative to the API (for example "/deals/d_kequ_nuaire/files/workbook.xlsx").
   // Asks for a folder, downloads each file from the API into it, and shows it in Finder.
   // Resolves to { canceled, folder, files } with the written paths; rejects if any download fails.
