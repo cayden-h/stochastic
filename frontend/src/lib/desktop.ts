@@ -8,6 +8,8 @@ export interface DesktopBridge {
   saveFiles?: (files: { url: string; name: string }[]) => Promise<SaveFilesResult>;
   /** Tells the app the console's first read of the deal is done, so it can show the window and close the splash. */
   appReady?: () => void;
+  /** A native macOS notification, for a question that needs the controller while they look at another app. */
+  notify?: (n: { title: string; body: string }) => void;
 }
 
 declare global {

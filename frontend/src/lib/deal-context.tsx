@@ -8,10 +8,31 @@ import {
   nextTalkEnd,
 } from "./conversation";
 import { canStart, runInFlight } from "./format";
-import type { AuditResponse, Case, Deal, Health, Mapping, Stage } from "./types";
+import type { AuditResponse, Case, DealSummary, Health, Mapping, Notice, Stage } from "./types";
+
+/** A policy an answer just taught, from a `conversation` message with `policy_id` ("Learned p_007: ..."). */
+export interface LearnedNotice { id: string; deal_id: string; from: string; policy_id: string; text: string; at: string }
+
+/** Where the controller asked to go from a notification: the flag card of this item, on the Case. */
+export interface FocusRequest { item_id: string; at: number }
+
+/** The deal the controller picked, kept for a reload of this window. Storage can be missing or refuse; then the
+ * console opens on the first deal, as before. */
+const PICKED = "stochastic:deal";
+function readPicked(): string | null {
+  try { return window.sessionStorage.getItem(PICKED); } catch { return null; }
+}
+function writePicked(id: string | null): void {
+  try { if (id) window.sessionStorage.setItem(PICKED, id); else window.sessionStorage.removeItem(PICKED); } catch { /* no storage */ }
+}
+
+/** A message sent before this page's stream connected is history, not news: it gets no toast. A little slack covers
+ * the clocks of the browser and the gateway. */
+const HISTORY_SLACK_MS = 2000;
 
 interface DealData {
-  deals: Deal[];
+  /** Every case, from GET /deals. The current deal's row reads its stage from the case, which is fresher. */
+  deals: DealSummary[];
   kase: Case | null;
   health: Health | null;
   audit: AuditResponse;
@@ -46,6 +67,19 @@ interface DealData {
   reset: (keepMemory: boolean) => Promise<void>;
   /** A run is in flight: starting, or the gateway says a job runs for the deal (`running` on /case). Writes wait for it. */
   running: boolean;
+  /** The 15-second demo: reset to a fresh deal with memory cleared, make the demo deal current, and run it at demo pace. */
+  runDemo: () => Promise<void>;
+  /** The questions that opened for the controller while this page was open (`notify` events), oldest first. */
+  notices: Notice[];
+  /** The policies answers taught while this page was open, oldest first. */
+  learned: LearnedNotice[];
+  /** Close a notice or a learned note by its id. */
+  dismiss: (id: string) => void;
+  /** When the last policy was learned, in ms, so the sidebar's Policies counter can pulse. 0 before any. */
+  learnedAt: number;
+  /** A notification's Decide: open the Case on this item's flag card. */
+  focus: FocusRequest | null;
+  requestFocus: (itemId: string) => void;
 }
 
 /** The gateway answered but holds no deal: a different screen from the gateway being down. */
@@ -60,7 +94,7 @@ const Ctx = createContext<DealData | null>(null);
 
 /** Reads the case in one call and refreshes on every stream event. The console never computes a number. */
 export function DealProvider({ children }: { children: React.ReactNode }) {
-  const [deals, setDeals] = useState<Deal[]>([]);
+  const [deals, setDeals] = useState<DealSummary[]>([]);
   const [kase, setCase] = useState<Case | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [audit, setAudit] = useState<AuditResponse>(emptyAudit);
@@ -84,6 +118,7 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     try {
       // The list is read every time: a reset drops uploaded deals, and the current one must fall back to the demo deal.
       const list = await api.deals();
+      if (dealId.current === null) dealId.current = readPicked();
       if (!list.some((d) => d.id === dealId.current)) dealId.current = list[0]?.id ?? null;
       const id = dealId.current;
       if (!id) throw new NoDeal();
@@ -110,8 +145,18 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
 
   const select = useCallback(async (id: string) => {
     dealId.current = id;
+    writePicked(id);
     return refresh();
   }, [refresh]);
+
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [learned, setLearned] = useState<LearnedNotice[]>([]);
+  const [focus, setFocus] = useState<FocusRequest | null>(null);
+  const dismiss = useCallback((nid: string) => {
+    setNotices((n) => n.filter((x) => x.id !== nid));
+    setLearned((n) => n.filter((x) => x.id !== nid));
+  }, []);
+  const requestFocus = useCallback((itemId: string) => setFocus({ item_id: itemId, at: Date.now() }), []);
 
   // The first read, from a timer callback so the effect body itself sets no state (react-hooks/set-state-in-effect).
   useEffect(() => {
@@ -134,6 +179,8 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
       .catch(() => { if (!closed) dispatchConversation({ type: "loadFailed", deal: id }); });
     load();
     const es = new EventSource(`${API_URL}/deals/${id}/stream`);
+    const connected = Date.now();
+    const live = (at: string) => new Date(at).getTime() >= connected - HISTORY_SLACK_MS;
     let firstStage = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const bump = () => {
@@ -160,7 +207,21 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     es.addEventListener("edit", bump);
     es.addEventListener("conversation", (e) => {
       const message = parse<ConversationMessage>(e);
-      if (message) dispatchConversation({ type: "message", message, receivedAt: Date.now() });
+      if (!message) return;
+      dispatchConversation({ type: "message", message, receivedAt: Date.now() });
+      // A policy an answer just taught: the console says so where the controller is looking.
+      if (message.policy_id && live(message.at)) {
+        const note: LearnedNotice = { id: `learned_${message.id}`, deal_id: message.deal_id, from: message.from, policy_id: message.policy_id, text: message.text, at: message.at };
+        setLearned((n) => (n.some((x) => x.id === note.id) ? n : [...n, note]));
+      }
+    });
+    // A question to the controller opened: a toast on every page, and in the Mac app a native notification. The
+    // stream replays the open questions when it connects; those are history (the Case badge counts them), not news.
+    es.addEventListener("notify", (e) => {
+      const notice = parse<Notice>(e);
+      if (!notice?.id || !live(notice.at)) return;
+      setNotices((n) => (n.some((x) => x.id === notice.id || (notice.item_id && x.item_id === notice.item_id)) ? n : [...n, notice]));
+      try { window.stochastic?.notify?.({ title: notice.title, body: notice.body }); } catch { /* the bridge is optional */ }
     });
     es.addEventListener("mapping", (e) => {
       const mapping = parse<MappingEvent>(e);
@@ -213,8 +274,27 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     }
     dispatchConversation({ type: "reset" });
     dispatchMapping({ type: "reset" });
+    setNotices([]); setLearned([]);
     await refresh();
   }, [refresh]);
+
+  const runDemo = useCallback(async () => {
+    setStarting(true);
+    try {
+      await reset(false);
+      // The demo deal is the one read from the public filings; the sample cases are for clicking through.
+      const list = await api.deals();
+      const demo = list.find((d) => d.data_source === "filings") ?? list[0];
+      if (!demo) throw new Error("The gateway has no deal to run.");
+      dealId.current = demo.id;
+      writePicked(demo.id);
+      await api.start(demo.id, "demo");
+    } catch (e) {
+      setStarting(false);
+      throw e;
+    }
+    void refresh();
+  }, [refresh, reset]);
 
   // Messages and mappings are shown only for the deal they belong to, so a deal switch never shows the last one's.
   const messages = useMemo(() => (conversation.deal === id ? conversation.messages : []), [conversation, id]);
@@ -233,6 +313,7 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
       messages, received: conversation.received, agentStates: agents,
       conversationLoaded: conversation.deal === id && conversation.loaded,
       conversationSupported: conversation.deal === id && conversation.supported, liveMappings, mappings, now, startRun, starting, reset, running,
+      runDemo, notices, learned, dismiss, learnedAt: learned.length ? Date.parse(learned[learned.length - 1].at) || 1 : 0, focus, requestFocus,
     }}>
       {children}
     </Ctx.Provider>

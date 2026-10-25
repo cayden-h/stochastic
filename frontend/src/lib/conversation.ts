@@ -14,6 +14,8 @@ export type MessageKind = "message" | "handoff" | "question" | "answer" | "refus
 export interface ConversationMessage {
   id: string; deal_id: string; at: string; from: Party | string; to: Party | string; kind: MessageKind | string;
   text: string; item_id: string | null; run_id: string | null; line_id: string | null;
+  /** The policy a message announces ("Learned p_007: ..."), when an answer taught one. */
+  policy_id?: string | null;
 }
 
 /** A conversation line as the Agent House plays it: a gateway message, or one derived from the audit log

@@ -8,7 +8,7 @@ import { Page } from "@/components/shell";
 import { Avatar, Button, Card, Label, Mono, PageHeader, Shape, Tag } from "@/components/ui";
 import { VerdictLine } from "@/components/verdict-line";
 import { BriefCard } from "@/components/brief-card";
-import { AskingBanner, Conversation, Pipeline } from "@/components/process-flow";
+import { AskingBanner, Conversation, Pipeline, agentName } from "@/components/process-flow";
 import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
@@ -33,12 +33,34 @@ function CaseTile({ href, label, value, sub, children }: { href: string; label: 
  * files are on the Review page (V3-7), which the Reviewer's hand-off opens. Mapping, Review and Log are tiles.
  */
 export default function CaseScreen() {
-  const { kase, refresh, messages, received, agentStates, startRun, starting, reset, running, mappings: liveRows } = useDeal();
+  const { kase, deals, refresh, messages, received, agentStates, startRun, starting, reset, running, mappings: liveRows, focus } = useDeal();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const editsCtx = useEdits();
   const flagRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLElement>(null);
+
+  // A notification's Decide: open that flag and bring its card into view, with the focus on it.
+  const focusAt = focus?.at ?? 0;
+  const focusItem = focus?.item_id ?? null;
+  useEffect(() => {
+    if (!focusAt || !focusItem) return;
+    const t0 = setTimeout(() => setCurrentId(focusItem), 0);
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // The card for the item is drawn on the next render; the case read may also be a moment behind the event.
+    let tries = 0;
+    let t: ReturnType<typeof setTimeout>;
+    const go = () => {
+      const card = cardRef.current;
+      if (card && card.dataset.flag === focusItem) {
+        card.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
+        card.focus({ preventScroll: true });
+      } else if (tries++ < 20) t = setTimeout(go, 100);
+    };
+    t = setTimeout(go, 50);
+    return () => { clearTimeout(t0); clearTimeout(t); };
+  }, [focusAt, focusItem]);
 
   // A new question from an agent brings its flag card into view, even if the controller scrolled down to read.
   const asked = messages.filter((m) => m.kind === "question" && m.to === "human:controller").length;
@@ -80,6 +102,8 @@ export default function CaseScreen() {
   const asFiled = asFiledOpt && deal.ebitda_basis !== "as_filed"
     ? { leverage: asFiledOpt.leverage!, ok: Boolean(asFiledOpt.ok), run_id: asFiledOpt.run_id } : null;
   const failed = stage === "run_failed";
+  // Where the figures come from: the filings for the demo deal, made-up figures for a sample case.
+  const sample = deals.find((d) => d.id === deal.id)?.data_source === "sample";
   const idle = canStart(stage) && !starting;
   // The question the open flag came with, so its card can say who is asking (the gateway asks for some covenant flags).
   const askedBy = current ? messages.findLast((m) => m.kind === "question" && m.item_id === current.id)?.from ?? current.proposed_by : null;
@@ -155,7 +179,7 @@ export default function CaseScreen() {
                     : `${deal.platform} acquires ${deal.target}. The Brief Reader reads the credit agreement first and drafts the Brief: the limit, what counts as debt, and the EBITDA adjustments, each with its quote. You check it before the agents map.`}
               </p>
               <Mono>
-                {plural(source_lines.filter((l) => l.company === deal.platform).length, `${deal.platform} line`)}, {plural(source_lines.filter((l) => l.company === deal.target).length, `${deal.target} line`)}, from public filings.
+                {plural(source_lines.filter((l) => l.company === deal.platform).length, `${deal.platform} line`)}, {plural(source_lines.filter((l) => l.company === deal.target).length, `${deal.target} line`)}, {sample ? "sample data, not from a filing" : "from public filings"}.
               </Mono>
             </Card>
           ) : null}
@@ -168,6 +192,9 @@ export default function CaseScreen() {
               banner={askedBy && !isAdjustmentFlag(current) ? <AskingBanner party={askedBy} count={blocking.length} /> : null}
               approvalReady={verdict?.approval_state === "PROPOSED"}
               key={current.id}
+              cardRef={cardRef}
+              asker={askedBy ? agentName(askedBy).replace(/^The /, "") : "Mapper"}
+              more={blocking.filter((f) => f.id !== current.id).length}
               item={current}
               lines={source_lines}
               busy={busy}
@@ -253,7 +280,7 @@ export default function CaseScreen() {
               <Button kind="link" disabled={busy || running} title={running ? "Wait for the agents to finish this step" : undefined} onClick={() => act(() => reset(false))}>Fresh deal (clear memory)</Button>
             ) : null}
             <span className="flex-1" />
-            <Mono>Figures from public SEC filings. Code does the math; a human approves. Not advice.</Mono>
+            <Mono>{sample ? "Sample figures, not from a filing." : "Figures from public SEC filings."} Code does the math; a human approves. Not advice.</Mono>
           </footer>
         </div>
 
