@@ -12,7 +12,8 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.api import certificate as cert_doc  # noqa: E402
-from app.api.export import AMBER, TARGET_EDIT_NOTE, build_workbook, export_filename, workbook_bytes  # noqa: E402
+from app.api.export import (AMBER, TARGET_EDIT_NOTE, THOUSANDS, build_workbook, export_filename, whole,  # noqa: E402
+                            workbook_bytes)
 from app.core.models import Edit  # noqa: E402
 from app.db.fixtures.kewaunee import DEAL_ID, PLATFORM, TARGET  # noqa: E402
 from app.main import create_app  # noqa: E402
@@ -205,7 +206,7 @@ def test_reasoned_edit_marks_the_cell_and_lists_the_edit(app, client):
     cell = ws.cell(row=r, column=4)
     assert cell.fill.fill_type == "solid" and cell.fill.fgColor.rgb.endswith(AMBER)
     text = cell.comment.text
-    assert text == ("Edited by human:controller, 2026-10-25 10:42 UTC. Line was 5,438.271. "
+    assert text == ("Edited by human:controller, 2026-10-25 10:42 UTC. Line was 5,438. "
                     "Reason: One-time acquisition cost, an allowed add-back. Policy p_12.")
     assert ws.cell(row=r, column=3).comment is None  # the platform cell is not edited
     assert marked(ws) == [(r, 4)]  # exactly one cell on the whole sheet
@@ -217,6 +218,19 @@ def test_reasoned_edit_marks_the_cell_and_lists_the_edit(app, client):
                        "human:controller", "2026-10-25 10:42 UTC", "p_12"]
 
 
+def test_figures_read_as_whole_thousands_like_the_cells(app, client):
+    """The note says "Line was 6,163", as the console's cells do, not the tool's 6,162.806; the cells keep the value."""
+    assert [whole(x) for x in (6162.806, 5438.271, 0.5, 19057.0, -5938.0, -0.4, 1234567.5)] == \
+        ["6,163", "5,438", "1", "19,057", "(5,938)", "0", "1,234,568"]
+    store, deal, result, items, chain = posted_parts(app, client)
+    wb = load(workbook_bytes(build_workbook(store, deal, result, items, chain, edits=[edit()])))
+    ws = wb["Combined"]
+    assert all(ws.cell(row=r, column=c).number_format == THOUSANDS for r in range(2, ws.max_row + 1) for c in (3, 4, 5))
+    we = wb["Edits"]
+    assert we.cell(row=2, column=3).value == 5438.271 and we.cell(row=2, column=3).number_format == THOUSANDS
+    assert we.cell(row=2, column=4).number_format == THOUSANDS
+
+
 def test_platform_edit_with_chip_and_no_policy(app, client):
     store, deal, result, items, chain = posted_parts(app, client)
     e = edit(company=PLATFORM, line="Net earnings", old_value=19057.0, new_value=19500.0, reason_text=None,
@@ -225,7 +239,7 @@ def test_platform_edit_with_chip_and_no_policy(app, client):
     r = next(i for i, row in enumerate(ws.iter_rows(values_only=True), start=1) if row[0] == "Net earnings")
     cell = ws.cell(row=r, column=3)
     assert cell.fill.fill_type == "solid"
-    assert cell.comment.text == "Edited by human:controller, 2026-10-25 10:42 UTC. Line was 19,057.000. Reason: chip 1."
+    assert cell.comment.text == "Edited by human:controller, 2026-10-25 10:42 UTC. Line was 19,057. Reason: chip 1."
     assert ws.cell(row=r, column=4).comment is None
     assert marked(ws) == [(r, 3)]
 

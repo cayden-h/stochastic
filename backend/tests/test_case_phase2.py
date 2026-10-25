@@ -88,7 +88,7 @@ def test_case_export_and_certificate_show_a_stored_edit(app, client):
     row = next(i for i, v in enumerate(ws.iter_rows(values_only=True), start=1) if v[0] == "Net earnings")
     cell = ws.cell(row=row, column=4)
     assert cell.fill.fill_type == "solid"
-    assert "Line was 5,438.271." in cell.comment.text and REASON in cell.comment.text
+    assert "Line was 5,438." in cell.comment.text and REASON in cell.comment.text
     edits_rows = [list(v) for v in wb["Edits"].iter_rows(values_only=True)]
     assert len(edits_rows) == 2 and edits_rows[1][:5] == ["Net Income", TARGET, 5438.271, 6438.271, REASON]
 

@@ -183,7 +183,7 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
   const row = /\d+/.exec(amber[0].ref)![0];
   expect(amber[0].ref).toBe(`D${row}`);
   expect(wb.get("Combined")!.cells.find((c) => c.ref === `A${row}`)?.text).toBe("Operating expenses");
-  expect(amber[0].note).toContain("Line was 6,162.806");
+  expect(amber[0].note).toContain("Line was 6,163");
   expect(amber[0].note).toContain("Reason: One-time acquisition cost, an allowed add-back.");
   const edits = wb.get("Edits")!;
   expect(edits.rows).toBe(2);
