@@ -102,9 +102,9 @@ export function Verdict({ kind, word }: { kind: VerdictKind; word?: string }) {
   );
 }
 
-/** A small caps tag: SUGGESTED in forest, or Learned in mint. */
-export function Tag({ children, tone = "ink" }: { children: ReactNode; tone?: "ink" | "agent" }) {
-  const cls = tone === "agent" ? "bg-mint text-forest" : "bg-forest text-white";
+/** A small caps tag: SUGGESTED in forest, Learned in mint, or Needs you in amber. */
+export function Tag({ children, tone = "ink" }: { children: ReactNode; tone?: "ink" | "agent" | "escalation" }) {
+  const cls = tone === "agent" ? "bg-mint text-forest" : tone === "escalation" ? "bg-escalation-tint text-escalation" : "bg-forest text-white";
   return (
     <span className={`inline-block shrink-0 whitespace-nowrap rounded-chip px-[6px] py-[2px] text-[10px] font-semibold uppercase tracking-[0.6px] ${cls}`}>
       {children}

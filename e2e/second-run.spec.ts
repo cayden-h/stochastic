@@ -24,7 +24,9 @@ test("run it again with what was learned, then a fresh deal", async ({ page, bac
   await expect(handoff(page)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("The Mapper is asking you")).toHaveCount(0);
   await expect(page.getByText(/No flag this time\. The Mapper applied your (earlier answer|\d+ earlier answers) to \d+ lines?/)).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Mapping 53 placed Learned .* lines? learned$/ })).toBeVisible();
+  // Nothing is unsure on the second run: no question is open, and the lines a policy placed are not unsure (37 is the
+  // 53 target lines less the 16 totals, which are not counted).
+  await expect(page.getByRole("link", { name: /^Mapping 37 placed Learned 37 sure · 0 unsure · \d+ lines? learned$/ })).toBeVisible();
   const again = await readCase(backend);
   expect(again.flags.filter((f: { answer: string | null }) => f.answer)).toHaveLength(0);
   expect(again.policies.length).toBe(learned);
@@ -36,7 +38,11 @@ test("run it again with what was learned, then a fresh deal", async ({ page, bac
   await byPolicy.click();
   await expect(byPolicy).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Certificates of Deposit", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^37 lines · 37 sure · 0 unsure · 16 totals$/)).toBeVisible();
   await shot("mapping-by-policy");
+  const unsure = page.getByRole("group", { name: "Filter the mappings" }).getByRole("button", { name: "Unsure" });
+  await unsure.click();
+  await expect(page.getByText(/^No line waits on you\./)).toBeVisible();
 
   // Fresh deal (clear memory): the policies are gone and the next run asks again.
   await nav(page, "Case").click();

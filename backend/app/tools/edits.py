@@ -168,6 +168,19 @@ def statement_feeds(lines: list[SourceLine], i: int) -> list[tuple[int, int]]:
     return [(j, 1) for j in fed]
 
 
+def platform_line_for(platform_lines: list[SourceLine], name: str | None, section: str | None = None,
+                      line_id: str | None = None) -> SourceLine | None:
+    """The platform line a mapping lands on: the mapping's platform_line_id when it names a line of that name, else
+    the line of that name in `section` (the target line's), else the first of that name in any section.
+    A name can repeat across sections (an "Other" in two statements), so the name alone is not enough."""
+    if line_id:
+        by_id = next((p for p in platform_lines if p.id == line_id), None)
+        if by_id is not None and _norm(by_id.line) == _norm(name):
+            return by_id
+    named = [p for p in platform_lines if _norm(p.line) == _norm(name)]
+    return next((p for p in named if p.section == section), named[0] if named else None)
+
+
 def remap_moves(target_lines: list[SourceLine], platform_lines: list[SourceLine], remapped: list[Mapping],
                 edits: Iterable[Edit] | None) -> list[dict]:
     """For each remapped target detail line, the subtotals it leaves and the ones it joins (the remap roll-up rule).
@@ -184,7 +197,9 @@ def remap_moves(target_lines: list[SourceLine], platform_lines: list[SourceLine]
             continue
         own = [x for x in target_lines if _norm(x.company) == _norm(t.company) and x.section == t.section]
         old = [(own[j], c) for j, c in statement_feeds(own, next(k for k, x in enumerate(own) if x.id == t.id))]
-        p = next(p for p in platform_lines if _norm(p.line) == _norm(m.platform_line))
+        p = platform_line_for(platform_lines, m.platform_line, t.section, m.platform_line_id)
+        if p is None:
+            continue  # apply_remap_edits refuses a remap onto a line the platform does not have
         theirs = [x for x in platform_lines if _norm(x.company) == _norm(p.company) and x.section == p.section]
         at = next(k for k, x in enumerate(theirs) if x.id == p.id)
         new = [(theirs[j], c) for j, c in statement_feeds(theirs, at)]
@@ -259,7 +274,7 @@ def apply_remap_edits(mappings: list[Mapping], target_lines: list[SourceLine], p
     """Copies of the mappings with each active remap edit's new_platform_line in place.
 
     The mapping is found through its target line (company and line name). platform_line_id is set to the id of the
-    platform line of that name (any section).
+    platform line of that name in the target line's section, else in any section (platform_line_for).
     Raises ValueError for a remap that matches no mapping, that is stale (old_platform_line set and not the mapping's
     current platform line), onto a line the platform does not have, or onto a
     platform total (is_total) for a detail target line. The input mappings are never changed.
@@ -278,7 +293,7 @@ def apply_remap_edits(mappings: list[Mapping], target_lines: list[SourceLine], p
             if old_name and _norm(old_name) != _norm(m.platform_line):
                 raise ValueError(f"remap edit {getattr(edit, 'id', '?')} is stale: it expects {old_name}, "
                                  f"but the mapping is now {m.platform_line}")
-            p = next((p for p in platform_lines if _norm(p.line) == _norm(new_name)), None)
+            p = platform_line_for(platform_lines, new_name, t.section)
             if p is None:
                 raise ValueError(f"remap edit {getattr(edit, 'id', '?')}: the platform has no line {new_name}")
             if p.is_total and not t.is_total:

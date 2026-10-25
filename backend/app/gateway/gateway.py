@@ -69,6 +69,10 @@ EDIT_TOOLS = ("consolidate", "ebitda", "covenant_debt")
 T1_MISSING = "edit-aware tools not installed (T1)"
 # The tools that read the Brief's terms: refused until the controller approves the Brief (D20).
 BRIEF_TOOLS = ("ebitda", "covenant_debt", "limit_test")
+# The stages where an agent is at work. A deal found in one with no job running (the app restarted mid-run) is moved
+# to run_failed on start, so the console offers Run again instead of a progress row that never ends.
+MID_RUN_STAGES = ("reading_brief", "mapping", "mapped", "flags_answered", "preparing", "awaiting_review")
+RESTARTED_MID_RUN = "the app restarted mid-run"
 
 # Per-role permissions. Agents are named, so the Mapper cannot call the Preparer's tools.
 PERMISSIONS: dict[str, set[str]] = {
@@ -185,7 +189,8 @@ class Gateway:
         self.lock = threading.RLock()  # background runs and requests write through one gateway
         self._depth = 0
         self.forks = None  # WhatIfForks when STORE=postgres and FORKS=tiger (app/gateway/whatif.py)
-        self.running: set[str] = set()  # deal ids with a background run in flight, shared with the API routes
+        self.running: set[str] = set()  # deal ids with a job in flight, shared with the API routes
+        self.running_lock = threading.Lock()  # guards `running`; /dev/reset holds it across its check and the reset
 
     # ------------------------------------------------------------------ audit log
     def _log(self, deal_id: str, actor: str, action: str, result: str, target: str | None = None,
@@ -387,6 +392,21 @@ class Gateway:
             return  # the runner already noted this failure; the background route notes it again
         self._log(deal_id, SYSTEM, "run:failed", "ALLOWED", deal_id, reason=error[:300])
         self._say(deal_id, SYSTEM, CONTROLLER, "message", f"The run stopped: {error}. Press Run to continue.")
+
+    @_writes
+    def recover_interrupted_runs(self) -> list[str]:
+        """On start, after the store loaded its ledger: a deal left at a working stage has no job behind it, because
+        jobs live in the process that stopped. Each one is marked run_failed with a run:failed row, so Run again
+        picks up where it stopped. Returns the deal ids it moved."""
+        stuck = [d.id for d in list(self.store.deals.values())
+                 if d.stage in MID_RUN_STAGES and d.id not in self.running]
+        for deal_id in stuck:
+            self.note_run_failed(deal_id, RESTARTED_MID_RUN)
+        return stuck
+
+    def is_running(self, deal_id: str) -> bool:
+        """A job is really running for this deal in this process (not inferred from the stage)."""
+        return deal_id in self.running
 
     # ------------------------------------------------------------------ tools
     @_writes

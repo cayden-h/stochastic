@@ -73,8 +73,13 @@ The agent state rules: a `handoff` to an agent sets it working and the sender do
   A question opens its flag card with "The Mapper is asking you" and the pipeline shows the Mapper waiting on You.
   After the Reviewer's hand-off a card offers "Review the books" (`/review`) and "See the log".
 - The Mapping page adds each row as its `mapping` event arrives, highlights the newest for about a second, and keeps the counts and filters on screen.
+- Unsure means a line in an open question (an open flag's `line_ids`), marked "Needs you" on its row; the Case tile and the Mapping page count only those.
+  Totals are not counted anywhere: they have no platform line by design ("Total, not mapped").
+  A line the Mapper placed without asking, one you approved, and one a policy placed are sure, whatever the confidence.
 - The Log highlights rows that arrive while it is open and has a Conversation view (`/log?view=conversation`).
-- With `DEMO_PACE=1` the paced Mapper holds the gateway lock for about 16 s. Run, Upload, and the reset links stay disabled while an agent works, so no write waits on the lock.
+- With `DEMO_PACE=1` the paced Mapper holds the gateway lock for about 16 s.
+  Run, Upload, and the reset links stay disabled while a job runs, so no write waits on the lock.
+  The console reads whether a job runs from the gateway (`running` on `/case`, and the stream's `run` event), never from the stage, so a deal left mid-run by a restart offers Run again.
   A reset in the second after the Reviewer's hand-off (the run is still finishing) is retried until the gateway takes it.
 
 ## The companion

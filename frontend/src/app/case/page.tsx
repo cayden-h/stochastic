@@ -13,7 +13,7 @@ import { api } from "@/lib/api";
 import { useDeal } from "@/lib/deal-context";
 import { useEdits } from "@/lib/edit-context";
 import { isAdjustmentFlag } from "@/lib/edits";
-import { canStart, fmtX, isBriefStage, learnedPolicies, plural } from "@/lib/format";
+import { canStart, fmtX, isBriefStage, learnedPolicies, mappingCounts, openQuestionLines, plural } from "@/lib/format";
 import { isReadyForApproval } from "@/lib/conversation";
 
 /** A tile in the right column: a label, one figure, one line under it. Each opens its page. */
@@ -95,7 +95,8 @@ export default function CaseScreen() {
   const flaggedIds = new Set(open.flatMap((f) => (Array.isArray(f.payload.line_ids) ? (f.payload.line_ids as string[]) : [])));
   const flaggedNames = new Set(source_lines.filter((l) => flaggedIds.has(l.id)).map((l) => l.line));
 
-  const unsure = liveRows.filter((m) => m.flagged || m.confidence < 0.8).length;
+  // Unsure: a line in an open question. Totals are not counted (they are not mapped by design).
+  const counts = mappingCounts(liveRows, source_lines, openQuestionLines(flags, open_flags));
   const approvalWaiting = verdict?.approval_state === "PROPOSED" && !verdict.posted;
   const showProcess = messages.length > 0 || running;
 
@@ -260,8 +261,8 @@ export default function CaseScreen() {
           <CaseTile
             href="/mapping"
             label="Mapping"
-            value={liveRows.length ? `${liveRows.length} placed` : stage === "mapping" ? "Mapping" : "Not run"}
-            sub={liveRows.length ? `${liveRows.length - unsure} sure · ${unsure} unsure${learnedLines ? ` · ${plural(learnedLines, "line")} learned` : ""}` : briefing ? "Starts after you approve the Brief" : "The Mapper runs first"}
+            value={counts.placed ? `${counts.placed} placed` : stage === "mapping" ? "Mapping" : "Not run"}
+            sub={counts.placed ? `${counts.sure} sure · ${counts.unsure} unsure${learnedLines ? ` · ${plural(learnedLines, "line")} learned` : ""}` : briefing ? "Starts after you approve the Brief" : "The Mapper runs first"}
           >
             {learned > 0 ? <Tag tone="agent">Learned</Tag> : null}
           </CaseTile>

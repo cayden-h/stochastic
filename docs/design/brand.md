@@ -112,7 +112,8 @@ With `prefers-reduced-motion: reduce` (macOS Settings, Accessibility, Display, R
 The desktop app is the real target.
 `desktop/main.js` opens the splash before anything else, as its own window:
 - Frameless and transparent (`frame: false`, `transparent: true`, `backgroundColor: "#00000000"`, `hasShadow: false`), 360 by 420, centered on the screen, not resizable or movable, and on top of other windows while it loads.
-- It loads `desktop/splash.html`, a static page with the SVG and the script inline and the font from `desktop/assets/fonts/`. It makes no network request, so it works offline.
+- It loads `desktop/splash.html`, a static page with the SVG and the script inline and the font from `desktop/assets/fonts/`.
+  It makes no network request, so it works offline.
 
 The launch sequence:
 1. The splash opens and plays.

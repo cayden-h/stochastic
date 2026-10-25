@@ -51,6 +51,9 @@ def create_app() -> FastAPI:
         gateway.forks.clean_leftovers()
     if not store.deals:  # a Postgres store that loaded a ledger keeps it
         seed(store, gateway)
+    stuck = gateway.recover_interrupted_runs()  # no job survives a restart; a deal left mid-run gets Run again
+    if stuck:
+        log.warning("deals left mid-run by the last process, now run_failed: %s", ", ".join(stuck))
     app = FastAPI(title="Stochastic gateway API", version="0.2.0")
     app.add_middleware(BodyLimitMiddleware, max_bytes=MAX_BODY_BYTES)
     # CORS is added last so it is outermost and a 413 still carries CORS headers
@@ -66,13 +69,16 @@ def create_app() -> FastAPI:
         so a second run shows the Mapper applying what the controller taught it. Between judges, use
         keep_memory=false so the next judge sees the flag. Refused while a run is in flight, because the run
         would keep writing into the new deal; the fork slot is freed."""
-        if gateway.running:
-            raise HTTPException(409, "a run is in progress; wait for it to finish, then reset")
-        with gateway.lock:
-            store.reset_deals(keep_memory=keep_memory)
-            seed(store, gateway)
-            if gateway.forks:
-                gateway.forks.reset()
+        # The running check and the reset hold the lock a run's claim takes (routes.claim), so a Run clicked at the
+        # same moment either claims first and the reset is refused, or waits and starts on the new deal.
+        with gateway.running_lock:
+            if gateway.running:
+                raise HTTPException(409, "a run is in progress; wait for it to finish, then reset")
+            with gateway.lock:
+                store.reset_deals(keep_memory=keep_memory)
+                seed(store, gateway)
+                if gateway.forks:
+                    gateway.forks.reset()
         return {"ok": True, "keep_memory": keep_memory, "policies": len(store.policies),
                 "sessions": len(store.sessions)}
 

@@ -72,7 +72,10 @@ interface Agent {
   key: AgentKey; name: string; glow: string;
   m: THREE.Group; pl: THREE.PointLight; baseY: number; baseYaw: number;
   state: AgentState; since: number; hop: number; glowNow: number;
-  label: HTMLDivElement; title: HTMLElement; text: HTMLElement;
+  /** The name pill, in the overlay's top layer, so no bubble ever covers a name. */
+  label: HTMLDivElement;
+  /** The speech bubble, in the layer under the pills. Shown only while the agent talks or asks. */
+  bubble: HTMLDivElement; title: HTMLElement; text: HTMLElement;
   mixer: THREE.AnimationMixer | null; clips: Map<string, THREE.AnimationClip>; current: THREE.AnimationAction | null;
   root: THREE.Object3D | null; rootRestY: number; scale: number;
 }
@@ -418,18 +421,25 @@ export function createHouse(container: HTMLElement, options: HouseOptions = {}):
   let pending = ROOMS.length;
   const overlay = document.createElement("div"); overlay.className = "agent-house-overlay";
   container.appendChild(overlay);
+  // Two layers: every bubble sits under every name pill, whatever the agents' depth or state.
+  const bubbles = document.createElement("div"); bubbles.className = "agent-house-layer agent-house-bubbles";
+  const pills = document.createElement("div"); pills.className = "agent-house-layer agent-house-pills";
+  overlay.append(bubbles, pills);
 
   function agentAt(key: AgentKey, cx: number, y: number, cz: number, size = 1.12) {
     const r = ROOMS.find((x) => x.key === key)!;
     // the 3D model built in Blender (front faces +Z), scaled so its larger side is `size`
     const m = new THREE.Group(); m.position.set(cx, y + 0.66 + size / 2, cz); scene.add(m);
     const pl = new THREE.PointLight(r.glow, 1.6, 2.4, 2); pl.position.set(cx, y + 1.3, cz - 0.6); scene.add(pl);   // behind the agent, so it lights the wall, not the face
-    const label = document.createElement("div"); label.className = "agent-house-label"; label.dataset.state = "idle"; label.style.setProperty("--tint", r.glow);
-    label.innerHTML = `<div class="agent-house-bubble"><b></b><span></span></div><div class="agent-house-pill"><i></i><b>${r.name}</b><em>· ${r.role}</em></div>`;
-    overlay.appendChild(label);
+    const label = document.createElement("div"); label.className = "agent-house-label"; label.dataset.state = "idle"; label.dataset.agent = key; label.style.setProperty("--tint", r.glow);
+    label.innerHTML = `<div class="agent-house-pill"><i></i><b>${r.name}</b><em>· ${r.role}</em><svg class="agent-house-done" viewBox="0 0 12 12" aria-label="done"><path d="M2.5 6.4l2.3 2.3 4.7-5"/></svg></div>`;
+    pills.appendChild(label);
+    const bubble = document.createElement("div"); bubble.className = "agent-house-bubble"; bubble.dataset.state = "idle"; bubble.dataset.agent = key; bubble.style.setProperty("--tint", r.glow);
+    bubble.innerHTML = "<b></b><span></span>";
+    bubbles.appendChild(bubble);
     const a: Agent = {
       key, name: r.name, glow: r.glow, m, pl, baseY: m.position.y, baseYaw: 0, state: "idle", since: 0, hop: 0, glowNow: 1.2,
-      label, title: label.querySelector(".agent-house-bubble b")!, text: label.querySelector(".agent-house-bubble span")!,
+      label, bubble, title: bubble.querySelector("b")!, text: bubble.querySelector("span")!,
       mixer: null, clips: new Map(), current: null, root: null, rootRestY: 0, scale: 1,
     };
     agents.push(a);
@@ -700,6 +710,7 @@ export function createHouse(container: HTMLElement, options: HouseOptions = {}):
     const changed = a.state !== state;
     a.state = state; if (changed) a.since = clock.getElapsedTime();
     a.label.dataset.state = state;
+    a.bubble.dataset.state = state;
     a.title.textContent = state === "talking" && opts.to ? `${a.name.toUpperCase()} · TO ${(NAMES[opts.to] ?? opts.to).toUpperCase()}` : `${a.name.toUpperCase()} · ${state.toUpperCase()}`;
     a.text.textContent = text;
     a.text.title = text;
@@ -772,7 +783,10 @@ export function createHouse(container: HTMLElement, options: HouseOptions = {}):
       head.copy(a.m.position); head.y += 0.82;
       if (a.root) { a.root.getWorldPosition(tmp); head.y += (tmp.y - a.rootRestY) - (a.m.position.y - a.baseY); }
       head.project(camera);
-      a.label.style.transform = `translate(${(head.x + 1) / 2 * W}px, ${(1 - head.y) / 2 * H}px) translate(-50%, -100%)`;
+      const at = `translate(${(head.x + 1) / 2 * W}px, ${(1 - head.y) / 2 * H}px) translate(-50%, -100%)`;
+      a.label.style.transform = at;
+      a.bubble.style.transform = `${at} translateY(calc(-1 * var(--ah-pill-gap)))`; // just above the pill
+
     });
     stepFlights(t);
     composer.render();

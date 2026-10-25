@@ -102,7 +102,7 @@ def test_the_demo_beat_through_http(c):
                if v[0] == m["platform_line"] and v[1] == "income_statement")
     cell = ws.cell(row=row, column=4)
     assert cell.fill.fill_type == "solid" and cell.fill.fgColor.rgb.endswith(AMBER)
-    assert "Line was 6,162.806" in cell.comment.text
+    assert "Line was 6,163" in cell.comment.text
 
 
 def test_undo_restores_the_agents_leverage(c):

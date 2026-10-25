@@ -24,12 +24,19 @@ If it is not in `~/Library/Caches/ms-playwright`, run `npx playwright install ch
 
 ## How it runs
 
-- The config picks three free ports at the start of each run (never 8000 or 3000, which the installed app uses): the backend, the console, and the Mac app's console. `E2E_BACKEND_PORT`, `E2E_CONSOLE_PORT` and `E2E_APP_CONSOLE_PORT` fix them.
-- The console is built for the run's backend port into `frontend/.next-e2e` (`NEXT_DIST_DIR`, about 10 seconds), so `frontend/.next`, which the Mac app serves, is never touched. It is served with `next start`.
-- Every browser test starts its own backend (uvicorn) on a freshly seeded deal and stops it after the test, so no test sees another's state. The backend port is baked into the console build, so the tests run one at a time.
+- The config picks three free ports at the start of each run (never 8000 or 3000, which the installed app uses): the backend, the console, and the Mac app's console.
+  `E2E_BACKEND_PORT`, `E2E_CONSOLE_PORT` and `E2E_APP_CONSOLE_PORT` fix them.
+- The console is built for the run's backend port into `frontend/.next-e2e` (`NEXT_DIST_DIR`, about 10 seconds), so `frontend/.next`, which the Mac app serves, is never touched.
+  It is served with `next start`.
+- Every browser test starts its own backend (uvicorn) on a freshly seeded deal and stops it after the test, so no test sees another's state.
+  The backend port is baked into the console build, so the tests run one at a time.
 - The `fast` project runs the backend with no pacing; the `paced` project runs it with `DEMO_PACE=1`, as on stage.
-- The `electron` project launches `desktop/main.js` through Playwright's Electron driver. The app starts its own backend and console from this checkout, as the packaged app does. `STOCHASTIC_USER_DATA` gives it its own profile, so it runs while the installed Stochastic.app is open. The folder dialog and Finder are stubbed in the main process; the download and the file writes are the app's own.
-- Every wait is on something the screen or the API shows. There are no fixed sleeps.
+- The `electron` project launches `desktop/main.js` through Playwright's Electron driver.
+  The app starts its own backend and console from this checkout, as the packaged app does.
+  `STOCHASTIC_USER_DATA` gives it its own profile, so it runs while the installed Stochastic.app is open.
+  The folder dialog and Finder are stubbed in the main process; the download and the file writes are the app's own.
+- Every wait is on something the screen or the API shows.
+  There are no fixed sleeps.
 
 ## The specs
 
@@ -65,4 +72,5 @@ Everything goes to `e2e/artifacts/` (git-ignored):
 
 - `screenshots/<spec>/<test>/NN-step.png`: one per step; `screenshots/electron/` for the app.
 - `logs/`: each test's backend output.
-- `report/`: the HTML report. `test-results/`: traces, failure screenshots, and the downloaded files.
+- `report/`: the HTML report.
+  `test-results/`: traces, failure screenshots, and the downloaded files.

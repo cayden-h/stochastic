@@ -12,7 +12,7 @@ from collections import OrderedDict
 
 from app.core.models import Brief, Mapping, SourceLine
 from app.tools.edits import (LIABILITIES_AND_EQUITY_TOTALS, active, apply_remap_edits, carry_amount_edits,
-                             remap_moves)
+                             platform_line_for, remap_moves)
 
 THOUSANDS = "USD thousands"
 
@@ -62,9 +62,6 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
     given = {id(m) for m in mappings}
     mappings, remap_ids = apply_remap_edits(mappings, target_lines, platform_lines, edits)
     remapped = {m.target_line_id for m in mappings if id(m) not in given}  # the copies a remap made
-    platform_section = {}
-    for p in platform_lines:
-        platform_section.setdefault(p.line.strip().lower(), p.section)
     by_id = {line.id: line for line in target_lines}
     seen: dict[str, Mapping] = {}
     for m in mappings:  # one target line may land in one place only, or it would be counted twice
@@ -99,7 +96,8 @@ def consolidate(platform_lines: list[SourceLine], target_lines: list[SourceLine]
             continue
         section = t.section
         if t.id in remapped:  # a remap may move the line across sections; it lands where the platform line is
-            section = platform_section.get(m.platform_line.strip().lower(), t.section)
+            landing = platform_line_for(platform_lines, m.platform_line, t.section, m.platform_line_id)
+            section = landing.section if landing else t.section
         k = _key(section, m.platform_line)
         row = platform_rows.get(k)
         if row is None:

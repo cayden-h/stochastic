@@ -66,6 +66,13 @@ export function canStart(stage: Stage): boolean {
   return stage === "new" || stage === "run_failed";
 }
 
+/** A run is in flight: this page just asked for one, or the gateway says a job is running for the deal now.
+ * Read from the gateway's `running`, never from the stage: after a restart a deal can be loaded at a working stage
+ * with no job behind it, and inferring from the stage then kept Run and Reset disabled for good. */
+export function runInFlight(starting: boolean, kase: { running?: boolean } | null): boolean {
+  return starting || Boolean(kase?.running);
+}
+
 /** The stage in the controller's words, and whether it waits on them. */
 export function stageWords(stage: Stage): { text: string; tone: "you" | "work" | "done" | "bad" | "idle" } {
   switch (stage) {
@@ -96,6 +103,28 @@ export function isLearned(m: Mapping): boolean {
 
 export function isLearnedTag(l: SourceLine): boolean {
   return Boolean(l.covenant_policy_id);
+}
+
+/** The lines an open question is about (an open flag item's `line_ids`). Answered flags are not open. */
+export function openQuestionLines(flags: Pick<WorkItem, "id" | "state" | "payload">[], openIds?: string[]): Set<string> {
+  const open = flags.filter((f) => (openIds ? openIds.includes(f.id) : f.state === "NEEDS_INFO"));
+  return new Set(open.flatMap((f) => (Array.isArray(f.payload.line_ids) ? (f.payload.line_ids as string[]) : [])));
+}
+
+/** Unsure: the line is in an open question, so it waits on the controller. A line the Mapper accepted without a
+ * question, one the controller approved, and one a policy placed are not unsure, whatever the confidence. */
+export function isUnsure(m: Pick<Mapping, "target_line_id">, asking: Set<string>): boolean {
+  return asking.has(m.target_line_id);
+}
+
+/** The Mapping counts the Case tile and the Mapping page show. Totals are left out everywhere: they have no platform
+ * line by design ("Total, not mapped"), so they are neither placed, sure, nor unsure. */
+export function mappingCounts(mappings: Pick<Mapping, "target_line_id">[], lines: Pick<SourceLine, "id" | "is_total">[],
+  asking: Set<string>): { placed: number; sure: number; unsure: number; totals: number } {
+  const total = new Set(lines.filter((l) => l.is_total).map((l) => l.id));
+  const rows = mappings.filter((m) => !total.has(m.target_line_id));
+  const unsure = rows.filter((m) => isUnsure(m, asking)).length;
+  return { placed: rows.length, sure: rows.length - unsure, unsure, totals: mappings.length - rows.length };
 }
 
 /** The distinct policies applied to this deal's lines: one controller answer can settle several lines. */

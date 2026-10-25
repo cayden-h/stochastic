@@ -8,6 +8,7 @@ Owner: Tri (backend/app/api/).
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
 
 from openpyxl import Workbook
@@ -18,6 +19,9 @@ from app.api import certificate as cert_doc
 from app.tools.edits import _line_matches, apply_remap_edits
 
 AMBER = "FBEBC8"
+# Whole thousands with separators, negatives in parentheses: how the console shows a figure. A display format only;
+# the cell keeps the tool's value.
+THOUSANDS = "#,##0;(#,##0)"
 XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 EDITS_HEADER = ["Line", "Company", "Agent value", "Final value", "Reason", "Who", "When", "Policy id"]
 AUDIT_HEADER = ["Figure", "Value", "Run id", "Tool"]
@@ -45,13 +49,19 @@ def export_filename(platform: str, target: str) -> str:
     return "".join(c if c.isascii() and c.isprintable() and c not in '"\\' else " " for c in name)
 
 
+def whole(x: float) -> str:
+    """A figure as the cells show it: whole thousands with separators, half up, a negative in parentheses."""
+    v = int(Decimal(str(x)).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    return f"({-v:,})" if v < 0 else f"{v:,}"
+
+
 def edit_note(edit) -> str:
     """The Excel note on an edited cell. For an amount edit the old figure is the edited line's value."""
     old, _ = cert_doc.edit_values(edit)
     if getattr(edit, "kind", None) == "remap":
         was = f"Line was mapped to {old or 'n/a'}"
     else:
-        num = cert_doc.fmt(old) if isinstance(old, (int, float)) and not isinstance(old, bool) else (old or "n/a")
+        num = whole(old) if isinstance(old, (int, float)) and not isinstance(old, bool) else (old or "n/a")
         was = f"Line was {num}"
     text = (f"Edited by {getattr(edit, 'actor', None) or 'unknown'}, {_when(getattr(edit, 'at', None))}. "
             f"{was}. Reason: {cert_doc.edit_reason(edit)}.")
@@ -122,6 +132,8 @@ def build_workbook(store, deal, result, items, chain_valid: bool, edits=None) ->
     ws.append(["Line", "Section", deal.platform, deal.target, "Combined", "Run id"])
     for r in result.rows:
         ws.append([r.line, r.section, r.platform, r.target, r.combined, r.run_id])
+        for cell in ws[ws.max_row][2:5]:
+            cell.number_format = THOUSANDS
     ws.cell(row=1, column=4).comment = Comment(TARGET_EDIT_NOTE, "Stochastic")
     fill = PatternFill("solid", fgColor=AMBER)
     for (i, col), e in _edited_cells(store, deal, result.rows, edits).items():
@@ -136,6 +148,9 @@ def build_workbook(store, deal, result, items, chain_valid: bool, edits=None) ->
         old, new = cert_doc.edit_values(e)
         we.append([getattr(e, "line", None), getattr(e, "company", None), old, new, cert_doc.edit_reason(e),
                    getattr(e, "actor", None), _when(getattr(e, "at", None)), getattr(e, "policy_id", None)])
+        for cell in we[we.max_row][2:4]:  # an amount edit's agent and final values; a remap's are line names
+            if isinstance(cell.value, (int, float)) and not isinstance(cell.value, bool):
+                cell.number_format = THOUSANDS
     _bold(we)
 
     wa = wb.create_sheet("Audit")

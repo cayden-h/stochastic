@@ -3,16 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useEdits } from "@/lib/edit-context";
 import { anchorKey, effectivePlatformLine } from "@/lib/edits";
-import { isLearned, isLearnedTag, pct } from "@/lib/format";
+import { isLearned, isLearnedTag, isUnsure, pct } from "@/lib/format";
 import type { Edit, Mapping, SourceLine } from "@/lib/types";
 import { Card, Label, Mono, Shape, Tag } from "./ui";
 
 export type MappingFilter = "all" | "unsure" | "policy" | "edited";
-
-/** Unsure: in a mapping question, or below 0.80 confidence. */
-export function isUnsure(m: Mapping): boolean {
-  return m.flagged || m.confidence < 0.8;
-}
 
 const FIRST = 10;
 
@@ -52,9 +47,11 @@ function Remapped({ edit }: { edit: Edit }) {
  * so the edit's new line is shown over it.
  */
 export function Mappings({
-  mappings, lines, filter, received = {}, live = false,
+  mappings, lines, filter, asking, received = {}, live = false,
 }: {
   mappings: Mapping[]; lines: SourceLine[]; filter: MappingFilter;
+  /** The lines an open question is about (openQuestionLines): those rows are unsure and wait on the controller. */
+  asking: Set<string>;
   /** When each mapping arrived on the stream, in ms: rows that arrive while the page is open fade in. */
   received?: Record<string, number>;
   /** The Mapper is storing mappings now: every row shows, and the page follows the newest one. */
@@ -88,7 +85,7 @@ export function Mappings({
     if (live && newest && following.current) newestRef.current?.scrollIntoView({ block: "nearest" });
   }, [live, newest]);
   const byId = new Map(lines.map((l) => [l.id, l]));
-  const rows = filter === "unsure" ? mappings.filter(isUnsure)
+  const rows = filter === "unsure" ? mappings.filter((m) => isUnsure(m, asking))
     : filter === "policy" ? mappings.filter(isLearned)
     : filter === "edited" ? mappings.filter((m) => editOf(byId.get(m.target_line_id), edits))
     : mappings;
@@ -103,8 +100,10 @@ export function Mappings({
           <Label className="w-[130px] shrink-0">Confidence</Label>
         </div>
         {shown.map((m) => {
-          const unsure = isUnsure(m);
+          const unsure = isUnsure(m, asking);
           const line = byId.get(m.target_line_id);
+          const total = line?.is_total ?? false;
+          // A low confidence the Mapper did not ask about is shown plainly, not in the green of a sure line.
           const remap = editOf(line, edits, "remap");
           const amount = editOf(line, edits, "amount");
           const now = effectivePlatformLine(m, line, edits);
@@ -126,9 +125,10 @@ export function Mappings({
                   : <span className="truncate">{now ?? (unsure ? "?" : "Total, not mapped")}</span>}
                 {isLearned(m) && !remap ? <Tag tone="agent">Learned</Tag> : null}
                 {m.approved_by && !remap ? <Mono>by you</Mono> : null}
+                {unsure && !remap ? <Tag tone="escalation">Needs you</Tag> : null}
               </span>
-              <span className={`w-[130px] shrink-0 font-ui font-semibold ${remap ? "text-slate" : unsure ? "text-escalation" : "text-clear"}`}>
-                {remap ? "Your edit" : pct(m.confidence)}
+              <span className={`w-[130px] shrink-0 font-ui font-semibold ${remap || total ? "text-slate" : unsure ? "text-escalation" : m.confidence < 0.8 ? "text-slate" : "text-clear"}`}>
+                {remap ? "Your edit" : total ? "Total" : pct(m.confidence)}
               </span>
             </div>
           );
@@ -146,7 +146,7 @@ export function Mappings({
         {!shown.length && !learnedTags.length ? (
           <p className="px-[20px] py-[14px] text-[14px] text-slate">
             {filter === "policy" ? "No line was settled by an earlier answer yet."
-              : filter === "unsure" ? "The Mapper was sure of every line."
+              : filter === "unsure" ? "No line waits on you. The Mapper placed every line or you answered its question."
               : filter === "edited" ? "No line was edited. Remap a line or change an amount on the Review page."
               : live ? "The Mapper is reading the lines. They appear here as the gateway stores them." : "The Mapper has not run."}
           </p>

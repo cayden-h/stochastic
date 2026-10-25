@@ -90,7 +90,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 
 | Method and path | Who | Purpose |
 | --- | --- | --- |
-| `GET /health` | any | `ok`, `chain_valid`, and the backend status (typed response) |
+| `GET /health` | any | `ok`, `chain_valid`, the backend status, and `running` (a job is running for some deal in this process) (typed response) |
 | `GET /deals` | any | List deals |
 | `GET /deals/{id}` | any | One deal, with its brief |
 | `GET /deals/{id}/case` | any | The whole screen in one read (shape below; response model `CaseResponse`, visible at `/docs`) |
@@ -98,7 +98,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /deals/{id}/mappings` | any | Mappings with confidence, reason, flagged, approved_by |
 | `GET /deals/{id}/result` | any | The latest result (404 before the Preparer ran) |
 | `GET /deals/{id}/certificate?format=md\|html\|json` | any | Draft compliance certificate from the approved, posted result (default `md`). Every figure is followed by the id of the tool run that produced it. 409 until the approve_result item is POSTED and the deal stage is `posted`. The `json` dict has `header`, `test_period`, `ebitda`, `debt`, `leverage`, `limit_test`, `tie_out`, `decisions`, `edits`, `approval`, `mappings`; each figure block carries `run_id`, and its keys are the tool's own output keys. `edits` lists each active controller edit (`id`, `kind`, `company`, `line`, `old`, `new`, `reason`, `actor`, `at`, `policy_id`), shown in the section "Edits in review" ("None." when there are none). It is a draft, not signed. |
-| `GET /deals/{id}/export.xlsx` | any | The final workbook, behind the same 409 gate as the certificate (shared helper; detail "final files are available after the controller approves the result"). Sheets: Combined (the result rows, numbers as numbers, with each row's run id; a cell a controller edited has an amber fill and a note with who, when, the old value, the reason, and the policy), Edits (one row per active edit), Audit (Figure, Value, Run id, Tool for EBITDA, debt, leverage, the limit test, the tie-out, and each combined row, then the audit summary, the backend, and "Draft. Not signed."). Figures are read from the same tool runs as the certificate. Served as `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` with `Content-Disposition: attachment; filename="<platform> + <target> combined books.xlsx"` (ASCII only). |
+| `GET /deals/{id}/export.xlsx` | any | The final workbook, behind the same 409 gate as the certificate (shared helper; detail "final files are available after the controller approves the result"). Sheets: Combined (the result rows, numbers as numbers, with each row's run id; a cell a controller edited has an amber fill and a note with who, when, the old value in whole thousands as the console shows it ("Line was 6,163"), the reason, and the policy; the figures display as whole thousands with separators, negatives in parentheses, and keep the tool's value), Edits (one row per active edit, amounts in the same display format), Audit (Figure, Value, Run id, Tool for EBITDA, debt, leverage, the limit test, the tie-out, and each combined row, then the audit summary, the backend, and "Draft. Not signed."). Figures are read from the same tool runs as the certificate. Served as `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` with `Content-Disposition: attachment; filename="<platform> + <target> combined books.xlsx"` (ASCII only). |
 | `GET /deals/{id}/work-items?state=&type=` | any | Work items |
 | `GET /deals/{id}/audit` | any | Audit rows for the deal and `chain_valid` |
 | `GET /deals/{id}/timeline?bucket=60` | any | Audit rows counted per time bucket, actor, and action family (the action before the colon). Returns `{"deal_id", "bucket_seconds", "source", "buckets": [{"start", "actor", "kind", "rows", "denied"}]}`, sorted by start, actor, kind. `bucket` is whole seconds, 1 to 86400 (422 otherwise); 404 for an unknown deal. On the Postgres store `source` is `time_bucket` (TimescaleDB `time_bucket` on the written audit log of the current ledger); on the memory store, or after a database error (with the fixed `error` text "timeline query failed; see the server log", the detail only in the server log), it is `memory`. Both floor to the TimescaleDB origin 2000-01-03 00:00 UTC, so they give the same buckets. Counts only, no deal figures. |
@@ -106,7 +106,7 @@ Each role has an `AgentSession` (backend, session id, turns, a short transcript)
 | `GET /runs/{run_id}` | any | One tool run: tool, inputs, outputs |
 | `GET /agents/memory` | any | Policies and sessions |
 | `GET /deals/{id}/conversation` | any | The deal's whole conversation in order: what the agents, the gateway, and the controller told each other (shape in "Live events" below). The same messages the stream sends as `conversation` events, for a page opened late or after a restart. 404 for an unknown deal. |
-| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, `stage`, `edit`, `conversation`, and `mapping` events (shapes below) |
+| `GET /deals/{id}/stream` | any | Server-Sent Events: audit rows as they are written, `stage`, `run`, `edit`, `conversation`, and `mapping` events (shapes below) |
 | `POST /deals` | human | Create a deal from an upload. Multipart form with `name`, `platform`, `target`, files `platform_csv` and `target_csv`, and exactly one of `brief` (a JSON string of the Brief; the reader is skipped) or `agreement_txt` (the credit agreement as a UTF-8 `.txt` file, same 2 MB limit; the deal starts with `brief_status` `none` and the run starts with the Brief Reader, unless an approved Brief for the same agreement hash is reused). Returns 201 with `{"deal_id", "stage", "lines": {"platform": n, "target": n}, "brief_status"}`. 422 when neither or both of `brief` and `agreement_txt` are sent, for an empty or non-UTF-8 agreement or a name not ending in `.txt`, and naming the file, row, and column for a bad CSV. Limits: 2 MB and 2,000 rows per file. The columns are in [`data/README.md`](../../data/README.md). |
 | `POST /deals/{id}/brief/amounts` | `human:controller` only | Set fields of the draft Brief (D20), most often an adjustment amount from the books with its source. Any draft field can be set by its path (the limit, the lender, the definitions, `debt_excludes[k]`, an adjustment's name, amount, or cap); only an amount needs a `source_ref`. Body `{"amounts": [{"field": "ebitda_addbacks[2].amount", "value": 698.0, "source_ref": "...", "inferred": false, "note": ""}]}` (a new adjustment is added by its `.name` at the next index). Every entry is checked first (path, index, type, source); a bad entry refuses the whole list with 422 naming `amounts[i]`, nothing applied, and a DENIED row. The entries are then applied in order through `gateway.amend_brief` under the gateway lock. The gateway cannot roll back: if it still refuses entry i, the 422 names `amounts[i]` and lists the earlier entries, which stay applied. Returns `{"brief", "brief_draft", "brief_status", "stage"}` (response model `BriefAmountsResponse`). 404 unknown deal; 422 for an empty list, a field path that is not `name[i].attr`, or a `value` that is a boolean, non-finite, too big for a float, 1e12 or more in size, or a number sent as text for an amount, a cap, or the limit (loc `amounts[i].value`, the message names the field path); 403 with a DENIED row for any actor but `human:controller` (an agent, `human:intern`), before any write; 409 when there is no draft or the Brief is approved. |
 | `POST /deals/{id}/brief/approve` | `human:controller` only | Approve the draft Brief through `gateway.approve_brief`; it is locked and the deal is back at stage `new`. The run does not continue by itself: the console calls `POST /deals/{id}/run` next. Returns the deal (response model `Deal`, `brief_status` `approved`, `stage` `new`). 404 unknown deal; 403 with a DENIED row for any actor but `human:controller`, or while a `brief_field` flag is open; 409 when there is no draft (a second approve, or a deal whose Brief came as JSON). |
@@ -363,6 +363,10 @@ tie_out(rows, tolerance=0.5)  # unchanged: no edits
   For example, Nu Aire's Research and Development (532) moved from Operating expenses to Cost of products sold lowers the target's Gross profit from 23,682 to 23,150 and leaves Operating profit, EBITDA, and leverage unchanged.
   On the balance sheet, a line feeds the first total after it, the later totals that nest that total (by name), and its side's total, so a remap from an asset onto a liability fails the tie-out.
   `consolidate` lists each moved subtotal under `remap_rollup` as `{edit_id, line, section, delta}`.
+  `remap_rollup` is a key the v3 edits added to the `consolidate` output; it is an empty list when no remap moved a subtotal.
+  The replay recordings hold the agents' typed outputs only, and the Preparer and the Reviewer re-run their tools on replay, so the new key needed no re-pin (checked 2026-10-24 with a replay run to 0.76x).
+  The pinned Mapper recording's input key already differed from the fixture's on origin/main; it replays all the same, and re-pinning it needs a live model.
+  A remapped line lands on the platform line the mapping's `platform_line_id` names, else the line of that name in the target line's section, else the first of that name (`platform_line_for` in `backend/app/tools/edits.py`), so a platform name used in two statements is never confused.
 - Each of the three tools returns `edits_applied: list[str]`, the ids of the edits it used.
   The gateway refuses the recompute (a DENIED `edit:apply` or `edit:revert` row) if the key is missing, names an edit it was not given, repeats an id, or, for `consolidate`, leaves out any live edit.
 The old approval item becomes `SUPERSEDED` (a new `State`) and stays in the log.
@@ -442,7 +446,7 @@ The scripted reader returns the fixture Brief with the verbatim quotes in `data/
 
 ## The stream
 
-`GET /deals/{id}/stream` sends five kinds of event: `audit`, `stage`, `edit`, `conversation`, and `mapping`.
+`GET /deals/{id}/stream` sends six kinds of event: `audit`, `stage`, `run`, `edit`, `conversation`, and `mapping`.
 It looks for new events every quarter second.
 On connect it sends everything the deal has so far (every audit row, the whole conversation, every stored mapping), then only what is new.
 Audit events are unchanged.
@@ -455,6 +459,17 @@ data: {"deal_id": "d_kequ_nuaire", "stage": "awaiting_flag", "open_flags": ["wi_
 
 `brief_status` is the deal's (`none`, `draft`, or `approved`).
 Every change of it in the gateway comes with a stage change, so it has no event of its own (verified by `test_the_stage_event_carries_brief_status` and a read of every `brief_status` write in `gateway.py`).
+
+A `run` event is sent once on connect and again whenever a job for the deal starts or stops.
+The job runner ends about a second after the Reviewer's hand-off, with no stage change, so the console needs this event to enable Run and Reset again:
+
+```
+event: run
+data: {"running": false}
+```
+
+`/case` has the same flag as `running`.
+The console reads it, never the stage, to tell whether a job is running.
 
 An `edit` event is sent whenever the deal's edits change (an edit applied, reasoned, or reverted), with every edit's id and status in order; nothing is sent on connect while the deal has no edits:
 
@@ -541,6 +556,9 @@ The waits are never inside the gateway's checks, a live model backend (`droid`, 
 `new` (loaded), `reading_brief`, `awaiting_brief`, `brief_ready`, `awaiting_flag`, `flags_answered`, `mapped`, `awaiting_review`, `needs_attention`, `awaiting_approval`, `posted`, and `run_failed`.
 A deal from agreement text goes `reading_brief`, `awaiting_brief` (open Brief flags), `brief_ready` (all answered), then back to `new` on approval, and maps from there.
 A run that stops on an error is `run_failed`, on the sync route as well as in the background, with one `run:failed` row.
+Jobs live in the API process, so none survives a restart.
+On start, a deal the store loaded at a working stage (`reading_brief`, `mapping`, `mapped`, `flags_answered`, `preparing`, or `awaiting_review`) is moved to `run_failed`, with a `run:failed` row whose reason is "the app restarted mid-run" and a message to the controller, so Run again picks up where it stopped (`Gateway.recover_interrupted_runs`).
+`/dev/reset` checks for a running job and resets under the lock a run's claim takes, so a Run and a reset never interleave.
 After an edit, the stage is `awaiting_approval` or `needs_attention` again, from the recompute's checks.
 
 ## Errors

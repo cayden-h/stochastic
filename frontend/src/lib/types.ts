@@ -95,6 +95,8 @@ export interface LastRun { role: string; backend: Backend; attempts: Attempt[]; 
 export interface BackendStatus { configured: Backend; fallback: string; anthropic_key: boolean; factory_key: boolean; last_runs: LastRun[] }
 
 export interface Case {
+  /** A job is running for this deal in the gateway's process now (not inferred from the stage). */
+  running?: boolean;
   deal: Deal; stage: Stage; source_lines: SourceLine[]; mappings: Mapping[]; flags: WorkItem[]; open_flags: string[];
   result: Result | null; verdict: Verdict | null; work_items: WorkItem[]; policies: Policy[]; sessions: unknown[];
   audit: { rows: number; chain_valid: boolean; denied: number }; backend: BackendStatus;
@@ -142,7 +144,7 @@ export interface StoreStatus {
   kind: "memory" | "postgres"; fallback_reason: string | null;
   host?: string; schema?: string; ledger?: number; pending?: number; last_error?: string | null; last_write_at?: string | null;
 }
-export interface Health { ok: boolean; chain_valid: boolean; backend: BackendStatus; store: StoreStatus }
+export interface Health { ok: boolean; chain_valid: boolean; backend: BackendStatus; store: StoreStatus; running?: boolean }
 
 export interface AuditRow {
   id: number; at: string; deal_id: string; actor: string; action: string; target: string | null;

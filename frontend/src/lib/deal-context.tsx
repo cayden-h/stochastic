@@ -7,7 +7,7 @@ import {
   agentStates as readAgentStates, conversationReducer, emptyConversation, emptyMappings, mappingReducer, mergeMappings,
   nextTalkEnd,
 } from "./conversation";
-import { canStart } from "./format";
+import { canStart, runInFlight } from "./format";
 import type { AuditResponse, Case, Deal, Health, Mapping, Stage } from "./types";
 
 interface DealData {
@@ -44,12 +44,9 @@ interface DealData {
   starting: boolean;
   /** POST /dev/reset, then clear the live conversation and mappings and read the case again. */
   reset: (keepMemory: boolean) => Promise<void>;
-  /** A run is in flight: starting, or an agent is at work and nothing waits on the controller. Writes wait for it. */
+  /** A run is in flight: starting, or the gateway says a job runs for the deal (`running` on /case). Writes wait for it. */
   running: boolean;
 }
-
-/** The stages where an agent is at work and the gateway may hold its lock (a paced Mapper holds it about 16 s). */
-const RUNNING: Stage[] = ["reading_brief", "mapping", "mapped", "flags_answered", "preparing", "awaiting_review"];
 
 /** The gateway answered but holds no deal: a different screen from the gateway being down. */
 class NoDeal extends Error {
@@ -157,6 +154,8 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
       bump();
     });
     es.addEventListener("audit", bump);
+    // A job started or stopped: the runner ends about a second after the Reviewer's hand-off, with no stage change.
+    es.addEventListener("run", bump);
     // An edit, a reason, or an undo made elsewhere (another window, the API): read the case again.
     es.addEventListener("edit", bump);
     es.addEventListener("conversation", (e) => {
@@ -226,7 +225,7 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
   );
   const caseMappings = kase?.mappings;
   const mappings = useMemo(() => mergeMappings(caseMappings ?? [], liveMappings), [caseMappings, liveMappings]);
-  const running = starting || (kase ? RUNNING.includes(kase.stage) : false);
+  const running = runInFlight(starting, kase);
 
   return (
     <Ctx.Provider value={{
