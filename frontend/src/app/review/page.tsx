@@ -272,8 +272,20 @@ export default function ReviewScreen() {
           <div className="flex w-full flex-col">
             {laid.rows.map(({ n, row }) => {
               if (row.kind === "head") return <HeaderRow key="head" n={n} platform={deal.platform} target={deal.target} />;
+              if (row.kind === "section" && row.key === "covenant") {
+                // The covenant test (Covenant EBITDA, Senior Funded Bank Debt, Leverage) is pinned to the bottom of the
+                // sheet, over the verdict strip, as in frame V3-7.3: the leverage an edit moves is always on screen at
+                // 1440x900. It keeps its place and row numbers under the income statement, and scrolls on from there.
+                const block = laid.rows.filter((r) => r.row.kind === "covenant");
+                return (
+                  <div key="covenant" className="sticky bottom-0 z-[5] bg-white shadow-[0_-1px_0_var(--color-sheet-line)]" data-covenant-block="">
+                    <SectionTitleRow n={n} title={row.title} />
+                    {block.map((r) => r.row.kind === "covenant" ? <CovenantSheetRow key={r.row.key} n={r.n} row={r.row} /> : null)}
+                  </div>
+                );
+              }
               if (row.kind === "section") return <SectionTitleRow key={row.key} n={n} title={row.title} />;
-              if (row.kind === "covenant") return <CovenantSheetRow key={row.key} n={n} row={row} />;
+              if (row.kind === "covenant") return null; // drawn in the pinned block above
               if (row.kind === "sub") return <SubSheetRow key={row.key} n={n} row={row} editable={editable} platform={deal.platform} options={options(row.line.section)} h={h} />;
               return (
                 <LineSheetRow

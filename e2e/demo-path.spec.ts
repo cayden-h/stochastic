@@ -17,7 +17,8 @@ interface CaseLines {
 }
 
 /** How many mapped (non-total) lines are in an open question: the console's "unsure". */
-function openQuestionMappings(c: CaseLines): number {
+function openQuestionMappings(kase: Record<string, unknown>): number {
+  const c = kase as unknown as CaseLines;
   const lines = new Set(c.flags.filter((f) => c.open_flags.includes(f.id)).flatMap((f) => f.payload.line_ids ?? []));
   const totals = new Set(c.source_lines.filter((l) => l.is_total).map((l) => l.id));
   return c.mappings.filter((m) => lines.has(m.target_line_id) && !totals.has(m.target_line_id)).length;
@@ -130,6 +131,12 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
   await page.getByRole("link", { name: "Review the books" }).click();
   await expect(page).toHaveURL(/\/review$/);
   await expect(reviewVerdict(page)).toHaveText("0.76× of 2.50×");
+  // The covenant test is on screen at 1440x900 without scrolling: pinned at the bottom of the sheet (V3-7.3).
+  const covenant = page.locator("[data-covenant-block]");
+  for (const label of ["Covenant EBITDA", "Senior Funded Bank Debt", /^Leverage, limit 2\.50×$/]) {
+    await expect(covenant.getByText(label)).toBeInViewport({ ratio: 1 });
+  }
+  expect(await page.locator("[data-sheet]").evaluate((el) => el.scrollTop)).toBe(0);
   await shot("review-open");
 
   // Edit Nu Aire's General and Administrative, 6,163 -> 5,663: the verdict reads 0.75x.
@@ -144,6 +151,7 @@ test("the demo path: run, answer, review, edit with a reason, approve, download"
     const c = await centre(cell), m = await centre(companion(page));
     return Math.hypot(c.x - m.x, c.y - m.y);
   }).toBeLessThan(260);
+  await expect(covenant.getByText(/^Leverage, limit 2\.50×$/)).toBeInViewport({ ratio: 1 });
   await shot("review-asking");
 
   // Press 1, then Enter: the learned note, Edits 1.
