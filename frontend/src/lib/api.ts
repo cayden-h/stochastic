@@ -84,7 +84,8 @@ export const api = {
   reject: (itemId: string, reason: string) => post<WorkItem>(`/work-items/${itemId}/reject`, { reason }),
   createDeal,
   /** keepMemory=false clears the learned policies and sessions, so the next judge sees the flag again. */
-  reset: (keepMemory = true) => post<{ ok: boolean }>(`/dev/reset?keep_memory=${keepMemory}`),
+  // It reseeds the live demo deal only; `kept_deals` names the deals it left alone (the Dashboard's other cases).
+  reset: (keepMemory = true) => post<{ ok: boolean; kept_deals?: string[] }>(`/dev/reset?keep_memory=${keepMemory}`),
   // Review edits (D19, Tri's T2): change an amount or remap a line, give the reason, undo.
   edit: (dealId: string, body: EditBody) => post<EditResponse>(`/deals/${dealId}/edits`, body),
   reason: (editId: string, reason: { chip: number } | { text: string }, remember: boolean) =>

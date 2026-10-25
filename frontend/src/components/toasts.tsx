@@ -73,7 +73,7 @@ function LearnedToast({ note, more, onClose }: { note: LearnedNotice; more: numb
           <Tag tone="agent">Learned</Tag>
           {more ? <span className="font-mono text-[12px] text-slate">+{more} more {more === 1 ? "policy" : "policies"}</span> : null}
         </span>
-        <p className="text-[14px] leading-[19px] text-forest">{learnedSentence(note)}</p>
+        <p className="line-clamp-3 text-[14px] leading-[19px] text-forest" title={learnedSentence(note)}>{learnedSentence(note)}</p>
       </div>
       <button type="button" onClick={onClose} aria-label="Close" className="-mt-[2px] -mr-[2px] flex size-[24px] shrink-0 items-center justify-center rounded-[6px] text-slate hover:bg-mint-select">
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>

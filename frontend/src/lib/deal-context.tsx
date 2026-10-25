@@ -273,12 +273,13 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [starting]);
 
-  const reset = useCallback(async (keepMemory: boolean) => {
+  const resetOnce = useCallback(async (keepMemory: boolean) => {
     // The job runner finishes about a second after the Reviewer's hand-off (the paced wait after a stored result), and
     // the gateway refuses a reset until then (409). A reset clicked in that second waits for it instead of failing.
+    let res: Awaited<ReturnType<typeof api.reset>>;
     for (let attempt = 0; ; attempt++) {
       try {
-        await api.reset(keepMemory);
+        res = await api.reset(keepMemory);
         break;
       } catch (e) {
         if (attempt >= 8 || !(e instanceof Error) || !/run is in progress/i.test(e.message)) throw e;
@@ -288,16 +289,23 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
     dispatchConversation({ type: "reset" });
     dispatchMapping({ type: "reset" });
     setNotices([]); setLearned([]); setDeciding(null);
+    return res;
+  }, []);
+
+  const reset = useCallback(async (keepMemory: boolean) => {
+    await resetOnce(keepMemory);
     await refresh();
-  }, [refresh]);
+  }, [refresh, resetOnce]);
 
   const runDemo = useCallback(async () => {
     setStarting(true);
     try {
-      await reset(false);
-      // The demo deal is the one read from the public filings; the sample cases are for clicking through.
+      const { kept_deals: kept = [] } = await resetOnce(false);
+      // The demo deal is the one the reset reseeded: every deal but the ones it kept. A gateway that does not say
+      // which it kept has one deal from the filings, the demo deal.
       const list = await api.deals();
-      const demo = list.find((d) => d.data_source === "filings") ?? list[0];
+      const demo = (kept.length ? list.find((d) => !kept.includes(d.id)) : undefined)
+        ?? list.find((d) => d.data_source === "filings") ?? list[0];
       if (!demo) throw new Error("The gateway has no deal to run.");
       dealId.current = demo.id;
       writePicked(demo.id);
@@ -307,7 +315,7 @@ export function DealProvider({ children }: { children: React.ReactNode }) {
       throw e;
     }
     void refresh();
-  }, [refresh, reset]);
+  }, [refresh, resetOnce]);
 
   // Messages and mappings are shown only for the deal they belong to, so a deal switch never shows the last one's.
   const messages = useMemo(() => (conversation.deal === id ? conversation.messages : []), [conversation, id]);

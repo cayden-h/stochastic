@@ -75,7 +75,7 @@ export function FlagCard({
       tabIndex={-1}
       data-flag={item.id}
       aria-label={`${kind}: ${heading}`}
-      className="flex w-full flex-col gap-[14px] rounded-card border border-amber-line bg-white p-[20px] outline-none focus-visible:shadow-[0_0_0_3px_var(--color-amber-line)]"
+      className="flex w-full scroll-mt-[20px] flex-col gap-[14px] rounded-card border border-amber-line bg-white p-[20px] outline-none focus-visible:shadow-[0_0_0_3px_var(--color-amber-line)]"
     >
       {banner}
       <div className="flex w-full items-center gap-[10px] whitespace-nowrap">
